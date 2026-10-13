@@ -1,0 +1,10 @@
+**/node_modules/
+**/.controlroom/
+**/dist/
+**/dist-electron/
+**/release/
+**/.runtime/
+**/*.log
+**/*.dpapi
+.env
+.env.*

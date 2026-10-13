@@ -1,0 +1,85 @@
+/* Design tokens. Fonts are system fonts only; nothing is loaded from the network. */
+:root {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --sidebar-w: 236px;
+
+  --bg: #0b0d10;
+  --bg-2: #101318;
+  --panel: rgba(21, 25, 31, 0.88);
+  --panel-solid: #151920;
+  --raised: #1c212a;
+  --sunken: #090b0e;
+  --line: #262c35;
+  --line-strong: #38414e;
+  --text: #e8ebf0;
+  --text-2: #b5bdc9;
+  --muted: #8591a1;
+  --accent: #5eaaff;
+  --accent-ink: #051528;
+  --accent-soft: rgba(94, 170, 255, 0.14);
+  --amber: #f2b441;
+  --amber-soft: rgba(242, 180, 65, 0.14);
+  --ok: #5fd3a2;
+  --ok-soft: rgba(95, 211, 162, 0.13);
+  --warn: #f2b441;
+  --danger: #ff7272;
+  --danger-soft: rgba(255, 114, 114, 0.13);
+  --focus: #8cc4ff;
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
+  --scene-opacity: 0.5;
+  color-scheme: dark;
+}
+
+:root[data-theme="nebula"] {
+  --bg: #0c0b17;
+  --bg-2: #11101f;
+  --panel: rgba(25, 23, 44, 0.88);
+  --panel-solid: #191730;
+  --raised: #221f3c;
+  --sunken: #090814;
+  --line: #2b2848;
+  --line-strong: #403b66;
+  --text: #ebe9f7;
+  --text-2: #bcb8d6;
+  --muted: #8f8bb0;
+  --accent: #8fa2ff;
+  --accent-ink: #0b0d2e;
+  --accent-soft: rgba(143, 162, 255, 0.15);
+  --amber: #f4b56a;
+  --amber-soft: rgba(244, 181, 106, 0.14);
+  --focus: #b0bcff;
+}
+
+:root[data-theme="paper"] {
+  --bg: #eceff2;
+  --bg-2: #e4e8ec;
+  --panel: rgba(255, 255, 255, 0.92);
+  --panel-solid: #ffffff;
+  --raised: #f3f5f8;
+  --sunken: #e9edf1;
+  --line: #d3d9e0;
+  --line-strong: #b4bdc8;
+  --text: #171c23;
+  --text-2: #39424f;
+  --muted: #5a6574;
+  --accent: #1f5fbf;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(31, 95, 191, 0.1);
+  --amber: #a86a0a;
+  --amber-soft: rgba(168, 106, 10, 0.12);
+  --ok: #17784f;
+  --ok-soft: rgba(23, 120, 79, 0.1);
+  --warn: #946000;
+  --danger: #bf2f2f;
+  --danger-soft: rgba(191, 47, 47, 0.09);
+  --focus: #1f5fbf;
+  --shadow: 0 10px 30px rgba(30, 40, 60, 0.12);
+  --scene-opacity: 0.12;
+  color-scheme: light;
+}

@@ -1,0 +1,47 @@
+{
+  "savedAt": "2026-10-13T10:31:17.558Z",
+  "spending": {
+    "limit": 300,
+    "safety": 10,
+    "committed": 11.948311450000014,
+    "remaining": 278.05168855,
+    "uncertain": 76
+  },
+  "workers": [
+    {
+      "id": "29bf9794-bfe1-4659-985a-439e343310b4",
+      "name": "Haiku · complete feature inventory and release checks",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-5",
+      "model": "claude-haiku-5-5"
+    },
+    {
+      "id": "404c8f7b-ff9b-4084-b030-f3fb6acb4a89",
+      "name": "Sonnet · native runtime and offline features",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-4",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "09606d52-dc27-4fcc-b6eb-dd1cc16ed92d",
+      "name": "Opus · architecture (updated harness)",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-3",
+      "model": "claude-opus-5-5"
+    },
+    {
+      "id": "01feaf28-59f7-4db0-8e21-56dd160aa367",
+      "name": "Sonnet · full desktop interface",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-2",
+      "model": "claude-sonnet-5-5"
+    },
+    {
+      "id": "702eb92a-c047-42dd-8406-a2191095cc01",
+      "name": "Opus · desktop architecture and acceptance gates",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-1",
+      "model": "claude-opus-5-5"
+    }
+  ]
+}

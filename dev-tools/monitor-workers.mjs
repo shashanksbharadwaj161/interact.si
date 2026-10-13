@@ -1,0 +1,3 @@
+import {call} from './control-room-client.mjs';
+const s=await call('status');console.log(JSON.stringify({spending:s.spending,workers:s.tasks.filter(t=>t.mode==='real').map(t=>({id:t.id,name:t.name,status:t.status,session:t.sessionId,usage:t.usage.requests,cost:t.cost,event:t.events.at(-1)?.text}))},null,2));
+if(process.argv[2]){const d=await call(`tasks/${process.argv[2]}/results`);console.log(JSON.stringify({messages:d.messages.slice(-3),activities:d.activities.filter(a=>a.status==='pending').map(a=>({id:a.id,kind:a.activityKind,summary:a.summary})),files:d.files.filter(f=>f.status!=='unmodified').map(f=>({path:f.path,status:f.status})),limitations:d.limitations},null,2));}
