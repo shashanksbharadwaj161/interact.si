@@ -30,11 +30,13 @@ export interface ActionDeps {
   now?: () => number;
   newId: () => string;
   resolveExecutable?: (entry: string) => Promise<string | null>;
+  confirm?: (summary: string, detail: string) => Promise<boolean>;
 }
 
 type WindowTarget = {hwnd: number; pid: number; process: string; title: string};
 type Plan =
-  | LaunchPlan
+  | Exclude<LaunchPlan, {kind: 'launch-app'}>
+  | {kind: 'launch-app'; entry: string; exe: string}
   | {kind: 'list-windows'}
   | {kind: 'focus'; win: WindowTarget}
   | {kind: 'move-window'; win: WindowTarget; x: number; y: number; width: number; height: number}
@@ -48,19 +50,26 @@ const clip = (s: string, n = 80) => (s.length > n ? s.slice(0, n - 1) + '…' : 
 const label = (t: WindowTarget) => `"${clip(t.title)}" (${t.process})`;
 
 /** Resolves an approved-app entry to an executable on disk. Never searches the current directory. */
-export async function resolveExecutable(entry: string, env: NodeJS.ProcessEnv = process.env, fs: Pick<FsLike, 'stat'> = realFs): Promise<string | null> {
+export async function resolveExecutable(entry: string, env: NodeJS.ProcessEnv = process.env, fs: Pick<FsLike, 'stat'> & Partial<Pick<FsLike, 'realpath'>> = realFs): Promise<string | null> {
   const isFile = async (p: string) => { try { return (await fs.stat(p)).isFile(); } catch { return false; } };
+  const canonical = async (p: string) => {
+    try {
+      const resolved = fs.realpath ? await fs.realpath(p) : p;
+      const normalized = normalizeAbsolutePath(resolved);
+      return 'error' in normalized || !/\.exe$/i.test(normalized.path) ? null : normalized.path;
+    } catch { return null; }
+  };
   if (!/^[A-Za-z0-9._ -]+\.exe$/i.test(entry)) {
     const n = normalizeAbsolutePath(entry);
     if ('error' in n || !/\.exe$/i.test(n.path)) return null;
-    return (await isFile(n.path)) ? n.path : null;
+    return (await isFile(n.path)) ? canonical(n.path) : null;
   }
   const root = env.SystemRoot || env.windir || 'C:\\Windows';
-  const dirs = [w.join(root, 'System32'), root, ...(env.PATH ?? env.Path ?? '').split(';').map((d) => d.trim().replace(/^"|"$/g, ''))]
+  const dirs = [w.join(root, 'System32'), root, env.ProgramFiles ?? '', env['ProgramFiles(x86)'] ?? '']
     .filter((d) => d && w.isAbsolute(d) && !/(^|[\\/])\.\.([\\/]|$)/.test(d));
   for (const d of dirs) {
     const cand = w.join(d, entry);
-    if (await isFile(cand)) return cand;
+    if (await isFile(cand)) return canonical(cand);
   }
   return null;
 }
@@ -93,13 +102,16 @@ export class ActionService {
       case 'open-url': {
         const a = await authorizeTarget('url', req.target ?? '', s, this.fs);
         if (!a.ok) return deny('Open a link', a.reason);
+        if (a.plan.kind !== 'open-url') return deny('Open a link', 'Invalid URL plan');
         const note = s.mode === 'offline' ? ' (opens in your default browser, which uses the network)' : '';
         return {allowed: true, summary: `Open ${clip(a.plan.kind === 'open-url' ? a.plan.url : '', 120)}${note}`, requiresApproval: true, plan: a.plan};
       }
       case 'launch': {
         const a = await authorizeTarget('any', req.target ?? '', s, this.fs);
         if (!a.ok) return deny(`Launch "${clip(req.target ?? '', 80)}"`, a.reason);
-        return {allowed: true, summary: this.launchSummary(a), requiresApproval: true, plan: a.plan};
+        const plan = await this.bindLaunch(a.plan);
+        if (!plan) return deny('Start approved app', 'The approved app could not be found on this computer');
+        return {allowed: true, summary: plan.kind === 'launch-app' ? `Start approved app ${plan.exe}` : this.launchSummary(a), requiresApproval: true, plan};
       }
       default:
         return this.evaluateWindowAction(req);
@@ -141,15 +153,17 @@ export class ActionService {
       }
       case 'type-text': {
         const text = req.text ?? '';
-        const summary = `Type ${text.length} characters into ${label(t)}`;
+        const summary = `Type into ${label(t)}: ${clip(text.replace(/\r\n|\r|\n/g, '⏎').replace(/\t/g, '⇥'), 200)}`;
         if (!text) return deny(summary, 'text is required');
-        const why = checkWindowPolicy(win, type, this.d.selfPids());
+        if (/[\r\n]/.test(text) && (/^(cmd|powershell|pwsh|windowsterminal|openconsole|conhost|wt|bash|wsl|mintty)(\.exe)?$/i.test(win.process) || (/^explorer(\.exe)?$/i.test(win.process) && /^run$/i.test(win.title)))) return deny(summary, 'Newline input into command windows is blocked');
+        // Preview does not send input. Foreground is enforced after trusted confirmation and exact-target focus.
+        const why = checkWindowPolicy({...win, foreground: true}, type, this.d.selfPids());
         return why ? deny(summary, why) : {allowed: true, summary, requiresApproval: true, plan: {kind: 'type-text', win: t, text}};
       }
       case 'click': {
         if (req.x === undefined || req.y === undefined) return deny(`Click in ${label(t)}`, 'x and y screen coordinates are required');
         const summary = `Left-click at ${req.x},${req.y} inside ${label(t)}`;
-        const why = checkWindowPolicy(win, type, this.d.selfPids());
+        const why = checkWindowPolicy({...win, foreground: true}, type, this.d.selfPids());
         if (why) return deny(summary, why);
         if (req.x < win.x || req.x >= win.x + win.width || req.y < win.y || req.y >= win.y + win.height) return deny(summary, 'The point is outside the target window');
         return {allowed: true, summary, requiresApproval: true, plan: {kind: 'click', win: t, x: req.x, y: req.y}};
@@ -177,6 +191,23 @@ export class ActionService {
     if (this.executed.length >= MAX_ACTIONS_PER_MINUTE) return true;
     this.executed.push(t);
     return false;
+  }
+
+  /** Shared limiter for capsule item launches and window moves. */
+  claimAction(): boolean { return !this.rateLimited(); }
+
+  private async bindLaunch(plan: LaunchPlan): Promise<Plan | null> {
+    if (plan.kind !== 'launch-app') return plan;
+    const resolved = await (this.d.resolveExecutable ?? ((e) => resolveExecutable(e)))(plan.entry);
+    if (!resolved) return null;
+    const normalized = normalizeAbsolutePath(resolved);
+    if ('error' in normalized || !/\.exe$/i.test(normalized.path)) return null;
+    return {kind: 'launch-app', entry: plan.entry, exe: normalized.path};
+  }
+
+  private detail(plan: Plan): string {
+    if (plan.kind === 'type-text') return `Window: ${plan.win.title}\nProcess: ${plan.win.process}, PID ${plan.win.pid}\nFull text (line breaks shown as ⏎, tabs as ⇥):\n${plan.text.replace(/\r\n|\r|\n/g, '⏎\n').replace(/\t/g, '⇥')}`;
+    return JSON.stringify(plan, null, 2);
   }
 
   /** Re-checks the live state against what was approved. Returns a denial reason or null. */
@@ -226,12 +257,26 @@ export class ActionService {
       await this.d.activity('action', `Rate limited: ${summary}`, `More than ${MAX_ACTIONS_PER_MINUTE} actions in one minute`);
       return {executed: false, reason: `Rate limit reached (${MAX_ACTIONS_PER_MINUTE} actions per minute)`};
     }
+    if (entry.ev.requiresApproval && !(await this.d.confirm?.(summary, this.detail(entry.ev.plan)))) {
+      await this.d.activity('action', `Declined in native confirmation: ${summary}`);
+      return {executed: false, reason: 'Native confirmation declined or unavailable'};
+    }
     const check = await this.revalidate(entry);
     if (!check.plan) {
       await this.d.activity('action', `Refused: ${summary}`, check.reason);
       return {executed: false, reason: check.reason ?? 'Not allowed'};
     }
     try {
+      // The native confirmation takes focus. Restore only the exact approved window,
+      // then re-check its identity and foreground state before native input.
+      if (check.plan.kind === 'type-text' || check.plan.kind === 'click') {
+        const target = check.plan.win;
+        const focus = await this.d.native.focusWindow({hwnd: target.hwnd, pid: target.pid});
+        if (!focus.focused) throw new Error('Windows did not allow the approved target to take focus');
+        const win = (await this.d.native.listWindows()).find((v) => v.hwnd === target.hwnd);
+        if (!win || win.pid !== target.pid || win.process.toLowerCase() !== target.process.toLowerCase() || !win.foreground || win.minimized || win.elevated !== 0 || this.d.selfPids().includes(win.pid)) throw new Error('The approved target changed or could not be safely focused');
+        if (this.d.safeLaunch()) throw new Error('Safe launch is active');
+      }
       const result = await this.perform(check.plan);
       await this.d.activity('action', `Executed: ${summary}`, 'ok');
       return {executed: true, ...result};
@@ -251,9 +296,7 @@ export class ActionService {
       }
       case 'open-url': await this.d.shell.openExternal(plan.url); return {};
       case 'launch-app': {
-        const exe = await (this.d.resolveExecutable ?? ((e) => resolveExecutable(e)))(plan.entry);
-        if (!exe) throw new Error('The approved app could not be found on this computer');
-        await this.d.shell.spawnApp(exe);
+        await this.d.shell.spawnApp(plan.exe);
         return {};
       }
       case 'launch-path': {
@@ -280,17 +323,29 @@ export class ActionService {
     }
   }
 
-  /** Used by capsule restore: authorize + open one item with no user preview (restore itself is the approval). */
-  async openItem(kind: 'file' | 'folder' | 'url' | 'app', target: string): Promise<{ok: true} | {ok: false; reason: string}> {
+  /** Prepares an exact target for the single trusted capsule confirmation. */
+  async prepareItem(kind: 'file' | 'folder' | 'url' | 'app', target: string): Promise<{ok: true; detail: string; run: () => Promise<{ok: true} | {ok: false; reason: string}>} | {ok: false; reason: string}> {
     if (this.d.safeLaunch()) return {ok: false, reason: 'Safe launch is active'};
     const a = await authorizeTarget(kind, target, this.d.settings(), this.fs);
     if (!a.ok) return a;
-    try {
-      await this.perform(a.plan);
-      return {ok: true};
-    } catch (e) {
-      return {ok: false, reason: (e as Error).message.slice(0, 300)};
-    }
+    const plan = await this.bindLaunch(a.plan);
+    if (!plan) return {ok: false, reason: 'The approved app could not be found'};
+    return {ok: true, detail: this.detail(plan), run: async () => {
+      if (this.d.safeLaunch()) return {ok: false, reason: 'Safe launch is active'};
+      const again = await authorizeTarget(kind, target, this.d.settings(), this.fs);
+      const fresh = again.ok ? await this.bindLaunch(again.plan) : null;
+      if (!fresh || JSON.stringify(fresh) !== JSON.stringify(plan)) return {ok: false, reason: 'Target or permissions changed since confirmation'};
+      if (!this.claimAction()) return {ok: false, reason: 'Action rate limit reached'};
+      try { await this.perform(plan); return {ok: true}; }
+      catch (e) { return {ok: false, reason: (e as Error).message.slice(0, 300)}; }
+    }};
+  }
+
+  async openItem(kind: 'file' | 'folder' | 'url' | 'app', target: string): Promise<{ok: true} | {ok: false; reason: string}> {
+    const item = await this.prepareItem(kind, target);
+    if (!item.ok) return item;
+    if (!(await this.d.confirm?.('Open capsule item', item.detail))) return {ok: false, reason: 'Native confirmation declined or unavailable'};
+    return item.run();
   }
 
   get pendingPreviews(): number { return this.registry.size; }

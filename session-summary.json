@@ -1,47 +1,542 @@
 {
-  "savedAt": "2026-10-13T10:31:17.558Z",
+  "savedAt": "2026-10-13T16:10:04.342Z",
   "spending": {
     "limit": 300,
     "safety": 10,
-    "committed": 11.948311450000014,
-    "remaining": 278.05168855,
-    "uncertain": 76
+    "committed": 58.81721504999998,
+    "remaining": 231.18278495,
+    "uncertain": 99
   },
+  "capacity": 10,
+  "online": false,
   "workers": [
+    {
+      "id": "daa6ae1f-d2cd-4462-ae71-110d2e21aa99",
+      "name": "Haiku · voice acceptance",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-30",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.19763874999999997
+    },
+    {
+      "id": "7f55b9a0-aeeb-41cc-a10e-c91e417fcfa2",
+      "name": "Haiku · integration inventory",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-29",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.20631695000000003
+    },
+    {
+      "id": "30f2c46d-de77-431c-bddb-a468d70d1ed8",
+      "name": "Haiku · model setup guide",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-28",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.1593799
+    },
+    {
+      "id": "2b09db30-627b-409a-a94f-8fd72fea0bfa",
+      "name": "Haiku · branding inventory",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-27",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.20202985
+    },
+    {
+      "id": "41ec7785-5933-44be-bda2-99ebb56c04c0",
+      "name": "Haiku · branding inventory",
+      "status": "failed",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "89fe8259-6698-4eec-b344-523ac47b8822",
+      "name": "Haiku · model setup guide",
+      "status": "failed",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "78a3a106-8b0b-4e96-af41-a787ad29b6d2",
+      "name": "Haiku · integration inventory",
+      "status": "failed",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "336a3d66-fe43-450e-83e1-d30471fe1f42",
+      "name": "Haiku · voice acceptance",
+      "status": "failed",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "6b596c0b-9510-47f3-8186-00d67694174e",
+      "name": "Haiku · keyboard audit",
+      "status": "complete",
+      "sessionId": "jarvis-desktop-26",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.31502420000000003
+    },
+    {
+      "id": "5505da54-2410-4143-ace8-9fd938c6bc51",
+      "name": "Haiku · dependency inventory",
+      "status": "complete",
+      "sessionId": "jarvis-desktop-25",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.1362331
+    },
+    {
+      "id": "e4c9194d-5bab-4642-94a1-3b71518d3444",
+      "name": "Haiku · release checklist",
+      "status": "complete",
+      "sessionId": "jarvis-desktop-24",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.16353889999999996
+    },
+    {
+      "id": "13b6bb2b-5014-418e-aebc-a8a70cd58266",
+      "name": "Haiku · feature registry",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-23",
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.2805979
+    },
+    {
+      "id": "22fd3db2-7e92-4c0a-a72c-760577430f0c",
+      "name": "Sonnet · onboarding and settings usability",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-22",
+      "model": "claude-sonnet-5-5",
+      "costEstimate": 1.3120917999999997
+    },
+    {
+      "id": "5ce4126a-3e66-4573-9909-e598d9de029f",
+      "name": "Sonnet · native lifecycle and voice",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-21",
+      "model": "claude-sonnet-5-5",
+      "costEstimate": 1.2855488999999998
+    },
+    {
+      "id": "00ca90b8-a06a-486d-a63b-47ac15280c58",
+      "name": "Sonnet · storage, policy and AI repair",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-20",
+      "model": "claude-sonnet-5-5",
+      "costEstimate": 0.7379539
+    },
+    {
+      "id": "45f98426-4f20-4bd7-af7d-0e9675ac50d2",
+      "name": "Opus · private local memory search",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-19",
+      "model": "claude-opus-5-5",
+      "costEstimate": 1.1903221000000006
+    },
+    {
+      "id": "2363985f-3619-488f-8fcf-ed2a3330bfe7",
+      "name": "Opus · offline intent planning",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-18",
+      "model": "claude-opus-5-5",
+      "costEstimate": 3.5948554999999995
+    },
+    {
+      "id": "7c2a4321-f3e5-478c-b687-cb9f0ce81fca",
+      "name": "Fable · interactive motion studio",
+      "status": "complete",
+      "sessionId": "jarvis-desktop-17",
+      "model": "claude-fable-5-1",
+      "costEstimate": 3.1628737499999997
+    },
+    {
+      "id": "39968a84-8040-4b85-8f38-2f4d15f1c5fc",
+      "name": "Haiku · branding inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "3c52c3ff-92db-4b78-9bdf-6858f7f5e555",
+      "name": "Haiku · model setup guide",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "8cb2101a-c3b4-435c-b437-5d7a5b6421d9",
+      "name": "Haiku · integration inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "c86fafeb-0db0-43ac-ad42-d0a198b16f62",
+      "name": "Haiku · voice acceptance",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "33876027-7f8b-4f6b-af77-548d36ab82b6",
+      "name": "Haiku · keyboard audit",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "fa1787fd-fbac-43fe-bf90-c9493acc6767",
+      "name": "Haiku · dependency inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "4a47787e-4c82-4bd0-b6c6-b11a8427c196",
+      "name": "Haiku · release checklist",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "d7d07ad8-e551-499a-947c-902ebf542af9",
+      "name": "Haiku · feature registry",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "6e1b259a-e10b-4cc4-977b-c0cfe3851b00",
+      "name": "Sonnet · onboarding and settings usability",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-16",
+      "model": "claude-sonnet-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "08769554-e0d6-474a-a095-9c435fe47ae7",
+      "name": "Sonnet · native lifecycle and voice",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-15",
+      "model": "claude-sonnet-5-5",
+      "costEstimate": 0.6961233
+    },
+    {
+      "id": "571587a2-5251-4115-8c2e-71eed99191ee",
+      "name": "Sonnet · storage, policy and AI repair",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-14",
+      "model": "claude-sonnet-5-5",
+      "costEstimate": 1.6369875
+    },
+    {
+      "id": "7778fe3d-cdae-4597-9f2e-a885ed08cbae",
+      "name": "Opus · interaction and feature audit",
+      "status": "complete",
+      "sessionId": "jarvis-desktop-13",
+      "model": "claude-opus-5-5",
+      "costEstimate": 3.4161272
+    },
+    {
+      "id": "859f4953-c675-4437-b023-51ebd496516b",
+      "name": "Opus · native security audit",
+      "status": "complete",
+      "sessionId": "jarvis-desktop-12",
+      "model": "claude-opus-5-5",
+      "costEstimate": 2.6269806
+    },
+    {
+      "id": "fe09fc95-04ac-4a7a-ba21-325e632d0387",
+      "name": "Fable · integration and release architecture",
+      "status": "complete",
+      "sessionId": "jarvis-desktop-11",
+      "model": "claude-fable-5-1",
+      "costEstimate": 6.834241
+    },
+    {
+      "id": "43518e31-6d79-4ad6-adf2-13630a244d66",
+      "name": "Fable · integration and release architecture",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-10",
+      "model": "claude-fable-5-1",
+      "costEstimate": 0.03514
+    },
+    {
+      "id": "84664031-a027-49b6-83de-1465e5a67743",
+      "name": "Haiku · branding inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "91843a7f-0cc2-4f9b-97f4-49b714b9e9c3",
+      "name": "Haiku · model setup guide",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "dce8530d-3c51-4e98-a869-34fc34ba2042",
+      "name": "Haiku · integration inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "bd523207-f410-471c-a530-481fb91d7950",
+      "name": "Haiku · voice acceptance",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "d7183a5a-21e9-4d0b-87b9-4abc05ba2e1f",
+      "name": "Haiku · keyboard audit",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "015b77cc-afeb-41cf-b731-cc9dbf32ab71",
+      "name": "Haiku · dependency inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "d0ad9c43-3033-4e52-8417-a29b808cde02",
+      "name": "Haiku · release checklist",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "95cbc264-2887-4c76-9fb9-674acc6b5276",
+      "name": "Haiku · feature registry",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "d959980d-b095-4f4f-8b73-d9a9494a49bd",
+      "name": "Sonnet · onboarding and settings usability",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-sonnet-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "6f59d184-9895-444e-a8e3-50f93b2666d3",
+      "name": "Sonnet · native lifecycle and voice",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-sonnet-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "41e8c4bb-8dca-4289-bff0-326a0c80b3bd",
+      "name": "Sonnet · storage, policy and AI repair",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-sonnet-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "1c8e74e5-c63e-4b31-a762-575f6809ad59",
+      "name": "Opus · interaction and feature audit",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-opus-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "ad8f5563-e92d-4d59-ad00-699447804b3b",
+      "name": "Opus · native security audit",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-9",
+      "model": "claude-opus-5-5",
+      "costEstimate": 0.015976
+    },
+    {
+      "id": "38840af9-b081-4150-aa71-8ffaba47a6df",
+      "name": "Fable · integration and release architecture",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-8",
+      "model": "claude-fable-5-1",
+      "costEstimate": 0.04094
+    },
+    {
+      "id": "b25cade3-6d65-456e-aea0-ae36ac969198",
+      "name": "Haiku · branding inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "5e9ce0aa-8082-4216-b124-6f276957e948",
+      "name": "Haiku · model setup guide",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "1812f440-e3c6-47d7-aefc-f6bae3e61859",
+      "name": "Haiku · integration inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "4541f9e5-09d3-43bc-8348-7001d8130353",
+      "name": "Haiku · voice acceptance",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "cca1c5ab-9079-4feb-a2a4-2af74eb24a4e",
+      "name": "Haiku · keyboard audit",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "6548146b-0307-4d9b-abdd-4d6772d4bb38",
+      "name": "Haiku · dependency inventory",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "f9f7eac4-c579-41f9-908b-23d906e94f8d",
+      "name": "Haiku · release checklist",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "33d1cd7d-bcba-4368-81cd-4331e00ed00c",
+      "name": "Haiku · feature registry",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-haiku-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "cad9b0b7-e044-4c5f-944d-d9bfc12eae4f",
+      "name": "Sonnet · onboarding and settings usability",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-sonnet-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "71cce1b5-bb15-444f-a610-428f1166577f",
+      "name": "Sonnet · native lifecycle and voice",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-sonnet-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "affe8a46-f005-43dc-81b5-80926f6d3c2b",
+      "name": "Sonnet · storage, policy and AI repair",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-sonnet-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "f70f2c20-4852-400c-b59d-d6c316f51abe",
+      "name": "Opus · interaction and feature audit",
+      "status": "cancelled",
+      "sessionId": null,
+      "model": "claude-opus-5-5",
+      "costEstimate": null
+    },
+    {
+      "id": "a983dc0a-c258-4c6c-bba0-8969d08a3060",
+      "name": "Opus · native security audit",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-7",
+      "model": "claude-opus-5-5",
+      "costEstimate": 0.013416
+    },
+    {
+      "id": "d7e679e0-9283-4c42-9a3b-907b4d496c2e",
+      "name": "Fable · integration and release architecture",
+      "status": "cancelled",
+      "sessionId": "jarvis-desktop-6",
+      "model": "claude-fable-5-1",
+      "costEstimate": 0.03334
+    },
     {
       "id": "29bf9794-bfe1-4659-985a-439e343310b4",
       "name": "Haiku · complete feature inventory and release checks",
       "status": "cancelled",
       "sessionId": "jarvis-desktop-5",
-      "model": "claude-haiku-5-5"
+      "model": "claude-haiku-5-5",
+      "costEstimate": 0.0906262
     },
     {
       "id": "404c8f7b-ff9b-4084-b030-f3fb6acb4a89",
       "name": "Sonnet · native runtime and offline features",
       "status": "cancelled",
       "sessionId": "jarvis-desktop-4",
-      "model": "claude-sonnet-5-5"
+      "model": "claude-sonnet-5-5",
+      "costEstimate": 2.4295155
     },
     {
       "id": "09606d52-dc27-4fcc-b6eb-dd1cc16ed92d",
       "name": "Opus · architecture (updated harness)",
       "status": "cancelled",
       "sessionId": "jarvis-desktop-3",
-      "model": "claude-opus-5-5"
+      "model": "claude-opus-5-5",
+      "costEstimate": 1.488062
     },
     {
       "id": "01feaf28-59f7-4db0-8e21-56dd160aa367",
       "name": "Sonnet · full desktop interface",
       "status": "cancelled",
       "sessionId": "jarvis-desktop-2",
-      "model": "claude-sonnet-5-5"
+      "model": "claude-sonnet-5-5",
+      "costEstimate": 3.2716697
     },
     {
       "id": "702eb92a-c047-42dd-8406-a2191095cc01",
       "name": "Opus · desktop architecture and acceptance gates",
       "status": "cancelled",
       "sessionId": "jarvis-desktop-1",
-      "model": "claude-opus-5-5"
+      "model": "claude-opus-5-5",
+      "costEstimate": null
     }
   ]
 }

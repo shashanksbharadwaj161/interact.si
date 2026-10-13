@@ -10,6 +10,7 @@ import { Orchestrator } from './adapter.mjs';
 import { Room } from './room.mjs';
 import { Budget,PRICES } from './budget.mjs';
 import {ownDirectory} from './ownership.mjs';
+import {routeRequest,countRequest} from './gateway-policy.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export async function createServer(options={}) {
   const dir=options.dir||process.env.CONTROL_ROOM_DIR||path.join(root,'.controlroom');await mkdir(dir,{recursive:true});if(process.platform==='win32')await protectDirectory(dir);
@@ -33,11 +34,11 @@ export async function createServer(options={}) {
       if(req.headers['anthropic-beta']){const allowed=['prompt-caching-2024-07-31','interleaved-thinking-2025-05-14','context-1m-2025-08-07'];const flags=req.headers['anthropic-beta'].split(',').map(s=>s.trim()).filter(s=>allowed.includes(s));if(flags.length)headers['anthropic-beta']=flags.join(',');}
       const providerFetch=options.fetchProvider||fetch;let payload=req.body;
       if(requestPath==='/v1/messages'&&PRICES[task.model]){
-        const body=JSON.parse(req.body.toString());body.model=task.model;body.max_tokens=Math.min(16384,Number(body.max_tokens)||8192);body.thinking={type:'adaptive'};body.output_config={...body.output_config,effort:task.effort||'high'};delete body.speed;delete body.inference_geo;delete body.service_tier;
+        const body=routeRequest(JSON.parse(req.body.toString()),task);
         if(body.mcp_servers||body.container||body.context_management)throw new Error('Unverified remote/experimental services are excluded from this budget');
         if((body.tools||[]).some(t=>t.type&&t.type!=='custom'))throw new Error('Paid server-side tools are excluded from this budget');
-        const countBody=Object.fromEntries(['model','messages','system','tools','tool_choice','thinking'].filter(k=>body[k]!==undefined).map(k=>[k,body[k]]));
-        const counted=await providerFetch('https://api.anthropic.com/v1/messages/count_tokens',{method:'POST',headers,body:JSON.stringify(countBody),signal:controller.signal});if(!counted.ok)throw new Error('Preflight token count failed; inference blocked');const count=await counted.json();reservation=await budget.reserve(task,task.model,count.input_tokens,body.max_tokens);payload=Buffer.from(JSON.stringify(body));
+        const countBody=countRequest(body);
+        const counted=await providerFetch('https://api.anthropic.com/v1/messages/count_tokens',{method:'POST',headers,body:JSON.stringify(countBody),signal:controller.signal});if(!counted.ok){const failure=await counted.json().catch(()=>({}));throw new Error('Preflight HTTP '+counted.status+': '+redact(String(failure.error?.message||'token count failed').slice(0,400),[key,...room.grants.keys()]));}const count=await counted.json();reservation=await budget.reserve(task,body.model,count.input_tokens,body.max_tokens);payload=Buffer.from(JSON.stringify(body));
       }else if(requestPath==='/v1/messages'&&!options.fetchProvider)throw new Error('Real inference requires a verified model budget policy');
       const upstream=await providerFetch(`https://api.anthropic.com${requestPath}`,{method:req.method,headers,body:req.method==='POST'?payload:undefined,signal:controller.signal});
       res.status(upstream.status);res.set('Content-Type',upstream.headers.get('content-type')||'application/json');
@@ -61,7 +62,7 @@ export async function createServer(options={}) {
   route('post','/api/provider',async req=>{if(room.active().length)throw new Error('Cancel active real workers before replacing credentials');await vault.save(req.body.key);return {configured:true};});
   route('delete','/api/provider',async()=>{await room.disableOnline();await vault.remove();return {configured:false};});
   route('post','/api/provider/test',async()=>{if(!room.online)throw new Error('Enable online development to test authentication');const key=await vault.get();const r=await fetch('https://api.anthropic.com/v1/models?limit=20',{headers:{'x-api-key':key,'anthropic-version':'2023-06-01'},signal:AbortSignal.timeout(15000)});if(!r.ok)throw new Error(`Anthropic authentication check returned HTTP ${r.status}`);const x=await r.json();return {ok:true,models:(x.data||[]).map(m=>({id:m.id,name:m.display_name}))};});
-  route('post','/api/settings',async req=>{if(req.body.maxWorkers!==undefined){if(![1,2].includes(req.body.maxWorkers))throw new Error('Concurrency must be one or two');room.maxWorkers=req.body.maxWorkers;}if(req.body.online===false)await room.disableOnline();if(req.body.online===true)room.online=true;await room.save();room.pump();return room.snapshot();});
+  route('post','/api/settings',async req=>{if(req.body.maxWorkers!==undefined){if(!Number.isInteger(req.body.maxWorkers)||req.body.maxWorkers<1||req.body.maxWorkers>10)throw new Error('Concurrency must be from one to ten');room.maxWorkers=req.body.maxWorkers;}if(req.body.online===false)await room.disableOnline();if(req.body.online===true)room.online=true;await room.save();room.pump();return room.snapshot();});
   route('post','/api/orchestrator/start',async()=>{room.orchestrator=await adapter.start();await room.save();return room.orchestrator;});
   route('get','/api/projects',async()=>adapter.projects());
   route('post','/api/projects',async req=>{if(typeof req.body.path!=='string'||!path.isAbsolute(req.body.path))throw new Error('Enter an absolute repository path');return adapter.addProject(req.body.path);});

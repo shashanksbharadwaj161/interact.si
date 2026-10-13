@@ -45,7 +45,7 @@ export class Orchestrator {
     const projectData=JSON.parse(await this.cli(['project','get',task.projectId,'--json']));const project=projectData.project??projectData;
     const repo=project.path??project.repoPath;if(!repo)throw new Error('Orchestrator project did not provide its repository path');
     const branch=(await exec('git',['-C',repo,'symbolic-ref','--short','HEAD'],{windowsHide:true})).stdout.trim();
-    const config={defaultBranch:branch,env:{ANTHROPIC_BASE_URL:gateway,ANTHROPIC_API_KEY:'control-room-broker',CLAUDE_CODE_EFFORT_LEVEL:task.effort||'high',CLAUDE_CONFIG_DIR:this.env.CLAUDE_CONFIG_DIR},worker:{agent:'claude-code'},agentConfig:{permissions:'accept-edits'}};
+    const config={defaultBranch:branch,env:{ANTHROPIC_BASE_URL:gateway,ANTHROPIC_API_KEY:'control-room-broker',ANTHROPIC_DEFAULT_HAIKU_MODEL:'claude-haiku-5-5',ANTHROPIC_SMALL_FAST_MODEL:'claude-haiku-5-5',ANTHROPIC_DEFAULT_FABLE_MODEL:'claude-fable-5-1',ANTHROPIC_DEFAULT_OPUS_MODEL:'claude-opus-5-5',ANTHROPIC_DEFAULT_SONNET_MODEL:'claude-sonnet-5-5',CLAUDE_CODE_EFFORT_LEVEL:task.effort||'high',CLAUDE_CONFIG_DIR:this.env.CLAUDE_CONFIG_DIR},worker:{agent:'claude-code'},agentConfig:{permissions:'accept-edits'}};
     await this.cli(['project','set-config',task.projectId,'--config-json',JSON.stringify(config)]);
     const out=await this.cli(['spawn','--project',task.projectId,'--harness','claude-code','--mode','chat','--model',task.model,'--name',task.name,'--prompt',task.prompt],120000);
     const id=out.match(/spawned session\s+(\S+)/)?.[1]; if(!id)throw new Error('Orchestrator did not return a worker ID'); return id;

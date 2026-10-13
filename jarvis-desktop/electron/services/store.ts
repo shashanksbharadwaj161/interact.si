@@ -5,6 +5,11 @@ import {randomUUID} from 'node:crypto';
 import type {Activity, AppState} from '../../src/shared/contracts';
 import {LIMITS, ValidationError, defaultState, parseState} from './validation';
 
+// Settings that grant reach or change where data goes. An import must never change them (see importDocument).
+const SECURITY_SETTING_KEYS = ['mode', 'allowedRoots', 'approvedApps', 'localEndpoint', 'cloudModel'] as const;
+const RETRYABLE_RENAME = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export const SCHEMA_VERSION = 1;
 const BACKUP_INTERVAL_MS = 10 * 60 * 1000;
 const KEEP_NEWEST = 10;
@@ -59,7 +64,7 @@ export function parseEnvelope(raw: string, formats: string[] = []): {schemaVersi
   try { j = JSON.parse(raw); } catch { throw new ValidationError('File is not valid JSON'); }
   if (typeof j !== 'object' || j === null || Array.isArray(j)) throw new ValidationError('File has an unexpected structure');
   const o = j as Record<string, unknown>;
-  if (formats.length && !formats.includes(String(o.format))) throw new ValidationError('File is not a Jarvis export');
+  if (formats.length && !formats.includes(String(o.format))) throw new ValidationError('File is not a Desktop Companion export');
   if (typeof o.schemaVersion !== 'number' || !Number.isInteger(o.schemaVersion) || o.schemaVersion < 1) throw new ValidationError('File has no valid schemaVersion');
   return {schemaVersion: o.schemaVersion, state: o.state, format: typeof o.format === 'string' ? o.format : undefined};
 }
@@ -104,17 +109,28 @@ export class Store {
     if (raw === null) {
       this.state = defaultState();
     } else {
-      try {
-        const env = parseEnvelope(raw);
-        if (env.schemaVersion > SCHEMA_VERSION) {
-          this.readOnly = true;
-          result = {recovered: false, readOnly: true, warning: 'Data was written by a newer version of Jarvis Desktop and is opened read-only.'};
-          this.state = parseState(env.state);
-        } else {
-          this.state = parseState(env.state);
+      let env: ReturnType<typeof parseEnvelope> | null = null;
+      try { env = parseEnvelope(raw); } catch (e) { result = await this.recover(raw, (e as Error).message); }
+      if (env) {
+        const dropped: string[] = [];
+        try {
+          this.state = parseState(env.state, {lenient: true, dropped});
+          if (env.schemaVersion > SCHEMA_VERSION) {
+            this.readOnly = true;
+            result = {recovered: false, readOnly: true, warning: 'Data was written by a newer version of Desktop Companion and is opened read-only.'};
+          } else if (dropped.length) {
+            this.pushActivity('recovery', `Removed ${dropped.length} permission entr${dropped.length === 1 ? 'y' : 'ies'} that are no longer allowed (network, device or invalid paths)`, dropped.join('\n'));
+          }
+        } catch (e) {
+          if (env.schemaVersion > SCHEMA_VERSION) {
+            // The file is intact but in a format this version cannot read: never overwrite or "recover" it.
+            this.readOnly = true;
+            this.state = defaultState();
+            result = {recovered: false, readOnly: true, warning: 'Data was written by a newer version of Desktop Companion and cannot be read; nothing was changed.'};
+          } else {
+            result = await this.recover(raw, (e as Error).message);
+          }
         }
-      } catch (e) {
-        result = await this.recover(raw, (e as Error).message);
       }
     }
     this.applyRetentionInMemory();
@@ -132,7 +148,7 @@ export class Store {
       try {
         const env = parseEnvelope(await this.fs.readFile(path.join(this.backupDir, n)));
         if (env.schemaVersion > SCHEMA_VERSION) continue;
-        recovered = parseState(env.state);
+        recovered = parseState(env.state, {lenient: true});
         break;
       } catch { /* try older */ }
     }
@@ -148,32 +164,50 @@ export class Store {
   /** tmp file + fsync + rename. A failure before rename leaves the previous state.json untouched. */
   private async persist(): Promise<void> {
     const tmp = this.statePath + '.tmp';
-    await this.fs.writeFile(tmp, JSON.stringify(this.envelope()));
-    await this.fs.rename(tmp, this.statePath);
+    try {
+      await this.fs.writeFile(tmp, JSON.stringify(this.envelope()));
+      // Windows can briefly lock the target (antivirus, indexer); retry the rename a few times.
+      for (let attempt = 0; ; attempt++) {
+        try { await this.fs.rename(tmp, this.statePath); break; } catch (e) {
+          if (attempt >= 3 || !RETRYABLE_RENAME.has((e as NodeJS.ErrnoException).code ?? '')) throw e;
+          await sleep(25 * (attempt + 1));
+        }
+      }
+    } catch (e) {
+      await this.fs.unlink(tmp).catch(() => undefined);
+      throw e;
+    }
+  }
+
+  /** Runs fn after every earlier queued operation, whether those succeeded or failed. */
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const p = this.queue.then(fn, fn);
+    this.queue = p.catch(() => undefined);
+    return p;
+  }
+
+  /** Must run inside the queue. fn mutates a clone; on throw nothing changes in memory or on disk. */
+  private async applyMutation(fn: (draft: AppState) => void): Promise<AppState> {
+    if (this.readOnly) throw new ValidationError('Data is read-only because it was written by a newer version');
+    const draft = structuredClone(this.state);
+    fn(draft);
+    draft.chat = draft.chat.slice(-LIMITS.chatMessages);
+    draft.activity = draft.activity.slice(-LIMITS.activity);
+    const prev = this.state;
+    this.state = draft;
+    try {
+      await this.persist();
+    } catch (e) {
+      this.state = prev;
+      throw new Error('Could not save data to disk');
+    }
+    await this.maybeBackup();
+    return structuredClone(this.state);
   }
 
   /** Serialized, atomic mutation. fn mutates a clone; on throw nothing changes in memory or on disk. */
   mutate(fn: (draft: AppState) => void): Promise<AppState> {
-    const run = async (): Promise<AppState> => {
-      if (this.readOnly) throw new ValidationError('Data is read-only because it was written by a newer version');
-      const draft = structuredClone(this.state);
-      fn(draft);
-      draft.chat = draft.chat.slice(-LIMITS.chatMessages);
-      draft.activity = draft.activity.slice(-LIMITS.activity);
-      const prev = this.state;
-      this.state = draft;
-      try {
-        await this.persist();
-      } catch (e) {
-        this.state = prev;
-        throw new Error('Could not save data to disk');
-      }
-      await this.maybeBackup();
-      return structuredClone(this.state);
-    };
-    const p = this.queue.then(run, run);
-    this.queue = p.catch(() => undefined);
-    return p;
+    return this.enqueue(() => this.applyMutation(fn));
   }
 
   private pushActivity(kind: string, summary: string, details?: string): Activity {
@@ -255,16 +289,44 @@ export class Store {
     return JSON.stringify({format: 'jarvis-export', schemaVersion: SCHEMA_VERSION, exportedAt: this.nowIso(), state: this.state}, null, 2);
   }
 
-  /** Validates fully before touching anything, takes a pre-import backup, then replaces state. */
+  /**
+   * Validates fully before touching anything, then (inside the write queue) takes a pre-import backup and replaces
+   * state. Permissions are never imported: the current mode, allowed folders, approved apps, local endpoint and cloud
+   * model are kept, so a shared file cannot widen what the app may open or where data is sent. What was ignored is
+   * recorded in the activity log.
+   */
   async importDocument(raw: string): Promise<AppState> {
+    if (typeof raw !== 'string') throw new ValidationError('Import data must be text');
     const env = parseEnvelope(raw, ['jarvis-export']);
-    if (env.schemaVersion > SCHEMA_VERSION) throw new ValidationError('Export was created by a newer version of Jarvis Desktop');
-    const next = parseState(env.state);
+    if (env.schemaVersion > SCHEMA_VERSION) throw new ValidationError('Export was created by a newer version of Desktop Companion');
+    const dropped: string[] = [];
+    const next = parseState(env.state, {lenient: true, dropped});
     if (this.readOnly) throw new ValidationError('Data is read-only because it was written by a newer version');
-    await this.queue.catch(() => undefined);
-    await this.backup('pre-import');
-    return this.mutate((d) => {
-      d.settings = next.settings; d.capsules = next.capsules; d.notes = next.notes; d.tasks = next.tasks; d.chat = next.chat; d.activity = next.activity;
+    return this.enqueue(async () => {
+      await this.backup('pre-import');
+      return this.applyMutation((d) => {
+        const kept = d.settings;
+        const lower = (l: string[]) => new Set(l.map((x) => x.toLowerCase()));
+        const haveApps = lower(kept.approvedApps), haveRoots = lower(kept.allowedRoots);
+        const ignored: string[] = [];
+        const addedApps = next.settings.approvedApps.filter((a) => !haveApps.has(a.toLowerCase()));
+        const addedRoots = next.settings.allowedRoots.filter((r) => !haveRoots.has(r.toLowerCase()));
+        if (addedApps.length) ignored.push(`${addedApps.length} approved app(s): ${addedApps.join(', ')}`);
+        if (addedRoots.length) ignored.push(`${addedRoots.length} allowed folder(s): ${addedRoots.join(', ')}`);
+        if (next.settings.mode !== kept.mode) ignored.push(`mode ${next.settings.mode}`);
+        if (next.settings.localEndpoint !== kept.localEndpoint) ignored.push(`local endpoint ${next.settings.localEndpoint}`);
+        if (next.settings.cloudModel !== kept.cloudModel) ignored.push(`cloud model ${next.settings.cloudModel}`);
+        const merged = {...next.settings} as unknown as Record<string, unknown>;
+        for (const k of SECURITY_SETTING_KEYS) merged[k] = kept[k];
+        d.settings = merged as unknown as AppState['settings'];
+        d.capsules = next.capsules; d.notes = next.notes; d.tasks = next.tasks; d.chat = next.chat; d.activity = next.activity;
+        const notes = [...(ignored.length ? [`Ignored imported permissions: ${ignored.join('; ')}`] : []), ...(dropped.length ? [`Dropped invalid entries: ${dropped.join('; ')}`] : [])];
+        d.activity.push({
+          id: this.newId(), at: this.nowIso(), kind: 'import',
+          summary: notes.length ? 'Imported data; current permissions were kept (see details)' : 'Imported data; current permissions were kept',
+          ...(notes.length ? {details: notes.join('\n').slice(0, 2000)} : {}),
+        });
+      });
     });
   }
 }

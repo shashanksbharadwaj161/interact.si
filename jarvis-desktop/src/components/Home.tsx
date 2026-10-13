@@ -7,9 +7,11 @@ import { useReady } from '../ui/store';
 import type { ViewId } from '../ui/nav';
 import { dueBucket, dueKey, fmtDueKey, relTime, truncate } from '../ui/util';
 import { sceneName } from '../ui/scenes';
+import { ModelReadinessNotice, modelReadiness, useModelCheck } from './Onboarding';
 
 export function Home({ go }: { go: (v: ViewId) => void }) {
   const { state, settings, system, systemError, cloudConfigured, api, mutate } = useReady();
+  const check = useModelCheck();
   const { state: avatarState } = useCompanion();
 
   const open = useMemo(() => state.tasks.filter((t) => !t.done), [state.tasks]);
@@ -28,7 +30,8 @@ export function Home({ go }: { go: (v: ViewId) => void }) {
   const lastChat = state.chat[state.chat.length - 1];
   const unavailable = system?.capabilities.filter((c) => !c.available) ?? [];
   const online = settings.mode === 'online';
-  const modelReady = online ? Boolean(settings.cloudModel) && cloudConfigured === true : Boolean(settings.localModel && settings.localEndpoint);
+  // Readiness comes from the backend's live check (local) or the saved key (online), not from whether fields are filled in.
+  const readiness = modelReadiness({ settings, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
 
   return (
     <div className="page">
@@ -67,14 +70,8 @@ export function Home({ go }: { go: (v: ViewId) => void }) {
         </button>
       </section>
 
-      {!modelReady && (
-        <Notice tone="warn" title={online ? 'Online mode is not fully configured' : 'No local model configured'} action={<Button size="sm" onClick={() => go('settings')}>Open Settings</Button>}>
-          {online
-            ? cloudConfigured === false
-              ? 'Add your cloud API key and model name. Chat will not fall back to a local model.'
-              : 'Set a cloud model name and confirm the key status in Settings.'
-            : 'Set the model endpoint and name in Settings. Chat will report an error until a local model is reachable.'}
-        </Notice>
+      {readiness.level !== 'ready' && (
+        <ModelReadinessNotice readiness={readiness} checking={check.checking} onRecheck={() => void check.recheck()} action={<Button size="sm" onClick={() => go('settings')}>Open Settings</Button>} />
       )}
 
       <div className="home-grid">
@@ -143,6 +140,7 @@ export function Home({ go }: { go: (v: ViewId) => void }) {
               <Avatar state={avatarState} size={120} />
               <div className="stack tight">
                 <Badge tone={online ? 'warn' : 'ok'}>{online ? 'Online mode' : 'Offline mode'}</Badge>
+                <Badge tone={readiness.level === 'ready' ? 'ok' : readiness.level === 'blocked' ? 'warn' : 'muted'}>{readiness.level === 'ready' ? 'Model ready' : readiness.level === 'blocked' ? 'Model not ready' : 'Model not checked'}</Badge>
                 <p className="field-hint">
                   {online ? `Cloud model: ${settings.cloudModel || 'not set'}. Key ${cloudConfigured ? 'saved' : cloudConfigured === false ? 'missing' : 'status unknown'}.` : `Local model: ${settings.localModel || 'not set'}.`}
                 </p>
@@ -156,7 +154,7 @@ export function Home({ go }: { go: (v: ViewId) => void }) {
             </div>
           </Panel>
 
-          <Panel title="Capabilities" eyebrow="Reported by backend" actions={<Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go('status')}>Details</Button>}>
+          <Panel title="Capabilities" eyebrow="Checked by this app" actions={<Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go('status')}>Details</Button>}>
             {systemError && <Notice tone="warn" title="Unavailable">{systemError}</Notice>}
             {system && (
               <>

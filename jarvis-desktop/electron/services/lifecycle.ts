@@ -40,7 +40,8 @@ export class LaunchGuard {
 
   /** Called on clean quit and when the user chooses to open normally. */
   async end(): Promise<void> {
-    await this.fs.remove(this.running);
+    // Counter first: an interruption between the two steps still leaves the marker, i.e. one unclean start, not two.
     await this.fs.write(this.counter, '0');
+    await this.fs.remove(this.running);
   }
 }

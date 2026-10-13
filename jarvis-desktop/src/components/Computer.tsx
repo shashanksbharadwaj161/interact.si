@@ -4,7 +4,9 @@ import type { ActionPreview, ActionRequest } from '../shared/contracts';
 import { Dialog } from '../ui/Dialog';
 import { Badge, Button, Empty, Field, KV, Notice, PageHeader, Panel } from '../ui/primitives';
 import { useReady } from '../ui/store';
-import { cx, errMsg, parseHttpUrl, relTime, safeJson, truncate } from '../ui/util';
+import { cx, errMsg, relTime, safeJson, truncate } from '../ui/util';
+
+import { actionOutcome, buildAction, listedWindows, type ActionForm, type ListedWindow } from '../ui/action-result';
 
 type ActionType = ActionRequest['type'];
 type Risk = 'low' | 'medium' | 'high';
@@ -15,75 +17,32 @@ const TYPES: Record<ActionType, { label: string; risk: Risk; does: string; scope
   launch: { label: 'Launch app', risk: 'medium', does: 'Starts an application.', scope: 'Starts a program with your user rights. It should be on your approved apps list; the preview tells you if it is not.', needs: 'App name or full path.' },
   focus: { label: 'Focus window', risk: 'medium', does: 'Brings an existing window to the front.', scope: 'Changes which window is active. It does not read the window contents.', needs: 'Part of a window title or a process name.' },
   'move-window': { label: 'Move / resize window', risk: 'medium', does: 'Repositions and resizes one window.', scope: 'Changes window geometry only, in screen pixels.', needs: 'Window target plus x, y, width and height.' },
-  'type-text': { label: 'Type text', risk: 'high', does: 'Sends keystrokes as if you typed them.', scope: 'Text goes to whichever window has focus when it runs, which may not be the one you meant. Never use this for passwords or secrets.', needs: 'The text to type and, optionally, a window to focus first.' },
-  click: { label: 'Click', risk: 'high', does: 'Clicks at a screen position.', scope: 'A click can press anything under that point, including buttons that send, delete or purchase. Positions change when windows move.', needs: 'Screen x and y in pixels.' },
+  'type-text': { label: 'Type text', risk: 'high', does: 'Sends keystrokes as if you typed them.', scope: 'The backend focuses and rechecks the exact approved window before typing. Never use this for passwords or secrets. Command windows can execute typed text.', needs: 'The complete text and an explicit target window.' },
+  click: { label: 'Click', risk: 'high', does: 'Clicks at a screen position.', scope: 'A click can press anything under that point, including buttons that send, delete or purchase. Positions change when windows move.', needs: 'An explicit target window and screen x and y in pixels inside that window.' },
 };
 
-type Form = { type: ActionType; target: string; text: string; x: string; y: string; width: string; height: string };
+type Form = ActionForm;
 const blank = (): Form => ({ type: 'list-windows', target: '', text: '', x: '', y: '', width: '', height: '' });
 
-function intIn(v: string, lo: number, hi: number): number | null {
-  if (!/^-?\d+$/.test(v.trim())) return null;
-  const n = Number(v);
-  return n >= lo && n <= hi ? n : null;
-}
-
-function buildAction(f: Form): { action?: ActionRequest; errors: Record<string, string> } {
-  const e: Record<string, string> = {};
-  const a: ActionRequest = { type: f.type };
-  const t = f.target.trim();
-  if (f.type === 'launch' || f.type === 'focus' || f.type === 'move-window') {
-    if (!t) e.target = f.type === 'launch' ? 'Enter an app name or path.' : 'Enter a window title or process name.';
-    a.target = t.slice(0, 500);
-  }
-  if (f.type === 'open-url') {
-    if (!parseHttpUrl(t)) e.target = 'Enter a full http:// or https:// address.';
-    a.target = t;
-  }
-  if (f.type === 'type-text') {
-    if (!f.text) e.text = 'Enter the text to type.';
-    if (t) a.target = t;
-    a.text = f.text.slice(0, 2000);
-  }
-  if (f.type === 'click' || f.type === 'move-window') {
-    const x = intIn(f.x, -32000, 32000);
-    const y = intIn(f.y, -32000, 32000);
-    if (x === null) e.x = 'Whole number, in pixels.';
-    if (y === null) e.y = 'Whole number, in pixels.';
-    if (x !== null) a.x = x;
-    if (y !== null) a.y = y;
-    if (f.type === 'click' && t) a.target = t;
-  }
-  if (f.type === 'move-window') {
-    const w = intIn(f.width, 1, 20000);
-    const h = intIn(f.height, 1, 20000);
-    if (w === null) e.width = 'Whole number from 1.';
-    if (h === null) e.height = 'Whole number from 1.';
-    if (w !== null) a.width = w;
-    if (h !== null) a.height = h;
-  }
-  return Object.keys(e).length ? { errors: e } : { action: a, errors: e };
-}
-
-function ResultView({ value }: { value: unknown }) {
-  const rows = Array.isArray(value) && value.length > 0 && value.every((r) => r && typeof r === 'object' && ('title' in r || 'process' in r)) ? (value as Record<string, unknown>[]) : null;
+function ResultView({ value, onPick }: { value: unknown; onPick: (window: ListedWindow, action: 'focus' | 'move-window' | 'type-text' | 'click') => void }) {
+  const rows = listedWindows(value);
   if (rows) {
+    if (!rows.length) return <Notice>No open windows were reported.</Notice>;
     return (
       <div className="table-wrap">
         <table className="table">
-          <thead>
-            <tr><th>Window</th><th>Process</th></tr>
-          </thead>
-          <tbody>
-            {rows.slice(0, 100).map((r, i) => (
-              <tr key={i}>
-                <td>{truncate(String(r.title ?? ''), 80) || '(untitled)'}</td>
-                <td className="mono">{truncate(String(r.process ?? ''), 40)}</td>
-              </tr>
-            ))}
-          </tbody>
+          <caption className="sr-only">Open windows reported by Windows. Selecting a target fills the form; it never runs an action.</caption>
+          <thead><tr><th>Window</th><th>Process</th><th>Size</th><th>Target</th></tr></thead>
+          <tbody>{rows.slice(0, 100).map((w, i) => (
+            <tr key={w.hwnd || i}>
+              <td>{w.title || '(untitled)'}{w.protected && <Badge tone="warn">Protected</Badge>}</td>
+              <td className="mono">{w.process || '(unknown)'}</td>
+              <td>{w.width !== null && w.height !== null ? `${w.width} × ${w.height}` : 'Not reported'}</td>
+              <td><div className="row wrap">{(['focus','move-window','type-text','click'] as const).map(type => <Button key={type} size="sm" variant="quiet" disabled={!w.hwnd || w.protected} onClick={() => onPick(w, type)}>{type==='move-window'?'Move':type==='type-text'?'Type':type==='focus'?'Focus':'Click'}</Button>)}</div></td>
+            </tr>
+          ))}</tbody>
         </table>
-        {rows.length > 100 && <p className="sub pad">Showing 100 of {rows.length}.</p>}
+        <p className="sub pad">Choose a target to prepare an action. Every change still needs a preview and approval.{rows.length > 100 ? ` Showing 100 of ${rows.length}.` : ''}</p>
       </div>
     );
   }
@@ -91,7 +50,7 @@ function ResultView({ value }: { value: unknown }) {
 }
 
 export function Computer() {
-  const { api, state, settings, toast, isPreview, run } = useReady();
+  const { api, state, settings, toast, isPreview, run, system, systemLoading, systemError, refreshSystem } = useReady();
   const [form, setForm] = useState<Form>(blank);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [previewing, setPreviewing] = useState(false);
@@ -99,11 +58,15 @@ export function Computer() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [review, setReview] = useState(false);
   const [executing, setExecuting] = useState<'approve' | 'reject' | null>(null);
-  const [result, setResult] = useState<{ kind: 'ran' | 'rejected' | 'failed'; value?: unknown; message?: string; summary: string } | null>(null);
+  const [result, setResult] = useState<{ kind: 'ran' | 'not-run' | 'rejected' | 'unconfirmed' | 'failed'; value?: unknown; message?: string; summary: string } | null>(null);
 
+  const desktop = system?.capabilities.find(c => c.id === 'ui-automation');
+  const desktopReady = desktop?.available === true && !systemError;
+  const desktopReason = systemError || desktop?.reason || (systemLoading ? 'Checking Windows desktop control…' : 'Windows desktop control has not been checked.');
+  const needsDesktop = !['launch','open-url'].includes(form.type);
   const meta = TYPES[form.type];
   const live = useMemo(() => buildAction(form), [form]);
-  const stale = prev !== null && live.action !== undefined && JSON.stringify(live.action) !== JSON.stringify(prev.action);
+  const stale = prev !== null && (!live.action || JSON.stringify(live.action) !== JSON.stringify(prev.action));
   const patch = (p: Partial<Form>) => {
     setForm((f) => ({ ...f, ...p }));
     setErrors({});
@@ -112,6 +75,7 @@ export function Computer() {
   const activity = useMemo(() => [...state.activity].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 8), [state.activity]);
 
   const doPreview = async () => {
+    if (needsDesktop && !desktopReady) return setPreviewError(desktopReason);
     const built = buildAction(form);
     if (!built.action) return setErrors(built.errors);
     setPreviewing(true);
@@ -134,12 +98,13 @@ export function Computer() {
     const summary = prev.preview.summary;
     try {
       const out = await api.executeAction(prev.preview.id, approved);
-      setResult(approved ? { kind: 'ran', value: out, summary } : { kind: 'rejected', summary });
+      setResult({ ...actionOutcome(out, approved), summary });
       setPrev(null);
       setReview(false);
       await run(async () => undefined);
     } catch (e) {
-      setResult({ kind: 'failed', message: errMsg(e, 'The action failed.'), summary });
+      setResult(approved ? { kind: 'failed', message: errMsg(e, 'The action failed.'), summary } : { kind: 'rejected', summary });
+      setPrev(null);
       setReview(false);
       toast('error', errMsg(e));
     } finally {
@@ -157,12 +122,19 @@ export function Computer() {
     }
   };
 
+  const pickWindow = (window: ListedWindow, type: 'focus' | 'move-window' | 'type-text' | 'click') => {
+    if (!window.hwnd || window.protected) return;
+    patch({ type, target: `hwnd:${window.hwnd}`, ...(type==='move-window' ? {x:String(window.x ?? 0), y:String(window.y ?? 0), width:String(window.width ?? 800), height:String(window.height ?? 600)} : {}) });
+    setPrev(null);setPreviewError(null);
+    toast('info', `Target selected: ${window.title || window.process}. Preview before running.`);
+  };
   const p = prev?.preview;
 
   return (
     <div className="page page-wide">
       <PageHeader eyebrow="Work" title="Computer" subtitle="Ask the backend to preview an action. Nothing runs until you read the preview and approve it." />
 
+      {needsDesktop&&!desktopReady&&<Notice tone="warn" title="Desktop control unavailable">{desktopReason}<div className="row"><Button size="sm" busy={systemLoading} onClick={()=>void refreshSystem()}>Check again</Button><a className="btn btn-ghost btn-sm" href="#/status">System status</a></div></Notice>}
       <div className="computer-grid">
         <div className="stack">
           <Panel title="1 · Describe the action" eyebrow="Request">
@@ -188,10 +160,10 @@ export function Computer() {
             </div>
 
             {form.type !== 'list-windows' && (
-              <Field label={form.type === 'open-url' ? 'Web address' : form.type === 'launch' ? 'App name or path' : form.type === 'type-text' || form.type === 'click' ? 'Window (optional)' : 'Window title or process'} error={errors.target}>
+              <Field label={form.type === 'open-url' ? 'Web address' : form.type === 'launch' ? 'App name or path' : form.type === 'type-text' || form.type === 'click' ? 'Target window (required)' : 'Window title or process'} error={errors.target}>
                 {(id, d) => (
                   <div className="row">
-                    <input id={id} aria-describedby={d} className="input grow" value={form.target} maxLength={500} spellCheck={false} onChange={(e) => patch({ target: e.target.value })} placeholder={form.type === 'open-url' ? 'https://example.com' : form.type === 'launch' ? 'notepad.exe' : 'e.g. Notepad'} />
+                    <input id={id} aria-describedby={d} className="input grow" value={form.target} maxLength={500} spellCheck={false} onChange={(e) => patch({ target: e.target.value })} placeholder={form.type === 'open-url' ? 'https://example.com' : form.type === 'launch' ? 'notepad.exe' : 'e.g. hwnd:12345 or Notepad'} />
                     {form.type === 'launch' && <Button icon={FolderOpen} onClick={() => void browse('file')}>Browse…</Button>}
                   </div>
                 )}
@@ -216,7 +188,7 @@ export function Computer() {
             )}
 
             <div className="row">
-              <Button variant="primary" icon={MagnifyingGlass} busy={previewing} onClick={() => void doPreview()}>
+              <Button variant="primary" icon={MagnifyingGlass} busy={previewing} disabled={needsDesktop&&!desktopReady || executing !== null} onClick={() => void doPreview()}>
                 Preview action
               </Button>
               <span className="sub">Preview asks the backend what would happen. It does not run anything.</span>
@@ -231,15 +203,15 @@ export function Computer() {
                 <dl className="kv-list">
                   <KV k="Summary">{p.summary}</KV>
                   <KV k="Allowed">{p.allowed ? <Badge tone="ok">Allowed</Badge> : <Badge tone="danger">Blocked</Badge>}</KV>
-                  <KV k="Approval">{p.requiresApproval ? 'Required' : 'Not required by the backend (this screen still asks)'}</KV>
+                  <KV k="Approval">{p.requiresApproval ? 'Required' : 'Not required — read-only action'}</KV>
                   {p.reason && <KV k="Reason">{p.reason}</KV>}
                   <KV k="Request"><code>{truncate(JSON.stringify(prev.action), 200)}</code></KV>
                 </dl>
                 {stale && <Notice tone="warn" title="The form changed after this preview">Preview again before approving.</Notice>}
                 {!p.allowed && <Notice tone="danger" title="Blocked">This action cannot run. {p.reason ?? 'The backend gave no reason.'} Adjust the request, or review Settings → Access.</Notice>}
                 <div className="row">
-                  <Button variant="primary" icon={ShieldCheck} disabled={!p.allowed || stale} onClick={() => setReview(true)}>
-                    Review &amp; approve…
+                  <Button variant="primary" icon={ShieldCheck} disabled={!p.allowed || stale || executing !== null || needsDesktop&&!desktopReady} onClick={() => p.requiresApproval ? setReview(true) : void decide(true)}>
+                    {p.requiresApproval ? 'Review & approve…' : 'Read windows'}
                   </Button>
                   <Button variant="quiet" disabled={executing !== null} onClick={() => void decide(false)}>
                     Reject
@@ -250,11 +222,12 @@ export function Computer() {
           </Panel>
 
           {result && (
-            <Panel title="3 · Outcome" eyebrow={result.kind === 'ran' ? 'Executed' : result.kind === 'rejected' ? 'Rejected' : 'Failed'}>
+            <Panel title="3 · Outcome" eyebrow={result.kind === 'ran' ? 'Done' : result.kind === 'not-run' ? 'Not run' : result.kind === 'unconfirmed' ? 'Not confirmed' : result.kind === 'rejected' ? 'Rejected' : 'Failed'}>
               <div aria-live="polite" className="stack">
                 <p><strong>{result.summary}</strong></p>
-                {result.kind === 'ran' && <ResultView value={result.value} />}
+                {result.kind === 'ran' && <ResultView value={result.value} onPick={pickWindow} />}
                 {result.kind === 'rejected' && <Notice>You rejected this action. Nothing ran.</Notice>}
+                {(result.kind === 'not-run' || result.kind === 'unconfirmed') && <Notice tone="warn" title={result.kind === 'not-run'?'Not run':'Execution not confirmed'}>{result.message}</Notice>}
                 {result.kind === 'failed' && <Notice tone="danger" title="The action did not complete">{result.message}</Notice>}
               </div>
             </Panel>
@@ -313,7 +286,9 @@ export function Computer() {
               <div className="scope-head"><WarningCircle size={16} aria-hidden /><strong>{TYPES[prev.action.type].label}</strong></div>
               <p className="field-hint">{TYPES[prev.action.type].scope}</p>
             </div>
-            <pre className="code-block">{safeJson(prev.action, 800)}</pre>
+            <dl className="kv-list"><KV k="Resolved target">{prev.preview.summary}</KV>{prev.action.target&&<KV k="Requested target"><code>{prev.action.target}</code></KV>}</dl>
+            {prev.action.type==='type-text'&&<><Field label={`Complete text to type · ${prev.action.text?.length || 0} characters`} hint="Read the complete text, including line breaks, before approving.">{id=><textarea id={id} className="input" rows={6} readOnly value={prev.action.text || ''}/>}</Field>{/cmd|powershell|pwsh|terminal|conhost|bash|wsl|mintty|shell/i.test(prev.preview.summary+' '+prev.action.target)&&<Notice tone="warn" title="Command window">Typed text can be interpreted as a command. Newline command input is blocked by the backend.</Notice>}</>}
+            <details><summary>Complete action data</summary><pre className="code-block">{JSON.stringify(prev.action, null, 2)}</pre></details>
           </div>
         )}
       </Dialog>

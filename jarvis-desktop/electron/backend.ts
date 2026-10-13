@@ -9,9 +9,9 @@ import {createGuardedFetch} from './services/netGuard';
 import {normalizeAbsolutePath} from './services/paths';
 import {Secrets} from './services/secrets';
 import {Speech} from './services/speech';
-import {Store, type LoadResult, type StoreFs} from './services/store';
+import {Store, parseEnvelope, type LoadResult, type StoreFs} from './services/store';
 import {System} from './services/system';
-import {LIMITS, ValidationError, buildCapsule, buildNote, buildTask, checkId, mergeSettings} from './services/validation';
+import {LIMITS, ValidationError, buildCapsule, buildNote, buildTask, checkId, mergeSettings, parseState} from './services/validation';
 import {createNativeAdapter, type NativeAdapter} from './native/adapter';
 import {NativeRunner} from './native/runner';
 
@@ -30,6 +30,8 @@ export interface BackendEnv {
   shell: ShellAdapter;
   selfPids: () => number[];
   safeLaunch?: () => boolean;
+  /** Trusted main-process dialog. Missing confirmation always denies sensitive changes/actions. */
+  confirm?: (summary: string, detail: string) => Promise<boolean>;
   /** Test seams. Production leaves these undefined. */
   native?: NativeAdapter;
   storeFs?: StoreFs;
@@ -81,8 +83,15 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   const speech = new Speech({native, settings, tmpDir: env.tmpDir, newId: () => store.id()});
   const system = new System({settings, fetch: guardedFetch, speech, secrets, native, safeLaunch});
   const actions = new ActionService({
-    settings, activity, native, shell: env.shell, selfPids: env.selfPids, safeLaunch, newId: () => store.id(),
+    settings, activity, native, shell: env.shell, selfPids: env.selfPids, safeLaunch, confirm: env.confirm, newId: () => store.id(),
   });
+  let sensitiveQueue: Promise<unknown> = Promise.resolve();
+  const sensitive = <T>(run: () => Promise<T>): Promise<T> => {
+    const next = sensitiveQueue.catch(() => undefined).then(run);
+    sensitiveQueue = next;
+    return next;
+  };
+  let lastRestore = -Infinity;
 
   const withLimit = (n: number, max: number, what: string) => { if (n >= max) throw new ValidationError(`Too many ${what} (max ${max})`); };
 
@@ -90,6 +99,16 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     async getState(): Promise<AppState> { return store.snapshot(); },
 
     async saveSettings(patch) {
+      return sensitive(async () => {
+      const before = settings();
+      const proposed = mergeSettings(before, patch);
+      const changes = [
+        ...proposed.approvedApps.filter((v) => !before.approvedApps.includes(v)).map((v) => `Approve executable: ${v}`),
+        ...proposed.allowedRoots.filter((v) => !before.allowedRoots.includes(v)).map((v) => `Allow folder: ${v}`),
+        ...(before.mode !== 'online' && proposed.mode === 'online' ? ['Enable online mode (cloud requests may send conversation content)'] : []),
+        ...(before.localEndpoint !== proposed.localEndpoint ? [`Local model endpoint: ${before.localEndpoint} → ${proposed.localEndpoint}`] : []),
+      ];
+      if (changes.length && !(await env.confirm?.('Change desktop permissions or AI connection?', changes.join('\n')))) throw new ValidationError('Native confirmation declined or unavailable');
       let changed: string[] = [];
       await store.mutate((d) => {
         const merged = mergeSettings(d.settings, patch);
@@ -99,6 +118,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       system.invalidate();
       if (changed.length) await activity('settings', `Settings changed: ${changed.join(', ')}`);
       return store.snapshot();
+      });
     },
 
     async getSystemInfo(): Promise<SystemInfo> { return system.info(); },
@@ -117,7 +137,12 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       return store.mutate((d) => { d.capsules = d.capsules.filter((c) => c.id !== id); });
     },
     async restoreCapsule(id) {
-      return restoreCapsule({state: () => store.snapshot(), actions, native, selfPids: env.selfPids, activity, windowWaitMs: env.windowWaitMs}, id);
+      return sensitive(async () => {
+        const now = (env.now ?? (() => new Date()))().getTime();
+        if (now - lastRestore < 3000) throw new ValidationError('Please wait before restoring another capsule');
+        lastRestore = now;
+        return restoreCapsule({state: () => store.snapshot(), actions, native, selfPids: env.selfPids, activity, safeLaunch, confirm: env.confirm, windowWaitMs: env.windowWaitMs}, id);
+      });
     },
 
     async saveNote(input) {
@@ -186,6 +211,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       return {path: file};
     },
     async importData() {
+      return sensitive(async () => {
       const src = await env.dialogs.openImport();
       if (!src) return store.snapshot();
       const n = normalizeAbsolutePath(src);
@@ -193,10 +219,18 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       const st = await fsp.stat(n.path);
       if (!st.isFile() || st.size > MAX_IMPORT_BYTES) throw new ValidationError('The import file is not a file or is too large');
       const raw = await fsp.readFile(n.path, 'utf8');
-      const state = await store.importDocument(raw);
+      // Imported content cannot grant permissions or change the AI endpoint/provider.
+      // Validate the original document fully inside Store before substituting its settings.
+      const envelope = parseEnvelope(raw, ['jarvis-export']);
+      const validated = parseState(envelope.state);
+      const document = {format: 'jarvis-export', schemaVersion: envelope.schemaVersion, state: validated};
+      const current = settings();
+      document.state.settings = {...document.state.settings, approvedApps: current.approvedApps, allowedRoots: current.allowedRoots, mode: 'offline', localEndpoint: current.localEndpoint, cloudModel: current.cloudModel};
+      const state = await store.importDocument(JSON.stringify(document));
       system.invalidate();
-      await activity('backup', 'Imported data (a pre-import backup was taken)');
+      await activity('backup', 'Imported data (a pre-import backup was taken)', 'Imported security settings ignored; current app/folder permissions and AI endpoints retained. Online mode disabled.');
       return state;
+      });
     },
     async pickPath(kind) {
       if (kind !== 'file' && kind !== 'folder') throw new ValidationError('kind must be "file" or "folder"');

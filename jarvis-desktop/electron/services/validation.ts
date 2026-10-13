@@ -154,11 +154,32 @@ export function mergeSettings(current: Settings, patch: unknown): Settings {
   return next as unknown as Settings;
 }
 
-function fullSettings(v: unknown): Settings {
+export interface ParseOptions {
+  /**
+   * Disk loads and imports: an invalid allowedRoots/approvedApps entry (for example a UNC path saved before network
+   * paths were refused) is dropped and reported in `dropped` instead of failing the whole file.
+   */
+  lenient?: boolean;
+  dropped?: string[];
+}
+
+function lenientList(key: 'allowedRoots' | 'approvedApps', v: unknown, opts: ParseOptions): unknown {
+  if (!opts.lenient || !Array.isArray(v) || v.length > 200) return v;
+  const keep = v.filter((item) => {
+    try { settingsField(key, [item]); return true; } catch {
+      opts.dropped?.push(`${key}: ${String(item).slice(0, 80)}`);
+      return false;
+    }
+  });
+  return keep.slice(0, key === 'allowedRoots' ? 50 : 100);
+}
+
+function fullSettings(v: unknown, opts: ParseOptions = {}): Settings {
   if (!isObj(v)) throw new ValidationError('settings missing');
   const out: Record<string, unknown> = {};
   for (const k of SETTING_KEYS) {
-    out[k] = k in v ? settingsField(k, v[k]) : (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[k];
+    if (!(k in v)) { out[k] = (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[k]; continue; }
+    out[k] = settingsField(k, k === 'allowedRoots' || k === 'approvedApps' ? lenientList(k, v[k], opts) : v[k]);
   }
   for (const k of Object.keys(v)) if (!SETTING_KEYS.includes(k)) throw new ValidationError(`Unknown setting "${k}"`);
   return out as unknown as Settings;
@@ -271,14 +292,23 @@ function activity(v: unknown): Activity {
   return a;
 }
 
-function list<T>(v: unknown, name: string, max: number, fn: (x: unknown) => T): T[] {
+function list<T extends {id?: string}>(v: unknown, name: string, max: number, fn: (x: unknown) => T, unique = false): T[] {
   if (!Array.isArray(v)) throw new ValidationError(`${name} must be a list`);
   if (v.length > max) throw new ValidationError(`${name} has too many entries (max ${max})`);
-  return v.map(fn);
+  const out = v.map(fn);
+  if (unique) {
+    const ids = new Set<string>();
+    for (const x of out) {
+      if (x.id === undefined) continue;
+      if (ids.has(x.id)) throw new ValidationError(`${name} contains a duplicate id`);
+      ids.add(x.id);
+    }
+  }
+  return out;
 }
 
-/** Strict whole-state validation, used for disk loads and imports. Throws ValidationError. */
-export function parseState(v: unknown): AppState {
+/** Whole-state validation, used for disk loads and imports. Throws ValidationError (see ParseOptions.lenient). */
+export function parseState(v: unknown, opts: ParseOptions = {}): AppState {
   if (!isObj(v)) throw new ValidationError('state must be an object');
   const caps = (x: unknown) => {
     if (!isObj(x)) throw new ValidationError('capsule is invalid');
@@ -287,20 +317,20 @@ export function parseState(v: unknown): AppState {
     return {...c, id: checkId(x.id), createdAt: isoDate(x.createdAt, 'createdAt'), updatedAt: isoDate(x.updatedAt, 'updatedAt')};
   };
   return {
-    settings: fullSettings(v.settings),
-    capsules: list(v.capsules, 'capsules', LIMITS.capsules, caps),
+    settings: fullSettings(v.settings, opts),
+    capsules: list(v.capsules, 'capsules', LIMITS.capsules, caps, true),
     notes: list(v.notes, 'notes', LIMITS.notes, (x) => {
       if (!isObj(x) || typeof x.id !== 'string') throw new ValidationError('note is invalid');
       const n = buildNote({...x, updatedAt: undefined}, undefined, () => '', '');
       return {...n, id: checkId(x.id), updatedAt: isoDate(x.updatedAt, 'updatedAt')};
-    }),
+    }, true),
     tasks: list(v.tasks, 'tasks', LIMITS.tasks, (x) => {
       if (!isObj(x) || typeof x.id !== 'string') throw new ValidationError('task is invalid');
       const t = buildTask({...x, createdAt: undefined}, undefined, () => '', '');
       return {...t, id: checkId(x.id), createdAt: isoDate(x.createdAt, 'createdAt')};
-    }),
-    chat: list(v.chat ?? [], 'chat', LIMITS.chatMessages, chatMessage),
-    activity: list(v.activity ?? [], 'activity', LIMITS.activity, activity),
+    }, true),
+    chat: list(v.chat ?? [], 'chat', LIMITS.chatMessages, chatMessage, true),
+    activity: list(v.activity ?? [], 'activity', LIMITS.activity, activity, true),
   };
 }
 

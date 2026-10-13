@@ -1,4 +1,5 @@
-// The ONLY egress path from the main process. No other module may call fetch / net / http(s).
+// The ONLY HTTP egress path from the main process. No other module may call fetch / net / http(s).
+// Filesystem access cannot reach the network either: paths.ts accepts local drive paths only (no UNC/WebDAV/device paths).
 import type {Mode} from '../../src/shared/contracts';
 import {isLoopbackHost} from './validation';
 

@@ -28,6 +28,9 @@ export const DEFAULT_TIMEOUT_MS = 15_000;
 export const DEFAULT_MAX_STDOUT = 1024 * 1024;
 const MAX_INPUT_BYTES = 256 * 1024;
 
+/** Helpers whose stdin carries secrets or user text. Their stderr is never surfaced: PowerShell errors can echo input values. */
+const SENSITIVE_INPUT: ReadonlySet<ScriptName> = new Set<ScriptName>(['dpapi', 'type-text', 'speak']);
+
 export function defaultPowerShellPath(env: NodeJS.ProcessEnv = process.env): string {
   const root = env.SystemRoot || env.windir || 'C:\\Windows';
   return path.win32.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
@@ -35,7 +38,7 @@ export function defaultPowerShellPath(env: NodeJS.ProcessEnv = process.env): str
 
 /** Builds the exact argv; exported so tests can assert there is no interpolation of user input. */
 export function buildArgs(scriptFile: string): string[] {
-  return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptFile];
+  return ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptFile];
 }
 
 export class NativeRunner {
@@ -83,20 +86,25 @@ export class NativeRunner {
     if (Buffer.byteLength(json) > MAX_INPUT_BYTES) throw new NativeError('Native helper input is too large', 'bad-output');
     const timeout = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const maxBuffer = opts.maxStdoutBytes ?? DEFAULT_MAX_STDOUT;
+    if (opts.signal?.aborted) throw new NativeError('Native helper was cancelled', 'cancelled');
     await this.acquire();
     try {
+      // Cancelled while waiting for a free slot: never start the helper.
+      if (opts.signal?.aborted) throw new NativeError('Native helper was cancelled', 'cancelled');
       return await new Promise<T>((resolve, reject) => {
         let child: ChildProcess;
+        const abort = () => { try { child?.kill(); } catch { /* ignore */ } };
         try {
           child = this.exec(this.ps, buildArgs(file), {timeout, maxBuffer, windowsHide: true, encoding: 'utf8', shell: false, killSignal: 'SIGKILL'}, (err, stdout, stderr) => {
             this.children.delete(child);
+            opts.signal?.removeEventListener('abort', abort);
             if (opts.signal?.aborted) return reject(new NativeError('Native helper was cancelled', 'cancelled'));
             if (err) {
               const e = err as NodeJS.ErrnoException & {killed?: boolean; code?: string | number};
               if (e.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') return reject(new NativeError('Native helper produced too much output', 'output-too-large'));
               if (e.killed) return reject(new NativeError('Native helper timed out', 'timeout'));
               if (e.code === 'ENOENT') return reject(new NativeError('Windows PowerShell is not available', 'unavailable'));
-              return reject(new NativeError(`Native helper failed (exit ${String(e.code ?? 'unknown')})${stderr ? ': ' + String(stderr).split(/\r?\n/)[0].slice(0, 160) : ''}`));
+              return reject(new NativeError(`Native helper failed (exit ${String(e.code ?? 'unknown')})${stderr && !SENSITIVE_INPUT.has(script) ? ': ' + String(stderr).split(/\r?\n/)[0].slice(0, 160) : ''}`));
             }
             const lines = String(stdout).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
             const last = lines[lines.length - 1];
@@ -109,7 +117,6 @@ export class NativeRunner {
         this.children.add(child);
         child.stdin?.on('error', () => undefined);
         if (opts.signal) {
-          const abort = () => { try { child.kill(); } catch { /* ignore */ } };
           if (opts.signal.aborted) abort(); else opts.signal.addEventListener('abort', abort, {once: true});
         }
         child.stdin?.end(json, 'utf8');

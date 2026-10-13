@@ -1,0 +1,5 @@
+# Build instructions
+
+Implement an original Windows companion, not a marketing page. Offline default, optionally user-provided cloud API. Use the shared contract in src/shared/contracts.ts. Keep code within this repository. Never access development credentials, Control Room private runtime, or user personal files. Do not change global computer settings, install global software, access outside services/accounts, or spend on any additional API. No WebSearch/server tools. No extra agent spawning.
+
+Use Windows-compatible commands. Own only paths assigned in task prompt. Do not edit package.json, shared contracts, AGENTS.md or other worker paths unless explicitly assigned. Tests must verify behavior. Stub/unavailable capabilities clearly marked; no fake voice, computer control, avatars, activity, or model responses. Do not copy restricted/GPL/AGPL implementation from linked repos. Use original code and permissive dependencies. Follow existing repo conventions. Run checks, leave changes uncommitted for orchestrator review, and finish with changed files, validation, limitations. No merge or push.

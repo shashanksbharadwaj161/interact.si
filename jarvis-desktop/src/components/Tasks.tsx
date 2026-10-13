@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, Pause, PencilSimple, Play, Plus, Target, Timer, Trash } from '@phosphor-icons/react';
 import type { Task } from '../shared/contracts';
 import { Dialog, ConfirmDialog } from '../ui/Dialog';
-import { Badge, Button, Empty, Field, IconButton, PageHeader, Panel } from '../ui/primitives';
+import { Badge, Button, Empty, Field, IconButton, PageHeader, Panel, Notice } from '../ui/primitives';
 import { useFocus } from '../ui/focus';
 import { useReady } from '../ui/store';
 import { cx, dueBucket, dueKey, fmtClock, fmtDueKey, type DueBucket } from '../ui/util';
@@ -90,7 +90,7 @@ function FocusPanel({ tasks }: { tasks: Task[] }) {
 }
 
 export function Tasks() {
-  const { state, api, mutate } = useReady();
+  const { state, api, mutate, toast } = useReady();
   const focus = useFocus();
   const [title, setTitle] = useState('');
   const [due, setDue] = useState('');
@@ -103,6 +103,10 @@ export function Tasks() {
   const [saving, setSaving] = useState(false);
   const [del, setDel] = useState<Task | null>(null);
   const [clearDone, setClearDone] = useState(false);
+  const checkboxes = useRef(new Map<string, HTMLInputElement>());
+  const addInput = useRef<HTMLInputElement>(null);
+  const pendingFocus = useRef<string|null>(null);
+  const [clearResult, setClearResult] = useState<string|null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const grouped = useMemo(() => {
@@ -113,6 +117,19 @@ export function Tasks() {
     g.done.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return g;
   }, [state.tasks]);
+
+  useEffect(()=>{
+    const id = pendingFocus.current;
+    if (!id || busyId || edit || del || clearDone) return;
+    const handle = requestAnimationFrame(()=>{
+      // Restore the same task after it moves groups, unless the user moved focus elsewhere.
+      if (document.activeElement===document.body || document.activeElement instanceof HTMLDialogElement || document.activeElement===checkboxes.current.get(id)) {
+        (checkboxes.current.get(id) || addInput.current)?.focus({preventScroll:true});
+      }
+      pendingFocus.current=null;
+    });
+    return ()=>cancelAnimationFrame(handle);
+  },[state.tasks,busyId,edit,del,clearDone]);
 
   const doneCount = grouped.done.length;
   const total = state.tasks.length;
@@ -131,6 +148,8 @@ export function Tasks() {
   };
 
   const toggle = async (t: Task) => {
+    if (busyId) return;
+    if (document.activeElement===checkboxes.current.get(t.id)) pendingFocus.current=t.id;
     setBusyId(t.id);
     await mutate(() => api.saveTask({ id: t.id, done: !t.done }));
     setBusyId(null);
@@ -150,7 +169,7 @@ export function Tasks() {
     setSaving(true);
     const ok = await mutate(() => api.saveTask({ id: edit.id, title: t, due: editDue }), 'Task updated.');
     setSaving(false);
-    if (ok) setEdit(null);
+    if (ok) {pendingFocus.current=edit.id;setEdit(null);}
   };
 
   const doDelete = async () => {
@@ -158,19 +177,22 @@ export function Tasks() {
     setSaving(true);
     const ok = await mutate(() => api.deleteTask(del.id), 'Task deleted.');
     setSaving(false);
-    if (ok) setDel(null);
+    if (ok) {pendingFocus.current=del.id;setDel(null);}
   };
 
   const doClearDone = async () => {
-    setSaving(true);
-    let ok = true;
-    for (const t of grouped.done) {
-      // sequential: each delete returns fresh state and keeps the backend's writes ordered
-      ok = (await mutate(() => api.deleteTask(t.id))) && ok;
-      if (!ok) break;
+    setSaving(true);setClearResult(null);
+    const tasks=[...grouped.done];let deleted=0;
+    for (const t of tasks) {
+      // Each delete returns persisted state; stop at the first failure and report partial work.
+      if (!(await mutate(() => api.deleteTask(t.id)))) break;
+      deleted++;
     }
     setSaving(false);
-    if (ok) setClearDone(false);
+    const message=`Deleted ${deleted} of ${tasks.length} completed tasks.`;
+    setClearResult(message);
+    if (deleted===tasks.length) {pendingFocus.current=tasks[0]?.id || 'add';setClearDone(false);toast('ok',message);}
+    else toast('error',message+' Remaining tasks were kept.');
   };
 
   return (
@@ -182,7 +204,7 @@ export function Tasks() {
           <Panel title="Add a task" eyebrow="Checklist">
             <form className="row wrap" onSubmit={(e) => { e.preventDefault(); void add(); }}>
               <Field label="Task" error={addError} className="grow">
-                {(id, d) => <input id={id} aria-describedby={d} className="input" value={title} maxLength={200} placeholder="What needs doing?" onChange={(e) => { setTitle(e.target.value); setAddError(null); }} />}
+                {(id, d) => <input id={id} aria-describedby={d} ref={addInput} className="input" value={title} maxLength={200} placeholder="What needs doing?" onChange={(e) => { setTitle(e.target.value); setAddError(null); }} />}
               </Field>
               <Field label="Due (optional)">
                 {(id) => <input id={id} type="date" className="input" value={due} onChange={(e) => setDue(e.target.value)} />}
@@ -204,7 +226,7 @@ export function Tasks() {
                   key={g.id}
                   title={`${g.title} · ${grouped[g.id].length}`}
                   className={cx('task-group', `task-${g.id}`)}
-                  actions={g.id === 'done' ? <Button size="sm" variant="quiet" icon={Trash} onClick={() => setClearDone(true)}>Clear completed</Button> : undefined}
+                  actions={g.id === 'done' ? <Button size="sm" variant="quiet" icon={Trash} onClick={() => {setClearResult(null);setClearDone(true);}}>Clear completed</Button> : undefined}
                 >
                   <ul className="list">
                     {grouped[g.id].map((t) => {
@@ -212,7 +234,7 @@ export function Tasks() {
                       const focusing = focus.taskId === t.id && (focus.phase === 'running' || focus.phase === 'paused');
                       return (
                         <li key={t.id} className={cx('list-row', t.done && 'is-done')}>
-                          <input type="checkbox" className="check" checked={t.done} disabled={busyId === t.id} aria-label={`${t.done ? 'Reopen' : 'Complete'} “${t.title}”`} onChange={() => void toggle(t)} />
+                          <input ref={element=>{if(element)checkboxes.current.set(t.id,element);else checkboxes.current.delete(t.id);}} type="checkbox" className="check" checked={t.done} disabled={busyId !== null} aria-label={`${t.done ? 'Reopen' : 'Complete'} “${t.title}”`} onChange={() => void toggle(t)} />
                           <span className="grow task-title">{t.title}</span>
                           {focusing && <Badge tone="accent">Focusing</Badge>}
                           {k && !t.done && <Badge tone={g.id === 'overdue' ? 'danger' : g.id === 'today' ? 'warn' : 'muted'}>{fmtDueKey(k)}</Badge>}
@@ -267,6 +289,7 @@ export function Tasks() {
       </ConfirmDialog>
       <ConfirmDialog open={clearDone} title="Clear completed tasks?" confirmLabel={`Delete ${doneCount}`} danger busy={saving} onCancel={() => setClearDone(false)} onConfirm={() => void doClearDone()}>
         <p>{doneCount} completed task{doneCount === 1 ? '' : 's'} will be permanently removed.</p>
+        {clearResult&&<Notice tone="warn">{clearResult} Remaining tasks were kept; retry affects only those still listed.</Notice>}
       </ConfirmDialog>
     </div>
   );

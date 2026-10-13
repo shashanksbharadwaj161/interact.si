@@ -7,7 +7,9 @@ import {checkWindowPolicy} from './policy';
 
 export interface CapsuleDeps {
   state: () => AppState;
-  actions: Pick<ActionService, 'openItem'>;
+  actions: Pick<ActionService, 'prepareItem' | 'claimAction'>;
+  confirm?: (summary: string, detail: string) => Promise<boolean>;
+  safeLaunch?: () => boolean;
   native: Pick<NativeAdapter, 'listWindows' | 'moveWindow'>;
   selfPids: () => number[];
   activity: (kind: string, summary: string, details?: string) => Promise<unknown>;
@@ -36,9 +38,21 @@ export async function restoreCapsule(deps: CapsuleDeps, id: unknown): Promise<Re
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = deps.now ?? Date.now;
   const result: RestoreResult = {opened: [], failed: []};
+  const allTargets = [...capsule.items.map((i) => i.target), ...(capsule.windows ?? []).map((i) => `window ${i.process} ${i.title ?? ''}`)];
+  const stop = (reason: string) => ({opened: [], failed: allTargets.map((target) => ({target, reason}))});
+  if (deps.safeLaunch?.()) return stop('Safe launch is active');
+  const prepared = await Promise.all(capsule.items.map((item) => deps.actions.prepareItem(item.kind, item.target)));
+  const detail = [
+    ...prepared.map((p, i) => `${capsule.items[i].kind}: ${capsule.items[i].target}\n${p.ok ? p.detail : `Blocked: ${p.reason}`}`),
+    ...(capsule.windows ?? []).map((win) => `Move window ${win.process} "${win.title ?? ''}" to ${win.x},${win.y}, ${win.width}×${win.height}`),
+  ].join('\n\n');
+  if (allTargets.length && !(await deps.confirm?.(`Restore capsule "${capsule.name}"`, detail))) return stop('Native confirmation declined or unavailable');
+  if (deps.safeLaunch?.()) return stop('Safe launch is active');
 
-  for (const item of capsule.items) {
-    const r = await deps.actions.openItem(item.kind, item.target);
+  for (let i = 0; i < capsule.items.length; i++) {
+    const item = capsule.items[i];
+    const preparedItem = prepared[i];
+    const r = preparedItem.ok ? await preparedItem.run() : preparedItem;
     if (r.ok) result.opened.push(item.target);
     else result.failed.push({target: item.target, reason: r.reason});
   }
@@ -61,6 +75,7 @@ export async function restoreCapsule(deps: CapsuleDeps, id: unknown): Promise<Re
         const name = `${saved.process}${saved.title ? ` "${saved.title}"` : ''}`;
         const why = checkWindowPolicy(win, 'move-window', deps.selfPids());
         if (why) { result.failed.push({target: `window ${name}`, reason: why}); continue; }
+        if (deps.safeLaunch?.() || !deps.actions.claimAction()) { result.failed.push({target: `window ${name}`, reason: deps.safeLaunch?.() ? 'Safe launch is active' : 'Action rate limit reached'}); continue; }
         try {
           await deps.native.moveWindow({hwnd: win.hwnd, pid: win.pid}, {x: saved.x, y: saved.y, width: saved.width, height: saved.height});
           result.opened.push(`window ${name}`);

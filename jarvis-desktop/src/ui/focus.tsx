@@ -61,7 +61,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   }, [saved, remainingSec, commit, toast]);
 
   useEffect(() => {
-    const base = 'Jarvis Desktop';
+    const base = 'Desktop Companion';
     document.title = saved.phase === 'running' ? `${fmtClock(remainingSec)} focus · ${base}` : base;
     return () => {
       document.title = base;

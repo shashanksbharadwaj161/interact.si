@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowCounterClockwise, DownloadSimple, Export, FloppyDisk, Key, Trash, UploadSimple, WifiHigh, WifiSlash } from '@phosphor-icons/react';
 import type { Mode, Settings as SettingsT } from '../shared/contracts';
 import { PathListEditor } from './shared';
+import { ModelReadinessNotice, cloudModelError, localEndpointError, localModelError, modelReadiness, useModelCheck } from './Onboarding';
 import { ConfirmDialog } from '../ui/Dialog';
 import { Badge, Button, Field, Notice, PageHeader, Panel, Segmented, Switch } from '../ui/primitives';
 import { useReady } from '../ui/store';
-import { cx, errMsg, isLoopbackHost, parseHttpUrl } from '../ui/util';
+import { cx, errMsg } from '../ui/util';
 
 type Tab = 'general' | 'models' | 'access' | 'data';
 const TABS: { id: Tab; label: string }[] = [
@@ -21,7 +22,8 @@ type Draft = Pick<SettingsT, DraftKey>;
 const pick = (s: SettingsT): Draft => ({ mode: s.mode, localEndpoint: s.localEndpoint, localModel: s.localModel, cloudModel: s.cloudModel, voice: s.voice, allowedRoots: [...s.allowedRoots], approvedApps: [...s.approvedApps], retainDays: s.retainDays, startInTray: s.startInTray });
 
 export function Settings() {
-  const { settings, state, api, mutate, run, toast, cloudConfigured, refreshCloud, isPreview } = useReady();
+  const { settings, state, api, mutate, run, toast, cloudConfigured, refreshCloud, refreshSystem, system, systemError, isPreview } = useReady();
+  const check = useModelCheck();
   const [tab, setTab] = useState<Tab>('general');
   const [draft, setDraft] = useState<Draft>(() => pick(settings));
   const [saving, setSaving] = useState(false);
@@ -57,18 +59,24 @@ export function Settings() {
 
   const set = <K extends DraftKey>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
-  const endpoint = parseHttpUrl(draft.localEndpoint);
-  const endpointError = !draft.localEndpoint.trim() ? null : endpoint ? null : 'Enter an http:// or https:// address.';
-  const remoteEndpoint = endpoint !== null && !isLoopbackHost(endpoint.hostname);
+  const endpointError = localEndpointError(draft.localEndpoint);
+  const modelError = localModelError(draft.localModel);
+  const cloudError = cloudModelError(draft.cloudModel);
   const retainNum = Number(retain);
   const retainError = /^\d+$/.test(retain) && retainNum >= 1 && retainNum <= 3650 ? null : 'Whole number of days from 1 to 3650.';
-  const invalid = Boolean(endpointError || retainError);
+  const invalid = Boolean(endpointError || modelError || cloudError || retainError);
+  // The backend probes the saved settings, so readiness always describes what is saved, not the unsaved draft.
+  const readiness = modelReadiness({ settings, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
 
   const doSave = async () => {
     setSaving(true);
     const ok = await mutate(() => api.saveSettings({ ...draft, localEndpoint: draft.localEndpoint.trim(), localModel: draft.localModel.trim(), cloudModel: draft.cloudModel.trim(), voice: draft.voice.trim(), retainDays: retainNum }), 'Settings saved.');
     setSaving(false);
     setConfirmOnline(false);
+    if (ok) {
+      void refreshSystem();
+      void refreshCloud();
+    }
     return ok;
   };
   const requestSave = () => {
@@ -90,7 +98,8 @@ export function Settings() {
       await api.setCloudKey(k);
       setKey('');
       await refreshCloud();
-      toast('ok', 'Key saved. It is held by the backend and will not be shown again.');
+      void refreshSystem();
+      toast('ok', 'Key saved. It is stored with Windows protection and will not be shown again.');
     } catch (e) {
       setKeyError(errMsg(e, 'The key could not be saved.'));
     } finally {
@@ -104,6 +113,7 @@ export function Settings() {
       await api.deleteCloudKey();
       toast('ok', 'Key deleted.');
       setConfirmKeyDelete(false);
+      void refreshSystem();
     } catch (e) {
       toast('error', errMsg(e, 'The key could not be deleted.'));
     } finally {
@@ -188,7 +198,7 @@ export function Settings() {
               <Switch label="Start in the system tray" description="Open minimised to the tray instead of showing the window." checked={draft.startInTray} onChange={(v) => set('startInTray', v)} />
             </Panel>
             <Panel title="Voice" eyebrow="Needs Save">
-              <Field label="Voice name" hint="Passed to the backend’s speech engine. Leave empty for its default. Available voices depend on what is installed.">
+              <Field label="Voice name" hint="Used by Windows speech. Leave empty for the default voice. Available voices depend on what is installed.">
                 {(id, d) => <input id={id} aria-describedby={d} className="input" value={draft.voice} maxLength={120} onChange={(e) => set('voice', e.target.value)} />}
               </Field>
             </Panel>
@@ -209,32 +219,30 @@ export function Settings() {
               />
               {online ? (
                 <Notice tone="warn" title="Online sends your messages to a cloud provider">
-                  Chat uses the cloud model below with your own API key. If that fails you get an error; it never falls back to the local model.
+                  Chat uses the cloud model below with your own API key. With no saved key, chat shows an error and sends nothing. If a cloud request fails, the failure is shown, but the request may already have reached the provider. There is no automatic fallback to the local model or any other provider.
                 </Notice>
               ) : (
                 <Notice title="Offline keeps chat on this computer">Chat uses only the local endpoint below. If it is not running you get an error; it never falls back to the cloud.</Notice>
               )}
             </Panel>
 
+            <ModelReadinessNotice readiness={readiness} checking={check.checking} onRecheck={() => void check.recheck()} />
+            {dirty && <p className="field-hint">This check uses your saved settings. Save your changes to check the new ones.</p>}
+
             <Panel title="Local model" eyebrow="Offline route">
+              <p className="field-hint">Desktop Companion does not include a model. Offline chat needs Ollama running on this computer. Install it, start it, then install a model once with “ollama pull” followed by the model name.</p>
               <div className="grid2">
-                <Field label="Endpoint" error={endpointError} hint="Address of a model server you run, usually on 127.0.0.1.">
+                <Field label="Endpoint" error={endpointError} hint="Must start with http:// and point at this computer (127.0.0.1, localhost or [::1]).">
                   {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.localEndpoint} maxLength={200} spellCheck={false} onChange={(e) => set('localEndpoint', e.target.value)} />}
                 </Field>
-                <Field label="Model name" hint="The name your server knows the model by.">
+                <Field label="Model name" error={modelError} hint="The name Ollama knows the model by, for example llama3.2:3b.">
                   {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.localModel} maxLength={120} spellCheck={false} onChange={(e) => set('localModel', e.target.value)} />}
                 </Field>
               </div>
-              {remoteEndpoint && (
-                <Notice tone="warn" title="This endpoint is not on this computer">
-                  “{endpoint?.hostname}” is a remote host, so offline-mode prompts would leave this machine. Use 127.0.0.1 or localhost to keep them local.
-                </Notice>
-              )}
-              <p className="field-hint">The app does not probe the endpoint. Send a chat message to test it.</p>
             </Panel>
 
             <Panel title="Cloud model" eyebrow="Online route">
-              <Field label="Model name" hint="Used only in online mode.">
+              <Field label="Model name" error={cloudError} hint="Used only in online mode.">
                 {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.cloudModel} maxLength={120} spellCheck={false} onChange={(e) => set('cloudModel', e.target.value)} />}
               </Field>
               <div className="key-box">
@@ -244,7 +252,7 @@ export function Settings() {
                   {cloudConfigured === null ? <Badge>Status unknown</Badge> : cloudConfigured ? <Badge tone="ok">Saved</Badge> : <Badge tone="warn">Not saved</Badge>}
                 </div>
                 <p className="field-hint">
-                  Stored by the backend using Windows protection, never in this window’s storage and never shown again. Saving replaces any existing key. Online mode without a key cannot send.
+                  Stored with Windows protection, never in this window’s storage and never shown again. Saving replaces any existing key. Online mode without a key cannot send.
                 </p>
                 <form
                   className="row wrap"
@@ -269,11 +277,11 @@ export function Settings() {
         {tab === 'access' && (
           <>
             <Panel title="Allowed folders" eyebrow="Files · needs Save">
-              <p className="field-hint">Folders Jarvis may work inside when asked. Anything outside is out of scope.</p>
+              <p className="field-hint">Folders Desktop Companion may work inside when asked. Anything outside is out of scope.</p>
               <PathListEditor kind="folder" items={draft.allowedRoots} onChange={(v) => set('allowedRoots', v)} />
             </Panel>
             <Panel title="Approved apps" eyebrow="Launching · needs Save">
-              <p className="field-hint">Applications Jarvis may launch. Each launch still shows a preview and waits for your approval on the Computer screen.</p>
+              <p className="field-hint">Applications Desktop Companion may launch. Windows asks you to confirm each one you add. Each launch still shows a preview and waits for your approval on the Computer screen.</p>
               <PathListEditor kind="app" items={draft.approvedApps} onChange={(v) => set('approvedApps', v)} />
             </Panel>
           </>
@@ -282,7 +290,7 @@ export function Settings() {
         {tab === 'data' && (
           <>
             <Panel title="Retention" eyebrow="Needs Save">
-              <Field label="Keep history for (days)" error={retainError} hint="How long the backend keeps chat and activity history. It is the backend that applies this.">
+              <Field label="Keep history for (days)" error={retainError} hint="How long this app keeps chat and activity history.">
                 {(id, d) => <input id={id} aria-describedby={d} className="input narrow" inputMode="numeric" value={retain} onChange={(e) => { const v = e.target.value.replace(/[^\d]/g, '').slice(0, 4); setRetain(v); if (/^\d+$/.test(v)) set('retainDays', Number(v)); }} />}
               </Field>
               <div className="row">
@@ -311,7 +319,7 @@ export function Settings() {
       )}
 
       <ConfirmDialog open={confirmOnline} title="Switch to online mode?" confirmLabel="Save and go online" busy={saving} onCancel={() => setConfirmOnline(false)} onConfirm={() => void doSave()}>
-        <p>Your chat messages will be sent to the cloud model “{draft.cloudModel || 'not set'}” using your API key. Offline mode stays available and there is no automatic switching between the two.</p>
+        <p>Your chat messages will be sent to the cloud model “{draft.cloudModel || 'not set'}” using your API key. Windows will ask you to confirm this too. Offline mode stays available and there is no automatic switching between the two.</p>
       </ConfirmDialog>
       <ConfirmDialog open={confirmKeyDelete} title="Delete the saved key?" confirmLabel="Delete key" danger busy={keyBusy} onCancel={() => setConfirmKeyDelete(false)} onConfirm={() => void deleteKey()}>
         <p>Online chat stops working until you save a key again. Offline mode is not affected.</p>

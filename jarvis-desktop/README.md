@@ -1,4 +1,4 @@
-# Jarvis Desktop — working name
+# Desktop Companion — working name
 
 Original Windows desktop companion. Local-first, personal use first; commercial packaging later. Full roadmap is in docs/product-roadmap.md. Experimental modules must expose honest capability/status rather than fake functionality. Never claim unsupported features work.
 

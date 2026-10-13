@@ -89,8 +89,9 @@
 }
 
 .brand-text strong {
-  font: 700 15px var(--font-display);
-  letter-spacing: 0.22em;
+  font: 700 14px var(--font-display);
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
 }
 
 .brand-text span {
@@ -366,8 +367,9 @@
   }
 }
 
-/* Preview banner */
-.preview-banner {
+/* Preview and recovery banners */
+.preview-banner,
+.recovery-banner {
   position: relative;
   z-index: 3;
   display: flex;
@@ -381,16 +383,27 @@
   font-size: 12.5px;
 }
 
-.preview-banner strong {
+.preview-banner strong,
+.recovery-banner strong {
   font: 700 11px var(--font-mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--amber);
 }
 
-.preview-banner span {
+.preview-banner span,
+.recovery-banner span {
   flex: 1 1 320px;
   color: var(--text-2);
+}
+
+.recovery-banner {
+  background: var(--danger-soft);
+  border-bottom-color: var(--danger);
+}
+
+.recovery-banner strong {
+  color: var(--danger);
 }
 
 @keyframes spin {

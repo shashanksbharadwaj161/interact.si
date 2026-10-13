@@ -1,18 +1,33 @@
 // Electron main process: lifecycle, window factory, security hooks, tray, hotkey, single instance, crash recovery.
-import {BrowserWindow, Menu, Tray, app, dialog, globalShortcut, nativeImage, session, shell} from 'electron';
+import {BrowserWindow, Menu, Notification, Tray, app, dialog, globalShortcut, nativeImage, session, shell} from 'electron';
 import {spawn} from 'node:child_process';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {createBackend, type Backend, type Dialogs} from './backend';
 import type {ShellAdapter} from './services/actions';
 import {LaunchGuard} from './services/lifecycle';
-import {isTrustedUrl} from './ipcCore';
+import {Reminders} from './services/reminders';
+import {createTrustedConfirm, isAllowedRequestUrl, isTestFixtureDir, isTrustedUrl, parseDevOrigin} from './ipcCore';
 import {registerIpc} from './ipc';
 import {METHODS, ACTIVITY_CHANNEL} from './channels';
 
-const TEST_MODE = process.env.JARVIS_TEST_MODE === '1';
-const DEV_URL = !app.isPackaged ? process.env.VITE_DEV_SERVER_URL : undefined;
+// Test mode (no dialogs, no tray, auto-approved confirmations) is honoured only for an isolated temp userData with a fixture
+// prefix. Anywhere else a stray JARVIS_TEST_MODE=1 must never reach real user data, so the app refuses to start.
+const TEST_REQUESTED = process.env.JARVIS_TEST_MODE === '1';
+// productName is now "Desktop Companion", which would move Electron's default userData folder. Keep using the existing
+// "Jarvis Desktop" data folder when it exists so a rename never orphans notes, tasks, capsules or the protected key.
+if (!TEST_REQUESTED) {
+  const legacy = path.join(app.getPath('appData'), 'Jarvis Desktop');
+  if (fs.existsSync(legacy) && legacy.toLowerCase() !== app.getPath('userData').toLowerCase()) app.setPath('userData', legacy);
+}
+const TEST_MODE = TEST_REQUESTED && isTestFixtureDir(app.getPath('userData'), os.tmpdir());
+// Development server: honoured only for an unpackaged build and a plain http loopback origin (NSR-11).
+const RAW_DEV_URL = !app.isPackaged ? process.env.VITE_DEV_SERVER_URL : undefined;
+const DEV_ORIGIN = parseDevOrigin(RAW_DEV_URL);
+const DEV_URL = DEV_ORIGIN ? RAW_DEV_URL : undefined;
+if (RAW_DEV_URL && !DEV_ORIGIN) console.warn('Ignoring VITE_DEV_SERVER_URL: only http loopback origins are accepted.');
 const HOTKEY = 'CommandOrControl+Alt+J';
 // 32x32 generated tray glyph (original artwork, no external asset).
 const TRAY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA/UlEQVR4nM2Xuw3EIAyGU7ACLeXJk1jKLgxwDUtlhhQ3QWbIFjkhueB4H4SYwg0C/g8/wCwKcOG0lkVSAa4KUCtAQ6ZpTI4CECSyvz/XlTM7h+aKuwDsZmdJOAJy0tpmAOvO7V/hCMiWC01K/KUAj15xB+KgPasAZElcAUatAiLwRAwg6faUcC0IhSMLoHuEa0D8xPRLLcj2VvEUBFWHiAHcevpaL7gAwSXTK57xwu4DyBGnL3hBugDrKPGMF1YXIIj/AwDaBTAMAGYqAPYQsCchexmyX0RTXMXsjxH7czxFQzJFS8belE7Rlv8kJtfHxC9Rtq9ZLDSPf06H2RcCn7+vr2EvhgAAAABJRU5ErkJggg==';
@@ -23,25 +38,38 @@ let tray: Tray | null = null;
 let quitting = false;
 let guard: LaunchGuard | null = null;
 let reloadedOnce = false;
+let reminders: Reminders | null = null;
+let shuttingDown = false;
+const liveNotifications = new Set<Notification>();
 
-const appFileUrl = () => pathToFileURL(path.join(__dirname, '..', 'dist', 'index.html')).href;
+const distDir = () => path.join(__dirname, '..', 'dist');
+const appFileUrl = () => pathToFileURL(path.join(distDir(), 'index.html')).href;
 const startHidden = () => process.argv.includes('--hidden') || process.argv.includes('--start-in-tray');
 
 function appUrlOk(url: string): boolean {
-  return isTrustedUrl(url, appFileUrl(), DEV_URL ? new URL(DEV_URL).origin : undefined);
+  return isTrustedUrl(url, appFileUrl(), DEV_ORIGIN ?? undefined);
 }
+
+// Trusted confirmation for BackendEnv.confirm: a native dialog owned by the visible, focused app window, Cancel is the default and
+// the full detail is shown. The renderer never supplies the answer. Tests auto-approve only inside the validated fixture sandbox.
+const trustedConfirm = createTrustedConfirm<BrowserWindow>({
+  getWindow: () => mainWindow,
+  isTrusted: (w) => !w.webContents.isLoading() && appUrlOk(w.webContents.getURL()),
+  showMessageBox: (w, options) => dialog.showMessageBox(w, options),
+});
+const confirm: (summary: string, detail: string) => Promise<boolean> = TEST_MODE ? async () => true : trustedConfirm;
 
 function createDialogs(): Dialogs {
   return {
     async saveExport(defaultName) {
       if (TEST_MODE) return null;
-      const opts = {defaultPath: path.join(app.getPath('documents'), defaultName), filters: [{name: 'Jarvis export (JSON)', extensions: ['json']}]};
+      const opts = {defaultPath: path.join(app.getPath('documents'), defaultName), filters: [{name: 'Desktop Companion export (JSON)', extensions: ['json']}]};
       const r = mainWindow ? await dialog.showSaveDialog(mainWindow, opts) : await dialog.showSaveDialog(opts);
       return r.canceled || !r.filePath ? null : r.filePath;
     },
     async openImport() {
       if (TEST_MODE) return null;
-      const opts = {properties: ['openFile' as const], filters: [{name: 'Jarvis export (JSON)', extensions: ['json']}]};
+      const opts = {properties: ['openFile' as const], filters: [{name: 'Desktop Companion export (JSON)', extensions: ['json']}]};
       const r = mainWindow ? await dialog.showOpenDialog(mainWindow, opts) : await dialog.showOpenDialog(opts);
       return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
     },
@@ -78,13 +106,13 @@ function toggleWindow() {
 }
 
 function safePage(message: string): string {
-  return 'data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><body style="font:16px Segoe UI,sans-serif;background:#16181d;color:#e8e8ea;padding:40px"><h2>Jarvis Desktop</h2><p>${message}</p><p>Your data is stored locally and was not changed. Restart the app to try again.</p>`);
+  return 'data:text/html;charset=utf-8,' + encodeURIComponent(`<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><body style="font:16px Segoe UI,sans-serif;background:#16181d;color:#e8e8ea;padding:40px"><h2>Desktop Companion</h2><p>${message}</p><p>Your data is stored locally and was not changed. Restart the app to try again.</p>`);
 }
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1180, height: 780, minWidth: 720, minHeight: 520,
-    show: false, backgroundColor: '#16181d', title: 'Jarvis Desktop',
+    show: false, backgroundColor: '#16181d', title: 'Desktop Companion',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true,
@@ -97,6 +125,7 @@ function createWindow() {
 
   win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
   win.webContents.on('will-navigate', (e, url) => { if (!appUrlOk(url)) e.preventDefault(); });
+  win.webContents.on('will-redirect', (e, url) => { if (!appUrlOk(url)) e.preventDefault(); });
   win.webContents.on('will-attach-webview', (e) => e.preventDefault());
   win.webContents.on('render-process-gone', () => {
     if (win.isDestroyed()) return;
@@ -119,14 +148,9 @@ function createWindow() {
 function hardenSession() {
   const ses = session.defaultSession;
   ses.setSpellCheckerEnabled(false);
-  const devOrigin = DEV_URL ? new URL(DEV_URL).origin : null;
+  // Only the packaged dist files (empty file host), the loopback dev server in development, and non-network schemes (NSR-10/11).
   ses.webRequest.onBeforeRequest((details, cb) => {
-    let allow = false;
-    try {
-      const u = new URL(details.url);
-      allow = u.protocol === 'file:' || u.protocol === 'devtools:' || u.protocol === 'data:' || u.protocol === 'blob:' || (devOrigin !== null && (u.origin === devOrigin || u.origin.replace('http', 'ws') === devOrigin.replace('http', 'ws')));
-    } catch { allow = false; }
-    cb({cancel: !allow});
+    cb({cancel: !isAllowedRequestUrl(details.url, distDir(), DEV_ORIGIN ?? undefined)});
   });
   // Microphone audio for the app's own page only; everything else is denied.
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
@@ -140,9 +164,9 @@ function hardenSession() {
 function createTray() {
   try {
     const t = new Tray(nativeImage.createFromDataURL(`data:image/png;base64,${TRAY_PNG}`));
-    t.setToolTip('Jarvis Desktop');
+    t.setToolTip('Desktop Companion');
     t.setContextMenu(Menu.buildFromTemplate([
-      {label: 'Show / hide Jarvis', click: toggleWindow},
+      {label: 'Show / hide Desktop Companion', click: toggleWindow},
       {type: 'separator'},
       {label: 'Quit', click: () => { quitting = true; app.quit(); }},
     ]));
@@ -157,6 +181,36 @@ function scheduleRetention() {
     scheduleRetention();
   }, 24 * 60 * 60 * 1000);
   t.unref();
+}
+
+/** Due-time notifications for tasks. Off in test mode and in safe launch (no automatic features there). */
+function startReminders(b: Backend, safe: boolean) {
+  if (TEST_MODE || safe || !Notification.isSupported()) return;
+  reminders = new Reminders({
+    tasks: () => b.store.snapshot().tasks,
+    now: () => Date.now(),
+    notify: (title, body) => {
+      const n = new Notification({title: title.slice(0, 120), body, silent: false});
+      liveNotifications.add(n);
+      n.on('click', showWindow);
+      n.on('close', () => liveNotifications.delete(n));
+      n.show();
+    },
+    record: async (summary) => { await b.store.addActivity('reminder', summary); },
+  });
+  reminders.start();
+}
+
+// Task changes (save, delete, import) move due times, so the reminder timer is re-aimed after those calls.
+const REARM_AFTER = new Set<string>(['saveTask', 'deleteTask', 'importData']);
+
+function withReminderRearm(b: Backend): Pick<Backend, (typeof METHODS)[number]> {
+  const handlers: Record<string, (...args: unknown[]) => Promise<unknown>> = {};
+  for (const m of METHODS) {
+    const fn = b[m] as (...args: unknown[]) => Promise<unknown>;
+    handlers[m] = REARM_AFTER.has(m) ? async (...args) => { try { return await fn(...args); } finally { reminders?.rearm(); } } : fn;
+  }
+  return handlers as unknown as Pick<Backend, (typeof METHODS)[number]>;
 }
 
 async function boot() {
@@ -175,11 +229,13 @@ async function boot() {
     shell: shellAdapter,
     selfPids: () => [process.pid, ...app.getAppMetrics().map((m) => m.pid)],
     safeLaunch: () => guard?.safe ?? false,
+    confirm,
   });
   if (launch.safe) await backend.store.addActivity('recovery', 'Safe launch: the previous two sessions did not exit cleanly. Desktop actions are disabled until a normal restart.');
   if (backend.load.warning) await backend.store.addActivity('recovery', backend.load.warning);
 
-  registerIpc(backend as Pick<Backend, (typeof METHODS)[number]>, {appFileUrl: appFileUrl(), devOrigin: DEV_URL ? new URL(DEV_URL).origin : undefined});
+  startReminders(backend, launch.safe);
+  registerIpc(withReminderRearm(backend), {appFileUrl: appFileUrl(), devOrigin: DEV_ORIGIN ?? undefined});
   backend.onActivity((a) => { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(ACTIVITY_CHANNEL, a); });
 
   if (!TEST_MODE && !launch.safe) {
@@ -190,7 +246,11 @@ async function boot() {
   scheduleRetention();
 }
 
-if (!TEST_MODE && !app.requestSingleInstanceLock()) {
+if (TEST_REQUESTED && !TEST_MODE) {
+  // Fail closed: test mode would auto-approve confirmations, so it is never allowed against a real profile.
+  console.error('JARVIS_TEST_MODE needs a userData folder directly inside the OS temp directory whose name starts with jarvis-smoke-, jarvis-test- or desktop-companion-test-.');
+  app.exit(1);
+} else if (!TEST_MODE && !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', showWindow);
@@ -199,14 +259,18 @@ if (!TEST_MODE && !app.requestSingleInstanceLock()) {
   app.on('will-quit', () => globalShortcut.unregisterAll());
   app.on('before-quit', (e) => {
     quitting = true;
-    if (!backend) return;
+    reminders?.dispose();
     e.preventDefault();
+    if (shuttingDown) return;
+    shuttingDown = true;
     const b = backend;
     backend = null;
-    void b.dispose().finally(async () => { await guard?.end().catch(() => undefined); app.exit(0); });
+    // Backup/cleanup gets at most 5 s; the clean-exit marker is written even when the backend never started.
+    const cleanup = b ? Promise.race([b.dispose().catch(() => undefined), new Promise<void>((r) => setTimeout(r, 5000))]) : Promise.resolve();
+    void cleanup.then(() => guard?.end()).catch(() => undefined).finally(() => app.exit(0));
   });
   app.whenReady().then(boot).catch((err) => {
-    dialog.showErrorBox('Jarvis Desktop could not start', String(err instanceof Error ? err.message : err).slice(0, 300));
+    dialog.showErrorBox('Desktop Companion could not start', String(err instanceof Error ? err.message : err).slice(0, 300));
     app.exit(1);
   });
 }

@@ -1,11 +1,7 @@
-# Interact / Jarvis development checkpoint
+# Interact — desktop companion development checkpoint
 
-Paused at user request, 2026-10-13. This is unfinished development source, not a completed installer.
+Paused at user request, 14 October 2026. Product name undecided; Desktop Companion is a placeholder.
 
-- `control-room/`: local agent dashboard and secure Anthropic gateway.
-- `jarvis-desktop/`: Electron application source, frontend and in-progress native backend combined for review.
-- `worker-snapshots/`: exact source snapshots retained for recovery; backend incomplete.
-- `planning/`: complete roadmap and design/integration research.
-- `RESUME.md`: remaining work and verification gates.
+`control-room/`: redesigned local agent dashboard, 10-worker capacity, protected Anthropic gateway and shared budget. `jarvis-desktop/`: combined in-progress Electron app. `worker-snapshots/`: all authored worker source retained for recovery. `planning/`: complete 140-scope roadmap/research. `RESUME.md`: state, evidence and remaining work.
 
-API keys, private agent runtime, transcripts, dependency folders and downloaded model weights are excluded. Credentials remain protected locally.
+Technical directory/API identifiers retained for compatibility. API keys, private runtime/transcripts, dependencies, model weights and installers are excluded from GitHub. A development installer exists only in the original local release folder; rebuild from source. This is not the completed 140-feature app.

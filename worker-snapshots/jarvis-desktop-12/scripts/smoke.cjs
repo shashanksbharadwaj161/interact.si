@@ -1,0 +1,9 @@
+// Runs only inside Electron, in a temporary user-data directory. No real desktop actions.
+const {app,BrowserWindow}=require('electron');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');
+const data=fs.mkdtempSync(path.join(os.tmpdir(),'jarvis-smoke-'));app.setPath('userData',data);process.env.JARVIS_TEST_MODE='1';
+const timeout=setTimeout(()=>{console.error('Electron smoke timed out');app.exit(1);},45000);
+require('../dist-electron/main.cjs');
+app.whenReady().then(async()=>{let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows()[0];if(win&&!win.webContents.isLoading())break;await new Promise(r=>setTimeout(r,200));}if(!win)throw new Error('Window missing');
+ const result=await win.webContents.executeJavaScript(`(async()=>{const a=window.jarvis;if(!a)throw Error('Preload bridge missing');const s=await a.getState();if(s.settings.mode!=='offline')throw Error('Must default offline');await a.saveNote({title:'Smoke note',body:'Local test',tags:['smoke']});await a.saveTask({title:'Smoke task'});const c=await a.saveCapsule({name:'Smoke capsule',description:'empty safe capsule',scene:'graphite',items:[]});const after=await a.getState();if(!after.notes.some(n=>n.title==='Smoke note')||!after.tasks.some(t=>t.title==='Smoke task')||!after.capsules.some(c=>c.name==='Smoke capsule'))throw Error('CRUD persistence failed');const cap=after.capsules.find(c=>c.name==='Smoke capsule');const restored=await a.restoreCapsule(cap.id);const k=await a.cloudKeyStatus();const info=await a.getSystemInfo();return {mode:after.settings.mode,notes:after.notes.length,tasks:after.tasks.length,capsules:after.capsules.length,keyConfigured:k.configured,capabilities:info.capabilities,restore:restored};})()`);
+ console.log('ELECTRON_SMOKE_PASS',JSON.stringify(result));clearTimeout(timeout);app.exit(0);
+}).catch(e=>{console.error(e.message);clearTimeout(timeout);app.exit(1);});

@@ -17,7 +17,7 @@ export function Developer() {
 
   const copy = async () => {
     const report = {
-      app: 'Jarvis Desktop UI',
+      app: 'Desktop Companion UI',
       runtime: isPreview ? 'browser preview (no backend)' : 'electron',
       platform: system?.platform ?? 'unknown',
       arch: system?.arch ?? 'unknown',

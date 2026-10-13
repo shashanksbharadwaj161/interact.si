@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-13T10:21:58.766Z",
+  "runtime": "ollama-v0.40.3",
+  "model": "qwen3.5:2b",
+  "context": 2048,
+  "results": [
+    {
+      "prompt": "Reply with exactly READY.",
+      "answer": "READY",
+      "seconds": 16.0114035,
+      "tokens": 2,
+      "tokensPerSecond": 19.246499542895638,
+      "loadSeconds": 15.462468
+    },
+    {
+      "prompt": "What is 7 + 5? Answer only the number.",
+      "answer": "12",
+      "seconds": 0.5657729999999992,
+      "tokens": 3,
+      "tokensPerSecond": 24.568012447792974,
+      "loadSeconds": 0.057199
+    }
+  ],
+  "loaded": [
+    {
+      "model": "qwen3.5:2b",
+      "bytes": 2924530885,
+      "vramBytes": 1897670898
+    }
+  ],
+  "note": "Two simple prompts only; not a quality, safety or universal performance guarantee. Model unloaded after test."
+}

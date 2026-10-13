@@ -83,7 +83,7 @@ export class Speech {
     if (!p.ok) return {text: '', reason: p.reason};
     if (!p.recognizers.length) return {text: '', reason: 'No Windows speech recognizer is installed'};
     const file = nodePath.win32.join(this.d.tmpDir, `jarvis-${this.d.newId()}.wav`);
-    const write = this.d.writeFile ?? ((f, b) => fsp.writeFile(f, b, {mode: 0o600}));
+    const write = this.d.writeFile ?? ((f, b) => fsp.writeFile(f, b, {mode: 0o600, flag: 'wx'}));
     const remove = this.d.removeFile ?? ((f) => fsp.rm(f, {force: true}));
     try {
       await write(file, wav);

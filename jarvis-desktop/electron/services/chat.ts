@@ -1,4 +1,4 @@
-// Chat routing: local Ollama by default; cloud only when mode is explicitly 'online' AND a key is stored.
+// Chat routing: local Ollama (loopback only) by default; cloud only when mode is explicitly 'online' AND a key is stored.
 // There is never a silent fallback in either direction. Failures become honest 'system' messages.
 import type {Capability, ChatMessage, Settings} from '../../src/shared/contracts';
 import type {GuardedFetch} from './netGuard';
@@ -10,6 +10,8 @@ import {validateChatText} from './validation';
 const HISTORY_CHARS = 8000;
 const REPLY_CAP = 60_000;
 export const ANTHROPIC_VERSION = '2023-06-01';
+/** How long Ollama keeps the model in memory after a reply. Short on purpose: frees RAM/VRAM soon after chatting stops. */
+export const LOCAL_KEEP_ALIVE = '2m';
 
 type Turn = {role: 'user' | 'assistant'; content: string};
 
@@ -43,16 +45,21 @@ async function errorText(res: Response): Promise<string> {
   } catch { return ''; }
 }
 
-export async function ollamaChat(fetch: GuardedFetch, settings: Settings, history: Turn[]): Promise<string> {
-  const res = await fetch(`${settings.localEndpoint}/api/chat`, {
+/** Guidance shown when the configured model is not installed. Installing a model needs a one-time download that this app never does. */
+export function missingModelHelp(model: string): string {
+  return `Model "${model}" is not installed in Ollama. Install it once with "ollama pull ${model}" (that download needs internet; Desktop Companion never downloads models) or choose an installed model in Settings`;
+}
+
+export async function ollamaChat(guardedFetch: GuardedFetch, settings: Settings, history: Turn[]): Promise<string> {
+  const res = await guardedFetch(`${settings.localEndpoint}/api/chat`, {
     method: 'POST',
     headers: {'content-type': 'application/json'},
-    body: JSON.stringify({model: settings.localModel, messages: history, stream: false, keep_alive: '5m'}),
+    body: JSON.stringify({model: settings.localModel, messages: history, stream: false, keep_alive: LOCAL_KEEP_ALIVE}),
     timeoutMs: 120_000,
   }, 'ollama');
   if (!res.ok) {
     const detail = await errorText(res);
-    throw new Error(res.status === 404 ? `Model "${settings.localModel}" is not installed in Ollama${detail ? ` (${detail})` : ''}` : `Ollama returned HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+    throw new Error(res.status === 404 ? missingModelHelp(settings.localModel) : `Ollama returned HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
   }
   const j = (await res.json()) as {message?: {content?: string}};
   const text = j.message?.content;
@@ -60,8 +67,8 @@ export async function ollamaChat(fetch: GuardedFetch, settings: Settings, histor
   return text.slice(0, REPLY_CAP);
 }
 
-export async function cloudChat(fetch: GuardedFetch, settings: Settings, key: string, history: Turn[], origin = 'https://api.anthropic.com'): Promise<string> {
-  const res = await fetch(`${origin}/v1/messages`, {
+export async function cloudChat(guardedFetch: GuardedFetch, settings: Settings, key: string, history: Turn[], origin = 'https://api.anthropic.com'): Promise<string> {
+  const res = await guardedFetch(`${origin}/v1/messages`, {
     method: 'POST',
     headers: {'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': ANTHROPIC_VERSION},
     body: JSON.stringify({model: settings.cloudModel, max_tokens: 1024, messages: history}),
@@ -85,12 +92,12 @@ export interface ChatDeps {
   cloudOrigin?: string;
 }
 
-function describe(e: unknown, where: 'local' | 'cloud'): string {
+function describe(e: unknown, where: 'local' | 'cloud', settings: Settings): string {
   if (e instanceof NetworkDenied) return `Blocked: ${e.message}`;
   const err = e as Error & {name?: string; cause?: {code?: string}};
   if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return where === 'local' ? 'Ollama did not answer in time' : 'The cloud provider did not answer in time';
   if (err?.cause?.code === 'ECONNREFUSED' || /fetch failed/i.test(err?.message ?? '')) {
-    return where === 'local' ? 'Ollama is not running at the configured local endpoint' : 'Could not reach the cloud provider';
+    return where === 'local' ? `Ollama is not running at ${settings.localEndpoint}. Start Ollama, then try again` : 'Could not reach the cloud provider';
   }
   return String(err?.message ?? 'Unknown error').slice(0, 300);
 }
@@ -100,41 +107,50 @@ export async function sendChat(deps: ChatDeps, rawText: unknown): Promise<ChatMe
   const state = deps.store.snapshot();
   const settings = state.settings;
   const now = () => deps.store.nowIso();
-  const useCloud = settings.mode === 'online' && (await deps.secrets.configured());
-  const routeSource: 'local' | 'cloud' = useCloud ? 'cloud' : 'local';
+  // Online mode is the user's explicit opt-in to the cloud. Without a stored key it fails honestly; it never falls back to local.
+  const routeSource: 'local' | 'cloud' = settings.mode === 'online' ? 'cloud' : 'local';
   const userMsg: ChatMessage = {id: deps.store.id(), role: 'user', text, createdAt: now(), source: routeSource};
   const history = buildHistory(state.chat, text);
   await deps.store.mutate((d) => { d.chat.push(userMsg); });
   let reply: ChatMessage;
+  // True once a cloud request was handed to the network layer; from then on the provider may have received the text.
+  let cloudRequestStarted = false;
   try {
     let out: string;
-    if (useCloud) {
+    if (routeSource === 'cloud') {
+      if (!(await deps.secrets.configured())) throw new Error('No cloud API key is configured. Add a key in Settings or switch to offline mode');
       const key = await deps.secrets.reveal();
       if (!key) throw new Error('The stored API key could not be decrypted; set it again in Settings');
+      cloudRequestStarted = true;
       out = await cloudChat(deps.fetch, settings, key, history, deps.cloudOrigin);
     } else {
       out = await ollamaChat(deps.fetch, settings, history);
     }
     reply = {id: deps.store.id(), role: 'assistant', text: out, createdAt: now(), source: routeSource};
   } catch (e) {
-    const reason = describe(e, routeSource);
-    reply = {id: deps.store.id(), role: 'assistant', text: `${routeSource === 'cloud' ? 'Cloud' : 'Local'} model unavailable: ${reason}. No reply was generated and nothing was sent elsewhere.`, createdAt: now(), source: 'system'};
+    const reason = describe(e, routeSource, settings);
+    // Be exact about where the text may have gone. A request the guard blocked, or one never started, left nothing.
+    const reached = cloudRequestStarted && !(e instanceof NetworkDenied);
+    const where = routeSource === 'cloud'
+      ? (reached ? 'Your message may have reached the cloud provider.' : 'Your message was not sent.')
+      : 'Your message was not sent to any cloud provider.';
+    reply = {id: deps.store.id(), role: 'assistant', text: `${routeSource === 'cloud' ? 'Cloud' : 'Local'} model unavailable: ${reason}. No reply was generated and no other model was tried. ${where}`, createdAt: now(), source: 'system'};
   }
   await deps.store.mutate((d) => { d.chat.push(reply); });
   return reply;
 }
 
 /** Capability probe for the local model: GET /api/tags with a short timeout. */
-export async function probeLocalModel(fetch: GuardedFetch, settings: Settings): Promise<Capability> {
+export async function probeLocalModel(guardedFetch: GuardedFetch, settings: Settings): Promise<Capability> {
   const base = {id: 'local-llm', name: 'Local model (Ollama)'};
   try {
-    const res = await fetch(`${settings.localEndpoint}/api/tags`, {timeoutMs: 1500}, 'ollama');
+    const res = await guardedFetch(`${settings.localEndpoint}/api/tags`, {timeoutMs: 1500}, 'ollama');
     if (!res.ok) return {...base, available: false, reason: `Ollama returned HTTP ${res.status}`};
     const j = (await res.json()) as {models?: {name?: string; model?: string}[]};
     const names = (j.models ?? []).map((m) => String(m.name ?? m.model ?? ''));
     const want = settings.localModel.includes(':') ? settings.localModel : `${settings.localModel}:latest`;
     if (!names.includes(want) && !names.includes(settings.localModel)) {
-      return {...base, available: false, reason: `Ollama is running but model "${settings.localModel}" is not installed`};
+      return {...base, available: false, reason: `Ollama is running but model "${settings.localModel}" is not installed. Install it once with "ollama pull ${settings.localModel}"`};
     }
     return {...base, available: true};
   } catch (e) {

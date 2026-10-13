@@ -1,6 +1,6 @@
 {
   "name": "jarvis-desktop",
-  "productName": "Jarvis Desktop",
+  "productName": "Desktop Companion",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -33,7 +33,7 @@
   },
   "build": {
     "appId": "in.local.jarvis.desktop",
-    "productName": "Jarvis Desktop",
+    "productName": "Desktop Companion",
     "directories": {
       "output": "release"
     },

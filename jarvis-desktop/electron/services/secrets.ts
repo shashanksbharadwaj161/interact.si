@@ -16,8 +16,13 @@ export const nodeSecretsFs: SecretsFs = {
   write: async (p, data) => {
     await fsp.mkdir(path.dirname(p), {recursive: true});
     const tmp = p + '.tmp';
-    await fsp.writeFile(tmp, data, 'utf8');
-    await fsp.rename(tmp, p);
+    try {
+      await fsp.writeFile(tmp, data, 'utf8');
+      await fsp.rename(tmp, p);
+    } catch (e) {
+      await fsp.rm(tmp, {force: true}).catch(() => undefined);
+      throw e;
+    }
   },
   remove: async (p) => { await fsp.rm(p, {force: true}); },
 };
@@ -46,14 +51,15 @@ export class Secrets {
   }
 
   async configured(): Promise<boolean> {
-    return (await this.fs.read(this.file)) !== null;
+    const blob = await this.fs.read(this.file);
+    return blob !== null && blob.trim().length > 0;
   }
 
   async set(key: unknown): Promise<{configured: boolean}> {
     const k = validateCloudKey(key);
     let enc: {ok: boolean; data?: string};
     try { enc = await this.native.dpapi('protect', k); } catch { throw new Error('Windows DPAPI is unavailable; the key was not stored'); }
-    if (!enc.ok || !enc.data) throw new Error('Windows DPAPI could not protect the key; the key was not stored');
+    if (!enc.ok || typeof enc.data !== 'string' || !/^[A-Za-z0-9+/=\s]{16,16384}$/.test(enc.data)) throw new Error('Windows DPAPI could not protect the key; the key was not stored');
     await this.fs.write(this.file, enc.data);
     return {configured: true};
   }

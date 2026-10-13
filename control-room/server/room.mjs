@@ -32,7 +32,7 @@ export class Room extends EventEmitter {
     for(const k of ['name','prompt','model'])if(typeof input[k]!=='string'||!input[k].trim())throw new Error(`${k} is required`);
     if(input.name.length>100||input.prompt.length>16000||input.model.length>256)throw new Error('Task exceeds supported length');
     const mode=input.mode==='demo'?'demo':'real';
-    if(mode==='real'){const aliases={opus:'claude-opus-5-5',sonnet:'claude-sonnet-5-5',haiku:'claude-haiku-5-5'};input={...input,model:aliases[input.model]||input.model};if(!PRICES[input.model]&&!this.allowUnverifiedModels)throw new Error('Use Opus 5.5, Sonnet 5.5 or Haiku 5.5 under the verified development spending policy');}
+    if(mode==='real'){const aliases={fable:'claude-fable-5-1',opus:'claude-opus-5-5',sonnet:'claude-sonnet-5-5',haiku:'claude-haiku-5-5'};input={...input,model:aliases[input.model]||input.model};if(!PRICES[input.model]&&!this.allowUnverifiedModels)throw new Error('Use Fable 5.1, Opus 5.5, Sonnet 5.5 or Haiku 5.5 under the verified development spending policy');}
     if(mode==='real' && !this.online)throw new Error('Enable online development in Providers before starting a real worker');
     if(mode==='real' && !input.projectId)throw new Error('Register and select a Git project');
     if(mode==='real')await this.vault.get();
@@ -42,7 +42,7 @@ export class Room extends EventEmitter {
     const t={id:randomUUID(),name:redact(input.name),prompt:redact(input.prompt),model:input.model,effort:['high','medium','low'].includes(input.effort)?input.effort:'high',projectId:input.projectId||'',mode,status:'queued',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),events:[],sessionId:null,actualModel:null,usage:{input:0,output:0,cacheRead:0,cacheWrite:0,requests:0},rates,cost:null,budget,reviewed:false,authorized:true};
     this.tasks.unshift(t);this.log(t,'service',mode==='demo'?'Simulation queued. No provider requests or actual code edits.':'Worker queued by explicit request.');await this.save();this.kick();return this.publicTask(t);
   }
-  active(){return this.tasks.filter(t=>t.mode==='real'&&t.authorized&&!terminal.has(t.status)&&!['queued','review'].includes(t.status));}
+  active(){return this.tasks.filter(t=>t.mode==='real'&&t.authorized&&!terminal.has(t.status)&&t.status!=='queued');}
   async pump(){
     if(this.launching)return;this.launching=true;
     try{for(const t of [...this.tasks].reverse()){
@@ -77,7 +77,17 @@ export class Room extends EventEmitter {
   async details(id){const t=this.task(id);if(t.mode==='demo')return {messages:t.events.map(e=>({role:e.kind==='user'?'user':'assistant',text:e.text})),activities:[],files:[],result:t.result||'',limitations:['Simulation: no real files or provider usage.']};if(!t.sessionId)return {messages:[],files:[],activities:[],limitations:['Worker has not launched.']};const d=await this.adapter.details(t.sessionId);const c=d.conversation?.conversation??d.conversation?.snapshot??d.conversation;const messages=(c?.messages||[]).map(m=>({role:m.role,text:redact(m.text||'', [this.vault.cached,...this.grants.keys()]),at:m.createdAt}));return {messages,activities:JSON.parse(redact((c?.activities||[]).filter(a=>a.activityKind!=='reasoning'),[this.vault.cached,...this.grants.keys()])),files:JSON.parse(redact(d.files?.files??[],[this.vault.cached,...this.grants.keys()])),limitations:d.limitations};}
   async decide(id,requestId,decisionId){const t=this.task(id);if(!this.online||!t.authorized||!t.sessionId)throw new Error('Worker is not authorized');const d=await this.details(id);const request=d.activities.find(a=>a.activityKind==='approval'&&a.requestId===requestId&&a.status==='pending');if(!request||!request.detail?.decisions?.some(x=>x.id===decisionId))throw new Error('Approval is stale or the decision is unsupported');await this.adapter.api(`sessions/${encodeURIComponent(t.sessionId)}/conversation/approvals/${encodeURIComponent(requestId)}/resolve`,{method:'POST',body:JSON.stringify({decisionId})});this.log(t,'user',`Explicit approval decision: ${decisionId}`);await this.save();return {ok:true};}
   recordUsage(taskId,model,usage){const t=this.task(taskId);t.actualModel=model||t.actualModel;t.usage.input+=Number(usage.input_tokens||0);t.usage.output+=Number(usage.output_tokens||0);t.usage.cacheRead+=Number(usage.cache_read_input_tokens||0);t.usage.cacheWrite+=Number(usage.cache_creation_input_tokens||0);t.usage.requests++;
-    const u=t.usage,r=t.rates;const parts=['input','output','cacheRead','cacheWrite'];t.cost=parts.some(k=>u[k]>0&&r[k]===null)?null:parts.reduce((sum,k)=>sum+u[k]*(r[k]??0)/1e6,0);
+    const actual=model||t.model,rates=PRICES[actual]||t.rates;
+    const delta={input:Number(usage.input_tokens||0),output:Number(usage.output_tokens||0),cacheRead:Number(usage.cache_read_input_tokens||0),cacheWrite:Number(usage.cache_creation_input_tokens||0)};
+    t.usageByModel??={};const bucket=t.usageByModel[actual]??={input:0,output:0,cacheRead:0,cacheWrite:0,requests:0};
+    for(const key of Object.keys(delta))bucket[key]+=delta[key];bucket.requests++;
+    const priced=Object.keys(delta).every(key=>!delta[key]||rates[key]!==null&&rates[key]!==undefined);
+    const requestCost=priced?Object.keys(delta).reduce((sum,key)=>sum+delta[key]*(rates[key]||0)/1e6,0):null;
+    // The gateway settles its persisted reservation before reporting usage.
+    // Rebuild from that ledger when available, including pre-upgrade history.
+    const settled=this.spending?.state?.requests?.filter(q=>q.taskId===taskId&&q.settled)||[];
+    if(settled.length)t.cost=settled.reduce((sum,q)=>sum+q.charge,0);
+    else t.cost=requestCost===null?null:(t.cost??0)+requestCost;
     this.log(t,'usage',`${model||t.model}: ${usage.input_tokens||0} input / ${usage.output_tokens||0} output tokens reported.`);
     if(t.cost!==null&&t.cost>=t.budget){t.authorized=false;this.log(t,'budget','Estimated task budget reached. Further requests blocked; the last request can overshoot.');}
     this.save().catch(e=>{this.serviceError=redact(e.message);this.emit('change');});

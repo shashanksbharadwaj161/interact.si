@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Info, WarningCircle, WifiHigh, WifiSlash, X } from '@phosphor-icons/react';
-import { Avatar } from './Avatar';
+import { Avatar, AVATAR_STATES } from './Avatar';
 import { SceneBackdrop } from './SceneBackdrop';
-import { Onboarding } from './Onboarding';
+import { Onboarding, modelReadiness, safeLaunchReason } from './Onboarding';
 import { Home } from './Home';
 import { Assistant } from './Assistant';
 import { Companion } from './Companion';
@@ -64,7 +64,7 @@ function Toasts() {
   return (
     <div className="toasts" aria-live="polite" aria-atomic="false">
       {toasts.map((t) => (
-        <div key={t.id} className={cx('toast', `toast-${t.kind}`)} role={t.kind === 'error' ? 'alert' : 'status'}>
+        <div key={t.id} className={cx('toast', `toast-${t.kind}`)} role={t.kind === 'error' ? 'alert' : undefined}>
           {t.kind === 'ok' ? <Check size={16} aria-hidden /> : t.kind === 'error' ? <WarningCircle size={16} aria-hidden /> : <Info size={16} aria-hidden />}
           <span>{t.text}</span>
           <button type="button" className="iconbtn" aria-label="Dismiss message" onClick={() => dismissToast(t.id)}>
@@ -124,11 +124,28 @@ function PreviewBanner() {
   );
 }
 
+/** Safe launch is only reported through the desktop-control capability, so the banner follows that. */
+function RecoveryBanner() {
+  const { system } = useStore();
+  const reason = safeLaunchReason(system?.capabilities);
+  if (!reason) return null;
+  return (
+    <div className="recovery-banner" role="note">
+      <strong>Safe launch</strong>
+      <span>
+        The last two sessions did not close cleanly, so actions that control Windows are turned off. Notes, tasks, capsules and settings still work. To leave safe launch, quit the app completely and open it again. ({reason})
+      </span>
+    </div>
+  );
+}
+
 function SidebarStatus() {
-  const { settings, cloudConfigured } = useStore();
+  const { settings, cloudConfigured, system, systemError } = useStore();
   const { state } = useCompanion();
   if (!settings) return null;
   const online = settings.mode === 'online';
+  const readiness = modelReadiness({ settings, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
+  const stateLabel = AVATAR_STATES.find((s) => s.id === state)?.label ?? state;
   return (
     <div className="dock-status">
       <Avatar state={state} size={64} />
@@ -140,8 +157,9 @@ function SidebarStatus() {
         <span className="dock-line" title={online ? settings.cloudModel : settings.localModel}>
           {online ? settings.cloudModel || 'No cloud model set' : settings.localModel || 'No local model set'}
         </span>
+        <span className="dock-line">{readiness.level === 'ready' ? 'Model ready' : readiness.level === 'blocked' ? 'Model not ready' : 'Model not checked'}</span>
         {online && <span className="dock-line">{cloudConfigured === null ? 'Key status unknown' : cloudConfigured ? 'Key saved' : 'No key saved'}</span>}
-        <span className="dock-line dock-state">Companion: {state}</span>
+        <span className="dock-line dock-state">Companion: {stateLabel}</span>
       </div>
     </div>
   );
@@ -166,7 +184,7 @@ function Shell() {
     const on = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       const n = e.key === '0' ? 10 : Number(e.key);
-      if (n >= 1 && n <= VIEWS.length) {
+      if (Number.isInteger(n) && n >= 1 && n <= Math.min(10, VIEWS.length)) {
         e.preventDefault();
         go(VIEWS[n - 1].id);
       }
@@ -225,8 +243,8 @@ function Shell() {
             <i />
           </span>
           <div className="brand-text">
-            <strong>JARVIS</strong>
-            <span>Desktop companion</span>
+            <strong>Desktop Companion</strong>
+            <span>Offline first</span>
           </div>
         </div>
         <nav aria-label="Primary" className="nav">
@@ -235,13 +253,16 @@ function Shell() {
               <p className="nav-label">{g}</p>
               {VIEWS.filter((v) => v.group === g).map((v) => {
                 const idx = VIEWS.indexOf(v) + 1;
+                // Alt+1…9 and Alt+0 reach the first ten views; later views have no shortcut.
+                const shortcut = idx <= 10 ? `Alt+${idx === 10 ? 0 : idx}` : null;
                 return (
                   <a
                     key={v.id}
                     href={`#/${v.id}`}
                     className={cx('nav-item', view === v.id && 'active')}
                     aria-current={view === v.id ? 'page' : undefined}
-                    title={`${v.label} (Alt+${idx === 10 ? 0 : idx})`}
+                    aria-label={v.label}
+                    title={shortcut ? `${v.label} (${shortcut})` : v.label}
                     onClick={(e) => {
                       e.preventDefault();
                       go(v.id);
@@ -259,6 +280,7 @@ function Shell() {
       </aside>
       <div className="stage">
         {isPreview && <PreviewBanner />}
+        <RecoveryBanner />
         <main id="main" ref={mainRef} tabIndex={-1} className="main" aria-label={VIEWS.find((v) => v.id === view)?.label}>
           <div key={view} className="view">
             {body}
@@ -285,7 +307,7 @@ function Gate() {
       <div className="boot">
         <div className="boot-card">
           <Notice tone="danger" title="Saved data could not be loaded">
-            {loadError ?? 'The backend did not respond.'}
+            {loadError ?? 'The app did not respond.'}
           </Notice>
           <Button variant="primary" onClick={() => reload().catch(() => undefined)}>
             Try again

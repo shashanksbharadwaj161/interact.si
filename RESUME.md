@@ -1,19 +1,30 @@
-# Resume handoff
+# Resume — 14 October 2026
 
-User requested explicit pause; do not start paid agents until user resumes. All external tasks cancelled and online provider access disabled. Internal supervision stopped.
+Latest explicit user instruction: stop ALL agents/services, push current progress, resume next session. Do not start cloud requests until user resumes.
 
-Budget: $300 total, $10 safety reserve. Current committed/reserved ledger: $11.9483; available after safety: $278.0517. These include uncertain failed/interrupted reservations, not authoritative billing. Preserve original local spending.json; do not reset spending on resume.
+## Budget and billing
+$300 shared development cap, $10 safety reserve. Persistent original ledger: $58.8172 committed/reserved; $231.1828 remaining after safety. Estimates include uncertain responses and conservative cache/Haiku tiers; not billed spend. Do not reset the local ledger.
+User-supplied Claude console was read: organization dashboard monthly spend $27.82 and credits $471.89; detailed Month-to-date/All-workspaces cost view $6.41. Views did not agree at observation; reconciliation not finished. No claim that either equals project-only spend.
 
-## Next steps
-1. Review combined frontend/native sources; backend was interrupted before tests and handoff. Run npm ci, typecheck, tests, build, Electron smoke in isolated userdata, then Windows installer. No complete app claimed.
-2. Finish Haiku feature registry and release checklist (task cancelled before file generation); retain all 140 planned features and mark implemented only with evidence.
-3. Activate latest Control Room hardening by restarting service: ownership mutex, input validation, terminal-state poll race, 204 approval responses. Tests passed before pause.
-4. Diagnose auxiliary Claude API 400 retries: gateway currently forces parent model/adaptive high onto every request, including small/forced-tool requests. Fix compatibility, preserve conservative budget reservations. Claude CLI updated to 2.1.296, required for Opus 5.5.
-5. Secure backend review: IPC validation, cloud opt-in, DPAPI, native action approvals and scope, no hidden reasoning or fabricated progress.
-6. Local runtime installed only in original workspace work/tools/ollama, official v0.40.3 checksum verified. Dedicated endpoint 127.0.0.1:11435, qwen3.5:2b downloaded, cloud disabled. Actual benchmark ~19–25 tokens/sec, cold load ~15s, VRAM ~1.9GB. Runtime/weights not in GitHub. App endpoint defaults may still be 11434; configure/test.
-7. Browser UI visual QA, actual offline chat test, voice capability checks, tray/startup, packaging/signing limitations. Expand remaining roadmap after core passes.
+## Completed work and evidence
+Redesigned Control Room: active/history filters, assigned versus latest API model, actual activity, actionable approvals, stale status, budget reservations, dialog keyboard focus; build passes. Shared capacity now 10. Credential helper avoids recursively rewriting unchanged ACLs. Gateway supports Fable5.1 and 5.5 main high effort, Haiku forced-tool auxiliaries, safe token counting, mixed-model estimates. Gateway tests13 passed before pause.
+Desktop baseline typecheck/build, 10 UI tests, real Electron offline CRUD/capability smoke, actual local AI arithmetic without cloud key passed; x64 NSIS unsigned development installer generated. Approval/security tests9 passed. Further worker files now collected into main source; latest combined validation is recorded separately if run.
+Reviewed Fable integration plan and two Opus audits; root implemented trusted action/capsule confirmations, import protection, exact target focus and negative tests. Workers delivered native lifecycle/voice/reminders, core storage/policy/chat repairs, onboarding/settings/branding fixes, offline intent planner, local memory search, original MotionStudio, all140 feature registry and eight small inventory/checklist docs. Snapshots preserve all source.
 
-## Local source and recovery
-Original outputs/control-room/.controlroom retains DPAPI credential, ledger, task state and worker worktrees; never publish it. Original outputs/jarvis-desktop Git history retained. GitHub checkpoint includes all authored source snapshots without dependencies or private runtime. Development helpers reference original outputs layout; adapt paths for cloned monorepo before use. Do not auto-resume cancelled sessions or enable online.
+## Immediate next work
+1. Validate latest combined tree (npm ci, typecheck, npm test, build). Resolve integration issues without overwriting root Computer/Assistant/Tasks fixes. Re-run isolated Electron smoke/localAI smoke after trusted native confirmation wiring. Inspect TEST_MODE restrictions before testing.
+2. Wire new MotionStudio, MemorySearch and intent planning into navigation/assistant with typed APIs and approvals. Components/services alone do not establish end-to-end features. Root App ownership coordination needed.
+3. Update stale roadmap/feature status against actual verification; keep planned/partial/verified separate. No broad completed claims.
+4. Native real-input, microphone and installer install/uninstall checks remain unverified. Rebuild installer after merged fixes; old installer predates them. Windows x64 only tested; no ARM64 claim, no code signing. Models/runtime are not bundled.
+5. Review all audit findings, key protection, file/UNC denial, cloud/no-key denial, confirmations, reminder behavior, accessibility and license inventory.
+6. Improve billing UI to separate reported cost, conservative reservation, uncertain historical calls and console observation; do not release historical reservations without evidence.
+7. AO catalog sometimes stale after latest scoped gateway is revoked. work/refresh-worker-catalog.mjs temporarily uses a catalog-only localhost proxy and verified provider metadata to refresh/requeue without inference or key exposure. Permanent fix: revalidate model catalog after assigning valid worker gateway in adapter.spawn; never inject real key into workers/config.
 
-Models authorized on resume: claude-opus-5-5 high, claude-sonnet-5-5 high, claude-haiku-5-5. Max two external workers concurrently. User wants concise reports, offline-by-default Windows app, personal first/commercial later.
+## Resume preferences and autonomy
+User requested 10 concurrent workers, 3 Fable5.1 high workers, Opus5.5/Sonnet5.5 high and 8 small Haiku tasks, continuously coordinated. Three new Fable tasks were NOT launched before latest stop request. User authorized unattended development command approval, but bypass mode was NOT enabled before cancellation. Configure deliberately on resume while preserving $300 cap and key protection; no actual user computer input/global settings/credential reads in worker tasks. Separate worktrees and explicit file ownership; use relevant installed skills, not every skill blindly. No final product name; visible text Desktop Companion, technical identifiers remain.
+
+## Local assets/state
+Original outputs/control-room/.controlroom retains DPAPI key, ledger, cancelled tasks, AO worktrees and private runtime; never publish. Original work/tools/ollama retains official v0.40.3 runtime and Apache2 qwen3.5:2b weights at dedicated127.0.0.1:11435, cloud disabled. Development helpers in work reference original outputs layout, not this cloned monorepo. No auto-resume. Source GitHub snapshots omit generated runtime/downloads and secrets.
+
+Final checkpoint validation: combined source TypeScript passed; npm test 124/124 passed. This does not replace pending real desktop input, packaged-app, accessibility, installer and integration checks.
+

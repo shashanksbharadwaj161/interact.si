@@ -2,6 +2,7 @@ import {readFile,writeFile,rename} from 'node:fs/promises';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 export const PRICES={
+ 'claude-fable-5-1':{input:10,output:50,cacheRead:.25,cacheWrite:20},
  'claude-opus-5-5':{input:4,output:20,cacheRead:.2,cacheWrite:8},
  'claude-sonnet-5-5':{input:2,output:10,cacheRead:.1,cacheWrite:4},
  'claude-haiku-5-5':{input:.5,output:2.5,cacheRead:.05,cacheWrite:1}

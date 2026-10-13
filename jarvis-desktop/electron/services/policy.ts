@@ -41,7 +41,47 @@ export function validateActionRequest(raw: unknown): ActionRequest {
   return req;
 }
 
-/** http(s) and mailto only. No credentials, no control chars, bounded length. */
+const MAILTO_PARAMS = ['subject', 'body', 'cc', 'bcc'];
+const ADDRESS_RE = /^[^\s@<>(),;:"\\/?#%]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$/;
+
+function parseAddressList(raw: string, what: string, max: number): {ok: true; list: string[]} | {ok: false; reason: string} {
+  let decoded: string;
+  try { decoded = decodeURIComponent(raw); } catch { return {ok: false, reason: `mailto ${what} is not valid`}; }
+  const list = decoded.split(',').map((s) => s.trim()).filter(Boolean);
+  if (list.length > max) return {ok: false, reason: `mailto has too many ${what} addresses`};
+  if (!list.every((a) => a.length <= 254 && ADDRESS_RE.test(a))) return {ok: false, reason: `mailto ${what} contains an invalid address`};
+  return {ok: true, list};
+}
+
+/**
+ * Rebuilds a mailto URL from validated parts. Only subject, body, cc and bcc are kept; any other parameter
+ * (attach, attachment, ...) rejects the link, because some mail clients attach local files from them.
+ */
+function rebuildMailto(u: URL): {ok: true; url: string} | {ok: false; reason: string} {
+  const to = parseAddressList(u.pathname, 'recipient', 20);
+  if (!to.ok) return to;
+  if (!to.list.length) return {ok: false, reason: 'mailto URL has no recipient'};
+  const parts: string[] = [];
+  const seen = new Set<string>();
+  for (const [k, v] of u.searchParams) {
+    const key = k.toLowerCase();
+    if (!MAILTO_PARAMS.includes(key)) return {ok: false, reason: `mailto parameter "${k.slice(0, 30)}" is not allowed (only ${MAILTO_PARAMS.join(', ')})`};
+    if (seen.has(key)) return {ok: false, reason: `mailto parameter "${key}" is repeated`};
+    seen.add(key);
+    if (key === 'cc' || key === 'bcc') {
+      const l = parseAddressList(encodeURIComponent(v), key, 20);
+      if (!l.ok) return l;
+      parts.push(`${key}=${l.list.map((a) => encodeURIComponent(a).replace(/%40/g, '@')).join(',')}`);
+    } else {
+      if (v.length > (key === 'subject' ? 200 : 1000)) return {ok: false, reason: `mailto ${key} is too long`};
+      parts.push(`${key}=${encodeURIComponent(v)}`);
+    }
+  }
+  const recipients = to.list.map((a) => encodeURIComponent(a).replace(/%40/g, '@')).join(',');
+  return {ok: true, url: `mailto:${recipients}${parts.length ? '?' + parts.join('&') : ''}`};
+}
+
+/** http(s) and mailto only. No credentials, no control chars, bounded length. mailto links are rebuilt from safe parts. */
 export function validateOpenUrl(target: unknown): {ok: true; url: string} | {ok: false; reason: string} {
   if (typeof target !== 'string' || !target.trim()) return {ok: false, reason: 'A URL is required'};
   const t = target.trim();
@@ -49,7 +89,7 @@ export function validateOpenUrl(target: unknown): {ok: true; url: string} | {ok:
   if (hasControlChars(t) || /\s/.test(t)) return {ok: false, reason: 'URL contains whitespace or control characters'};
   let u: URL;
   try { u = new URL(t); } catch { return {ok: false, reason: 'URL is not valid'}; }
-  if (u.protocol === 'mailto:') return u.pathname ? {ok: true, url: u.href} : {ok: false, reason: 'mailto URL has no recipient'};
+  if (u.protocol === 'mailto:') return rebuildMailto(u);
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return {ok: false, reason: `Only http, https and mailto links can be opened (not ${u.protocol})`};
   if (!u.hostname) return {ok: false, reason: 'URL has no host'};
   if (u.username || u.password) return {ok: false, reason: 'URLs containing credentials are not allowed'};
@@ -81,7 +121,7 @@ export type LaunchPlan =
 export type Authorization = {ok: true; plan: LaunchPlan} | {ok: false; reason: string};
 
 /**
- * Single authority for "may Jarvis open this?". Used by previewAction, executeAction (re-check) and capsule restore.
+ * Single authority for "may Desktop Companion open this?". Used by previewAction, executeAction (re-check) and capsule restore.
  * kind 'any' is used by the generic launch action.
  */
 export async function authorizeTarget(
@@ -135,13 +175,36 @@ export function selectWindow(target: string | undefined, windows: WindowInfo[], 
   return {ok: true, window: hits[0]};
 }
 
-export function checkWindowPolicy(win: WindowInfo, type: ActionRequest['type'], selfPids: number[]): string | null {
-  if (selfPids.includes(win.pid)) return 'Jarvis Desktop windows cannot be controlled';
+/** Processes whose input line runs commands. Typing a line break into them is refused. */
+export const TERMINAL_PROCESSES = ['cmd.exe', 'powershell.exe', 'pwsh.exe', 'windowsterminal.exe', 'openconsole.exe', 'conhost.exe', 'wt.exe', 'bash.exe', 'wsl.exe', 'mintty.exe'];
+
+/** Typed text for an approval summary: first `max` characters with visible markers for line breaks and tabs. */
+export function describeTypedText(text: string, max = 200): string {
+  const shown = text.replace(/\r\n|\r|\n/g, '⏎').replace(/\t/g, '⇥');
+  return shown.length > max ? shown.slice(0, max - 1) + '…' : shown;
+}
+
+/**
+ * Refuses windows that must never be controlled and, for type-text/click, windows that cannot receive input.
+ *
+ * type-text/click require `win.foreground`. The action service evaluates a background preview by passing a copy of the
+ * window with `foreground: true`, then focuses the exact approved window after confirmation and re-checks the real value.
+ *
+ * `text` (type-text only) is checked so a line break is never typed into a terminal or the Run dialog.
+ */
+export function checkWindowPolicy(win: WindowInfo, type: ActionRequest['type'], selfPids: number[], text?: string): string | null {
+  if (selfPids.includes(win.pid)) return 'Desktop Companion windows cannot be controlled';
   if (win.elevated !== 0) return 'The window is elevated or protected; Windows does not allow it';
   if (!win.process) return 'The owning process of this window could not be identified';
   if (type === 'type-text' || type === 'click') {
     if (win.minimized) return 'The window is minimized';
-    if (!win.foreground) return 'The window is not in the foreground; run a focus action first';
+    if (!win.foreground) return 'The window is not in the foreground';
+  }
+  if (type === 'type-text' && text !== undefined && /[\r\n]/.test(text)) {
+    const proc = win.process.toLowerCase();
+    if (TERMINAL_PROCESSES.includes(proc) || (proc === 'explorer.exe' && win.title.trim().toLowerCase() === 'run')) {
+      return 'Typing a line break into a terminal or the Run dialog could run a command; remove the line breaks';
+    }
   }
   return null;
 }
