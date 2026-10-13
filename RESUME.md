@@ -28,3 +28,6 @@ Original outputs/control-room/.controlroom retains DPAPI key, ledger, cancelled 
 
 Final checkpoint validation: combined source TypeScript passed; npm test 124/124 passed. This does not replace pending real desktop input, packaged-app, accessibility, installer and integration checks.
 
+
+Shutdown check found one orphaned dedicated AO chat-host (session16) and its Claude child after daemon shutdown; both process trees were terminated within the exact owned runtime scope. Add orphan confirmation/cleanup to future cancellation tests. Codex browser runtime processes were left alone.
+
