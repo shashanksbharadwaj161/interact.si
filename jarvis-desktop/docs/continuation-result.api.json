@@ -1,0 +1,64 @@
+{
+  "role": "api",
+  "session": "jarvis-desktop-49",
+  "branch": "ao/jarvis-desktop-49/root",
+  "baseCommit": "8e1aac3",
+  "done": true,
+  "files": [
+    "electron/backend.ts",
+    "src/shared/contracts.ts",
+    "src/ui/bridges.ts",
+    "tests/autopilot-api.test.mjs",
+    "docs/continuation-result.api.json"
+  ],
+  "unchangedOwnedFiles": [
+    "electron/preload.ts (already binds all 64 METHODS)",
+    "electron/ipc.ts (registers every METHODS entry)",
+    "electron/ipcCore.ts (ARG_SPECS already cover every v2.1 method; argument shapes re-validated in backend/services)",
+    "electron/channels.ts (METHODS/ARITY already complete)",
+    "electron/services/sidecar.ts (used as-is for routines, model-profile, integrations, usage-ledger)"
+  ],
+  "checks": [
+    {"command": "npm ci --ignore-scripts", "result": "pass (repo-local)"},
+    {"command": "npx tsc --noEmit", "result": "pass (baseline: 38 missing JarvisAPI methods + RoutinePlan import error; both fixed)"},
+    {"command": "node --test tests/autopilot-api.test.mjs", "result": "22/22 pass (15 existing, 1 updated for routines now available, 7 new)"},
+    {"command": "npm test", "result": "482/484 pass. The 2 failures are the pre-existing baseline failures in tests/autopilot-models.test.mjs (chat cancellation system note; cloud cancel warning) owned by the models worker; untouched here."},
+    {"command": "npm run build", "result": "pass: typecheck, vite build, dist-electron/main.cjs and preload.cjs contain the v2.1 methods"}
+  ],
+  "interfaces": {
+    "contractFix": "src/shared/contracts.ts now imports RoutinePlan from electron/services/intent (where it is exported) instead of routines. No contract shapes changed; all v2.1 methods stay optional on JarvisAPI and required on FullJarvisAPI.",
+    "BackendEnv": {
+      "confirm": "unchanged: trusted main-process dialog. Now also gates routine scheduled starts (and every routine step via ActionService), model pulls/imports, integration key storage and checks, and turning clipboard history on. Missing confirm denies all of these.",
+      "clipboard?: {readText(): Promise<string>; isConcealed?(): Promise<boolean>}": "NEW optional. Native main owner should pass {readText: async () => clipboard.readText()} from Electron. Absent: clipboard-history reported unavailable, clipboardSetEnabled(true) rejects, status carries a 'not connected' warning.",
+      "appMetrics?: () => AppProcessMetric[]": "NEW optional. Pass a reduction of app.getAppMetrics() ({pid,type,cpuPercent,workingSetKB}). Absent: systemResources lists 'app-processes' as unavailable.",
+      "dialogs.saveUsageExport?(defaultName, format)": "NEW optional save dialog with a CSV/JSON filter. Absent: falls back to dialogs.saveExport (JSON filter) and the backend forces the .csv/.json extension.",
+      "testSeams": "sidecarFs?, clipboardPollMs? (production leaves undefined)"
+    },
+    "Backend": "adds routines: RoutineEngine, models: ModelRuntime, integrations: IntegrationService, usage: UsageLedger, clipboard: ClipboardHistory. dispose() stops clipboard polling, disposes routine timers and cancels running model jobs.",
+    "methods": {
+      "routines*": "createRoutinesApi(RoutineEngine). Storage: <userData>/routines.json sidecar. Actions port = ActionService.preview/execute, so each step previews and asks its own native confirmation. ids checked with checkId; text/json inputs type-checked. routinesPlanText/PlanModel return preview-only RoutinePlan.",
+      "models*": "ModelRuntime over the guarded fetch (loopback 'ollama' purpose, pinned to settings.localEndpoint). Guard = env.confirm dialog. modelsSelect options strictly read ({warm?, unloadOthers?} booleans only) and returns only the settings patch; the renderer saves it with saveSettings. modelsSetProfile persists to <userData>/model-profile.json and is restored on restart. modelsPickPackFolder = dialogs.pick('folder') normalized. Chat now uses the selected profile (sendChat profile: models.chatProfile).",
+      "integrations*": "createIntegrationService with a DPAPI key vault under <userData>/secrets/integrations; the 'anthropic' slot aliases the existing Secrets cloud-key vault so chat and integrations share one key. After set/remove the backend refreshes keyConfigured and invalidates SystemInfo. Prefs in <userData>/integrations.json. Audit lines go to Activity (no key material).",
+      "usage*": "createUsageLedger persisted to <userData>/usage-ledger.json (loadState on start, saved after setPrices/setBudget). usageReport -> {report, performance} (UsageSummary, matches UsagePanel props). usageSetPrices/usageSetBudget require exactly {prices} / {budget}. usageExport(format) writes via save dialog with atomic temp+rename; cancelled -> {path:null, rows, truncated}.",
+      "clipboard*": "ClipboardHistory, memory only (persisted:false). Turning on needs env.clipboard, not-safe-launch and the trusted dialog; capture polls every 1.5 s only while enabled; turning off stops polling and clears. clipboardGet/Remove check ids. clipboardPurge returns status.",
+      "systemResources": "System.resources() (measured only; unavailable list for gpu/temperature/battery/app-processes).",
+      "getApiInfo": "routines, integrations, model-runtime, usage-ledger, resource-monitor now available (with reasons). clipboard-history available only when env.clipboard is supplied. chat-streaming/chat-cancel/region-capture/ocr/vision/automatic-input remain unavailable."
+    },
+    "netGuard": "createGuardedFetch now receives localEndpoint (loopback traffic pinned to the configured endpoint) and audits all non-loopback allowed traffic (cloud-chat and provider-check) plus every denial.",
+    "bridges": "src/ui/bridges.ts adds USAGE_METHODS/usageBridge -> UsageClient {report, exportAs, setPrices(prices), setBudget(budget)}, CLIPBOARD_METHODS/clipboardBridge -> ClipboardClient, resourcesBridge -> () => Promise<ResourceSnapshot>. Each returns null when the methods are absent (browser preview)."
+  },
+  "security": [
+    "No renderer boolean authorizes anything new: routine steps use ActionService (native confirm per step), scheduled starts use env.confirm, model downloads/imports, integration keys/checks and enabling clipboard history all require env.confirm and fail closed without it (tested for routines, integrations and clipboard).",
+    "Offline guard retained: model pulls refused offline before any dialog or request; integration checks in offline mode send nothing (tested with fetch log).",
+    "Keys stay write-only: no method returns key material; activity log checked for absence of the key (tested).",
+    "Clipboard is never read before the user turns history on, and polling stops when turned off (tested)."
+  ],
+  "limitations": [
+    "electron/main.ts (not owned) does not yet pass env.clipboard, env.appMetrics or dialogs.saveUsageExport, so in the packaged app clipboard history reports 'not connected', app-process metrics report unavailable, and usage export uses the JSON-filtered save dialog (extension still forced). Native main owner/captain should inject these.",
+    "Chat replies are not metered: chat.ts exposes no token metrics hook, so the usage ledger records no events automatically (stated in getApiInfo).",
+    "RoutineEngine.init() runs inside createBackend, before main.ts creates the window. A scheduled slot that is due at startup asks the trusted confirm, which fails closed without a visible focused window, so it is recorded as declined rather than run.",
+    "Integration usage history (integrationsUsage) is in memory and cleared on restart (service design).",
+    "No live Ollama, Windows DPAPI or Electron runtime run in this worktree; adapters tested with injected native/fetch/confirm mocks.",
+    "The 2 pre-existing models streaming test failures remain for the models owner."
+  ]
+}

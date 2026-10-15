@@ -1,0 +1,47 @@
+{
+  "role": "motion",
+  "sessionId": "jarvis-desktop-111",
+  "done": true,
+  "ownedChangedPaths": [
+    "src/components/MotionStudio.tsx",
+    "src/components/Scene3D.tsx",
+    "tests/parallel-motion.test.mjs",
+    "docs/parallel-result.motion.json"
+  ],
+  "changes": {
+    "MotionStudio": [
+      "Play after a finished non-looping timeline restarts from frame 0 (previously stopped at once).",
+      "A running WebM recording now stops and exports when playback pauses, ends, or reduced motion turns on, instead of capturing a still.",
+      "Keyframe ticks on the timeline, previous/next keyframe jumps, timecode in the frame hint and aria-valuetext, and a Set/Replace keyframe label.",
+      "Keyframe set/remove no longer mutates state inside a setState updater; limit messages name the 12-track and 16-key caps; success is announced.",
+      "Pasted and file lab import share one validated path (applyLab) with 'Imported ...' / 'Rejected ...' messages; file import is size-checked and ignores late reads after unmount or a newer pick. Import textarea bound is now MAX_LAB_BYTES.",
+      "Pure exported helpers: keyframeFrames, adjacentKeyFrame, restartFrame, shouldStopRecording."
+    ],
+    "Scene3D": [
+      "Step back / forward one frame (1/30 s) buttons that pause playback first.",
+      "Named local presets (max 8, 40-char printable names, case-insensitive replace) stored under scene3d.userPresets; every stored scene is re-run through normalizeScene, junk is dropped, count is capped.",
+      "Import success/failure feedback (applied, clamped, rejected).",
+      "No new icon imports were added so the existing substantial-scene3d icon stub keeps working.",
+      "Pure exported helpers: normalizePresetName, parseUserPresets, upsertUserPreset, STEP_SECONDS, USER_PRESETS_KEY."
+    ],
+    "preserved": "WebGL2 allocation/dispose, context-loss/restore handlers, reduced motion, import size bounds, 'export ready: choose where to save it' wording, no MP4/GIF/realistic-3D claims, no remote assets. Existing substantial-scene3d tests unchanged and passing."
+  },
+  "checks": [
+    { "command": "npm ci --ignore-scripts", "result": "ok, repo-local, 331 packages" },
+    { "command": "npx tsc --noEmit", "result": "clean" },
+    { "command": "node --test tests/parallel-motion.test.mjs", "result": "13 tests, 13 pass" },
+    { "command": "node --test tests/parallel-motion.test.mjs tests/substantial-scene3d.test.mjs tests/backlog-motion.test.mjs tests/motion-presets.test.mjs tests/autopilot-shell.test.mjs tests/autopilot-visual.test.mjs tests/backlog-ux-review.test.mjs tests/full-integration.test.mjs", "result": "151 tests, 151 pass, 0 fail" },
+    { "command": "npx vite build", "result": "ok; MotionStudio chunk 76.8 kB" }
+  ],
+  "interfaceProposals": [
+    "Captain: both components keep their existing props, so App.tsx needs no change.",
+    "Scene3D now also exports USER_PRESETS_KEY, MAX_USER_PRESETS, normalizePresetName, parseUserPresets, upsertUserPreset from the component module; if the captain wants them in src/ui/scene3d.ts (non-component module, friendlier to Fast Refresh) that file is outside this task's ownership.",
+    "Timeline keyframe ticks use inline styles because src/styles/motion-studio.css is not owned; a .motion-key-ticks rule could replace them."
+  ],
+  "limitations": [
+    "No browser/GPU runs: components were checked by typecheck, static server rendering with stubbed icons, pure-helper tests and source-level lifecycle invariants. Recorder behaviour (stop-on-pause) and WebGL2 behaviour were not exercised against a real MediaRecorder or GPU here.",
+    "Test 'Scene3D keeps its GPU lifecycle' and 'releases recorder resources' are regex source guards, not runtime tests; runtime allocation and context-loss behaviour remains covered by tests/substantial-scene3d.test.mjs (fake GL).",
+    "No video export for 3D; WebM recording remains 2D Motion Studio only. MP4/GIF/APNG remain unavailable and are labelled so.",
+    "Working-copy files show LF/CRLF warnings from git autocrlf; blobs in HEAD are LF and edits were written as LF."
+  ]
+}

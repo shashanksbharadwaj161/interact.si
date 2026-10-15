@@ -1,0 +1,63 @@
+{
+  "role": "native",
+  "files": {
+    "added": [
+      "electron/native/integrity.ts",
+      "electron/native/startup.ts",
+      "tests/autopilot-native.test.mjs",
+      "docs/autopilot-result.native.json"
+    ],
+    "modified": [
+      "electron/main.ts",
+      "electron/native/runner.ts",
+      "electron/services/lifecycle.ts",
+      "electron/services/reminders.ts",
+      "scripts/build-main.mjs",
+      "scripts/smoke.cjs",
+      "scripts/local-ai-smoke.cjs"
+    ],
+    "generatedNotCommitted": ["dist-electron/main.cjs", "dist-electron/preload.cjs", "dist-electron/native-manifest.json"]
+  },
+  "checks": {
+    "npx tsc --noEmit": "pass",
+    "node --test tests/*.test.mjs": "149/149 pass (25 new in tests/autopilot-native.test.mjs; run in isolation 25/25)",
+    "npm run build (typecheck + vite + build-main)": "pass; dist-electron/native-manifest.json lists 10 helper hashes, same digests embedded in main.cjs",
+    "mutation check": "removing the runner's verify() call makes 4 new tests fail, so the integrity tests exercise the real gate",
+    "node --check scripts/smoke.cjs scripts/local-ai-smoke.cjs": "pass (syntax only, see limitations)",
+    "npm ci --ignore-scripts": "done in this worktree; no Electron binary was downloaded"
+  },
+  "delivered": {
+    "helperIntegrity": "scripts/build-main.mjs hashes native/*.ps1 (SHA-256), writes dist-electron/native-manifest.json and embeds it in the main bundle as __NATIVE_MANIFEST__. NativeRunner re-hashes the requested script plus common.ps1 before every spawn; mismatch, unreadable or unlisted file throws NativeError kind 'integrity' and PowerShell is never started. main.ts calls configureNativeIntegrity before createBackend with required = app.isPackaged (packaged builds fail closed without a manifest). No edit to backend.ts was needed: the runner reads the process-wide config.",
+    "trustedConfirm": "Verified already wired in main.ts: createTrustedConfirm over dialog.showMessageBox (Cancel default, full detail, requires visible/focused/trusted window), auto-approve only when TEST_MODE, which requires JARVIS_TEST_MODE plus a userData folder with a fixture prefix directly in the OS temp dir. Covered by a static wiring test.",
+    "fileAndDevUrlConfinement": "main.ts uses isTrustedUrl/isAllowedRequestUrl/parseDevOrigin (ipcCore). Added: app-wide web-contents-created guards (window.open deny, will-navigate, webview block) and session will-download cancel.",
+    "legacyUserDataFix": "resolveUserDataDir: the legacy 'Jarvis Desktop' folder is adopted only when userData is still Electron's default. Previously local-ai-smoke.cjs (temp userData, no test mode) would have been redirected to the real profile and saved settings there; it now runs in test mode in a desktop-companion-test-* temp folder and deletes it afterwards.",
+    "tray_startup_hotkey": "registerHotkey tries CommandOrControl+Alt+J then CommandOrControl+Alt+Shift+J, validates accelerators (modifier + key only), reports conflicts into Activity, debounced 300 ms against key auto-repeat. applyLoginItem (packaged Windows only, --hidden arg, verifies the result) is implemented and tested but NOT called: no setting exists yet, and the app must not change OS startup without an explicit user choice.",
+    "reminders": "enabled() preference hook (off marks tasks announced silently), burst cap MAX_BURST=4 with a '<n> more tasks are due' summary, resync() on powerMonitor 'resume' so reminders slipped by sleep are announced, notification body capped at 240 chars.",
+    "crashSafeLifecycle": "LaunchGuard tolerates garbage counters and unwritable profiles (trackingError) and end() never throws; endSync() runs on window 'session-end' (logoff/shutdown) so a clean OS shutdown is not counted as a crash; 'unresponsive' and uncaughtException/unhandledRejection are recorded as Activity 'recovery' with user paths redacted; existing 5 s bounded backup on quit retained.",
+    "idleBehavior": "IdleGovernor: one unref'd timer starts when the window hides/minimizes (5 min), clears the session cache once, cancelled on show; no polling. summarizeMetrics (pure) turns app.getAppMetrics into process count / working set / CPU for acceptance M5; smoke prints it, dev builds log it on idle."
+  },
+  "limitations": [
+    "Electron binary is not installed (ignore-scripts), so scripts/smoke.cjs and scripts/local-ai-smoke.cjs were syntax-checked only and NOT run; main.ts changes are covered by typecheck, bundling and static wiring tests, not an Electron run. Captain should run `npx electron scripts/smoke.cjs` where the binary exists.",
+    "Integrity is tamper-evidence, not authentication: the manifest ships in the same install, so an attacker able to rewrite the whole bundle can rewrite it. A file swapped between hash and PowerShell start (TOCTOU) is not prevented. -ExecutionPolicy Bypass is unchanged. Authenticode signing is an unavailable gate; no signature is invented.",
+    "No launch-at-login, notification or hotkey preference exists in Settings (contract not owned here), so those are not user-configurable. Needs Settings fields plus an IPC path owned by the API owner.",
+    "Reminders announced within the 10-minute start grace can repeat once after an app restart (fired-set is in memory).",
+    "uncaughtException handler records and keeps running instead of showing Electron's default error dialog.",
+    "Not touched (not owned or unavailable): signed updates, ARM64 tiers, commercial licensing, managed deployment (roadmap 117-120) remain gated; installer/uninstaller (111) and offline bundle (112) need the captain's package build; safeStorage migration for DPAPI (NSR-13) is a secrets.ts change owned elsewhere.",
+    "Real helper behaviour (focus/type/click, PowerShell speech) was not run: no real desktop input by policy."
+  ],
+  "interfaces": {
+    "electron/native/integrity.ts": "buildManifest(files), isNativeManifest(v), verifyFiles(manifest, names, join, read), sha256Hex, configureNativeIntegrity({manifest, required}), getNativeIntegrity(), IntegrityError, SHARED_HELPERS",
+    "electron/native/runner.ts": "NativeRunnerOptions gains integrity?: IntegrityConfig and readFileImpl?; NativeError.kind gains 'integrity'",
+    "electron/native/startup.ts": "applyLoginItem(api, {enabled, packaged, platform, execPath}) -> {ok, enabled, reason?}; validateAccelerator(raw); registerHotkey(api, candidates, onPress) -> {registered, reason?}; debounced(fn, ms); HIDDEN_ARG",
+    "electron/services/lifecycle.ts": "LaunchGuard.endSync(), LaunchGuard.trackingError, resolveUserDataDir(...), IdleGovernor({onIdle,onActive?,hiddenMs?}), summarizeMetrics(metrics)",
+    "electron/services/reminders.ts": "ReminderDeps.enabled?: () => boolean, Reminders.resync(), MAX_BURST",
+    "build": "scripts/build-main.mjs defines __NATIVE_MANIFEST__ for main.cjs and writes dist-electron/native-manifest.json; package.json 'files' already ships dist-electron/** and native/** (no change needed)",
+    "captainWiringNeeded": "To expose launch-at-login or notification toggles: add Settings fields, then call applyLoginItem(app, ...) from the API owner's saveSettings path (behind the trusted confirm) and pass enabled: () => settings.<notifications> in startReminders."
+  },
+  "dependencies": {
+    "runtime": "none added; uses node:crypto, node:fs and existing Electron APIs (powerMonitor, session, globalShortcut)",
+    "buildTime": "existing esbuild 0.28.2",
+    "package.json": "unchanged"
+  },
+  "done": true
+}

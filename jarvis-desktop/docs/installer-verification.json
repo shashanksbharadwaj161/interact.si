@@ -1,0 +1,21 @@
+{
+  "builtAt": "2026-10-14T11:32:39.2709415Z",
+  "sourceCommit": "bd9a4fb",
+  "path": "release/Desktop Companion Setup 0.1.0.exe",
+  "bytes": 111752531,
+  "sha256": "a60a0b688af88efb935af4983a19f67b2fecc49a79d4ec2e5c9c26a3b9755a28",
+  "packagingPassed": true,
+  "signature": "NotSigned",
+  "installUninstallTested": false,
+  "tests": {
+    "passed": 955,
+    "todo": 0,
+    "failed": 0
+  },
+  "electronSmoke": {
+    "routes": 20,
+    "rendererErrors": 0,
+    "externalRequests": 0
+  },
+  "packagedCodeSmokePassed": true
+}

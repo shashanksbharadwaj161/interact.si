@@ -1,0 +1,91 @@
+/*
+ * Accessibility layer. Load after the component styles so it fills gaps without restyling components.
+ * Standard element, class and attribute selectors only. The media query strings match MEDIA in
+ * src/ui/accessibility.ts, and data-motion / data-forced-colors come from applyAccessibilityAttributes.
+ */
+
+/*
+ * Visible focus for controls. :where() keeps specificity at zero, so component rules such as
+ * .input:focus-visible still win. Outline is used rather than box-shadow because forced colors removes box-shadow.
+ */
+:where(a[href], button, input, select, textarea, summary, [role='button'], [role='tab'], [role='radio'], [role='switch'], [role='checkbox'], [role='option'], [role='menuitem']):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Reduced motion, when the OS asks for it. Only animation, transition and smooth scrolling are shortened. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Reduced motion, from the in-app setting. Same rules as above, applied by the root data attribute. */
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
+/*
+ * Windows High Contrast (forced colors). Backgrounds, box-shadows and most decoration are removed, so state
+ * has to come from text, borders and outlines. System color keywords are used for every value.
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  /*
+   * Controls whose normal focus style relies on box-shadow or border-color (text fields, studio sliders,
+   * studio list items and presets). Forced colors drops box-shadow, so they need an outline here. Same specificity as
+   * the component rules; this sheet is imported last in main.tsx, so it wins the cascade.
+   */
+  .input:focus-visible,
+  .avs-slider:focus-visible,
+  .avs-item:focus-visible,
+  .motion-slider:focus-visible,
+  .motion-preset:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* Switch track and knob. Forced colors removes the track and knob fills, so the track gets a border and the knob a fill. */
+  .switch {
+    border: 1px solid ButtonText;
+  }
+
+  .switch .switch-knob,
+  .switch.on .switch-knob {
+    background: ButtonText;
+  }
+
+  /* Selected, current and pressed states: the active nav item, chips, tabs, switches and radios. */
+  [aria-current]:not([aria-current='false']),
+  [aria-selected='true'],
+  [aria-checked='true'],
+  [aria-pressed='true'] {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    border-color: Highlight;
+  }
+
+  /* Disabled controls keep their shape but lose the foreground color that marks them as active. */
+  :disabled,
+  [aria-disabled='true'] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+
+  .switch:disabled .switch-knob {
+    background: GrayText;
+  }
+}

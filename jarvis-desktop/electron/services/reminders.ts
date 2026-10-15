@@ -8,6 +8,8 @@ export const MAX_TIMER_MS = 2_147_483_647;
 export const START_GRACE_MS = 10 * 60_000;
 /** Date-only due values (YYYY-MM-DD) remind at 09:00 local time. */
 export const DATE_ONLY_HOUR = 9;
+/** At most this many separate notifications per check; the rest are folded into one summary so a backlog never floods the desktop. */
+export const MAX_BURST = 4;
 
 /** Due instant in ms, or null when the task has no usable due value. */
 export function dueAt(task: Pick<Task, 'due'>): number | null {
@@ -27,6 +29,8 @@ export interface ReminderDeps {
   now: () => number;
   /** Shows one notification. Must not throw for the scheduler to keep running. */
   notify: (title: string, body: string, task: Task) => void;
+  /** Notification preference. When it returns false, due tasks are marked announced without a notification. Defaults to on. */
+  enabled?: () => boolean;
   /** Optional audit hook, e.g. Activity{kind:'reminder'}. */
   record?: (summary: string) => void | Promise<void>;
   setTimer?: (fn: () => void, ms: number) => TimerHandle;
@@ -88,13 +92,30 @@ export class Reminders {
     // Drop bookkeeping for tasks that no longer exist or changed their due value.
     const live = new Set(this.d.tasks().map(keyOf));
     for (const k of this.fired) if (!live.has(k)) this.fired.delete(k);
-    for (const t of due) {
-      this.fired.add(keyOf(t));
-      try { this.d.notify(t.title, 'Due now', t); } catch { /* a failing notifier must not stop later reminders */ }
-      try { await this.d.record?.(`Reminder: ${t.title}`); } catch { /* ignore */ }
+    const on = this.d.enabled ? this.d.enabled() !== false : true;
+    const sorted = [...due].sort((a, b) => (dueAt(a) ?? 0) - (dueAt(b) ?? 0));
+    for (const t of sorted) this.fired.add(keyOf(t));
+    if (on) {
+      const folded = sorted.length > MAX_BURST ? sorted.length - (MAX_BURST - 1) : 0;
+      const single = folded ? sorted.slice(0, MAX_BURST - 1) : sorted;
+      for (const t of single) {
+        try { this.d.notify(t.title, 'Due now', t); } catch { /* a failing notifier must not stop later reminders */ }
+        try { await this.d.record?.(`Reminder: ${t.title}`); } catch { /* ignore */ }
+      }
+      if (folded) {
+        const rest = sorted.slice(MAX_BURST - 1);
+        try { this.d.notify(`${rest.length} more tasks are due`, rest.slice(0, 3).map((t) => t.title).join(', ').slice(0, 200), rest[0]); } catch { /* ignore */ }
+        try { await this.d.record?.(`Reminder: ${rest.length} more tasks due`); } catch { /* ignore */ }
+      }
     }
     this.schedule();
     return due.length;
+  }
+
+  /** After system sleep/resume or a clock change: timers may have slipped, so announce anything now due and re-aim the timer. */
+  resync(): void {
+    if (this.disposed) return;
+    void this.fire();
   }
 
   /** Arms the timer for the first announcement of this run (announces recent overdue tasks within the grace window). */

@@ -1,0 +1,41 @@
+{
+  "role": "guidance",
+  "session": "jarvis-desktop-99",
+  "model": "claude-opus-5-5",
+  "at": "2026-10-15",
+  "status": "done",
+  "uncommitted": true,
+  "files": [
+    "src/ui/guidance.ts",
+    "src/components/GuidedSetup.tsx",
+    "tests/full-guidance.test.mjs",
+    "docs/full-interface.guidance.json",
+    "docs/full-result.guidance.json"
+  ],
+  "summary": "Mountable guided setup/help: eight local topics (notes, tasks, capsules, dictation, streaming, local models, privacy, motion/3D) with short tours, a checklist whose statuses come only from passed capabilities, API features, settings, key status and saved counts, plus a local/model/cloud explainer, re-check flow and validated checklist backup/import.",
+  "behaviour": [
+    "Unavailable, blocked or unchecked topics are never counted as done; a manual 'done' mark is refused by the reducer and ignored if the feature later becomes unusable.",
+    "Capability/feature results older than 10 minutes, future-dated or errored are treated as unknown, never as available.",
+    "Streaming requires the 'chat-streaming' feature and a ready route (local-llm for offline; model name + saved key for online); no fallback is implied.",
+    "Local models are done only from the live 'local-llm' capability; missing Ollama is 'needs attention' with no automatic download.",
+    "onNavigate/onAction fire only from explicit controls; rendering calls nothing.",
+    "Only the non-sensitive checklist preference is persisted (usePref key guidance.v1); stored data is validated with a visible notice, imports are size-capped and refused whole on any problem.",
+    "Keyboard: native buttons, roving arrow/Home/End movement in the topic list, aria-current, aria-live tour region; reduced motion disables smooth scrolling."
+  ],
+  "checks": {
+    "typecheck": "npx tsc --noEmit — pass",
+    "guidanceTests": "node --test tests/full-guidance.test.mjs — 18/18 pass",
+    "fullSuite": "npm test — 1007/1007 pass (baseline 989 + 18)",
+    "mutationCheck": "allowing a manual mark to pass any status makes the manual-marks test fail (verified, then reverted)"
+  },
+  "artifacts": [
+    "control-room/.controlroom/orchestrator/artifacts/jarvis-desktop-99/guided-setup-preview.html (static render with app stylesheets, synthetic status)"
+  ],
+  "limitations": [
+    "Not mounted: App/nav/Settings are captain-owned; see docs/full-interface.guidance.json for the proposed 'guide' view and wiring.",
+    "Status freshness depends on the host passing checkedAt; the component re-renders each minute to age it but does not fetch anything itself.",
+    "webgl2 is optional input; without it the 3D fact reads 'Unknown'.",
+    "No live Electron/browser screenshot was taken; layout uses existing classes and was checked through static markup only.",
+    "Dictation/streaming completion has no observable evidence in app state, so those rely on an explicit user mark while usable."
+  ]
+}

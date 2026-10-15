@@ -1,0 +1,72 @@
+{
+  "role": "acceptance",
+  "baseline": "590aa55",
+  "preparedOn": "2026-10-14",
+  "files": [
+    {"path": "docs/milestone-acceptance.md", "change": "new: baseline, evidence audit, level separation, verified review items, manual checklist MA-1 to MG-2, gap register"},
+    {"path": "docs/release-checklist.md", "change": "re-checked at 590aa55: validation results, A2/X8 results, §0 gate status, N7 absence note, pointer to milestone acceptance"},
+    {"path": "docs/feature-matrix.md", "change": "conflicts section replaced with the current green baseline; verified-review and not-re-checked bullets updated; acceptance pass note added"},
+    {"path": "docs/milestone-result.acceptance.json", "change": "new: this result"}
+  ],
+  "unchangedReviewed": [
+    "src/shared/feature-registry.json (140 entries; no status, integration or evidence change: the audit found no contradiction and no new evidence)"
+  ],
+  "artifactsOutsideRepo": [
+    "%TEMP%\\jarvis-acceptance-audit\\audit.cjs (registry shape and evidence-ref audit)",
+    "%TEMP%\\jarvis-acceptance-audit\\tap-check.cjs (test refs against TAP output)",
+    "%TEMP%\\jarvis-acceptance-audit\\matrix-check.cjs (feature matrix against registry)"
+  ],
+  "gitignoredOutputsCreated": [
+    "node_modules/ (npm ci --ignore-scripts)",
+    "dist/ and dist-electron/ (npm run build)",
+    "root *.log files from the baseline runs (removed after the pass)"
+  ],
+  "checks": [
+    {"name": "npm ci --ignore-scripts", "result": "pass", "detail": "exit 0. git status warns Filename too long for node_modules/app-builder-lib/node_modules/@electron/get/node_modules/fs-extra/lib/ (known in release §1)."},
+    {"name": "npm run typecheck", "result": "pass", "detail": "tsc --noEmit exit 0"},
+    {"name": "npm run build", "result": "pass", "detail": "typecheck, vite build, build-main exit 0; chunk-size warning only (614 kB JS)"},
+    {"name": "npm test", "result": "pass", "detail": "579 tests: 575 pass, 0 fail, 4 todo, exit 0, about 29 s"},
+    {"name": "registry shape audit", "result": "pass", "detail": "140 entries, ids 1-140 unique, status and integration vocabularies valid, planned entries have no evidence, every verified entry is integrated or runtime-verified. 0 issues."},
+    {"name": "registry test evidence vs TAP", "result": "pass", "detail": "103 test refs: each title in its named tests/ file and a passing TAP line; 0 failing, 0 todo"},
+    {"name": "registry doc and smoke evidence", "result": "pass", "detail": "every doc path in doc refs exists; smoke refs point to docs/current-verification.md"},
+    {"name": "feature matrix vs registry", "result": "pass", "detail": "140 of 140 rows match on scope, tier, status, integration, owner, gates, evidence types and limitation"},
+    {"name": "gate and experimental lists", "result": "pass", "detail": "46 gated scopes; gate blocks match; experimental without gate 20, 49, 50, 98, 99, 100, 109, 110, 120; G1-G8 not-recorded, no gate documents in docs/"},
+    {"name": "A2 static egress scan", "result": "pass with note", "detail": "2 lines, both calls through the injected guarded fetch: electron/services/integrations.ts:218 and electron/services/models.ts:312. Release doc now accepts only these."},
+    {"name": "X8 static scan", "result": "pass with note", "detail": "no user-visible Jarvis match in src/, electron/ or index.html. Comment and legacy-folder matches only: electron/main.ts:24,27 and electron/services/lifecycle.ts:74,80. actions.ts denial text now names Desktop Companion."},
+    {"name": "N7 executable-type denylist", "result": "fail (absent)", "detail": "no match for .chm, .iso, .msix, .library-ms, .settingcontent-ms, .wsc, .sct or .inf under electron/. launch-path still calls shell.openPath (electron/services/actions.ts:395). Blocking release row."},
+    {"name": "microphone grant", "result": "open", "detail": "electron/main.ts:175-179 grants audio-only media to the app URL, not tied to push-to-talk. Decision open."},
+    {"name": "OAuth presence search", "result": "pass", "detail": "no OAuth, redirect_uri, code_challenge or client_secret flow in src/, electron/ or tests/. Calendar and Spotify remain setup-required in src/ui/integration-catalog.ts."},
+    {"name": "wiring by name", "result": "pass with note", "detail": "backend.ts and preload.ts name routines, integrations, usage and clipboard; Routines.tsx, Integrations.tsx and UsagePanel.tsx are not imported by other source files; productivity absent from backend.ts and preload.ts; main.ts has no clipboard reference. Not run in Electron."}
+  ],
+  "limitations": [
+    "Evidence audit only. No scope status, integration level or evidence entry changed. Verified count stays 5.",
+    "Electron binary is not installed (--ignore-scripts). Smoke, packaging and any packaged-app check were not run in this pass.",
+    "No real desktop input, microphone, speech, window focus, OCR, screen capture, live Ollama, live cloud or provider call was performed. No hardware was used for G1, G2, G4 or footprint checks.",
+    "No OAuth flow exists, so no OAuth acceptance test can be run. This is a gap, not a skipped check.",
+    "The pre-continuation smoke for scopes 2, 3 and 51 was not repeated. Scope 116's packaged network-denial run is not recorded. The captain must decide whether these stay verified.",
+    "The audit scripts live outside the repository and are not part of npm test. The shape check is therefore not enforced by CI.",
+    "Module wiring was checked by name in the current tree, not by running the app. Result-file limitations were not re-verified one by one.",
+    "The release checklist sign-off table (§8) is not filled. This pass records no sign-off.",
+    "Code signing (G8) is absent. The build is unsigned, and SmartScreen will warn.",
+    "Licence review is incomplete (release A5 open; project licence undeclared, U1)."
+  ],
+  "interfaces": {
+    "manualChecklist": "docs/milestone-acceptance.md section 5, IDs MA-1 to MG-2. Results are recorded in docs/release-checklist.md section 8.",
+    "promotionRule": "docs/milestone-acceptance.md section 4. A scope may move to verified only when integration is integrated or runtime-verified, a passing test title is in the candidate TAP output, its manual items are recorded as pass, no limitation contradicts it, and the captain records the evidence in the registry, matrix and acceptance doc together.",
+    "registry": "src/shared/feature-registry.json is unchanged. The captain owns any future status change.",
+    "auditScripts": "Out-of-repo one-off scripts in %TEMP%\\jarvis-acceptance-audit. Not a public interface."
+  },
+  "dependencies": {
+    "requiresFromOtherModules": [
+      {"owner": "native", "item": "add an executable and code-running file-type denylist for launch-path and open plans (MD-7, release N7), a blocking item"},
+      {"owner": "native/main", "item": "gate the microphone grant on push-to-talk, or reword release B4 (ME-1)"},
+      {"owner": "captain", "item": "confirm the wiring of routines, integrations, usage and clipboard into main, preload and mounted screens before any module-tested scope moves up"},
+      {"owner": "captain", "item": "wire productivity into backend, preload and the shell (window.jarvis.productivity does not exist)"},
+      {"owner": "captain", "item": "re-run the smoke for scopes 2, 3 and 51 on the candidate commit (MG-1), and record a packaged network-denial run for scope 116 (MG-2)"},
+      {"owner": "captain", "item": "decide the two pending verified-record reviews in milestone-acceptance section 4"}
+    ]
+  },
+  "done": true,
+  "doneScope": "Evidence audit and doc refresh finished at 590aa55. Baseline recorded: typecheck and build pass, npm test 575 pass, 0 fail, 4 todo. Registry and matrix consistency confirmed. No status changed. Manual checks, gap register and OAuth/hardware/signing gaps are written down. Nothing is signed off.",
+  "releaseReady": false
+}

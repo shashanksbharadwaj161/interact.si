@@ -1,0 +1,70 @@
+{
+  "role": "api",
+  "session": "jarvis-desktop-33",
+  "branch": "ao/jarvis-desktop-33/root",
+  "baseCommit": "b0f5c1b",
+  "done": true,
+  "files": [
+    "src/shared/contracts.ts",
+    "electron/backend.ts",
+    "electron/channels.ts",
+    "electron/ipcCore.ts",
+    "electron/preload.ts",
+    "src/components/Assistant.tsx",
+    "src/components/Computer.tsx",
+    "tests/autopilot-api.test.mjs",
+    "docs/autopilot-result.api.json"
+  ],
+  "unchangedOwnedFiles": ["electron/ipc.ts (registers every METHODS entry already; no change needed)"],
+  "checks": [
+    {"command": "npm ci --ignore-scripts", "result": "pass (repo-local, no install scripts)"},
+    {"command": "npx tsc --noEmit", "result": "pass"},
+    {"command": "node --test tests/autopilot-api.test.mjs", "result": "15/15 pass"},
+    {"command": "npm test", "result": "139/139 pass (124 existing + 15 new)"},
+    {"command": "npm run build", "result": "pass: typecheck, vite build (488 kB JS / 44 kB CSS), dist-electron/main.cjs + preload.cjs contain the new methods"}
+  ],
+  "interfaces": {
+    "contractVersion": 2,
+    "compatibility": "All new JarvisAPI methods are optional, so src/preview.ts and any older bridge still type-check. FullJarvisAPI = Required<JarvisAPI> is what the Electron preload and Backend implement. Callers must feature-check (api.planIntent?.) before use.",
+    "newTypes": ["IntentField", "IntentSource", "IntentCandidate", "IntentPlan", "IntentOptions", "SearchCategory", "SearchResult", "SearchOptions", "LocalModel", "LocalModelList", "ApiFeatureId", "ApiFeature", "ApiInfo", "FullJarvisAPI"],
+    "newMethods": {
+      "getApiInfo()": "-> {apiVersion: 2, features: ApiFeature[]}. Static, honest feature list. Unavailable: chat-streaming, chat-cancel, routines, region-capture, ocr, vision, automatic-input (by design).",
+      "planIntent(command: string, options?: {useLocalModel?: boolean})": "-> IntentPlan. Wraps electron/services/intent.ts planIntent. For window-targeting ready plans, takes a read-only window snapshot (own PIDs excluded, skipped in safe launch) to pin a unique hwnd or return a clarification with candidates. useLocalModel=true only for commands the rules mark 'Unknown command': asks the loopback Ollama model via netGuard ('ollama' purpose) and parses the reply with parseModelPlan. Never the cloud. Never previews, confirms or executes.",
+      "search(query: string, options?: {includeChat?: boolean; limit?: 1..50})": "-> SearchResult[]. Wraps electron/services/search.ts searchState over the current store snapshot. Unknown or mistyped options are refused.",
+      "listLocalModels()": "-> LocalModelList {available, endpoint, models[{name,sizeBytes?,modifiedAt?,family?,parameterSize?,quantization?}], reason?}. GET <localEndpoint>/api/tags through netGuard, 2.5 s timeout, 2 MB / 200-entry bounds, malformed entries skipped. Never downloads models."
+    },
+    "ipc": {
+      "channels": "jarvis:getApiInfo, jarvis:planIntent, jarvis:search, jarvis:listLocalModels added to METHODS/ARITY (electron/channels.ts).",
+      "argumentValidation": "electron/ipcCore.ts ARG_SPECS + validateArgs(method, args): every method has a per-argument spec (string with min/max, plain object, boolean, enum, finite-number array). Runs after the sender check and before any handler; missing required args, wrong types, non-plain objects (Date, arrays) and oversized strings/arrays are rejected. executeAction's second argument must be a real boolean. undefined counts as an absent optional argument.",
+      "HandlerMap": "Pick<Required<JarvisAPI>, MethodName>; main.ts withReminderRearm(backend) already iterates METHODS, so the new methods are registered without main.ts changes."
+    },
+    "renderer": {
+      "Assistant.tsx": "Composer mode switch Chat | Desktop command. Command mode: Plan -> (ready plan or clarification candidates) Preview -> Approve… -> backend native confirmation -> outcome via actionOutcome. Exported pure helpers planCommand, planChoices, previewCommand, decideCommand, PLANNER_UNAVAILABLE, MAX_COMMAND_CHARS. Each helper makes one backend call; nothing auto-chains. Opt-in pref 'intentModelAssist' (enabled only when local-llm capability is available). Plan state is ephemeral, not written to chat history. Push-to-talk transcripts still land in the box for review only.",
+      "Computer.tsx": "Optional 'Fill from a command' field (planIntent -> form via exported formFromRequest; candidates selectable; user still previews/approves). 'Screen reading' panel lists region capture / OCR / vision from getApiInfo as unavailable (exported SCREEN_FEATURES)."
+    }
+  },
+  "security": [
+    "No change to native approval: BackendEnv.confirm remains the only approval; renderer 'approved' is still just a request; missing confirm denies (tested).",
+    "Plan and preview send no input (tested with injected native mocks); previews stay single use.",
+    "Model assist cannot override rule safety blocks (chains/click/oversize never reach the model) and is loopback-only via netGuard (tested: no https/cloud URL fetched).",
+    "Secret methods unchanged and write-only: no IPC method returns the cloud key (tested by method-name scan).",
+    "Strict IPC argument validation added for every method (tested: 31 malformed calls rejected with zero handler invocations)."
+  ],
+  "dependencies": [
+    "Uses existing services owned elsewhere: electron/services/intent.ts (planIntent, parseModelPlan, PLANNED_TYPES, MAX_COMMAND_CHARS), search.ts (searchState, SEARCH_LIMITS), chat.ts (ollamaChat), netGuard.ts, actions.ts, validation.ts (LIMITS).",
+    "If the intent owner changes the 'Unknown command' summary string, backend model-assist gating must be updated (covered by tests/autopilot-api.test.mjs).",
+    "Renderer MAX_COMMAND_CHARS (2200) mirrors services/intent.ts MAX_COMMAND_CHARS; a test asserts they match.",
+    "Captain: if a routines or models module lands, add its methods to contracts (optional), channels METHODS/ARITY, ipcCore ARG_SPECS, preload and backend, and flip the getApiInfo feature entry. The test 'every IPC method has an argument spec…' fails until all four are updated.",
+    "src/preview.ts (not owned) does not implement the optional v2 methods; the UI shows them as unavailable in browser preview. Its owner may add honest stubs later."
+  ],
+  "limitations": [
+    "Chat is not streamed and cannot be cancelled: the backend only returns complete replies, so no streamed state was added to the UI (getApiInfo reports both as unavailable).",
+    "Routines: no routines module exists in this worktree, so no routines API was invented; reported unavailable.",
+    "Region capture, OCR and vision are not implemented anywhere; shown as unavailable, never simulated.",
+    "Planner window snapshot returns matching window titles as clarification candidates without an activity-log entry (read-only; same data list-windows already exposes).",
+    "listLocalModels reads the full loopback response body before applying the 2 MB bound.",
+    "Model-assist plan quality depends on the user's local model; no live Ollama run was performed in this session (fetch mocked in tests).",
+    "Live UI check in the AO browser panel was not possible: browser runtime reported BROWSER_RUNTIME_RECONNECTING. UI verified by typecheck, production build and helper tests only.",
+    "No Electron runtime/smoke run in this worktree (npm ci --ignore-scripts installs no Electron binary)."
+  ]
+}

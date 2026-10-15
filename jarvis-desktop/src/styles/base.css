@@ -147,7 +147,7 @@ textarea.input {
   padding: 6px 10px;
   color: var(--text);
   background: var(--sunken);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: var(--r-sm);
   font: inherit;
   transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
@@ -164,7 +164,7 @@ textarea.input {
 }
 
 .input:hover {
-  border-color: var(--line-strong);
+  border-color: var(--text-2);
 }
 
 .input:focus-visible {

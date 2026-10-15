@@ -1,0 +1,57 @@
+{
+  "role": "captain",
+  "sessionId": "jarvis-desktop-101",
+  "done": false,
+  "state": "checkpoint: 8/20 modules integrated and committed; privacy fixes PS-01..03 landed; offline Electron fixture and installer rebuild pending",
+  "originalRepositoryCommits": ["d3e6987", "8d54b53", "114f4b3", "3f1c861", "5523436"],
+  "ownedChangedPaths": [
+    "electron/ipcCore.ts",
+    "electron/backend.ts",
+    "electron/services/chat.ts",
+    "src/ui/audio.ts",
+    "src/components/App.tsx",
+    "src/components/Calendar.tsx",
+    "tests/parallel-captain.test.mjs",
+    "docs/parallel-final.md",
+    "docs/parallel-launch-recovery.md",
+    "docs/parallel-result.captain.json"
+  ],
+  "peerEditsByAuthorization": [
+    "tests/parallel-security.test.mjs: removed the three todo options (PS-01 loop, PS-02, PS-03) only after those tests passed, as root directed"
+  ],
+  "integratedPeers": ["security 104", "tasks 110", "notes 109", "integrations 106", "assistant 107", "settings 108", "motion 111", "calendar-import 105"],
+  "notIntegrated": {
+    "home 102": "no done marker at review; own tests 19/22 at read-only checkpoint; root local helper finishing",
+    "avatar 103": "no done marker at review; own tests 11/11 at read-only checkpoint; root local helper finishing; expansion-voice-avatar icon stub needs ArrowClockwise/CaretLeft at integration",
+    "never launched": ["workbench", "guide", "usage", "customization", "routines", "models", "status", "developer", "release-check"]
+  },
+  "checks": [
+    {"command": "node --test tests/*.test.mjs (captain worktree, e5442ec baseline)", "result": "1078 tests, 1078 pass, 0 fail, 0 skipped, 0 todo"},
+    {"command": "npx tsc --noEmit (original repo, after each batch)", "result": "exit 0"},
+    {"command": "node --test tests/*.test.mjs (original, batch 1)", "result": "1133: 1127 pass, 0 fail, 1 skip, 5 todo"},
+    {"command": "node --test tests/*.test.mjs (original, batch 2)", "result": "1203: 1197 pass, 0 fail, 1 skip, 5 todo"},
+    {"command": "node --test tests/*.test.mjs (original, motion)", "result": "1216: 1210 pass, 0 fail, 1 skip, 5 todo"},
+    {"command": "node --test tests/*.test.mjs (original, calendar)", "result": "1233: 1228 pass, 0 fail, 0 skip, 5 todo"},
+    {"command": "node --test tests/*.test.mjs (original, privacy fixes, todo removed)", "result": "1233 tests, 1233 pass, 0 fail, 0 skipped, 0 todo"},
+    {"command": "node --test tests/parallel-captain.test.mjs", "result": "7 tests, 7 pass"},
+    {"command": "npm run build (original, after motion batch)", "result": "pass; existing >500 kB chunk warning"},
+    {"command": "launch recovery probe (temporary script importing control-room adapter.mjs with stubbed cli/api)", "result": "4/4 assertions"}
+  ],
+  "pending": ["npm run smoke (offline Electron route fixture) on final source", "npm run package:win + verify-package-footprint.mjs + SHA-256", "home/avatar integration after done markers"],
+  "interfaceDecisions": [
+    "Calendar takes an optional Review component prop (CalendarReviewView); App passes the lazily loaded CalendarImport so Calendar keeps its renderer-safe import allowlist and the review stays out of the entry bundle.",
+    "Integrations: backend passes localModel: () => settings().localModel (read-only installed check).",
+    "ipcCore exports redactSecrets(text); safeErrorMessage applies it before path redaction.",
+    "chat.ts: CloudChatError marks cloud errors whose text the app wrote; describe() replaces every other cloud error with a fixed sentence."
+  ],
+  "deferredProposals": [
+    "Integrations 'stale' ConnectionState (contract change) not adopted; UI infers out-of-date from lastCheck.",
+    "Task completedAt/order fields not added; UI states completion time is not recorded.",
+    "Persisted note/settings drafts not added (would need consent copy)."
+  ],
+  "limitations": [
+    "No DOM test library: Calendar review mount is checked by source wiring plus a headless pipeline test (peer review -> bridge -> main parser), not by simulated clicks.",
+    "Fixture and installer gates are not yet re-run on this source; the release/ installer predates it.",
+    "No real cloud provider, microphone, signing or desktop input exercised."
+  ]
+}

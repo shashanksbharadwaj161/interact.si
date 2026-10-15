@@ -1,0 +1,52 @@
+{
+  "role": "settings",
+  "session": "jarvis-desktop-108",
+  "done": true,
+  "summary": "Settings now has grouped sections with a one-line blurb per group, ranked search with an Enter-to-open shortcut and a live match count, a Connection status panel that reports the saved route, local readiness (from the live check), cloud setup and key state honestly, a before-you-save summary (failed or declined save with retry, blocking problems that jump to their field, and a preview of the permission changes Windows will ask you to confirm), stricter and quieter masked key handling, Ctrl+S and keyboard help. No new bridges, dependencies, requests or storage.",
+  "files": [
+    "src/components/Settings.tsx",
+    "tests/parallel-settings.test.mjs",
+    "docs/parallel-result.settings.json"
+  ],
+  "checks": [
+    "npm ci --ignore-scripts in the worktree: completed, exit 0",
+    "npx tsc --noEmit: exit 0",
+    "node --test tests/parallel-settings.test.mjs: 27 tests, 27 pass, 0 fail",
+    "node --test tests/autopilot-shell.test.mjs tests/onboarding.test.mjs tests/backlog-ux-review.test.mjs (existing Settings tests): 68 tests, 68 pass, 0 fail",
+    "node --test tests/*.test.mjs (full suite): 1105 tests, 1105 pass, 0 fail"
+  ],
+  "changes": {
+    "grouping": "SETTINGS_TAB_BLURBS (exported) shown under the tab strip; new 'status' index entry in the Mode & models group.",
+    "search": "searchSettings ranks sections whose title matches first and keeps screen order for ties; Enter in the search box opens the first match; a polite sr-only live region announces the count; input has aria-controls to the results region; jumps scroll with behavior 'auto'.",
+    "status": "connectionStatus() (exported, pure) builds rows for route, unsaved mode change, local model, cloud model and API key. Local and cloud readiness reuse modelReadiness() from Onboarding with the mode forced, so local readiness comes from the live local-llm capability and never from filled-in fields. No request is made to produce it.",
+    "validation": "settingsIssues() and retainDaysError() (exported) replace inline checks. PreSaveSummary (exported) lists each blocking problem as a button that jumps to its section, shows a danger notice with Try again when a save fails or the Windows confirmation is declined (edits are kept), and the save bar reports the problem count.",
+    "trusted-confirmation": "nativeConfirmationChanges() (exported) previews the changes the main process confirms (new app, new folder, going online, different local endpoint). It only informs; the gate remains the main-process dialog and the renderer passes no confirm value. A test pins the preview to the rule text in electron/backend.ts so they cannot drift silently.",
+    "key": "apiKeyProblem() (exported) also rejects whitespace and control characters. The pasted key is held in component memory only and is cleared on successful save, when the Cloud model section is hidden (tab change or search), when the window becomes hidden, and on unmount. Placeholder says a key is saved when one is. The key is never part of a settings patch, storage write, toast or log.",
+    "keyboard": "Ctrl+S saves when there are unsaved changes and no dialog is open; Keyboard section lists Save, Search and tab keys."
+  },
+  "interfaces": {
+    "newExportsFromSettings.tsx": [
+      "SETTINGS_TAB_BLURBS: Record<SettingsTab, string>",
+      "SettingsIssue, settingsIssues(draft, retain): SettingsIssue[]",
+      "retainDaysError(retain): string | null",
+      "nativeConfirmationChanges(saved, draft): string[]",
+      "apiKeyProblem(raw): string | null",
+      "StatusRow, connectionStatus({savedMode, draftMode, local, cloud, cloudConfigured}): StatusRow[]",
+      "PreSaveSummary({issues, confirmations, saveFailed, saving, onRetry, onJump})"
+    ],
+    "preserved": "Settings, SHELL_PREF, useShellPref, MAX_DISPLAY_NAME, normalizeDisplayName, SETTINGS_TABS, SETTINGS_INDEX, searchSettings keep their names and signatures. The Settings props are unchanged ({ initialQuery }).",
+    "proposals": [
+      "Captain: the sticky .savebar has a negative top margin and cannot hold a long list, so problems and confirmations render in an inline region above the tab body. If a stylesheet owner wants a visual treatment, the hooks are the existing .stack.tight, .chips and .notice classes under region 'Before you save'.",
+      "Captain: if the main process ever returns a typed 'declined' error (instead of ValidationError 'Native confirmation declined or unavailable'), PreSaveSummary could say so specifically; today any failed save shows the same recovery notice."
+    ]
+  },
+  "limitations": [
+    "Settings drafts live in component state, so leaving the Settings screen with unsaved edits discards them. A leave-guard needs router changes in App.tsx, which this task does not own.",
+    "No DOM library is available, so interaction (typing, Ctrl+S, tab focus, visibilitychange clearing) is verified by rendering with react-dom/server plus source assertions, not by simulated events. Pure functions and rendered output are tested behaviorally; the clear-on-hide and clear-on-unmount effects are pinned by source assertions only.",
+    "Status for the local model reflects the most recent system check; if the check has not run it shows Unknown rather than guessing.",
+    "Cloud provider reachability and key validity are not probed (no automatic API requests), so status says only whether a model name and a saved key exist.",
+    "The key delete and set-key bridges are not described as Windows-confirmed because this review did not find a confirmation on those paths in electron/backend.ts for settings; no claim is made either way.",
+    "The renderer cannot enforce the Windows confirmation and does not try; the preview mirrors the main-process rule and can lag if that rule changes (guarded by the source-pinning test).",
+    "Not launched in the real Electron window; no screenshots were taken."
+  ]
+}

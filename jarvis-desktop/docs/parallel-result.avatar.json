@@ -1,0 +1,42 @@
+{
+  "role": "avatar",
+  "done": true,
+  "date": "2026-10-15",
+  "completedLocally": true,
+  "ownedChangedPaths": [
+    "src/components/AvatarStudio.tsx",
+    "src/ui/avatar-editor.ts",
+    "src/styles/parallel-avatar.css",
+    "tests/parallel-avatar.test.mjs",
+    "docs/parallel-result.avatar.json"
+  ],
+  "checks": [
+    {
+      "command": "npm run typecheck",
+      "result": "pass, zero diagnostics"
+    },
+    {
+      "command": "node --test tests/parallel-avatar.test.mjs tests/backlog-avatar.test.mjs",
+      "result": "39 tests,39 pass,0 fail,0 skipped"
+    },
+    {
+      "command": "node --test tests/expansion-voice-avatar.test.mjs",
+      "result": "integration test-stub gap: existing hardcoded Phosphor stub lacks ArrowClockwise/CaretLeft; captain must add these exports. Outside owned files, not changed."
+    }
+  ],
+  "delivered": [
+    "Bounded pack-edit undo/redo with slider coalescing, pose-name validation and actionable messages.",
+    "Scoped keyboard timeline transport/keyframe navigation and edit history; inputs retain editing shortcuts; composing/prevented keys ignored.",
+    "Classify chosen/dropped files before reading; editable pack JSON only, size bounds and explicit unsupported format messages.",
+    "Real import/export previews and reviewed replace/merge semantics with undo step.",
+    "Asynchronous selected-file reads ignore stale/superseded results and cannot stage a pack after unmount.",
+    "Existing voice amplitude injection, quiet-zero behavior, reduced motion gating and render cleanup preserved."
+  ],
+  "limitations": [
+    "Static-render and pure-logic coverage; keyboard handlers, drag/drop, clipboard/file dialogs and actual Electron visuals not interactively exercised here.",
+    "Existing expansion-voice-avatar test must refresh its iconstub during integration before full suite can pass.",
+    "Original Avatar.tsx unchanged; procedural 2D geometry only, no VRM/Live2D importer or video encoder added.",
+    "Captain owns integration/build/installer validation."
+  ],
+  "paidApiCalls": 0
+}

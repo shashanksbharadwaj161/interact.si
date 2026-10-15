@@ -1,0 +1,50 @@
+{
+  "role": "ocr",
+  "status": "complete-local-wiring",
+  "files": [
+    "electron/backend.ts",
+    "electron/channels.ts",
+    "electron/ipcCore.ts",
+    "electron/preload.ts",
+    "src/shared/contracts.ts",
+    "src/ui/bridges.ts",
+    "src/components/Computer.tsx",
+    "tests/expansion-ocr-ui.test.mjs",
+    "tests/autopilot-api.test.mjs"
+  ],
+  "checks": [
+    {
+      "command": "node --test tests/expansion-ocr-ui.test.mjs tests/backlog-ocr.test.mjs",
+      "pass": 32,
+      "fail": 0
+    },
+    {
+      "command": "node --test tests/autopilot-api.test.mjs",
+      "pass": 22,
+      "fail": 0
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "result": "pass"
+    },
+    {
+      "command": "node --test tests/expansion-ocr-ui.test.mjs after UI request cleanup and root-independent test paths",
+      "pass": 5,
+      "fail": 0
+    }
+  ],
+  "behavior": [
+    "Main-process image selection only; renderer accepts installed-language option and receives no image path",
+    "Single active selection/recognition; cancel prevents helper start during picker and discards late results",
+    "Safe launch and missing engine/language fail closed",
+    "Read-only escaped plaintext review, no action/chat/input handlers",
+    "Status query alone does not trigger cancel on component cleanup; in-flight panel request cleanup cancels and guards late state updates"
+  ],
+  "limitations": [
+    "Real Windows OCR recognition still requires manual acceptance using a deliberately chosen nonsensitive image; tests use fake OCR adapters and synthetic image headers",
+    "Cancellation cannot close the native file picker; a returned selection is discarded after cancellation",
+    "Screen region capture and vision remain unavailable",
+    "No automatic copying/saving/planning from recognized text"
+  ],
+  "paidWorkers": "not started, resumed, or supervised; no paid requests"
+}

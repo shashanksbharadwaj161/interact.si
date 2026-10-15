@@ -7,6 +7,7 @@ import './styles/components.css';
 import './styles/views.css';
 import './styles/avatar.css';
 import './styles/responsive.css';
+import './styles/accessibility.css';
 import { App } from './components/App';
 import { AppProvider } from './ui/store';
 import { FocusProvider } from './ui/focus';

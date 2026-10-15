@@ -1,0 +1,111 @@
+{
+  "role": "shell",
+  "session": "jarvis-desktop-31",
+  "date": "2026-10-14",
+  "scopes": {
+    "covered": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 62, 63, 64, 65, 67, 68],
+    "partial": {
+      "7": "Display name only, kept as a window preference (no contract field for profiles).",
+      "9": "Tray preference existed; notification preference is limited to the in-app corner messages. The app has no Windows notifications.",
+      "64": "Reduce motion (app and Windows) plus a battery rule and a fullscreen toggle. The battery rule depends on navigator.getBattery in the Electron renderer.",
+      "65": "Companion state is shown in the sidebar and on Home; the avatar itself belongs to another module.",
+      "67": "Scene changes cross-fade through CSS (opacity only, removed under reduced motion). No per-capsule transition.",
+      "68": "Widget arrange mode: reorder, hide, show, reset, with the dashboard itself as the live preview. No free-form drag or resize."
+    },
+    "not_built": {
+      "61": "Movable expanding desktop island needs an always-on-top native window from the native owner. Nothing in the renderer pretends to be one.",
+      "66": "Audio-reactive effects belong to the avatar/audio owners."
+    }
+  },
+  "files": [
+    "src/components/App.tsx",
+    "src/components/Home.tsx",
+    "src/components/Settings.tsx",
+    "src/components/Onboarding.tsx",
+    "src/ui/nav.tsx",
+    "src/styles/shell.css",
+    "src/styles/views.css",
+    "tests/autopilot-shell.test.mjs",
+    "docs/autopilot-result.shell.json"
+  ],
+  "summary": [
+    "Navigation gained Memory search (Work, Ctrl+K) and Motion studio (Cockpit); the existing MemorySearch and MotionStudio modules are wired as full views and MemorySearch also runs as a Home widget.",
+    "Hash routes carry optional parameters (#/notes?item=id, #/settings?q=word). Search results and Home lists navigate with an item parameter; Settings opens pre-filtered from Home's readiness notice.",
+    "Global shortcuts are a pure, tested map: Alt+1..9/0 for the first ten views, Ctrl+K search, F1 help. They are ignored while any native dialog is open (keyboard audit K4).",
+    "Help dialog (F1 and sidebar button): every shortcut, every view with a blurb, and where diagnostics live.",
+    "Banners: safe launch now offers System status and Check again; a new Check failed banner appears when the capability check itself fails so readiness is reported as unknown, not fine.",
+    "Home: time-of-day greeting with optional display name; nine widgets with arrange mode (move, hide, show, reset) persisted per window; readiness widget hides itself only when the live check says ready.",
+    "Settings: a search box over a sixteen-section index that shows matching sections from every tab and jumps to them; new Accessibility tab (reduce motion, battery rule, text size, keyboard); Profile and Notifications sections; Home/End on tabs.",
+    "Onboarding: the model step can save just the endpoint and model and run the live Ollama check before finishing; the review step states Ready to answer from the real check or says it is not checked yet.",
+    "Motion: scene cross-fade and view entry are opacity/transform CSS only and are removed by the existing reduced-motion rules; the sidebar shows why motion is reduced (setting, Windows or battery) and Motion studio explains why playback is paused."
+  ],
+  "checks": [
+    { "command": "npm ci --ignore-scripts", "result": "ok" },
+    { "command": "npx tsc --noEmit", "result": "ok, no errors" },
+    { "command": "npx vite build", "result": "ok (dist built; pre-existing chunk-size warning for the single 555 kB bundle)" },
+    { "command": "npm test", "result": "144 passed, 0 failed (baseline before changes: 124 passed)" },
+    { "command": "node --test tests/autopilot-shell.test.mjs", "result": "20 passed" },
+    { "command": "ao browser open http://127.0.0.1:4173/ (vite preview)", "result": "not possible: AO desktop browser runtime stayed in BROWSER_RUNTIME_RECONNECTING; no visual check was made" }
+  ],
+  "interfaces": {
+    "nav": {
+      "module": "src/ui/nav.tsx",
+      "exports": ["VIEWS", "VIEW_IDS", "viewById", "navGroups", "positionalShortcut", "parseHash", "hashFor", "viewFromHash", "VIEW_FOR_CATEGORY", "shortcutAction"],
+      "route_params": {
+        "item": "Record id to select; sent to notes, tasks, capsules (saved record id) and assistant (chat message id). Receiving views may read parseHash(window.location.hash).params.item; they currently ignore it, so the screen opens without preselection.",
+        "q": "Initial search text for Settings (Settings receives it as initialQuery from App)."
+      },
+      "view_ids_added": ["search", "motion"],
+      "icons": "The two new views take icons through the package namespace (Phosphor.MagnifyingGlass, Phosphor.Waveform) so tests/ui.test.mjs's fixed icon stub keeps building."
+    },
+    "app": {
+      "module": "src/components/App.tsx",
+      "exports": ["App", "SafeLaunchBanner", "CheckFailedBanner", "HelpContent", "batteryWantsReducedMotion", "modalIsOpen", "Go", "MotionState", "BatterySnapshot"],
+      "wiring": {
+        "motion": "<MotionStudio reducedMotion={motion.reduced} /> inside a page frame; reduced motion is the union of the saved setting, the Windows media query and the optional battery rule.",
+        "search": "<MemorySearch state onNavigate> inside a page frame; onNavigate -> go(VIEW_FOR_CATEGORY[category], { item: id }). Ctrl+K focuses the search input after navigation."
+      },
+      "root_attributes": { "data-theme": "graphite|nebula|paper", "data-motion": "full|reduced", "data-text": "normal|large" }
+    },
+    "settings": {
+      "module": "src/components/Settings.tsx",
+      "props": { "initialQuery": "optional string, pre-fills the settings search" },
+      "exports": ["Settings", "SHELL_PREF", "useShellPref", "SETTINGS_TABS", "SETTINGS_INDEX", "searchSettings", "normalizeDisplayName", "MAX_DISPLAY_NAME"],
+      "shell_prefs": {
+        "storage": "localStorage through src/ui/prefs.ts (same prefix as other UI prefs); never secrets",
+        "keys": { "profile.displayName": "string", "text.size": "normal|large", "motion.onBattery": "boolean", "toasts.quiet": "boolean", "home.layout": "{ order: WidgetId[], hidden: WidgetId[] }" },
+        "same_window_sync": "useShellPref dispatches a 'shell-pref-change' CustomEvent so every reader in the window updates; usePref alone only hears other windows."
+      }
+    },
+    "home": {
+      "module": "src/components/Home.tsx",
+      "props": { "go": "(view, params?) => void" },
+      "exports": ["Home", "WIDGETS", "DEFAULT_LAYOUT", "normalizeLayout", "moveWidget", "setWidgetHidden", "layoutIsDefault", "greeting"]
+    },
+    "onboarding": {
+      "module": "src/components/Onboarding.tsx",
+      "change": "Save and check now calls api.saveSettings({ localEndpoint, localModel }) without onboarded, then re-runs getSystemInfo and cloudKeyStatus. The trusted Windows confirmation for a changed endpoint applies as in Settings."
+    },
+    "requests_for_other_owners": [
+      "Notes, Tasks, Capsules, Assistant owners: optionally read the 'item' hash parameter (src/ui/nav.tsx parseHash) to preselect the record a search result or Home link points at.",
+      "Developer owner: the shortcut list can use VIEWS[i].shortcut instead of the positional index so Ctrl+K and F1 appear; the first ten Alt numbers are unchanged.",
+      "ui.test.mjs owner: the fixed icon-name stub still works; a dynamic scan like tests/onboarding.test.mjs or tests/autopilot-shell.test.mjs would remove the constraint on named icon imports in nav.tsx.",
+      "Native owner: a true desktop island (scope 61) and OS-level fullscreen/kiosk need main-process windows; the renderer's fullscreen button only uses the Fullscreen API inside the current window."
+    ]
+  },
+  "dependencies": {
+    "added": [],
+    "proposed": [],
+    "notes": "Only existing dependencies are used (react, react-dom, @phosphor-icons/react). The Battery Status API and Fullscreen API are Chromium built-ins and are detected at runtime; when absent the controls say so."
+  },
+  "limitations": [
+    "No visual verification: the AO desktop browser runtime was reconnecting for the whole session, so the preview at http://127.0.0.1:4173/ (vite preview of the built bundle) was never rendered. Behaviour is covered by typecheck, build and 144 tests, not by screenshots.",
+    "Item preselection from search results and Home links depends on the receiving views reading the item parameter; today they open the right screen only.",
+    "Text size uses CSS zoom on the app container; Windows display scaling still applies on top.",
+    "Battery-aware reduced motion only works where navigator.getBattery exists; the switch is disabled with an explanation otherwise.",
+    "Settings search matches section titles and keywords, not every field label.",
+    "Scope 61 (desktop island) and scope 66 (audio-reactive effects) are not built in this module and are not represented as built anywhere in the shell.",
+    "Owned files use CRLF in the working copy to match the checkout; the index stays LF through core.autocrlf."
+  ],
+  "done": true
+}

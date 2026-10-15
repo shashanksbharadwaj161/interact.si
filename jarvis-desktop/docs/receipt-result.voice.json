@@ -1,0 +1,31 @@
+{
+  "role": "voice",
+  "done": true,
+  "status": "integrated-locally-tested",
+  "sourceSession": "jarvis-desktop-87",
+  "files": [
+    "src/components/Assistant.tsx",
+    "src/components/AvatarStudio.tsx",
+    "src/ui/audio.ts",
+    "src/ui/companion.tsx",
+    "tests/expansion-voice-avatar.test.mjs"
+  ],
+  "changes": [
+    "Explicit in-app microphone consent before capture, separate from OS permission; persisted locally without automatic recording.",
+    "Actual bounded analyser amplitude forwarded only from the recorder the Assistant still owns; source distinguishes a quiet attached microphone from no source.",
+    "Optional inline Avatar Studio preview stays on the Assistant page during recording; labelled source and simulated fallback, still timelines for compact reduced-motion preview.",
+    "Cancelling, revoking consent, navigating away, device loss, size/time limits release capture resources; stale asynchronous recording/decode/transcript completions cannot replace current state.",
+    "Halted capture closes its analyser, clears scheduled animation and resets amplitude; late frames cannot publish stale levels. Provider hold timer is cleared on unmount."
+  ],
+  "checks": [
+    { "command": "npm run typecheck", "result": "pass" },
+    { "command": "node --test tests/expansion-voice-avatar.test.mjs tests/backlog-voice.test.mjs tests/backlog-avatar.test.mjs", "result": "71/71 pass, zero skips/TODOs" }
+  ],
+  "limitations": [
+    "Tests use fake browser audio APIs and server rendering; actual microphone, Windows recognition, pointer interaction and live avatar rendering still require manual acceptance.",
+    "An already dispatched transcription request cannot be aborted through the current shared API; cancellation/revocation discards its returned transcript.",
+    "Windows TTS does not expose speech amplitude; no invented TTS lip sync or unattended microphone capture.",
+    "Avatar Studio on its separate route receives no live microphone because navigating away correctly cancels Assistant recording. The inline preview provides simultaneous source and host.",
+    "No external API calls, real microphone access, shared-contract edits, dependencies, App edits, commits or push performed by this local continuation."
+  ]
+}

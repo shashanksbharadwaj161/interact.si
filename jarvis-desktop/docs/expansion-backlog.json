@@ -1,0 +1,155 @@
+{
+  "createdAt": "2026-10-14T08:03:56.659Z",
+  "originalRepository": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop",
+  "concurrency": 10,
+  "sharedCap": 300,
+  "safety": 30,
+  "allocated": 39,
+  "captain": {
+    "taskId": "48557b13-d592-4beb-806f-8710a910ea73",
+    "sessionId": "jarvis-desktop-79",
+    "model": "claude-fable-5-1",
+    "budget": 12,
+    "status": "running",
+    "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-79"
+  },
+  "workers": [
+    {
+      "role": "motion",
+      "model": "claude-fable-5-1",
+      "budget": 8,
+      "files": [
+        "src/components/MotionStudio.tsx",
+        "src/ui/motion-presets.ts",
+        "src/ui/motion-timing.ts",
+        "src/styles/motion-studio.css",
+        "tests/backlog-motion.test.mjs"
+      ],
+      "taskId": "21573688-497d-43b5-8049-bfab75c37921",
+      "status": "running",
+      "sessionId": "jarvis-desktop-80",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-80",
+      "retries": 2,
+      "previousSource": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-75"
+    },
+    {
+      "role": "avatar",
+      "model": "claude-sonnet-5-5",
+      "budget": 5,
+      "files": [
+        "src/components/AvatarStudio.tsx",
+        "src/ui/avatar-editor.ts",
+        "src/styles/avatar-studio.css",
+        "tests/backlog-avatar.test.mjs"
+      ],
+      "taskId": "1e3a7073-ecc8-42ec-b819-1b111ab8fd37",
+      "status": "running",
+      "sessionId": "jarvis-desktop-76",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-76",
+      "retries": 1
+    },
+    {
+      "role": "voice",
+      "model": "claude-sonnet-5-5",
+      "budget": 4,
+      "files": [
+        "electron/services/speech.ts",
+        "src/ui/audio.ts",
+        "tests/backlog-voice.test.mjs"
+      ],
+      "taskId": "e01d5acf-fdbd-4f63-b9fd-e92277de5157",
+      "status": "running",
+      "sessionId": "jarvis-desktop-70",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-70"
+    },
+    {
+      "role": "ocr",
+      "model": "claude-sonnet-5-5",
+      "budget": 6,
+      "files": [
+        "electron/services/ocr.ts",
+        "native/OcrLocal.ps1",
+        "tests/backlog-ocr.test.mjs"
+      ],
+      "taskId": "59b7b1f5-c309-4368-be94-c1b6f39558d7",
+      "status": "running",
+      "sessionId": "jarvis-desktop-77",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-77",
+      "retries": 1
+    },
+    {
+      "role": "connectors",
+      "model": "claude-sonnet-5-5",
+      "budget": 4,
+      "files": [
+        "electron/services/integrations.ts",
+        "src/components/Integrations.tsx",
+        "src/ui/integration-catalog.ts",
+        "tests/backlog-connectors.test.mjs"
+      ],
+      "taskId": "73c4df85-6812-4e80-9a17-690f464faee8",
+      "status": "running",
+      "sessionId": "jarvis-desktop-71",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-71"
+    },
+    {
+      "role": "routines",
+      "model": "claude-sonnet-5-5",
+      "budget": 4,
+      "files": [
+        "electron/services/routines.ts",
+        "electron/services/intent.ts",
+        "src/components/Routines.tsx",
+        "tests/backlog-routines.test.mjs"
+      ],
+      "taskId": "128ff05d-fb41-4935-90cc-18f80e78b719",
+      "status": "running",
+      "sessionId": "jarvis-desktop-72",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-72"
+    },
+    {
+      "role": "resources",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "electron/services/system.ts",
+        "src/ui/resource-policy.ts",
+        "tests/backlog-resources.test.mjs"
+      ],
+      "taskId": "f8f8569a-9edd-468d-a7f6-196fd84479e2",
+      "status": "running",
+      "sessionId": "jarvis-desktop-73",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-73"
+    },
+    {
+      "role": "coverage",
+      "model": "claude-haiku-5-5",
+      "budget": 2,
+      "files": [
+        "src/shared/feature-registry.json",
+        "docs/feature-matrix.md",
+        "docs/autopilot-coverage.md",
+        "docs/product-roadmap.md"
+      ],
+      "taskId": "c16c6c2c-84da-4ddd-9e4c-5a6240da4a89",
+      "status": "running",
+      "sessionId": "jarvis-desktop-78",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-78",
+      "retries": 2
+    },
+    {
+      "role": "ux-review",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "docs/backlog-ux-review.md",
+        "tests/backlog-ux-review.test.mjs"
+      ],
+      "taskId": "9a73ecdf-49e1-4721-afde-4cc8a30f3ea0",
+      "status": "running",
+      "sessionId": "jarvis-desktop-74",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-74"
+    }
+  ],
+  "fableAssignmentAt": "2026-10-14T08:31:03.823Z"
+}

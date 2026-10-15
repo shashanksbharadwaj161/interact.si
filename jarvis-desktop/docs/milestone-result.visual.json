@@ -1,0 +1,37 @@
+{
+  "role": "visual",
+  "done": true,
+  "source": "Assigned paths copied from preserved partial worktree jarvis-desktop-51, then hardened and tested here.",
+  "files": [
+    { "path": "src/ui/avatar-editor.ts", "purpose": "DOM-free avatar model: 2D vector geometry, 8 built-in expressions, timelines with hold/linear/ease tweening, strict bounded pack import/export, SVG and canvas renderers, manual quality profiles, honest gate list for scopes 133-136." },
+    { "path": "src/components/AvatarStudio.tsx", "purpose": "Editor UI: geometry controls, expression library, timeline editor and playback, pack import (file or paste) with warnings, export (download or copy), SVG snapshot, quality profile, simulated voice level. Not yet mounted in App.tsx (not an assigned path)." },
+    { "path": "src/styles/avatar-studio.css", "purpose": "Studio styles; transitions limited to transform/border/background; reduced motion via OS query and data-motion attribute." },
+    { "path": "src/ui/motion-presets.ts", "purpose": "Motion presets, scenes (up to 4 layers), bounded scene parse/serialize, model-reply extraction that validates before use, clip plan limits. Fix this run: scene byte limit now measured in UTF-8 bytes." },
+    { "path": "src/components/MotionStudio.tsx", "purpose": "Scene composer with import/export (paste JSON), PNG snapshot, optional local WebM clip when the runtime has MediaRecorder. Fix this run: layer opacity slider now has aria-label (fixed a failing route-label test)." },
+    { "path": "src/styles/motion-studio.css", "purpose": "Motion studio styles with the same reduced-motion handling." },
+    { "path": "tests/autopilot-visual.test.mjs", "purpose": "35 behavior tests: round trips, malicious imports (non-JSON, wrong version, prototype pollution keys, reserved/duplicate/malformed ids, multi-byte size bypass, deep nesting, count caps, NaN/Infinity/huge numbers), hostile text in SVG export, reduced-motion sampling and particle freezing, deterministic simulation, resource ceilings, source-level checks for no network/HTML sinks/native bridges/dashes/over-promising copy." },
+    { "path": "docs/milestone-result.visual.json", "purpose": "This result record." }
+  ],
+  "interfaces": {
+    "AvatarStudio": "{ reducedMotion: boolean; className?: string; voiceLevel?: number | null }. voiceLevel is host-injected amplitude 0..1; null means the studio uses its own simulation slider.",
+    "MotionStudio": "{ reducedMotion: boolean; className?: string } (already mounted in App.tsx).",
+    "preferences": "avatar.pack, avatar.quality, motion.presets, motion.scenes via usePref (non-sensitive prefix).",
+    "pure modules": "src/ui/avatar-editor.ts and src/ui/motion-presets.ts export parse/serialize functions usable from Node tests and other workers."
+  },
+  "checks": [
+    { "command": "npm ci --ignore-scripts", "result": "pass" },
+    { "command": "node --test tests/autopilot-visual.test.mjs", "result": "pass, 35 of 35" },
+    { "command": "npx tsc --noEmit", "result": "pass (exit 0)", "note": "Covers AvatarStudio.tsx even though App does not import it." },
+    { "command": "npm test", "result": "614 tests, 610 pass, 0 fail, 4 todo", "note": "The 4 todo are pre-existing shell-runtime markers outside this module." },
+    { "command": "esbuild bundle of both studio components (css stubbed, react external)", "result": "pass" }
+  ],
+  "limitations": [
+    "AvatarStudio is not mounted anywhere: App.tsx and nav are not assigned paths. The Integration captain must add an import and a route or a Customization panel.",
+    "Avatars are original 2D vector shapes only. No 3D (scope 133) and no realistic portrait or photo animation (scope 135); both are shown as unavailable in the UI.",
+    "Voice-driven mouth/pose (134) reacts to a host-injected amplitude only; the studio never opens a microphone, and its slider is labeled a simulation.",
+    "Quality profiles (136) are manual; there is no automatic hardware detection.",
+    "Motion scene import is paste-only (JSON text, or text containing JSON); only the avatar studio has a file picker.",
+    "WebM clip export depends on MediaRecorder and canvas.captureStream in the runtime; when absent the UI says clips cannot be encoded.",
+    "Component behavior is verified by typecheck, bundling and source-level contract tests; there was no rendered DOM or visual screenshot test in this run."
+  ]
+}

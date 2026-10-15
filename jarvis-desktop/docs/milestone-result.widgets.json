@@ -1,0 +1,77 @@
+{
+  "role": "widgets",
+  "milestone": "home-widgets",
+  "done": true,
+  "files": [
+    "src/components/Home.tsx",
+    "src/components/WidgetPicker.tsx",
+    "tests/milestone-home-widgets.test.mjs",
+    "docs/milestone-result.widgets.json"
+  ],
+  "changes": {
+    "src/components/Home.tsx": "Additive. Imports WidgetPicker, usePref, useId and the pure widget module (namespace import as dashboard). Adds exported DashboardWidgets above Home and renders it once between the arranging notice and the existing cockpit grid. Existing exports (WIDGETS, normalizeLayout, DEFAULT_LAYOUT, layoutIsDefault, greeting, moveWidget, setWidgetHidden) and the cockpit Arrange mode are unchanged.",
+    "src/components/WidgetPicker.tsx": "Not edited. Mounted as is, with the saved validated layout and onLayoutChange that only receives layouts that passed the widget rules."
+  },
+  "checks": [
+    {
+      "command": "npx tsc --noEmit",
+      "result": "pass",
+      "covers": "typecheck of the whole project including the Home and picker changes"
+    },
+    {
+      "command": "node --test tests/milestone-home-widgets.test.mjs",
+      "result": "pass",
+      "summary": "16 of 16 tests pass",
+      "covers": "server-rendered Home and DashboardWidgets against a fixture store: default layout with no saved value and its label; summaries from real counts and states including Not loaded, empty and capability counts from the last check only; valid saved layout order, widths and grid placement; hostile object-form layout (unknown kind, bad width, duplicate) reported as adjusted; unreadable, oversized and wrong-type saved values falling back to default; empty saved layout; picker mounted open with saved checked state and width text; allowed width choices; accessible names on every button and labelled selects; polite status region; no Math.random, performance.now or Date.now in the summary path"
+    },
+    {
+      "command": "node --test tests/autopilot-shell.test.mjs tests/autopilot-shell-runtime.test.mjs tests/autopilot-widgets.test.mjs",
+      "result": "pass",
+      "summary": "70 pass, 0 fail, 4 TODO entries in the shell runtime suite (pre-existing, reported by the test file as known open items)",
+      "covers": "shell owner's Home export checks, owned-file rules (no working name, no em or en dashes in Home.tsx), full-app runtime render, and the widget registry and picker markup tests"
+    },
+    {
+      "command": "npm test",
+      "result": "pass",
+      "summary": "591 pass, 0 fail, 4 todo across all suites"
+    }
+  ],
+  "interfaces": {
+    "src/components/Home.tsx": {
+      "exports": {
+        "DashboardWidgets": "({ source: dashboard.WidgetSource, startEditing?: boolean }) => JSX. Renders the At a glance panel with summary cards and, when opened, the WidgetPicker. startEditing only sets the first render; Home does not pass it, so the picker starts closed."
+      },
+      "storage": "usePref<unknown>(dashboard.LAYOUT_PREF_KEY) which is 'dashboard.widgets' under the 'jarvis.ui.' prefix. The value is the text from serializeLayout, JSON-encoded by the preference writer. A non-string saved value goes through normalizeLayout, so it is validated and reported rather than trusted."
+    },
+    "dashboardSource": {
+      "tasks": "state.tasks",
+      "notes": "state.notes",
+      "capsules": "state.capsules",
+      "activity": "state.activity",
+      "settings": "settings (Pick of onboarded, mode, localModel is used)",
+      "capabilities": "system?.capabilities ?? null, so a failed or missing system check reads as Not loaded"
+    },
+    "markers": {
+      "summary cards": "section.panel.dash-card with data-dash-widget=<kind>, inline grid-column and grid-row from packLayout",
+      "cockpit frames": "unchanged, still data-widget=<id>"
+    }
+  },
+  "dependencies": [
+    "src/ui/widgets.ts (widgets module; read only, not edited)",
+    "src/ui/prefs.ts (usePref; read only)",
+    "src/components/Settings.tsx (SHELL_PREF and useShellPref; unchanged)"
+  ],
+  "limitations": [
+    "Not in a live DOM. The lockfile has no DOM library, so clicks, keyboard focus and the toggle are not simulated. Tests server-render and check markup and attributes. The picker's edit rules are covered by the pure functions in tests/autopilot-widgets.test.mjs.",
+    "Two arrangement systems now coexist on Home. The cockpit panels keep Arrange and the home.layout preference from the shell. The summary cards use the picker and dashboard.widgets. Some content appears twice: Notes, Capsules and Recent activity have both a cockpit panel and a summary card. Whether to merge these is a product decision for the shell owner and captain.",
+    "Layout is a 12-column inline grid with no media query. Below the shell's 1000px breakpoint the spans are not collapsed. A styles owner should add a single-column rule for .dash-grid and .dash-card. No CSS was added because styles are outside this module's paths.",
+    "Summary text is computed on render from the store passed in. It does not poll. The date-based detail uses the local date at render time.",
+    "The saved layout lives in this window's localStorage, like the other UI preferences. Another window updates it only through the usePref storage event.",
+    "No screen reader or browser accessibility audit was run. Accessibility is checked through the markup: names, labels, aria-expanded, aria-controls and the status region.",
+    "The capability count shows Not loaded until a system check completes. This is deliberate and matches the source contract."
+  ],
+  "coordination": {
+    "shell owner": "Home.tsx is also listed in the shell owner's manifest entry. The change is additive and touches the imports, one source object, one render line, and the new DashboardWidgets block. A captain merge should keep both sides. The shell owner should confirm the product choice above about duplicate content before merging.",
+    "captain": "No AO messages were sent. Changes are uncommitted. Nothing was pushed."
+  }
+}

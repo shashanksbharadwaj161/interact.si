@@ -427,3 +427,169 @@
   min-height: 0;
   height: auto;
 }
+
+/* Scene cross-fade: opacity only, keyed on the scene id in App.tsx. Removed by the reduced-motion rules. */
+.scene-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  animation: scene-in 0.6s var(--ease) both;
+}
+
+@keyframes scene-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Capability check failed: unknown state, not fine */
+.check-banner {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.check-banner strong {
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.check-banner span {
+  flex: 1 1 320px;
+  color: var(--text-2);
+}
+
+/* Sidebar tools: help, fullscreen and the motion indicator */
+.dock-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.dock-motion {
+  margin-left: auto;
+  font: 600 10px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+/* Help dialog */
+.help {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 22px;
+}
+
+.help-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.help-col h3 {
+  margin: 0;
+  font: 600 10.5px var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.help-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.help-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+
+.help-link > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--accent);
+}
+
+.help-link > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.help-link:hover {
+  background: var(--raised);
+}
+
+.help-link:active {
+  transform: translateY(1px);
+}
+
+/* Larger text: scales the whole window; Windows display scaling still applies on top */
+:root[data-text="large"] .app,
+:root[data-text="large"] .onboard-wrap,
+:root[data-text="large"] .boot {
+  zoom: 1.15;
+}
+
+@media (max-width: 1000px) {
+  .dock-tools {
+    flex-direction: column;
+  }
+
+  .dock-motion {
+    display: none;
+  }
+}
+
+/* Clipboard history rows: one clipped line per entry so a long copy never stretches the list. */
+.clip-preview {
+  max-width: 52ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.9em;
+}
+
+@media (max-width: 720px) {
+  .clip-preview {
+    max-width: 30ch;
+  }
+
+  .dock-tools {
+    display: none;
+  }
+
+  .help {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

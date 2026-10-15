@@ -1,0 +1,19 @@
+{
+  "role": "memory",
+  "status": "partial-recovered-locally",
+  "cloudWorkersStopped": true,
+  "files": ["electron/services/store.ts", "tests/expansion-memory.test.mjs", "docs/receipt-result.memory.json"],
+  "implemented": [
+    "Recovered the worker's only unfinished store patch: optional checkpoint original timestamp, normalized and future timestamps rejected.",
+    "Checkpoint capacity eviction orders by original timestamp, preventing late ancient imports from evicting newer evidence.",
+    "Existing project goals, reference validation, atomic persistence, scoped forget and retention remain intact."
+  ],
+  "checks": [{"command": "node --test tests/expansion-memory.test.mjs tests/autopilot-productivity.test.mjs", "passed": 55, "failed": 0}],
+  "interfaces": ["ProductivityStore.apply({op:'checkpoint.add', title, note?, capsuleId?, refs?, createdAt?}) accepts optional original date. Omit createdAt for current time. No shared contract change required for the store's existing unknown operation payload."],
+  "limitations": [
+    "No additional renderer workbench or import UI was completed by this worker; this change adds store support only.",
+    "Changing retention policy stores policy only; deletion occurs through existing explicit applyRetention or reload.",
+    "Search/recap behavior remains existing exact local evidence-based behavior; no semantic embedding or cloud memory feature added.",
+    "Imported dates older than the newest 1000 checkpoints can be discarded immediately by the bounded store."
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "role": "integrations",
+  "session": "jarvis-desktop-54",
+  "date": "2026-10-14",
+  "done": true,
+  "base": "8e1aac3 (continuation baseline); changes are uncommitted in this worktree for the captain",
+  "scope": "Review of the captain's partial netGuard/provider integration, offline/SSRF/redirect verification against the REAL guard, durable-only preference persistence, and clear separation of website handoffs from API connections (no OAuth exists).",
+  "files": [
+    "electron/services/netGuard.ts",
+    "electron/services/integrations.ts",
+    "src/ui/integration-catalog.ts",
+    "src/components/Integrations.tsx",
+    "tests/autopilot-integrations.test.mjs",
+    "docs/continuation-result.integrations.json"
+  ],
+  "changes": {
+    "netGuard.ts": "ProviderCheck gains an exact `query`; 'provider-check' now matches origin + path + query exactly, so no data can be appended to an allowed provider URL (Open-Meteo pinned to the fixed 0,0 query). Nothing else in the policy changed.",
+    "integrations.ts": [
+      "The enable preference is now real: every item that can contact a provider (needsOptIn = checkable and online) is OFF until turned on; preview/check refuse with 'Turn on <name> first' before any dialog or fetch. Local (Ollama) and handoffs take no opt-in.",
+      "Preferences persist ONLY through an injected PrefsStore. No store: setEnabled throws and choiceStorage='not-connected' (nothing kept only in memory). Store read error: choiceStorage='unreadable', everything stays off, and setEnabled refuses so saved choices are never overwritten; the load is retried on the next call.",
+      "setEnabled is serialized (no lost toggles); turning off clears the last check result; audit lines 'Turned on/off: <name>'.",
+      "After the trusted confirmation, the request is re-evaluated (mode, key, opt-in, destination) before sending: a switch to offline while the dialog is open sends nothing.",
+      "New optional dep onKeyChange(slot) called after setKey/removeKey.",
+      "list() shares one prefs read for all views."
+    ],
+    "integration-catalog.ts": "needsOptIn(); ChoiceStorage type; ConnectionState 'turned-off'; IntegrationView.choiceStorage (required); egressRequirements() now returns path, query and credentialHeader too. Removed stale 'netGuard must allow ...' blockers. Handoff notThis text says 'not an account connection: no OAuth or sign-in'.",
+    "Integrations.tsx": "Turn on/off control (aria-pressed) for provider items, disabled with an explanation when choices cannot be saved, alert when unreadable; Check connection disabled while off; header notice states there is no OAuth/account sign-in and a subscription is not a developer key."
+  },
+  "checks": [
+    {"command": "node --test tests/autopilot-integrations.test.mjs", "result": "43/43 pass (31 previous + 12 new)"},
+    {"command": "npm test", "result": "487/489 pass. The 2 failures are the baseline models failures recorded in docs/continuation-baseline.md (tests/autopilot-models.test.mjs cancellation system note / cloud cancellation warning), owned by the models worker; unrelated to these files."},
+    {"command": "npx tsc --noEmit", "result": "2 errors, both baseline and outside my paths: electron/backend.ts(201) missing API methods; src/shared/contracts.ts RoutinePlan not exported by routines. No errors in owned files."},
+    {"command": "npx vite build", "result": "pass"},
+    {"command": "node scripts/build-main.mjs", "result": "pass"},
+    {"command": "mutation testing (temporary edits, restored from namespaced scratch copies)", "result": "each caught: dropping the query pin (SSRF test), dropping the opt-in gate (2 tests), dropping the post-confirm re-check (mode-switch test), allowing a save after an unreadable load (no-clobber test), redirect:'follow' in netGuard (2 redirect tests)"}
+  ],
+  "verified_against_real_guard": [
+    "Catalog online checks and netGuard.PROVIDER_CHECKS match exactly (origin, path, query, credential header); test fails if either side drifts.",
+    "Service + real createGuardedFetch online: only the 4 exact URLs are fetched, each with redirect:'error', GET and a timeout signal; no denials.",
+    "Offline: the real guard denies every provider URL with 'Offline mode' and fetchImpl is never called; the service itself never reaches the guard or the dialog while offline.",
+    "SSRF/exfiltration variants denied: http downgrade, other port, suffix host, foreign host, userinfo, path traversal, extra query, real-location query, missing query, loopback and 169.254.169.254 under provider-check, file:, invalid URL, POST, wrong/extra credential headers (x-api-key, cookie, proxy-authorization, authorization to keyless Open-Meteo); provider origins unreachable under 'ollama' or 'cloud-chat' for /v1/models.",
+    "A 302 from a provider is reported as a failed check (HTTP 302) and no second request is made."
+  ],
+  "interfaces": {
+    "service": "createIntegrationService({fetch: guardedFetch, mode, keys, confirm, localEndpoint?, prefs?, onKeyChange?, audit?, now?, definitions?, checkTimeoutMs?, cooldownMs?}) -> {list, view, preview, check, setKey, removeKey, setEnabled, usage, clearUsage, definitions}. IPC methods/arity unchanged (INTEGRATION_METHODS / INTEGRATION_ARITY match electron/channels.ts and ipcCore ARG_SPECS already merged).",
+    "prefs store": "electron/services/sidecar.ts createJsonSidecar(env.userData, 'integrations') is structurally a PrefsStore and is tested as one (round trip across a simulated restart with an injected SidecarFs).",
+    "IntegrationView": "adds required choiceStorage: 'saved'|'not-connected'|'unreadable' and state 'turned-off'. src/shared/contracts.ts imports the type from the catalog, so no contracts edit is needed.",
+    "bridge": "src/ui/bridges.ts integrationsBridge() is compatible unchanged."
+  },
+  "captain_wiring": [
+    "electron/backend.ts (API owner): const keys = createDpapiKeyVault({native, dir: env.userData, aliases: {anthropic: secrets}}); const integrations = createIntegrationService({fetch: guardedFetch, mode: () => settings().mode, keys, confirm: env.confirm, localEndpoint: () => settings().localEndpoint, prefs: createJsonSidecar(env.userData, 'integrations'), onKeyChange: (slot) => { if (slot === 'anthropic') void secrets.configured().then((v) => { keyConfigured = v; }); }, audit: (s) => void activity('integration', s)}); then spread integrationHandlers(integrations) into the backend object. env.confirm must be the trusted dialog.showMessageBox callback (Cancel default); never a renderer boolean.",
+    "Without onKeyChange, storing the Anthropic key from the Integrations page would leave backend's cached keyConfigured stale and the chat guard would keep refusing until cloudKeyStatus() is called.",
+    "backend.ts guardedFetch audit currently logs only denials and cloud-chat; consider also logging allowed 'provider-check' so approved provider contacts appear in Activity (the service already writes its own 'Connection check: ...' line).",
+    "backend.ts does not pass localEndpoint to createGuardedFetch; the service validates the Ollama endpoint itself, but passing it to the guard enforces the exact loopback origin there too (security/API owner call).",
+    "UI shell owner: render <Integrations bridge={integrationsBridge(window.jarvis) ?? undefined} /> on a nav route."
+  ],
+  "limitations": [
+    "Not wired end to end: backend.ts does not yet construct the service (outside my paths). Until then the page says checks are not wired, and website handoffs still work through the existing action approval.",
+    "No OAuth flow exists anywhere. Calendar and Spotify playback remain setup-required; Claude/ChatGPT/Spotify website items are browser handoffs, not account connections.",
+    "Connection checks only verify reachability or key acceptance. OpenAI chat, GitHub issue posting, the weather widget, web research, news, downloads, sync and marketplace are still not built (labelled in the catalog).",
+    "Last-check status and usage history stay in memory for the session. Only the on/off choices persist, and only through the injected store.",
+    "No real provider, account or website was contacted: all network, DPAPI, filesystem and dialog behaviour is tested with injected mocks. The real DPAPI round trip for integration slots and the real Electron dialog are untested here.",
+    "The UI toggle reuses existing Button/CSS. Visual layout was checked only through SSR markup tests, not a live window.",
+    "Turning items off by default is a behaviour change: any previously saved 'enabled' entries for local or handoff items are dropped on load (they had no effect before)."
+  ]
+}

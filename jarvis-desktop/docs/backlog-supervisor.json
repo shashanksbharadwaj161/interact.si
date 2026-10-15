@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-10-14T08:06:08.991Z",
+  "notified": [
+    "resources",
+    "voice",
+    "routines",
+    "coverage",
+    "ocr",
+    "connectors",
+    "ux-review",
+    "avatar"
+  ],
+  "fallback": null,
+  "state": "watching",
+  "completed": [
+    "avatar",
+    "voice",
+    "ocr",
+    "connectors",
+    "routines",
+    "resources",
+    "coverage",
+    "ux-review"
+  ],
+  "updatedAt": "2026-10-14T08:49:29.907Z",
+  "conservativeBudget": {
+    "limit": 300,
+    "safety": 30,
+    "committed": 230.45145164999963,
+    "remaining": 39.548548350000374,
+    "uncertain": 160
+  }
+}

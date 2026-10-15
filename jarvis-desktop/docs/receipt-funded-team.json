@@ -1,0 +1,109 @@
+{
+  "at": "2026-10-14T10:38:43.927Z",
+  "originalRepository": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop",
+  "sharedCap": 300,
+  "safety": 32,
+  "totalBudget": 42,
+  "consoleSpendObserved": 145.59,
+  "consoleCreditsObserved": 354.42,
+  "pricingCorrection": "Reported receipt TTL and Haiku prompt tier; all unresolved reservations retained",
+  "workers": [
+    {
+      "role": "ocr",
+      "model": "claude-fable-5-1",
+      "budget": 8,
+      "files": [
+        "electron/backend.ts",
+        "electron/channels.ts",
+        "electron/ipcCore.ts",
+        "electron/preload.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "src/components/Computer.tsx",
+        "tests/expansion-ocr-ui.test.mjs"
+      ],
+      "taskId": "1b90ada0-7844-415f-9ed9-989b7850d584",
+      "status": "cancelled-paid-access-revoked",
+      "sessionId": "jarvis-desktop-90",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-90",
+      "retries": 1
+    },
+    {
+      "role": "voice",
+      "model": "claude-fable-5-1",
+      "budget": 8,
+      "files": [
+        "src/components/Assistant.tsx",
+        "src/components/AvatarStudio.tsx",
+        "src/ui/audio.ts",
+        "src/ui/companion.tsx",
+        "tests/expansion-voice-avatar.test.mjs"
+      ],
+      "taskId": "889977a1-3acd-4cfd-a92b-00be53ade10f",
+      "status": "cancelled-paid-access-revoked",
+      "sessionId": "jarvis-desktop-87",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-87"
+    },
+    {
+      "role": "scene3d",
+      "model": "claude-fable-5-1",
+      "budget": 8,
+      "files": [
+        "src/components/Scene3D.tsx",
+        "src/ui/scene3d.ts",
+        "src/styles/scene3d.css",
+        "tests/expansion-scene3d.test.mjs"
+      ],
+      "taskId": "3438f4d1-ba0e-457e-81a9-e5e2c021b77d",
+      "status": "cancelled-paid-access-revoked",
+      "sessionId": "jarvis-desktop-91",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-91",
+      "retries": 1
+    },
+    {
+      "role": "memory",
+      "model": "claude-fable-5-1",
+      "budget": 8,
+      "files": [
+        "electron/services/store.ts",
+        "electron/services/search.ts",
+        "src/components/Capsules.tsx",
+        "src/components/MemorySearch.tsx",
+        "src/components/MemoryWorkbench.tsx",
+        "tests/expansion-memory.test.mjs"
+      ],
+      "taskId": "bf9225bc-297b-4db2-9527-f0c73ecb7480",
+      "status": "cancelled-paid-access-revoked",
+      "sessionId": "jarvis-desktop-88",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-88"
+    },
+    {
+      "role": "security",
+      "model": "claude-opus-5-5",
+      "budget": 5,
+      "files": [
+        "docs/expansion-security-review.md",
+        "tests/expansion-security-review.test.mjs"
+      ],
+      "taskId": "a74fe520-ef48-4da2-9872-6c4b1a8daf62",
+      "status": "cancelled-paid-access-revoked",
+      "sessionId": "jarvis-desktop-92",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-92",
+      "retries": 1
+    },
+    {
+      "role": "captain",
+      "model": "claude-opus-5-5",
+      "budget": 5,
+      "files": [],
+      "taskId": "b30805b8-3bad-4e79-839f-1dc9f740b0c3",
+      "status": "cancelled-paid-access-revoked",
+      "sessionId": "jarvis-desktop-89",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-89"
+    }
+  ],
+  "stoppedAt": "2026-10-14T10:56:53.709Z",
+  "stopReason": "User new Claude Console total stop point USD150; observed159.57. Paid access revoked, workers cancelled; local recovery only.",
+  "consoleStopPoint": 150,
+  "consoleSpendAtStop": 159.57
+}

@@ -1,0 +1,89 @@
+{
+  "role": "accessibility",
+  "done": true,
+  "files": [
+    {
+      "path": "src/ui/accessibility.ts",
+      "purpose": "DOM-free helpers: system preference reading and watching, reduced-motion resolution, bounded accessibility prefs, root data attributes, keyboard chord matching and the Alt+digit view shortcut mapping."
+    },
+    {
+      "path": "src/styles/accessibility.css",
+      "purpose": "Visible focus ring for controls (zero-specificity :where), reduced motion from the OS query and from the in-app data-motion attribute, and forced-colors state rules that use system color keywords only."
+    },
+    {
+      "path": "tests/autopilot-accessibility.test.mjs",
+      "purpose": "21 behavior tests. Bundles the real TypeScript with esbuild and calls it with fake matchMedia, dataset and key-event objects. Parses the stylesheet for validity, focus safety, reduced-motion scope and system-only colors."
+    },
+    {
+      "path": "docs/autopilot-result.accessibility.json",
+      "purpose": "This result record."
+    }
+  ],
+  "checks": [
+    {
+      "command": "npm ci --ignore-scripts",
+      "result": "pass (exit 0)",
+      "note": "Existing lockfile dependencies only. No global installs."
+    },
+    {
+      "command": "node --test tests/autopilot-accessibility.test.mjs",
+      "result": "pass, 21 of 21"
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "result": "pass (exit 0)",
+      "note": "Covers src/ui/accessibility.ts because tsconfig includes src."
+    },
+    {
+      "command": "npm test",
+      "result": "pass, 145 of 145",
+      "note": "Whole suite in this worktree. Not a result for this module alone."
+    },
+    {
+      "command": "mutation check (temporary edits, restored afterwards)",
+      "result": "caught",
+      "note": "Changing the Alt+0 mapping fails 3 tests. Changing the forced-colors outline to a named color fails the system-color test. Restored files pass again."
+    }
+  ],
+  "interfaces": {
+    "module": "src/ui/accessibility.ts",
+    "stylesheet": "src/styles/accessibility.css",
+    "exports": {
+      "MEDIA": "{ reducedMotion: '(prefers-reduced-motion: reduce)', forcedColors: '(forced-colors: active)' }",
+      "readSystemPreferences": "(matchMedia | undefined) => { reducedMotion: boolean; forcedColors: boolean }. Missing matchMedia reads as false.",
+      "watchSystemPreferences": "(matchMedia | undefined, onChange(prefs)) => cleanup(). Without matchMedia it is a no-op.",
+      "resolveReducedMotion": "(systemReduced, appReduced) => boolean. Either source wins. Only literal true counts.",
+      "normalizeAccessibilityPrefs": "(raw: unknown) => { reduceMotion: boolean }. Use for the in-app setting.",
+      "resolveAccessibilityState": "(system, prefs) => { reduceMotion, forcedColors }",
+      "applyAccessibilityAttributes": "(rootElement, state) => void. Sets data-motion='reduced'|'full' and data-forced-colors='active'|'none'.",
+      "parseChord": "(chord: string) => Chord | null. Modifiers Alt, Ctrl/Control, Shift, Meta/Win.",
+      "matchesChord": "(chord: string, keyEvent) => boolean. Exact key and exact modifier set.",
+      "VIEW_SHORTCUT_LIMIT": "10",
+      "VIEW_SHORTCUTS": "[{ position: 1..10, chord: 'Alt+1'..'Alt+9', 'Alt+0' }]",
+      "viewShortcut": "(position) => 'Alt+n' | null. Null outside 1..10, so Alt+11 is never shown.",
+      "viewPositionFromEvent": "(keyEvent, viewCount = 10) => position | null. Alt plus a digit only, with no other modifiers, and within viewCount."
+    },
+    "captain_wiring": [
+      "main.tsx: import './styles/accessibility.css' after responsive.css so it loads last.",
+      "App.tsx useReducedMotion / useThemeSync: replace the local OS query with watchSystemPreferences + resolveAccessibilityState + applyAccessibilityAttributes. The result should set data-motion exactly as before.",
+      "App.tsx Shell keydown and nav labels: use viewPositionFromEvent(e, VIEWS.length) and viewShortcut(idx) instead of inline Alt logic. This also removes the Alt+11 label on Developer (K10).",
+      "Any JS-driven animation (for example the Motion Studio canvas loop) must read the resolved reduceMotion flag itself. The CSS rules cannot stop requestAnimationFrame."
+    ]
+  },
+  "dependencies": {
+    "new_packages": [],
+    "existing_used": ["esbuild (tests only, existing devDependency)"],
+    "browser_apis_used_at_runtime": ["window.matchMedia (passed in by the caller, optional)", "HTMLElement.dataset (passed in by the caller)"]
+  },
+  "limitations": [
+    "Nothing was rendered. Forced colors, reduced motion and focus rules are checked by parsing the stylesheet and by the TypeScript behavior tests, not in Electron or Windows High Contrast. A runtime check is still needed before any accessibility claim.",
+    "No real desktop input, screen reader or Narrator run was done. Focus order and announcements remain unverified.",
+    "The forced-colors rules cover the state markers the components already emit (aria-current, aria-selected, aria-checked, aria-pressed, disabled). Components that show state only with background color and no ARIA marker are not covered.",
+    "Reduced motion shortens durations to 0.01ms rather than removing them. Spinners stop after one iteration, so any busy indicator also needs text.",
+    "prefers-contrast is not handled. It was left out to keep the module small.",
+    "The in-app App.tsx reduce-motion logic is not changed here. The captain or shell owner must switch it over, as listed in captain_wiring.",
+    "The brief's phrase 'Small8/64' was ambiguous, so no 8 or 64 size bounds were added. The bounded helpers are the prefs normalizer and the view-position limit.",
+    "No skill files were read. None were explicitly assigned to this worker.",
+    "Shell wiring, the Developer shortcut list and the App.tsx changes belong to other owners. This module is not imported by any existing file yet."
+  ]
+}

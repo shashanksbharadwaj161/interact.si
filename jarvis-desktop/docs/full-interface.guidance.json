@@ -1,0 +1,55 @@
+{
+  "role": "guidance",
+  "session": "jarvis-desktop-99",
+  "at": "2026-10-15",
+  "status": "proposal for captain; nothing outside the owned files was edited",
+  "component": {
+    "file": "src/components/GuidedSetup.tsx",
+    "export": "GuidedSetup",
+    "props": {
+      "status": "GuidanceInput (src/ui/guidance.ts) — see statusSources",
+      "checking": "boolean, optional — true while the host runs the re-check it started",
+      "reducedMotion": "boolean — pass the resolved accessibility state (resolveAccessibilityState(...).reduceMotion)",
+      "onNavigate": "(target: GuideTarget) => void — GuideTarget = { view: ViewId; params?: Record<string,string> }; map directly to App's go(target.view, target.params)",
+      "onAction": "(action: GuideAction) => void — { type: 'recheck' } | { type: 'open-onboarding' } | { type: 'open-shortcuts' }",
+      "initialTopic": "GuideTopicId, optional — e.g. from #guide?topic=dictation",
+      "now": "number, optional — tests only"
+    },
+    "alsoExported": ["GuidedSetupView (hook-free presentational view)", "GuidedSetupProps", "GuidedSetupViewProps"],
+    "callbackGuarantee": "onNavigate/onAction are only invoked from a click or key press on their own controls; rendering never calls them (tested)."
+  },
+  "statusSources": {
+    "capabilities": "getSystemInfo().capabilities, or null before the first answer. Uses ids 'stt' and 'local-llm'.",
+    "capabilitiesError": "message if getSystemInfo/getApiInfo rejected, else null",
+    "apiFeatures": "getApiInfo().features; pass [] when window.jarvis.getApiInfo is absent (browser preview) so streaming reads 'not supported by this build'; null while pending. Uses 'chat-streaming', 'chat-cancel', 'local-models'.",
+    "settings": "state.settings (mode, reduceMotion, localModel, cloudModel, allowedRoots, approvedApps)",
+    "cloudKeyConfigured": "cloudKeyStatus().configured, or null if unknown",
+    "counts": "{ notes: state.notes.length, tasks: state.tasks.length, capsules: state.capsules.length }",
+    "systemReducedMotion": "readSystemPreferences(window.matchMedia).reducedMotion",
+    "webgl2": "optional; true/false if the host already knows whether a WebGL2 context can be created, else null/omitted",
+    "checkedAt": "Date.now() when capabilities/apiFeatures were last fetched; null if never. Older than 10 minutes => treated as stale"
+  },
+  "actionHandling": {
+    "recheck": "re-run getSystemInfo, getApiInfo and cloudKeyStatus (no probe beyond what Settings' re-check already does), set checking while pending, then update checkedAt",
+    "open-onboarding": "show the existing Onboarding flow (or Settings), host decides; GuidedSetup does not duplicate it",
+    "open-shortcuts": "open the existing help/shortcut overlay (ShortcutAction { kind: 'help' })"
+  },
+  "navigationProposal": {
+    "preferred": "Add ViewId 'guide' (label 'Guided setup', group 'System', blurb 'Short local tours and a setup checklist driven by what this computer reports.'); App renders <GuidedSetup initialTopic={loc.params.topic} .../> for it.",
+    "alternative": "Mount inside the existing help overlay or as a Settings tab if the captain prefers not to add a view.",
+    "entryPoints": ["Home card 'Next setup step' using summarizeGuide(buildGuideItems(...)).next and progressLabel(...)", "Help overlay link 'Open guided setup'", "Onboarding finish screen link"],
+    "targetsUsed": ["notes", "tasks", "capsules", "assistant", "models", "motion", "avatar", "settings?q=voice|readiness|local model|mode|folders|retention|motion"]
+  },
+  "helpersForOtherScreens": {
+    "file": "src/ui/guidance.ts",
+    "exports": ["buildGuideItems(input, prefs, now)", "summarizeGuide(items)", "progressLabel(summary)", "statusFreshness(input, now)", "normalizeGuidancePrefs(raw)", "parseGuidanceImport(text)", "exportGuidancePrefs(prefs)", "reduceGuidancePrefs(prefs, event)", "ROUTE_EXPLAINER", "GUIDE_TOPIC_IDS", "GUIDANCE_PREF_KEY"]
+  },
+  "persistence": {
+    "key": "jarvis.ui.guidance.v1 via src/ui/prefs.ts usePref",
+    "shape": { "v": 1, "marked": "Partial<Record<GuideTopicId, 'done'|'skipped'>>", "lastTopic": "GuideTopicId|null", "hideFinished": "boolean" },
+    "validation": "stored data: invalid parts dropped and reported in a notice (user can save a cleaned copy); pasted import: max 2048 chars, refused whole on any problem; only known topic ids copied (no prototype keys)",
+    "sensitiveData": "none — no notes, keys, settings or paths"
+  },
+  "noSideEffects": "No bridge calls, network, microphone, storage access outside usePref, model download, permission or settings change. Source-level test enforces it.",
+  "styling": "Uses existing classes only (page, panel, split, select-list/select-item.on, kv-list, help-list, notice, badge, btn). No CSS file changes; a dedicated .guide rule is optional."
+}

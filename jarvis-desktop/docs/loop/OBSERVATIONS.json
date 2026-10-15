@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "879ae9ca-17b6-4a72-921a-b79f3836f41e",
+  "round": 16,
+  "at": "2026-10-15T05:06:07.722Z",
+  "priorVerifiedWork": [],
+  "reason": "Round failed; retry from observable error",
+  "error": "Worker worklog-standup-drafts stopped: failed"
+}

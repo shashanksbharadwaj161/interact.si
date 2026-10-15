@@ -1,5 +1,10 @@
 import {PRICES} from './budget.mjs';
 
+export function auxiliaryRequest(input,task){
+  return ['any','tool'].includes(input?.tool_choice?.type)||
+    (task.model!=='claude-haiku-5-5'&&(/^claude-haiku(?:-|$)/.test(input?.model||'')||input?.model==='haiku'));
+}
+
 // Token counting has a narrower message schema than inference. Effort changes
 // generation, not prompt text; omit its per-message wrapper for this endpoint.
 export function countRequest(body) {
@@ -30,9 +35,10 @@ export function routeRequest(input,task) {
   const effort=['low','medium','high'].includes(task.effort)?task.effort:'high';
   body.thinking=forced?{type:'disabled'}:{type:'adaptive'};
   body.output_config={...body.output_config,effort};
+  // Native CLI message-level output metadata is rejected by Messages even
+  // though count_tokens accepts the stripped shape. Effort belongs at top level.
+  for(const message of body.messages||[])delete message.output_config;
   // Sampling values copied from older model requests cause 400s on 5.5.
   for(const key of ['temperature','top_p','top_k','speed','inference_geo','service_tier'])delete body[key];
-  // Disabled thinking requires consistent effort across message overrides.
-  if(forced)for(const message of body.messages||[]){if(message.output_config?.effort!==undefined)message.output_config={...message.output_config,effort};}
   return body;
 }

@@ -1,0 +1,106 @@
+{
+  "role": "widgets",
+  "roadmap": [
+    68
+  ],
+  "done": true,
+  "files": [
+    "src/ui/widgets.ts",
+    "src/components/WidgetPicker.tsx",
+    "tests/autopilot-widgets.test.mjs",
+    "docs/autopilot-result.widgets.json"
+  ],
+  "checks": [
+    {
+      "command": "npx tsc --noEmit",
+      "result": "pass",
+      "covers": "typecheck of the whole project, including the two new source files"
+    },
+    {
+      "command": "node --test tests/autopilot-widgets.test.mjs",
+      "result": "pass",
+      "summary": "29 of 29 tests pass",
+      "covers": "registry integrity, default layout, normalization of hostile and malformed input, bounded parsing, add/remove/width/move edits with no input mutation, packing with no overlap across 400 seeded random edits, read-only summaries with missing sources reported as not loaded, picker server-rendered markup (labels, checked state, disabled edge moves, width choices, preview spans, status region, optional Close)"
+    },
+    {
+      "command": "npm test",
+      "result": "pass",
+      "summary": "153 of 153 tests pass across all existing and new suites"
+    }
+  ],
+  "limitations": [
+    "Not mounted anywhere. The shell owner must render WidgetPicker and persist the layout; no dashboard or settings file was edited.",
+    "No CSS. The picker uses class names (widget-picker, widget-list, widget-row, widget-toggle, widget-name, widget-controls, widget-width, widget-preview, widget-preview-head, widget-preview-cell, widget-actions) that the styles owner must define. Only the preview grid geometry is inline.",
+    "Click and keyboard interaction is not exercised in a DOM. The tests server-render the picker and check markup; edit behaviour is tested through the pure functions the picker calls. No browser or accessibility-tree audit was run.",
+    "Layout is one widget per kind, ordered, with column spans only. There is no free drag positioning. packLayout computes positions, so the preview is a schematic grid, not the real dashboard.",
+    "Summaries are computed from whatever state the caller passes and do not update on their own. 'system' needs the capability list from getSystemInfo, and 'mode' shows the saved setting without checking the model.",
+    "No skill files were read; none were assigned to this role.",
+    "Changes are uncommitted for the captain. Nothing was pushed or sent to other sessions."
+  ],
+  "interfaces": {
+    "src/ui/widgets.ts": {
+      "constants": [
+        "GRID_COLUMNS = 12",
+        "LAYOUT_VERSION = 1",
+        "MAX_LAYOUT_JSON = 4096",
+        "LAYOUT_PREF_KEY = 'dashboard.widgets'",
+        "WIDGET_KINDS",
+        "MAX_WIDGETS"
+      ],
+      "types": [
+        "WidgetKind",
+        "WidgetDef",
+        "WidgetPlacement",
+        "WidgetLayout",
+        "PlacedWidget",
+        "LayoutResult",
+        "EditResult",
+        "WidgetSource",
+        "WidgetSummary"
+      ],
+      "functions": {
+        "defaultLayout": "() => WidgetLayout (fresh object, every kind once, default widths)",
+        "normalizeLayout": "(input: unknown) => { layout, issues } (never throws; drops unknown fields, unknown kinds and duplicates; at most 5 issues)",
+        "parseLayout": "(raw: string | null | undefined) => { layout, issues } (size-bounded JSON, falls back to default)",
+        "serializeLayout": "(layout) => string (validated JSON for LAYOUT_PREF_KEY)",
+        "addWidget": "(layout, kind) => EditResult",
+        "removeWidget": "(layout, kind) => EditResult",
+        "setWidgetWidth": "(layout, kind, width) => EditResult",
+        "moveWidget": "(layout, kind, direction: -1 | 1) => EditResult",
+        "resetLayout": "() => EditResult",
+        "packLayout": "(layout) => { items: PlacedWidget[], rows } (validated first; no overlap, always inside GRID_COLUMNS)",
+        "summarizeWidget": "(kind, source: WidgetSource, today?: string) => WidgetSummary (state: ready | empty | unavailable)",
+        "widgetDef": "(kind) => WidgetDef | undefined",
+        "isWidgetKind": "(v: unknown) => v is WidgetKind"
+      },
+      "notes": "EditResult.layout is the input object itself when ok is false, so callers can compare by reference. Edits never mutate their input."
+    },
+    "src/components/WidgetPicker.tsx": {
+      "component": "WidgetPicker",
+      "props": {
+        "layout": "WidgetLayout (required)",
+        "onLayoutChange": "(next: WidgetLayout) => void (called only after a passing edit)",
+        "onClose": "() => void (optional; the Close button is rendered only when this is given)"
+      },
+      "notes": "Shows a status line through role=status for each result. Uses Panel, Button, IconButton and Badge from src/ui/primitives."
+    },
+    "shell wiring expected": [
+      "Read the saved layout with readPref<string | null>(LAYOUT_PREF_KEY, null), then parseLayout(value).layout.",
+      "Persist changes with writePref(LAYOUT_PREF_KEY, serializeLayout(next)).",
+      "Build WidgetSource from AppState (settings, tasks, notes, capsules, activity) and from the getSystemInfo capabilities, pass null for capabilities until that call returns, and call summarizeWidget(kind, source) per widget in packLayout(layout).items.",
+      "Show issues from parseLayout once, then drop them."
+    ]
+  },
+  "dependencies": {
+    "added": [],
+    "existing": [
+      "react 19.2.0",
+      "@phosphor-icons/react (ArrowUp, ArrowDown, and primitives icons)",
+      "src/ui/primitives.tsx",
+      "src/ui/util.ts (dueBucket, localDateKey, truncate)",
+      "src/shared/contracts.ts (types only)",
+      "esbuild (tests only)"
+    ],
+    "package_json_changed": false
+  }
+}

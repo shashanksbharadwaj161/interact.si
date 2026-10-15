@@ -1,0 +1,99 @@
+{
+  "createdAt": "2026-10-14T08:51:08.867Z",
+  "originalRepository": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop",
+  "totalBudget": 34,
+  "sharedCap": 300,
+  "safety": 30,
+  "workers": [
+    {
+      "role": "release",
+      "model": "claude-fable-5-1",
+      "budget": 8,
+      "files": [],
+      "taskId": "76245e67-ebd2-4920-a503-912cf9575a66",
+      "status": "running",
+      "sessionId": "jarvis-desktop-84",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-84",
+      "retries": 1
+    },
+    {
+      "role": "ux",
+      "model": "claude-fable-5-1",
+      "budget": 6,
+      "files": [
+        "src/components/Settings.tsx",
+        "src/ui/primitives.tsx",
+        "src/styles/tokens.css",
+        "src/styles/base.css",
+        "src/styles/accessibility.css",
+        "tests/backlog-ux-review.test.mjs",
+        "tests/final-ux.test.mjs"
+      ],
+      "taskId": "8a97e940-dbcd-4f0e-9749-355eeea7622d",
+      "status": "running",
+      "sessionId": "jarvis-desktop-85",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-85",
+      "retries": 1
+    },
+    {
+      "role": "motion",
+      "model": "claude-fable-5-1",
+      "budget": 6,
+      "files": [
+        "src/components/MotionStudio.tsx",
+        "src/ui/motion-presets.ts",
+        "src/ui/motion-timing.ts",
+        "src/styles/motion-studio.css",
+        "tests/backlog-motion.test.mjs"
+      ],
+      "taskId": "e694adef-db9f-4a77-a1c6-906e178ce4f0",
+      "status": "running",
+      "sessionId": "jarvis-desktop-81",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-81"
+    },
+    {
+      "role": "voice-avatar",
+      "model": "claude-fable-5-1",
+      "budget": 6,
+      "files": [
+        "src/components/Assistant.tsx",
+        "src/components/AvatarStudio.tsx",
+        "src/ui/audio.ts",
+        "tests/final-voice-avatar.test.mjs"
+      ],
+      "taskId": "55c23a95-4dee-47ac-ad1e-25c5bd793176",
+      "status": "running",
+      "sessionId": "jarvis-desktop-86",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-86",
+      "retries": 1
+    },
+    {
+      "role": "security",
+      "model": "claude-opus-5-5",
+      "budget": 4,
+      "files": [
+        "tests/final-security-review.test.mjs",
+        "docs/final-security-review.md"
+      ],
+      "taskId": "946c62a1-1e85-4362-825f-f9cc50316e7b",
+      "status": "running",
+      "sessionId": "jarvis-desktop-82",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-82"
+    },
+    {
+      "role": "providers",
+      "model": "claude-opus-5-5",
+      "budget": 4,
+      "files": [
+        "electron/services/integrations.ts",
+        "src/components/Integrations.tsx",
+        "src/ui/integration-catalog.ts",
+        "tests/final-provider-flows.test.mjs"
+      ],
+      "taskId": "bd18821c-5005-4e35-bf44-c94d9f7163cb",
+      "status": "running",
+      "sessionId": "jarvis-desktop-83",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-83"
+    }
+  ]
+}

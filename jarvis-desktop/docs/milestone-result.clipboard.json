@@ -1,0 +1,54 @@
+{
+  "role": "clipboard",
+  "milestone": "clipboard-ui",
+  "files": [
+    "src/components/Clipboard.tsx",
+    "tests/milestone-clipboard-ui.test.mjs",
+    "docs/milestone-result.clipboard.json"
+  ],
+  "checks": [
+    "node --test tests/milestone-clipboard-ui.test.mjs: 14 pass, 0 fail",
+    "node --test tests/autopilot-clipboard.test.mjs (existing service tests): 28 pass, 0 fail",
+    "npx tsc --noEmit (whole project): exit 0, 0 errors",
+    "node --test tests/ui.test.mjs, tests/autopilot-shell.test.mjs, tests/autopilot-accessibility.test.mjs (scan src/components): 10, 20 and 21 pass, 0 fail",
+    "npm ci --ignore-scripts run in this worktree (repo-local install, no install scripts)",
+    "No system clipboard read or write in any test: the reader is an in-memory fake; a test asserts the component source has no navigator.clipboard, readText, writeText, or electron import"
+  ],
+  "interfaces": {
+    "exports": {
+      "Clipboard": "function Clipboard({ client, onStatus?, initial? }): renders the Privacy panel (switch, settings facts, secret-risk notice, entries list with per-entry remove, clear-all behind a confirm dialog). Renders a 'not connected' notice when client is null.",
+      "ClipboardProps": "{ client: ClipboardClient | null; onStatus?: (status: ClipboardStatus) => void; initial?: { status: ClipboardStatus; entries: ClipboardEntryView[] } }",
+      "clipboardActions": "(client: ClipboardClient) => { load(), setEnabled(on), remove(id), purge() }; each returns Promise<{ ok: true; value } | { ok: false; error }> with a readable error",
+      "retentionLabel": "(ms: number) => string, for example '1 day', '2 hours', '1 minute'"
+    },
+    "wiring": {
+      "client": "Pass clipboardBridge(api) from src/ui/bridges.ts. It returns null when the preload lacks the six clipboard methods, which renders the not-connected notice.",
+      "mount": "The shell owner places <Clipboard client={clipboardBridge(api)} /> in a view, for example Settings or Privacy. This module does not add navigation.",
+      "onStatus": "Optional. Called after each successful read or change, for example to show an On/Off badge elsewhere.",
+      "loading": "Loads once per mount (when client becomes connected). The bridge object is rebuilt each render, so the component does not depend on its identity."
+    },
+    "backend_contract": "Turning history on calls clipboardSetEnabled(true). The backend shows the native confirmation; the renderer sends only a boolean. Turning it off clears entries. Clear-all calls clipboardPurge, which empties entries and keeps the enabled flag. Remove calls clipboardRemove(id)."
+  },
+  "dependencies": {
+    "new": [],
+    "uses": [
+      "src/ui/bridges.ts (ClipboardClient, clipboardBridge)",
+      "src/ui/primitives.tsx (Panel, Switch, Badge, Button, IconButton, Notice, Empty, KV, LoadingBlock)",
+      "src/ui/Dialog.tsx (ConfirmDialog)",
+      "src/ui/util.ts (errMsg, fmtDateTime)",
+      "electron/services/clipboard.ts (types only: ClipboardStatus, ClipboardEntryView)",
+      "electron/services/clipboard.ts (real ClipboardHistory in tests only)"
+    ]
+  },
+  "limitations": [
+    "Not mounted in any view. The shell owner or captain must add it to a screen; this module does not change navigation or Settings.",
+    "No copy-back. The bridge has no system-clipboard write method, so the panel has no Copy or Paste control and never reports copying to the system. clipboardGet is not surfaced, so full text is not viewable here (previews only, 120 characters).",
+    "Turning history on depends on the native confirmation in the main process. The renderer cannot confirm for itself. The UI shows the backend's declined or unavailable error and keeps the switch off.",
+    "Interaction is tested at the action layer and in server-rendered markup. The repo has no DOM test library and no new dependency was added, so switch clicks, dialog focus, and keyboard flow are not exercised by automated tests.",
+    "Secret filtering is a heuristic inherited from the service. The panel states this in a notice; it does not guarantee that no secret is stored.",
+    "Capture polling is owned by the backend. The panel shows enabled/off and counts but does not show whether a poll is currently running.",
+    "Dates use the browser locale, so the exact text varies by system locale. Tests check structure, not a specific date format.",
+    "Storage is memory-only in this build because the backend passes no storage adapter; the panel reports this from status.persisted rather than assuming it."
+  ],
+  "done": true
+}

@@ -1,0 +1,21 @@
+{
+  "task": "Loop 8: writing-tone-translation",
+  "sessionId": "api-827a4923-ca7d-4662-aeb6-f05025ed1e02",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/tone-profiles.ts",
+      "bytes": 27372,
+      "sha256": "fb84b39f2ac3b255b50164cc6b4df4a3f9eeb0e950f91be94cccb3e6e78df79d"
+    },
+    {
+      "path": "src/ui/workbench.ts",
+      "bytes": 9780,
+      "sha256": "cb6fbc03443d1b84b11cb54bc715dcf76e6c96127af2976c5ef30d7d8238e5a8"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

@@ -1,0 +1,55 @@
+{
+  "role": "clipboard",
+  "files": [
+    "electron/services/clipboard.ts",
+    "tests/autopilot-clipboard.test.mjs",
+    "docs/autopilot-result.clipboard.json"
+  ],
+  "checks": [
+    "node --test tests/autopilot-clipboard.test.mjs: 28 pass, 0 fail",
+    "npx tsc --noEmit (whole project, includes electron/): exit 0, 0 errors",
+    "npm ci --ignore-scripts run in this worktree to install locked dependencies (esbuild, tsc)",
+    "No real system clipboard read or write occurs in any test; reader and storage are in-memory fakes; a test asserts the module source does not import electron or call clipboard read/write APIs"
+  ],
+  "limitations": [
+    "Caller-driven capture: the service has no timers. The native or API owner must call capture() on its own polling interval while history is enabled.",
+    "Not wired into the app: no IPC channel, backend method, UI, or main-process startup code. Captain must wire the service and the Electron clipboard reader.",
+    "Secret filtering is heuristic (regex on credential shapes such as private key blocks, AWS/GitHub/Slack/Google/OpenAI-style keys, JWTs, Bearer tokens, and password/secret/api_key assignments). It reduces accidental capture and does not guarantee that no secret is stored. Credit-card and high-entropy detection are not implemented.",
+    "The concealed-content check depends on the injected reader's optional isConcealed(). The native owner must implement it using Windows clipboard formats (for example ExcludeClipboardContentFromMonitorProcessing). Without it, password-manager content is only filtered by text patterns.",
+    "Persistence is optional and plaintext when storage is injected. Without storage, history is memory only. No DPAPI or encryption is applied by this module; if persistence is enabled, the native owner should decide on encryption.",
+    "list() prunes expired entries in memory without writing to storage; the on-disk copy is pruned on the next write or on load.",
+    "A failed storage write keeps the change in memory and surfaces status().lastError. A failed read or capture is also reported through lastError rather than thrown.",
+    "Duplicate detection compares against the most recent clipboard fingerprint (SHA-256, not persisted) and against stored text. Copying the same text repeatedly while it is still on the clipboard is reported as unchanged, not as a new copy.",
+    "Entries that look sensitive are rejected at capture and also dropped when a stored document is loaded."
+  ],
+  "interfaces": {
+    "module": "electron/services/clipboard.ts",
+    "exports": [
+      "CLIPBOARD_SCHEMA_VERSION: 1",
+      "CLIPBOARD_LIMITS: {maxEntries {min 1, max 200, default 50}, retentionMs {min 60s, max 30d, default 24h}, maxChars {min 1, max 20000, default 5000}, previewChars 120}",
+      "looksSensitive(text: string): boolean",
+      "class ClipboardHistory(opts: ClipboardHistoryOptions)",
+      "types: ClipboardReader, ClipboardStorage, ClipboardEntry, ClipboardEntryView, CaptureOutcome, ClipboardStatus, ClipboardHistoryOptions"
+    ],
+    "ClipboardReader": "{ readText(): Promise<string>; isConcealed?(): Promise<boolean> } (injected; native owner wraps the real clipboard)",
+    "ClipboardStorage": "{ read(): Promise<string | null>; write(data: string): Promise<void> } (optional; atomic write expected)",
+    "ClipboardHistoryOptions": "{ reader, storage?, now?: () => number (epoch ms), newId?: () => string, maxEntries?, retentionMs?, maxChars? }",
+    "methods": {
+      "init()": "Promise<void>. Loads persisted state when storage is provided. Call once at startup.",
+      "status()": "ClipboardStatus {enabled, persisted, count, maxEntries, retentionMs, maxChars, lastError?, warning?}",
+      "setEnabled(on: boolean)": "Promise<ClipboardStatus>. Default off. Turning off purges all entries.",
+      "capture()": "Promise<CaptureOutcome>. Outcomes: disabled | unchanged | empty | concealed | sensitive | too-large | added | merged. Returns disabled without calling the reader when history is off.",
+      "list(limit?)": "ClipboardEntryView[] newest first {id, preview (whitespace collapsed, max 120 chars), capturedAt, copies}. No full text.",
+      "get(id)": "string | null. Full text for the caller to paste. The service never writes to the clipboard.",
+      "remove(id)": "Promise<boolean>",
+      "purge()": "Promise<void>. Removes all entries and keeps the enabled flag."
+    },
+    "IPC_or_API_exposure": "None. Native and API owners decide what to expose. list() returns previews only; get() returns full text, so it should be gated before any renderer or API exposure."
+  },
+  "dependencies": {
+    "runtime": "node:crypto (createHash, randomUUID). No new npm packages.",
+    "external_repo_code": "None copied. Original implementation.",
+    "tests": "esbuild (existing devDependency) to bundle the TypeScript module, following tests/backend-core.test.mjs. node:test and node:assert."
+  },
+  "done": true
+}

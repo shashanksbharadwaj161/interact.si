@@ -1,0 +1,59 @@
+{
+  "role": "ocr",
+  "done": true,
+  "files": {
+    "added": [
+      "electron/services/ocr.ts",
+      "native/OcrLocal.ps1",
+      "tests/backlog-ocr.test.mjs",
+      "docs/backlog-result.ocr.json"
+    ],
+    "modified": []
+  },
+  "checks": {
+    "npx tsc --noEmit": "clean",
+    "node --test tests/backlog-ocr.test.mjs": "27/27 pass",
+    "node --test tests/*.test.mjs": "747/747 pass (full suite with the new file)",
+    "ps1 parse": "OcrLocal.ps1 parses under Windows PowerShell 5.1 (parser only, asserted by a test)",
+    "dev smoke (not part of the tests, nothing left behind)": "Ran the real helper against a synthetic PNG rendered in memory into a namespaced temp folder (ao-ocr-fixture-*, deleted afterwards): probe returned en-GB/en-US; recognize returned the two rendered lines in en-GB and en-US; ja-JP was refused as not installed; a wrong sha256, a junction component, a UNC path and an unknown op were each refused with a fixed message. No screen capture, personal file or network was used."
+  },
+  "interfaces": {
+    "module": "electron/services/ocr.ts",
+    "class": "new Ocr(deps: OcrDeps)  implements OcrServiceApi",
+    "OcrDeps": "{ native: OcrNativeRunner; fs?: OcrFs; pickImage?: () => Promise<string | null>; platform?: string; now?: () => number; limits?: lower-only overrides of {maxBytes,maxDimension,maxPixels,maxChars,timeoutMs} }",
+    "OcrNativeRunner": "{ run(script: string, input: unknown, opts?: RunOptions): Promise<unknown> }. The real NativeRunner satisfies it (typechecked in the test bundle) once 'OcrLocal' is registered; until then it reports a clear unavailable state and never spawns.",
+    "OcrClient (renderer-facing, no path argument)": "status(): Promise<OcrStatus>; chooseAndRecognize(opts?: {language?: string}): Promise<OcrResult>; cancel(): Promise<boolean>",
+    "OcrServiceApi (main process)": "OcrClient + capability(): Promise<Capability> (id 'ocr') + recognizeChosen(path: unknown, opts?): Promise<OcrResult> for a path that came from a trusted dialog",
+    "OcrResult": "OcrSuccess {ok:true, source:'windows-media-ocr', untrusted:true, text, lines, language, width, height, format, fileName, truncated, sanitized, note?} | OcrFailure {ok:false, code, reason, cancelled?}. Failures never throw; code is one of unavailable|invalid-request|invalid-image|too-large|language-unavailable|busy|cancelled|changed|failed.",
+    "OcrStatus": "{available, reason?, engine, languages[], profileLanguage|null, maxImageDimension|null, limits, busy, cloud:false, continuousCapture:false}",
+    "exports": "Ocr, sniffImage, cleanOcrLine, OCR_LIMITS, OCR_EXTENSIONS, OCR_SCRIPT ('OcrLocal'), OCR_ENGINE, realOcrFs and the types above",
+    "helper protocol": "native/OcrLocal.ps1: stdin JSON {op:'probe'} or {op:'recognize', path, sha256, language?, maxBytes, maxDimension, maxPixels}; one JSON line out. Failures carry a code and a fixed message, never the path or exception text."
+  },
+  "proposedWiring": {
+    "forCaptain": [
+      "electron/native/runner.ts: add 'OcrLocal' to SCRIPTS (the runner maps a name to native/<name>.ps1, so the file name is the script name).",
+      "electron/native/runner.ts: add 'OcrLocal' to SENSITIVE_INPUT so helper stderr is never surfaced (stdin carries a user file path). The service already ignores exit/bad-output text, but the runner would otherwise include the first stderr line.",
+      "Integrity manifest: scripts/build-main.mjs hashes native/*.ps1 at build time, so rebuilding produces the OcrLocal.ps1 digest automatically. Do not enable the helper in a packaged build until dist-electron/native-manifest.json is regenerated and lists OcrLocal.ps1; the runner fails closed on an unlisted file. I did not edit runner.ts, build-main.mjs or any manifest.",
+      "Main process: build `new Ocr({native: runner, pickImage})` where pickImage is a dialog.showOpenDialog restricted to OCR_EXTENSIONS and returns the first path or null. Expose status/chooseAndRecognize/cancel over IPC; add the capability() entry to system capabilities. Contracts/backend/IPC were not touched.",
+      "Treat result.text as untrusted data: do not pass it into action planning or confirmations without showing it to the user."
+    ]
+  },
+  "behaviour": {
+    "scope": "One user-selected image per call. No capture, watching, polling, history or storage; nothing is written to disk.",
+    "preChecks (before any process starts)": "Lexical local-drive path only (UNC/device/relative/..//stream refused), extension allowlist, lstat on every folder and the file (links and junctions refused), regular non-empty file, <= 10 MB, bounded read whose length must equal the lstat size, header sniff of PNG/JPEG/BMP/GIF/TIFF that must match the extension, 16 px minimum, 10000 px per side and 25 megapixel ceiling. Caller limits can only lower these.",
+    "helper re-checks": "Local-drive regex, ReparsePoint check on every component, size cap, SHA-256 of the bytes it reads must equal the digest the app validated (closes a swap between check and use), dimensions re-checked against the OS engine's MaxImageDimension.",
+    "languages": "Probed from the OS through the injectable runner (cached 30 s). The requested tag must be installed; with no request the Windows profile language is used, and if none matches the call fails asking the user to choose. A helper answering in another language than requested is treated as failure. No silent fallback.",
+    "results": "Plain text only: control characters, invisible and direction-changing characters and lone surrogates removed (sanitized flag), NFC, 5000 lines / 100k chars cap (truncated flag), empty result carries a note rather than invented text. File name is shown with visible markers; folder path is never returned.",
+    "cancellation": "cancel() aborts the helper through the runner's AbortSignal, a late result is discarded, and the slot is freed. One recognition (or one open picker) at a time; a second call returns 'busy'."
+  },
+  "limitations": [
+    "Only the first frame of animated GIFs and the first page of multi-page TIFFs is read (stated in result.note).",
+    "No bounding boxes or per-word data, plain text only.",
+    "Needs a Windows OCR language pack. This machine has en-GB and en-US; other machines may have none, in which case status reports unavailable with the reason. Packs are never downloaded or installed by the app.",
+    "WebP/HEIC/JXR/ICO are not accepted even if a codec is installed (header sniffing is limited to five formats). The OS engine's own limits still apply on top of ours.",
+    "Handwriting and very low-resolution text give poor results, as with any Windows.Media.Ocr use.",
+    "The helper reads the file path from stdin on the same machine; a local-drive file that the user can read is the only input. A file on a removable or network-mapped drive letter is treated as local by Windows path rules (same limitation as the other chosen-file code).",
+    "Not wired: until the captain registers 'OcrLocal' in the runner and regenerates the integrity manifest, the real NativeRunner reports OCR unavailable and never spawns the helper. Tests cover this unwired state and the argv/stdin shape once it is registered.",
+    "Developer-side: ran `npm ci --ignore-scripts` in this worktree (local node_modules only, no Electron binary downloaded)."
+  ]
+}

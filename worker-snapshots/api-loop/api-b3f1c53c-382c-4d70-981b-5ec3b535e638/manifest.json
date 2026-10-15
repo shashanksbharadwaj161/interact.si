@@ -1,0 +1,21 @@
+{
+  "task": "Loop 13: writing-tone-and-error-diagnosis",
+  "sessionId": "api-b3f1c53c-382c-4d70-981b-5ec3b535e638",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/prompt-tools.ts",
+      "bytes": 36670,
+      "sha256": "c9eb5adb9f14332f52c109c0239d3db2d6d83789fc180b95ee889178e71af4c0"
+    },
+    {
+      "path": "src/ui/error-diagnosis.ts",
+      "bytes": 32972,
+      "sha256": "310b2c904086576b4e1d8a2a0f75b69481c17abd3c3a8552333b99ee24669190"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

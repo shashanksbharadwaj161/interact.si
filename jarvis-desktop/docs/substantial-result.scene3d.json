@@ -1,0 +1,14 @@
+{
+  "role": "scene3d",
+  "done": true,
+  "status": "integrated-and-synthetic-runtime-tested-locally",
+  "sourceSession": "jarvis-desktop-94",
+  "files": ["src/components/Scene3D.tsx", "src/ui/scene3d.ts", "src/styles/scene3d.css", "src/components/App.tsx", "tests/substantial-scene3d.test.mjs"],
+  "checks": [
+    {"kind": "behavior tests", "passed": 12, "failed": 0},
+    {"kind": "TypeScript", "result": "pass"},
+    {"kind": "owned hidden Electron WebGL2 fixture", "result": "pass", "nonBackgroundPixels": 36856, "loopPixelSeam": true, "changedAt3s": true, "framePngBytes": 34592, "pngSha256": "ce37a783a84cf6ec2971b98ce1e458939bbb3a0abac69f2c835c5dbc119173b7", "frameAndContactSheetDownloads": true, "reducedMotion": true, "contextLossRestore": true, "externalRequests": 0}
+  ],
+  "changes": ["Lazy 3D option inside Motion view preserves original 2D studio", "Original WebGL2 renderer, bounded deterministic geometry and controls", "Import byte/number bounds, frame-loop limits, shader cleanup and allocation rollback", "Reduced-motion and unavailable-context states with truthful playback/export controls"],
+  "limitations": ["Fixture uses owned synthetic canvas, not a real user desktop or other applications", "No second-laptop performance/DPI benchmark or complete G7 acceptance", "No photorealistic avatar, imported external 3D model, audio soundtrack or MP4/GIF encoder", "Updated installer and final full route acceptance are assigned to external integration captain"]
+}

@@ -1,0 +1,78 @@
+{
+  "role": "productivity",
+  "done": true,
+  "source": "Salvaged from the jarvis-desktop-48 worktree (identical base blobs, so a direct copy), then reviewed, fixed and completed here. Nothing outside the assigned paths was edited.",
+  "files": [
+    {"path": "electron/services/store.ts", "change": "modified", "purpose": "Store.forgetHistory + parseForgetHistory (IPC-safe); new ProductivityStore sidecar (productivity.json): capsule goals/references, checkpoints, focus history, reminder snooze/dismiss, opt-in application timeline, associations, file shelf, recents, retention policy. Atomic tmp+fsync+rename, serialized queue, rollback on failed write, corrupt-file quarantine with .prev restore, newer-version read-only."},
+    {"path": "electron/services/search.ts", "change": "modified", "purpose": "Search over checkpoints, shelf, goals/references, opt-in history/chat/external records with project, tag, category and date filters; navResult; evidence-cited daily/resume recaps, worklog draft, association suggestions, reminder status/snooze helpers, focus observer/summary, retention preview."},
+    {"path": "electron/services/capsules.ts", "change": "modified", "purpose": "previewRestore (dry run, never launches), previewGeometry, captureGeometry, portable capsule packs (exportCapsulePack, parseCapsulePack, mapPath) with {ROOT:name} tokens; imported packs carry no permissions."},
+    {"path": "src/components/Capsules.tsx", "change": "modified", "purpose": "ProjectMemory (goals, references, checkpoints, resume recap) and RestoreTools (preview, window capture, pack export/import) mounted in the capsule editor."},
+    {"path": "src/components/Notes.tsx", "change": "modified", "purpose": "Ranked note search using the shared engine, copy text, 'referenced by capsule' hint."},
+    {"path": "src/components/Tasks.tsx", "change": "modified", "purpose": "FocusRecorder, focus history, reminder snooze/dismiss controls, calendar-today list."},
+    {"path": "src/components/MemorySearch.tsx", "change": "modified", "purpose": "Filters, history switch, non-linked rows, MemoryControls (timeline opt-in, retention preview, two-step forgetting). Falls back to the app store for sidecar data and shared signals when no props are passed."},
+    {"path": "src/ui/store.tsx", "change": "modified", "purpose": "ProductivityAPI type, productivity state, applyProductivity/refreshProductivity, useOptionalStore."},
+    {"path": "tests/autopilot-productivity.test.mjs", "change": "added", "purpose": "51 node:test cases bundling the real TypeScript with an in-memory file system."},
+    {"path": "docs/continuation-result.productivity.json", "change": "added", "purpose": "This marker."}
+  ],
+  "fixesMadeDuringSalvage": [
+    "effectiveReminderTasks reverted a snooze to its original due time once the snooze elapsed, so the scheduler never announced it (failing test). A snoozed task now keeps the snooze end as its due time; the unused nowMs parameter was removed.",
+    "search.ts widened SearchCategory beyond src/shared/contracts.ts, which broke typecheck in backend.ts, App.tsx and Home.tsx. searchState now has an overload: the original {includeChat, limit} call is typed with the four contract categories; MemorySearch passes onNavigate a contract-shaped NavResult via navResult. No contract or other-owner file was touched.",
+    "parseProductivity gave persisted goals/references without an id an empty-string id; it now treats that as damage and runs recovery.",
+    "MemorySearch ignored the sidecar when its callers (Home, Search view) passed no props, so checkpoints and shelf were never searched; it now reads the optional app store. A non-throwing useOptionalStore keeps standalone rendering working (tests/backend-search.test.mjs).",
+    "Store.forgetHistory now validates its input (booleans, date, at least one kind) because it will receive renderer data."
+  ],
+  "checks": [
+    {"command": "npm ci --ignore-scripts", "result": "pass", "detail": "repo-local install in this worktree"},
+    {"command": "node --test tests/autopilot-productivity.test.mjs", "result": "pass", "detail": "51 tests, 0 failures"},
+    {"command": "node --test tests/*.test.mjs", "result": "2 pre-existing failures", "detail": "528 tests, 526 pass. Failures: tests/autopilot-models.test.mjs 'cancelling mid-stream...' and 'cloud streaming parses SSE...' (chat.ts, models owner; already listed in docs/continuation-baseline.md). They use a fake store and do not load any file from this module."},
+    {"command": "npx tsc --noEmit", "result": "2 errors outside owned paths", "detail": "electron/backend.ts(201) missing routines/models/integrations/usage/clipboard/system API methods, and src/shared/contracts.ts(1) RoutinePlan not exported from services/routines. Zero errors in owned files; previously search/contract errors in backend.ts:363, App.tsx:382, Home.tsx:228 are gone."},
+    {"command": "npx vite build --outDir <temp>", "result": "pass", "detail": "renderer bundles; no node: module reaches it (store/capsules are imported type-only from views)."}
+  ],
+  "validated": {
+    "atomicWrites": "Failed rename rolls memory back, removes the .tmp file and keeps the previous file (ProductivityStore and Store.forgetHistory); a leftover .tmp never replaces good data; 25 concurrent operations serialize with none lost.",
+    "retention": "ProductivityStore prunes on load and applyRetention per policy (0 = keep); Store drops chat/activity older than settings.retainDays on load and applyRetention while notes, tasks and capsules are untouched; previewRetention counts without changing anything.",
+    "backups": "Rotation keeps the newest 10, the newest of each of the last 7 days and 5 pre-import files; older ones are removed.",
+    "recovery": "Corrupt main state is quarantined and restored from the newest valid backup (a damaged newest backup is skipped) or reset with a visible activity entry; corrupt sidecar restores from .prev or resets; newer-version data is read-only and never overwritten.",
+    "import": "Main-state import keeps current mode, allowedRoots, approvedApps, localEndpoint and cloudModel and records what was ignored; capsule packs are validated item by item (UNC, traversal, relative, NUL, bad URL, unknown kind dropped), carry no approval, and are re-authorized per item by prepareItem at restore."
+  },
+  "interfaces": {
+    "rendererApi": "src/ui/store.tsx ProductivityAPI, read from window.jarvis.productivity (not declared in contracts.ts; read by cast): get(): Promise<ProductivityState>; apply(op: ProductivityOp): Promise<ProductivityState>; forgetHistory?(opts: {chat?, activity?, before?}): Promise<{removed: {chat, activity}}>; capsule?: {previewRestore(id): Promise<RestorePreview>; listWindows?(): Promise<{hwnd, title, process}[]>; captureGeometry?(id, hwnds): Promise<{saved, skipped}>; exportPack?(id, roots: PathRoot[]): Promise<{saved, unmapped}>; readPack?(): Promise<string|null>; parsePack?(raw, mappings): Promise<PackImport>}; signals?(): Promise<ExternalDoc[]>. Every member is optional and the views say so when it is missing.",
+    "store.ts": {
+      "Store": "existing class, plus forgetHistory(raw: unknown): Promise<{state: AppState; removed: {chat: number; activity: number}}>",
+      "parseForgetHistory": "(raw: unknown) => {chat?: boolean; activity?: boolean; before?: string}",
+      "ProductivityStore": "new ProductivityStore({dir, fs?, now?, newId?, fileName? = 'productivity.json'}); load(): Promise<LoadResult>; snapshot(): ProductivityState; apply(raw: unknown): Promise<ProductivityState> (validated discriminated ProductivityOp, unknown ops rejected); reconcile({capsuleIds, taskIds}): Promise<ProductivityState>; applyRetention(): Promise<ProductivityState>; isReadOnly; statePath",
+      "operations": ["capsule.setMeta", "checkpoint.add|update|delete", "focus.record|delete", "reminder.snooze|dismiss|clear", "timeline.record|delete", "association.set|clear", "shelf.add|pin|remove", "recent.record|remove", "policy.set", "forget {scope: checkpoints|focus|timeline|reminders|associations|shelf|recents|all, before?}"],
+      "exports": ["PRODUCTIVITY_VERSION", "PRODUCTIVITY_LIMITS", "emptyProductivity", "parseProductivity", "reminderKey", "FORGET_SCOPES", "types ProductivityState, ProductivityOp, CapsuleMeta, Checkpoint, FocusSession, ReminderState, TimelineEntry, ShelfItem, RecentItem, MemoryPolicy"]
+    },
+    "search.ts": {
+      "searchState": "(state, query, options?: BasicSearchOptions): NavResult[] and (state, query, options?: SearchOptions): SearchResult[]; SearchOptions adds includeHistory, productivity, external, categories, tag, capsuleId, since",
+      "navResult": "(result, productivity?) => NavResult | null",
+      "recaps": "buildDailyRecap(state, prod, 'YYYY-MM-DD'), buildResumeRecap(state, prod, capsuleId), draftWorklog(recap, {withSources?}), suggestAssociations(subject, state, limit?)",
+      "reminders": "reminderStatus(task, states, nowMs), snoozeUntil('10m'|'1h'|'tomorrow', nowMs), effectiveReminderTasks(tasks, states)",
+      "focus": "observeFocus(prev, cur, nowMs) => {next, record}, focusSummary(sessions, sinceMs?), MIN_RECORDED_FOCUS_SEC=60",
+      "retention": "previewRetention(state, prod, nowMs)"
+    },
+    "capsules.ts": "restoreCapsule(deps, id) unchanged; previewRestore({state, actions, native, selfPids}, id, displays?) => RestorePreview; previewGeometry(capsule, windows, selfPids, displays?); captureGeometry(windows, selectedHwnds, selfPids) => {windows, skipped}; exportCapsulePack(capsule, meta, roots?, now?) => {json, unmapped}; parseCapsulePack(raw, mappings?) => PackImport (saves nothing); mapPath; PACK_FORMAT='jarvis-capsule-pack'; PACK_LIMITS",
+    "views": "ProjectMemory and RestoreTools (mounted in Capsules.tsx); FocusRecorder (mounted in Tasks.tsx); exported MemorySearch (props: state, onNavigate(NavResult), initialQuery?, limit?, productivity?, external?) and MemoryControls (no props, reads useReady)"
+  },
+  "captainWiring": [
+    "Main process: create ProductivityStore({dir: userData}), await load(), surface a returned warning, and expose it as window.jarvis.productivity through a preload IPC bridge with sender validation (apply must pass the raw payload to ProductivityStore.apply; forgetHistory to Store.forgetHistory).",
+    "Main process: call ProductivityStore.reconcile({capsuleIds, taskIds}) after note/task/capsule deletes and after Store.importDocument.",
+    "Main process: feed Reminders with () => effectiveReminderTasks(state.tasks, productivity.reminders) and call rearm() after reminder.snooze/dismiss/clear so a snooze announces again when it ends.",
+    "Main process (capsule API): previewRestore with the real ActionService and NativeAdapter; listWindows/captureGeometry (use captureGeometry() then save via the validated saveCapsule path); exportPack/readPack behind trusted native save/open dialogs (readPack at most 1 MB); parsePack = parseCapsulePack. Imported packs must still be saved through the normal validated capsule save.",
+    "Main process: Store.backup('pre-import') already runs inside importDocument; nothing else needed for imports.",
+    "Renderer shell: mount <FocusRecorder /> once at app level (inside the focus provider) so sessions are recorded on every view; today it only runs while the Tasks view is open. Mount <MemoryControls /> in Settings (it is not mounted anywhere yet). Home.tsx and App.tsx need no change for search: onNavigate now receives the four contract categories.",
+    "searchState with the original {includeChat, limit} options keeps returning contract SearchResult[]; electron/backend.ts needs no change for search."
+  ],
+  "limitations": [
+    "Not wired in main/preload: window.jarvis.productivity does not exist yet, so in the current tree every productivity feature shows 'not connected' and nothing is saved for it. Chat/activity forgetting and memory search over notes/tasks/capsules work without it.",
+    "Shelf, recents, application timeline and session associations have storage, validation, search and forgetting but no add/edit UI, and nothing in the app reports timeline sessions; the timeline stays off by default and empty until a module reports sessions with the user's opt-in.",
+    "Focus sessions are recorded only while FocusRecorder is mounted (Tasks view) until the captain moves it to the shell.",
+    "Screen history and meeting/system-audio capture (roadmap 39, 40) and deep app-state restoration and spatial map (49, 50) are not implemented; the UI marks them unavailable and nothing is captured.",
+    "Recaps and worklog drafts are assembled from stored records, with a cited source per line; no model is used, so they are deliberately plain.",
+    "Association suggestions are word overlap only and never applied without user confirmation.",
+    "Tests use an in-memory file system, so real Windows EPERM/EBUSY rename retry timing and fsync are simulated, not exercised on disk. Views are tested through static markup (what is rendered and hidden), not through click or keyboard events.",
+    "Backups of the main state may still hold chat/activity forgotten later until they rotate out; the Forget panel says so.",
+    "Remaining failures are outside this module: 2 models-owner tests and 2 typecheck errors (backend.ts API methods, RoutinePlan export)."
+  ]
+}

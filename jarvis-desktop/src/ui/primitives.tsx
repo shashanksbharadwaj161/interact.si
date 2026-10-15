@@ -123,42 +123,67 @@ export function LoadingBlock({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
+/**
+ * Labelled on/off control. The button is named by aria-labelledby, pointing at the visible label, so its name does
+ * not depend on the <label for> link alone. The description is linked with aria-describedby. Disabled switches keep
+ * the same name, so a disabled state is announced with what it applies to.
+ */
 export function Switch({ checked, onChange, label, description, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; description?: string; disabled?: boolean }) {
   const id = useId();
+  const labelId = `${id}-label`;
+  const descriptionId = description ? `${id}-description` : undefined;
   return (
     <div className="switch-row">
       <div>
-        <label htmlFor={id} className="switch-label">
+        <label id={labelId} htmlFor={id} className="switch-label">
           {label}
         </label>
-        {description && <p className="field-hint">{description}</p>}
+        {description && (
+          <p id={descriptionId} className="field-hint">
+            {description}
+          </p>
+        )}
       </div>
-      <button id={id} type="button" role="switch" aria-checked={checked} disabled={disabled} className={cx('switch', checked && 'on')} onClick={() => onChange(!checked)}>
-        <span className="switch-knob" />
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-labelledby={labelId}
+        aria-describedby={descriptionId}
+        disabled={disabled}
+        className={cx('switch', checked && 'on')}
+        onClick={() => onChange(!checked)}
+      >
+        <span className="switch-knob" aria-hidden />
       </button>
     </div>
   );
 }
 
 export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; icon?: IconType; hint?: string }[]; label: string }) {
+  // Roving tabindex. When `value` matches no option (stale or unset), the first option stays tabbable so the group is
+  // still reachable with Tab; arrow keys move relative to the option that has focus, not to `value`.
+  const selected = options.findIndex((o) => o.value === value);
+  const tabbable = selected >= 0 ? selected : 0;
   return (
     <div className="segmented" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
+      {options.map((o, index) => (
         <button
           key={o.value}
           type="button"
           role="radio"
           aria-checked={value === o.value}
-          tabIndex={value === o.value ? 0 : -1}
+          tabIndex={index === tabbable ? 0 : -1}
           className={cx('seg', value === o.value && 'on')}
           title={o.hint}
           onClick={() => onChange(o.value)}
           onKeyDown={(e) => {
-            const i = options.findIndex((x) => x.value === value);
             const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-            if (!step) return;
+            const jump = e.key === 'Home' ? 0 : e.key === 'End' ? options.length - 1 : -1;
+            if (!step && jump < 0) return;
             e.preventDefault();
-            const next = options[(i + step + options.length) % options.length];
+            const next = jump >= 0 ? options[jump] : options[(index + step + options.length) % options.length];
             onChange(next.value);
             const btns = e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role=radio]');
             btns?.[options.indexOf(next)]?.focus();

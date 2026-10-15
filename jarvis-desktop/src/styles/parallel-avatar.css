@@ -1,0 +1,128 @@
+/* Avatar Studio usability layer: history, transport, export preview, drop zone and keyboard help.
+   Imported by src/components/AvatarStudio.tsx after avatar-studio.css; relies on tokens.css. */
+
+.avs-history {
+  align-items: center;
+}
+
+.avs-transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.avs-transport-pos {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.avs-exports {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.avs-exports li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 6px);
+  background: var(--sunken);
+}
+
+.avs-exports li.off {
+  opacity: 0.8;
+}
+
+.avs-export-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.avs-export-name .field-hint {
+  overflow-wrap: anywhere;
+}
+
+.avs-drop {
+  position: relative;
+  padding: 6px;
+  margin: -6px;
+  border: 1px dashed transparent;
+  border-radius: var(--r-md);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.avs-drop.over {
+  border-color: var(--accent, currentColor);
+  background: var(--sunken);
+}
+
+.avs-drop-hint {
+  margin: 0;
+}
+
+.avs-keys {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 12px;
+}
+
+.avs-key {
+  display: contents;
+}
+
+.avs-keys dt,
+.avs-keys dd {
+  margin: 0;
+}
+
+.avs-keys kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm, 6px);
+  background: var(--sunken);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.avs-keys dd {
+  color: var(--text-dim, inherit);
+  font-size: 0.92em;
+}
+
+/* Reduced motion: the drop highlight snaps instead of fading */
+:root[data-motion="reduced"] .avs-drop {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avs-drop {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .avs-keys {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .avs-exports li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

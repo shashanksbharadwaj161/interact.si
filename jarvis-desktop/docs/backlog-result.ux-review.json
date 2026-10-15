@@ -1,0 +1,64 @@
+{
+  "role": "ux-review",
+  "scope": "Read-only UI audit of HEAD 84578df in this worktree. No source, package.json, contract or other worker path was changed.",
+  "files": [
+    "docs/backlog-ux-review.md",
+    "tests/backlog-ux-review.test.mjs",
+    "docs/backlog-result.ux-review.json"
+  ],
+  "checks": [
+    {
+      "command": "npm ci --ignore-scripts --no-audit --no-fund",
+      "result": "pass",
+      "detail": "Installed 331 packages into the worktree node_modules (gitignored). Electron binary download skipped by --ignore-scripts."
+    },
+    {
+      "command": "node --test tests/backlog-ux-review.test.mjs",
+      "result": "pass",
+      "detail": "33 tests: 26 pass, 0 fail, 7 todo. The 7 todo tests are known defects UX-01, UX-02, UX-03 (three themes), UX-04, UX-05 and the MotionStudio toggle; each asserts the correct behaviour and reports as TODO."
+    },
+    {
+      "command": "node --test tests/milestone-a11y.test.mjs",
+      "result": "pass",
+      "detail": "Baseline harness check: 20 of 20 pass before and after this work."
+    }
+  ],
+  "interfaces": {
+    "providesTo": "captain",
+    "testEntry": "tests/backlog-ux-review.test.mjs has no exports. It is a node:test file. Rerun it after the visual and shell merges.",
+    "consumesFromSource": [
+      "src/ui/primitives.tsx: Switch, Segmented, Button, IconButton, Field, Panel, Notice",
+      "src/ui/Dialog.tsx: Dialog",
+      "src/components/MotionStudio.tsx: MotionStudio({ reducedMotion })",
+      "src/components/Avatar.tsx: Avatar({ state })",
+      "src/ui/nav.tsx: VIEWS, shortcutAction, parseHash, hashFor",
+      "src/styles/tokens.css: declared colour tokens for graphite, nebula and paper"
+    ],
+    "fixPaths": [
+      { "id": "UX-01", "file": "src/components/Settings.tsx", "line": 538, "owner": "shell (jarvis-desktop-31)", "severity": "medium", "status": "todo test" },
+      { "id": "UX-02", "file": "src/styles/tokens.css", "owner": "unowned (captain)", "severity": "medium", "status": "todo test" },
+      { "id": "UX-03", "file": "src/styles/base.css", "line": "142-150", "owner": "unowned (captain)", "severity": "medium", "status": "todo test" },
+      { "id": "UX-04", "file": "src/components/MotionStudio.tsx", "line": 592, "owner": "visual (jarvis-desktop-32)", "severity": "low-medium", "status": "todo test" },
+      { "id": "UX-05", "file": "src/ui/primitives.tsx", "line": 173, "owner": "unowned (captain)", "severity": "low", "status": "todo test" },
+      { "id": "UX-06", "file": "src/styles/accessibility.css", "line": "forced-colors block", "owner": "accessibility (jarvis-desktop-44)", "severity": "medium", "status": "static; verify in Windows High Contrast" },
+      { "id": "UX-07", "file": "src/components/Settings.tsx", "line": 346, "owner": "shell (jarvis-desktop-31)", "severity": "low-medium", "status": "static" },
+      { "id": "UX-08", "file": "src/styles/views.css", "line": "863-865", "owner": "shell (jarvis-desktop-31)", "severity": "low", "status": "static" },
+      { "id": "UX-09", "file": "src/components/Notes.tsx", "line": "236-240", "owner": "productivity (jarvis-desktop-48)", "severity": "low", "status": "static" },
+      { "id": "UX-10", "file": "src/components/App.tsx", "line": "144-146", "owner": "shell (jarvis-desktop-31)", "severity": "low", "status": "static" },
+      { "id": "UX-11", "file": "src/components/App.tsx", "line": 617, "owner": "shell (jarvis-desktop-31)", "severity": "low", "status": "static" },
+      { "id": "UX-12", "file": "src/ui/accessibility.ts", "owner": "accessibility (jarvis-desktop-44) with shell", "severity": "low", "status": "static" },
+      { "id": "UX-13", "file": "src/components/App.tsx", "line": "606-622", "owner": "visual (jarvis-desktop-32) and captain", "severity": "integration", "status": "AvatarStudio unmounted at HEAD" }
+    ]
+  },
+  "dependencies": [],
+  "limitations": [
+    "No browser, DOM, screen reader or Windows High Contrast run. Findings UX-06 to UX-13 are static and need one before a fix is accepted.",
+    "Contrast uses the declared hex values in tokens.css. It does not measure translucent panels, scene backdrops or text over imagery.",
+    "The visual worker (jarvis-desktop-32) is still running. The avatar and motion audit covers HEAD in this worktree only. The captain must rerun the test file after merging it, and must not treat this audit as covering the visual worker's changes.",
+    "Reading other assigned source worktrees was not done; that is reserved for the captain.",
+    "The 94 disabled controls without a same-line title were triaged by grep only. No per-control claim is made from that count.",
+    "AvatarStudio is not mounted anywhere, so its reduced-motion gating (AvatarStudio.tsx ~L178, ~L287-288) has no mounted test. The captain needs to pass reducedMotion from the Shell when mounting it."
+  ],
+  "done": true,
+  "doneNote": "Audit complete for the assigned scope. Fixes are routed as paths in interfaces.fixPaths; none were applied by this worker."
+}

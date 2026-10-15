@@ -1,0 +1,16 @@
+{
+  "task": "Loop 11: scene-spec-validator",
+  "sessionId": "api-49541483-d13d-4b48-a26d-9e1ab30aa7d3",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/scene-spec.ts",
+      "bytes": 24471,
+      "sha256": "600765ffcd324452693d7131eae21f6572b603983b54ab8c127def6bf3caeba0"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

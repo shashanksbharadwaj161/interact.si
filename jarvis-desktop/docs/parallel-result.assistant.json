@@ -1,0 +1,41 @@
+{
+  "role": "assistant",
+  "session": "jarvis-desktop-107",
+  "done": true,
+  "changedPaths": [
+    "src/components/Assistant.tsx",
+    "tests/parallel-assistant.test.mjs",
+    "docs/parallel-result.assistant.json"
+  ],
+  "summary": "Conversation UX around the existing real streaming/cancel routes. Backend contract, shared contracts, CSS and package.json are untouched; no new icons or dependencies.",
+  "changes": [
+    "Bounded rendering: stored messages over 6,000 chars fold behind an aria-expanded 'Show all N characters' button (full text never altered); a trailing 'Sources:/References:/Citations:' block (<=2,000 chars) stays visible when the middle is folded; live draft draws only its latest 8,000 chars with an honest 'showing the latest X of Y' note (reducer cap MAX_LIVE_CHARS unchanged); only the newest 200 messages are drawn with a 'Show earlier messages' control. Surrogate pairs are never split.",
+    "Visible route / key / privacy strip above the composer (routeState): Local vs Cloud model, model name, endpoint or api.anthropic.com, key state (saved/not saved/not checked, never key material), a privacy sentence (loopback endpoint = stays on this computer; non-loopback host is named and flagged; cloud = leaves this computer, nothing sent until Send), 'Sending is off: <backend reason>' when unavailable. Command mode shows its own statement. The message box is aria-describedby the privacy text. No fallback between routes is offered or implied.",
+    "Double send prevented by a synchronous ref lock (state updates are async) held until the reply is reloaded; Send shows 'Replying…'/'Saving…', has a visible blocker reason (sendBlocker) via aria-describedby; Clear conversation and push-to-talk are disabled while a reply is in flight.",
+    "Stale updates: per-stream sequence token; events and finishStream from an older stream or after unmount are dropped (previously a late finishStream after reload could write a stale notice / companion state / clear a newer lock).",
+    "Cancel: Esc in the message box stops a live reply (aria-keyshortcuts on Stop); Stop no longer freezes if chatStreamCancel throws (status reverts); if the backend does not confirm within 8 s a warning appears and the button becomes 'Stop again'. Real elapsed seconds shown on pending/live replies (no invented progress).",
+    "Retry: an explicit Retry button (chat mode only) appears for a trailing 'unavailable'/'incomplete'/generic failure note, never after a user stop; it says it re-sends and adds the message again, is disabled with the backend reason when the route is down, and leaves the composer draft untouched. Nothing is ever sent automatically.",
+    "Accessibility: polite sr-only status region announces state changes only (sent, writing, stopping, finished/stopped/cut off/interrupted), not each delta; log has a label; auto-scroll follows new text only while the reader is at the end."
+  ],
+  "tests": {
+    "command": "node --test tests/parallel-assistant.test.mjs",
+    "counts": { "tests": 26, "pass": 26, "fail": 0 },
+    "fullSuite": { "command": "node --test tests/*.test.mjs", "tests": 1104, "pass": 1104, "fail": 0 },
+    "otherChecks": ["npx tsc --noEmit: clean", "npx vite build: succeeded"],
+    "setup": "npm ci --ignore-scripts (repo-local, node_modules ignored by git)",
+    "providerRequests": "none: the fake store's chat/chatStreamStart/chatStreamCancel/onChatStream/planIntent throw if called; test asserts zero calls"
+  },
+  "interfaceProposals": [
+    "No backend change required. New pure exports from Assistant.tsx (additive): headOf, tailOf, boundMessage, boundDraft, windowMessages, isNearBottom, endpointHost, routeState, sendBlocker, retryCandidate, liveAnnouncement, MessageText, constants MESSAGE_PREVIEW_CHARS/LIVE_VIEW_CHARS/MAX_RENDERED_MESSAGES/STOP_CONFIRM_MS/CITATION_TAIL_CHARS.",
+    "Optional for captain: ChatMessage has no structured citations, so citations are preserved only as text and a trailing 'Sources:' block is kept visible when folded. If retrieval-backed answers later carry structured sources (e.g. ChatMessage.sources?: {kind,id,label}[]), the folded view and a clickable chip list can use them without changing this layout.",
+    "Optional for captain: ChatStreamEvent could carry the number of characters dropped past MAX_LIVE_CHARS so the live draft could say so exactly; today the stored reply (reloaded at the end) is the record."
+  ],
+  "limitations": [
+    "No DOM library exists in the repo, so React state transitions (the send lock, stream sequence guard, Esc handler, stop watchdog timer, expander click) are verified by server-rendered output, pure-helper tests and source-wiring assertions, not by simulated clicks/timers. A browser/Electron smoke run is still advisable.",
+    "Retry re-sends through the normal path, so the stored chat contains the user message twice; the backend has no 'regenerate' API.",
+    "The cloud privacy sentence says earlier conversation is included for context; electron/backend.ts passes a buildHistory(...) array to the provider, but how many turns it contains was not audited here.",
+    "Local-endpoint privacy wording is derived from the configured URL host only (loopback vs other); it is not a network check.",
+    "Non-streaming fallback path (bridge without streaming) cannot be stopped once sent; this is still stated to the user and unchanged.",
+    "Styling uses existing classes only (CSS not owned); the route strip reuses .chat-error/.row/.field-hint, so visual polish may be adjusted by the owner of styles."
+  ]
+}

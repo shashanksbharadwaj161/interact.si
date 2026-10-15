@@ -1,0 +1,40 @@
+{
+  "role": "notes",
+  "session": "jarvis-desktop-109",
+  "done": true,
+  "summary": "Notes: unsaved drafts survive leaving the page (renderer memory only), restored-draft / changed-elsewhere / deleted-elsewhere notices, Revert/Clear draft, inline save-failure notice, clearer delete confirmation (size, tags, referencing capsules, backup caveat), paged note list (100 at a time) with cheap snippets and a once-per-change search index, keyboard navigation of the list, stuck tag filter fix and clear-filters actions. Memory search: every result shows a truthful source line, the note-tag filter suggests tags that exist, and filters can be cleared in one click.",
+  "ownedChangedPaths": [
+    "src/components/Notes.tsx",
+    "src/components/MemorySearch.tsx",
+    "tests/parallel-notes.test.mjs",
+    "docs/parallel-result.notes.json"
+  ],
+  "unchangedContracts": "No change to the store schema, JarvisAPI bridge, search service, package.json, shared contracts or any other worker path. Notes still saves through api.saveNote/api.deleteNote; search still uses searchState. No new dependencies.",
+  "checks": [
+    { "command": "npm ci --ignore-scripts", "result": "ok (331 packages, repo-local)" },
+    { "command": "npx tsc --noEmit", "result": "exit 0" },
+    { "command": "node --test tests/parallel-notes.test.mjs", "result": "17 tests, 17 pass, 0 fail" },
+    { "command": "node --test tests/*.test.mjs", "result": "1095 tests, 1095 pass, 0 fail (includes the existing MemorySearch tests in autopilot-productivity)" }
+  ],
+  "behaviours": [
+    "Drafts: module-level in-memory cache (max 20, newest wins) keyed by note id or 'new'; restored on return to Notes unless a deep link names another note; cleared by save, Revert/Clear draft, discard and delete. Never written to disk or sent anywhere; lost when the app closes (stated in the UI).",
+    "Stale protection: draft remembers the saved version's updatedAt; if the stored note changed meanwhile a warning says Save replaces it. A note deleted elsewhere keeps its text and Save stores it as a new note.",
+    "Save: failure leaves the text in place with an inline alert; a successful save re-reads the stored note (keeps text typed while the save was in flight). Ctrl+S unchanged.",
+    "Delete: dialog (Cancel focused) states size/tags, that it cannot be undone and that backups may keep an older copy, and names capsules that still reference the note.",
+    "List: 100 notes per page with 'Show N more (M not shown)'; snippet reads only the first 400 characters; lower-cased haystacks built once per notes change; search uses useDeferredValue; status line reports 'X of Y notes match' and best-50 truncation.",
+    "Keyboard: ArrowDown from search enters the list; Up/Down/Home/End move between notes, Escape returns to search; Escape clears the search box.",
+    "Filters: an active tag filter whose tag disappeared is cleared automatically; a hidden (beyond top 16) active tag shows a removable chip; no-match state has 'Clear search and tag filter'.",
+    "Memory search: describeSource() (exported) adds a source line built only from stored records (note tags/updated/capsule that references it, task state/due, checkpoint's capsule, chat source, calendar/other-module source); unknown records add nothing. Tag filter input gets a datalist of existing tags; 'Clear filters' appears when any filter is active."
+  ],
+  "interfaceProposals": [
+    "Notes.tsx now also exports NOTE_PAGE, noteDrafts, noteSnippet, sameDraft; MemorySearch.tsx exports describeSource(result, state, productivity?, external?). The captain may reuse describeSource for Home/Search source labels.",
+    "If the captain wants drafts to survive an app restart, that would need an explicit persisted-drafts store and consent copy; deliberately not done here."
+  ],
+  "limitations": [
+    "No DOM library is available, so tests render static markup and call exported pure helpers; the interactive paths (typing, Save, Delete click, list keyboard movement, Show more, Revert) are type-checked but not exercised by an automated test.",
+    "Delete-confirmation wording is pinned by a source-level test because ConfirmDialog renders nothing while closed.",
+    "Edits are not merged: a changed-elsewhere warning is shown, and Save overwrites the stored version only when the user presses it.",
+    "Unsaved drafts are not kept across an app restart or window reload.",
+    "Search ranking, citations and the search service were not modified; the 50-result search cap still bounds ranked note lists."
+  ]
+}

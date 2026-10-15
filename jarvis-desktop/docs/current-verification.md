@@ -12,6 +12,3 @@ This is an in-progress companion, without a final product name. The 140-feature 
 - $300 persistent development ledger remains in the original protected local runtime; uncertain reservations retained, no reset. Billing remains authoritative.
 
 Pending: agent security findings, backend negative tests, keyboard/browser QA, model setup UX, scoped native action tests, package execution, signing decisions, commercial dependency checks, and the remaining roadmap. A successful test above does not establish those pending features.
-
-Pause checkpoint: merged worker source passes TypeScript and 124/124 automated tests. Newly added services/components still require navigation/API wiring and live runtime verification.
-

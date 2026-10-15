@@ -1,0 +1,166 @@
+{
+  "createdAt": "2026-10-14T05:28:36.508Z",
+  "originalRepository": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop",
+  "sharedCap": 300,
+  "concurrency": 10,
+  "workers": [
+    {
+      "role": "api",
+      "model": "claude-opus-5-5",
+      "budget": 14,
+      "files": [
+        "electron/backend.ts",
+        "electron/preload.ts",
+        "electron/ipc.ts",
+        "electron/ipcCore.ts",
+        "electron/channels.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "electron/services/sidecar.ts",
+        "tests/autopilot-api.test.mjs"
+      ],
+      "taskId": "d2bac319-07b7-4cca-bd9a-57cd56745930",
+      "status": "running",
+      "sessionId": "jarvis-desktop-49",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-49"
+    },
+    {
+      "role": "productivity",
+      "model": "claude-sonnet-5-5",
+      "budget": 10,
+      "files": [
+        "electron/services/store.ts",
+        "electron/services/search.ts",
+        "electron/services/capsules.ts",
+        "src/components/Capsules.tsx",
+        "src/components/Notes.tsx",
+        "src/components/Tasks.tsx",
+        "src/components/MemorySearch.tsx",
+        "src/ui/store.tsx",
+        "tests/autopilot-productivity.test.mjs"
+      ],
+      "taskId": "6c3de711-7e73-446e-9c2f-1a5d69effa7d",
+      "status": "running",
+      "sessionId": "jarvis-desktop-50",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-50"
+    },
+    {
+      "role": "visual",
+      "model": "claude-fable-5-1",
+      "budget": 12,
+      "files": [
+        "src/components/AvatarStudio.tsx",
+        "src/components/MotionStudio.tsx",
+        "src/ui/avatar-editor.ts",
+        "src/ui/motion-presets.ts",
+        "src/styles/avatar-studio.css",
+        "src/styles/motion-studio.css",
+        "tests/autopilot-visual.test.mjs"
+      ],
+      "taskId": "2401e899-03e6-45aa-8d84-4f4d40537fca",
+      "status": "running",
+      "sessionId": "jarvis-desktop-51",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-51"
+    },
+    {
+      "role": "models",
+      "model": "claude-sonnet-5-5",
+      "budget": 8,
+      "files": [
+        "electron/services/chat.ts",
+        "electron/services/speech.ts",
+        "electron/services/models.ts",
+        "src/components/Models.tsx",
+        "src/ui/audio.ts",
+        "tests/autopilot-models.test.mjs"
+      ],
+      "taskId": "ac1e3cbf-e2e0-4c3b-b99b-2dcf1476e141",
+      "status": "running",
+      "sessionId": "jarvis-desktop-52",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-52"
+    },
+    {
+      "role": "routines",
+      "model": "claude-sonnet-5-5",
+      "budget": 8,
+      "files": [
+        "electron/services/intent.ts",
+        "electron/services/routines.ts",
+        "src/components/Routines.tsx",
+        "tests/autopilot-routines.test.mjs"
+      ],
+      "taskId": "55c88355-61b8-4d3e-8dce-eb56c2b635b7",
+      "status": "running",
+      "sessionId": "jarvis-desktop-53",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-53"
+    },
+    {
+      "role": "integrations",
+      "model": "claude-opus-5-5",
+      "budget": 10,
+      "files": [
+        "electron/services/integrations.ts",
+        "electron/services/netGuard.ts",
+        "src/components/Integrations.tsx",
+        "src/ui/integration-catalog.ts",
+        "tests/autopilot-integrations.test.mjs"
+      ],
+      "taskId": "95590461-a560-4f87-84dc-3b6c285bb2ad",
+      "status": "running",
+      "sessionId": "jarvis-desktop-54",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-54"
+    },
+    {
+      "role": "shell-qa",
+      "model": "claude-haiku-5-5",
+      "budget": 4,
+      "files": [
+        "tests/autopilot-shell-runtime.test.mjs",
+        "docs/autopilot-shell-runtime.md"
+      ],
+      "taskId": "d67207aa-06e6-4c4b-b15c-8457bf223baf",
+      "status": "running",
+      "sessionId": "jarvis-desktop-55",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-55"
+    },
+    {
+      "role": "coverage",
+      "model": "claude-haiku-5-5",
+      "budget": 4,
+      "files": [
+        "src/shared/feature-registry.json",
+        "docs/feature-matrix.md",
+        "docs/autopilot-coverage.md"
+      ],
+      "taskId": "d1c2904b-32f9-4a88-b332-ad172ed47d29",
+      "status": "running",
+      "sessionId": "jarvis-desktop-56",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-56"
+    },
+    {
+      "role": "control-status",
+      "model": "claude-haiku-5-5",
+      "budget": 5,
+      "files": [
+        "server/room.mjs",
+        "server/status-errors.mjs",
+        "tests/status-errors.test.mjs",
+        "docs/status-errors-review.md"
+      ],
+      "taskId": "73d1b402-40d6-4658-aa47-caa5506a80e9",
+      "status": "running",
+      "sessionId": "jarvis-desktop-57",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-57"
+    },
+    {
+      "role": "captain",
+      "model": "claude-fable-5-1",
+      "budget": 18,
+      "files": [],
+      "taskId": "48703735-b6ce-4894-8836-32aa84ca6f98",
+      "status": "running",
+      "sessionId": "jarvis-desktop-58",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-58"
+    }
+  ]
+}

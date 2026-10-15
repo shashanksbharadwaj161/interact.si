@@ -1,0 +1,181 @@
+{
+  "at": "2026-10-15T06:29:10.345Z",
+  "canonicalAppBase": "6a58b6099730343b690f105a4de6a871c3952f96",
+  "scope": {
+    "verified": 5,
+    "partial": 81,
+    "planned": 54,
+    "total": 140
+  },
+  "loop": {
+    "lastRound": 16,
+    "status": "blocked",
+    "acceptedBatches": 0
+  },
+  "workerDrafts": [
+    {
+      "task": "Loop 16: worklog-standup-drafts",
+      "sessionId": "api-e756fbe4-4bac-49f1-91bb-b8eaf6d0d295",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts"
+      ]
+    },
+    {
+      "task": "Loop 15: writing-tone-translation",
+      "sessionId": "api-9cf09bd6-8318-4586-aa20-0229a6d7928e",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/workbench.ts"
+      ]
+    },
+    {
+      "task": "Loop 15: worklog-standup-drafts",
+      "sessionId": "api-d373bc8f-39f9-4377-9973-4ccba07de65e",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts"
+      ]
+    },
+    {
+      "task": "Loop 15: error-diagnosis-service",
+      "sessionId": "api-07f011da-60c9-4dcf-97a9-c30e835dbf6e",
+      "status": "unverified-draft",
+      "files": [
+        "src/shared/contracts.ts"
+      ]
+    },
+    {
+      "task": "Loop 14: motion-clip-export",
+      "sessionId": "api-0e23ab4d-fa8f-458d-9ed8-8c6ee43fe4cf",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/clip-export.ts"
+      ]
+    },
+    {
+      "task": "Loop 14: worklog-standup-drafts",
+      "sessionId": "api-c8b9b401-ba82-41d1-a33b-750d05b8a84f",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts",
+        "electron/channels.ts",
+        "src/shared/contracts.ts"
+      ]
+    },
+    {
+      "task": "Loop 13: motion-clip-export",
+      "sessionId": "api-524d185d-669b-4a1d-b85b-111e8298af5a",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/motion-clip.ts",
+        "src/ui/scenes.ts",
+        "tests/round13-motion-clip.test.mjs"
+      ]
+    },
+    {
+      "task": "Loop 13: writing-tone-and-error-diagnosis",
+      "sessionId": "api-b3f1c53c-382c-4d70-981b-5ec3b535e638",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/prompt-tools.ts",
+        "src/ui/error-diagnosis.ts"
+      ]
+    },
+    {
+      "task": "Loop 13: worklog-standup-drafts",
+      "sessionId": "api-fab0b72d-71c0-49e1-8b02-ca1ea7c02558",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts",
+        "electron/channels.ts",
+        "electron/ipcCore.ts"
+      ]
+    },
+    {
+      "task": "Loop 12: worklog-standup-drafts",
+      "sessionId": "api-5151085b-9a8f-4fec-9cee-1a5d868f3b48",
+      "status": "unverified-draft",
+      "files": [
+        "src/shared/contracts.ts"
+      ]
+    },
+    {
+      "task": "Loop 11: scene-spec-validator",
+      "sessionId": "api-49541483-d13d-4b48-a26d-9e1ab30aa7d3",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/scene-spec.ts"
+      ]
+    },
+    {
+      "task": "Loop 11: error-diagnosis",
+      "sessionId": "api-15985bec-433d-4cba-b2eb-643f130898cb",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/error-diagnosis.ts"
+      ]
+    },
+    {
+      "task": "Loop 11: worklog-standup-drafts",
+      "sessionId": "api-4ac89ddc-3ff9-40e8-aed9-95e13a04f4ca",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts"
+      ]
+    },
+    {
+      "task": "Loop 10: worklog-drafts",
+      "sessionId": "api-0ef95e20-dae5-408d-be1f-9836f86535de",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts",
+        "src/components/MemoryWorkbench.tsx"
+      ]
+    },
+    {
+      "task": "Loop 10: scene-spec-validator",
+      "sessionId": "api-75e0d06d-3fda-4219-97ed-73a64859ba76",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/scene-spec.ts"
+      ]
+    },
+    {
+      "task": "Loop 9: worklog-standup-drafts",
+      "sessionId": "api-8b44a87d-2a40-45b2-88ea-11fb8dee3b2c",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts"
+      ]
+    },
+    {
+      "task": "Loop 8: writing-tone-translation",
+      "sessionId": "api-827a4923-ca7d-4662-aeb6-f05025ed1e02",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/tone-profiles.ts",
+        "src/ui/workbench.ts"
+      ]
+    },
+    {
+      "task": "Loop 8: motion-scene-validation-export",
+      "sessionId": "api-cc198d15-78a9-4c7f-9a24-f7380c8c5de0",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/scene-validator.ts",
+        "src/ui/clip-export.ts"
+      ]
+    },
+    {
+      "task": "Loop 8: worklog-standup-drafts",
+      "sessionId": "api-847acf0d-6061-4515-96dc-15bdc1eb4642",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts",
+        "src/shared/contracts.ts"
+      ]
+    }
+  ],
+  "credentialsIncluded": false
+}

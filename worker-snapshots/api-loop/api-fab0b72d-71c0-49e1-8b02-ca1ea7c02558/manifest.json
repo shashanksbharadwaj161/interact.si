@@ -1,0 +1,26 @@
+{
+  "task": "Loop 13: worklog-standup-drafts",
+  "sessionId": "api-fab0b72d-71c0-49e1-8b02-ca1ea7c02558",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "electron/services/worklog.ts",
+      "bytes": 15644,
+      "sha256": "46ae01bbe93472134a24db33041fc91eec9c9140cec8189ba98ffeb2af57e34f"
+    },
+    {
+      "path": "electron/channels.ts",
+      "bytes": 4368,
+      "sha256": "5b523b2cd1300eba4440c221500ba510c3f050da2a6ff87bdc8d19047fcb5aef"
+    },
+    {
+      "path": "electron/ipcCore.ts",
+      "bytes": 25049,
+      "sha256": "60cb528ba9c8da9ff3aa1b0a0f56badfe2cb1f9a66735f3ff2c3c99462ecfd8a"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

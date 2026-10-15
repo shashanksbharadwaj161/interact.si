@@ -1,0 +1,62 @@
+{
+  "role": "security",
+  "files": [
+    "electron/services/actions.ts",
+    "electron/services/policy.ts",
+    "electron/services/paths.ts",
+    "electron/services/validation.ts",
+    "electron/services/netGuard.ts",
+    "electron/services/secrets.ts",
+    "electron/services/system.ts",
+    "tests/autopilot-security.test.mjs",
+    "docs/autopilot-result.security.json"
+  ],
+  "checks": [
+    "npx tsc --noEmit: clean",
+    "npm test: 167/167 pass (124 existing + 43 new in tests/autopilot-security.test.mjs); no existing test was edited",
+    "node scripts/build-main.mjs: builds",
+    "Mutation spot-check: disabling the executable/file fingerprint makes 2 new tests fail; restored afterwards",
+    "Source scan: no invisible/bidi characters in the 7 owned files or the new test (intent.ts, not owned, contains the sanitizer's own character list)",
+    "All tests use injected fs/native/shell/confirm/fetch/os/process fakes. Only real I/O: a mkdtemp directory under the OS temp dir (prefix ao-security-secrets-), removed afterwards, to test the atomic secrets writer. No desktop input, no network, no key files read."
+  ],
+  "nsr_status": {
+    "NSR-01": "Import keeps current permissions and forces offline in backend.ts (already in baseline, tested there). New helper validation.describePermissionChanges(before, after) gives the full permission diff for the trusted dialog/activity log. Lenient parse drops UNC/device permission entries (regression-tested).",
+    "NSR-02": "ActionService fails closed without a trusted confirm; a throwing or non-true confirm is a refusal. Added: optional minPreviewAgeMs, decline lockout (3 declines/60 s pauses dialogs 30 s), cancelPending() that also aborts an execution waiting in the dialog, preview rate cap (120/min), execution rate cap retained (30/min). Dialog focus/visibility checks live in the native owner's trusted confirm.",
+    "NSR-03/04": "Forward-slash conversion first, then device and UNC/WebDAV rejection, lexical containment before any fs call, post-realpath network check. Regression tests use a throwing fs to prove zero I/O.",
+    "NSR-05": "Allowlist of document/media types (already in baseline); regression test covers every example from the review plus .scf .theme .xll .inf .cab .mht .hta .docm and extensionless files.",
+    "NSR-06": "mailto rebuilt from recipients + subject/body/cc/bcc only; attach/attachment/unknown/repeated params and invisible characters rejected.",
+    "NSR-07": "Summary shows typed text with visible markers; dialog shows full text; one shared rule (checkWindowPolicy) refuses line breaks (CR, LF, NEL, U+2028, U+2029) into shells/terminals/REPLs, Explorer (any title, so localized Run dialog is covered) and Start/Search hosts; re-checked against the live window after focus. Per-chunk SendInput re-check is in native/common.ps1 (not owned, not verified here).",
+    "NSR-08": "Executable resolved at preview, absolute path + size/mtime fingerprint stored in the plan and re-compared after the dialog and at spawn; bare names resolve only from System32/SystemRoot/ProgramFiles; bare-name syntax is now strict (isBareExeName).",
+    "NSR-09": "Capsule item launches/moves already share ActionService.claimAction (baseline); declined capsule-item confirmations now count toward the same decline lockout. Safe-launch check and restore throttling are in capsules.ts/backend.ts (not owned).",
+    "NSR-10/11": "Not in owned files (ipcCore.ts/main.ts); already covered by tests/backend-native.test.mjs in the baseline.",
+    "NSR-12": "netGuard: loopback only for purposes listed in LOOPBACK_PURPOSES (currently only 'ollama'), fixed paths (/api/chat, /api/tags, /api/version), allowed methods, and, when GuardContext.localEndpoint is supplied, only the configured endpoint origin. Credential headers (x-api-key, authorization, cookie, proxy-authorization) can only go to the cloud origin. Cloud: one path, POST, 30 requests/min cap. Caller abort signal and timeout both apply. Redirects stay errors.",
+    "NSR-13": "Secrets accepts an injected Electron safeStorage (blobs prefixed ss1:), keeps DPAPI as fallback and reads legacy DPAPI blobs. set() verifies the round trip before replacing the stored blob; writes are fsync'd, unique-temp, per-path serialized with EPERM/EBUSY retry (a real Windows concurrency bug found by the test). Vault serializes as {secrets:'redacted'}. Script-hash check of native/*.ps1 is in runner.ts (not owned)."
+  },
+  "interfaces": {
+    "netGuard.GuardContext": "New optional fields: localEndpoint: () => string (wire as () => settings().localEndpoint to activate endpoint pinning), now, maxCloudPerMinute. evaluateEgress gained an optional 6th argument {localEndpoint?, method?, headers?}; old 4/5-argument calls behave as before. New exports: LOOPBACK_PURPOSES, CLOUD_PATHS, MAX_CLOUD_REQUESTS_PER_MINUTE. A new local model purpose needs a new LOOPBACK_PURPOSES entry plus a Purpose union member; agree it with the shared-API owner.",
+    "secrets.Secrets": "constructor(native, dir, fs?, safeStorage?: SafeStorageLike). Wire as new Secrets(native, env.userData, undefined, env.safeStorage) once the native owner passes Electron's safeStorage through BackendEnv. Exports SafeStorageLike.",
+    "system.System": "New resources(): ResourceSnapshot (measured memory, process memory, CPU deltas, cores, uptimes, per-process Electron metrics when SystemDeps.appMetrics is given, plus an 'unavailable' list for GPU/temperature/battery). No contract change was made; exposing it to the UI needs a contract + IPC addition by the shared-API owner. Optional deps: appMetrics (pass () => app.getAppMetrics().map(...)), os, proc (test hooks). capabilities() now shares in-flight probes and keys its cache on safe launch.",
+    "actions.ActionService": "New ActionDeps.minPreviewAgeMs (default 0; RECOMMENDED_MIN_PREVIEW_AGE_MS = 500, enabling it requires the baseline backend-approval tests to wait before execute). New methods/getters: cancelPending() (call on settings save, import, mode change, safe launch), confirmationsPaused. New exports: DECLINE_LIMIT, DECLINE_WINDOW_MS, DECLINE_COOLDOWN_MS, MAX_PREVIEWS_PER_MINUTE, RECOMMENDED_MIN_PREVIEW_AGE_MS. preview() now throws when more than 120 previews are requested in a minute.",
+    "validation": "New describePermissionChanges(before, after): string[]; backend.saveSettings can replace its inline list with it (adds a cloud-model line when online). validateApprovedApp now rejects reserved/odd bare names.",
+    "paths/policy": "New exports: isBareExeName, hasInvisibleFormatChars, isInvisibleFormatChar, visibleText (paths.ts); hasLineBreak, isCommandSurface (policy.ts). FsLike.stat may return size/mtimeMs. TERMINAL_PROCESSES list expanded. Paths containing invisible or direction-changing characters are now rejected."
+  },
+  "dependencies": [
+    "No new packages. Existing esbuild is used by the tests.",
+    "npm ci --ignore-scripts was run in this worktree (node_modules is untracked/ignored).",
+    "electron/services/chat.ts (probeLocalModel) is imported by system.ts, unchanged.",
+    "Captain wiring needed in files outside this module: backend.ts (pass localEndpoint to createGuardedFetch, safeStorage to Secrets, call actions.cancelPending() on settings/import changes, optionally describePermissionChanges and minPreviewAgeMs) and main.ts (inject safeStorage and app.getAppMetrics)."
+  ],
+  "limitations": [
+    "Endpoint pinning in netGuard only takes effect once backend.ts passes localEndpoint; until then loopback is still restricted by purpose, path and method but not by port.",
+    "minPreviewAgeMs is off by default so the baseline tests that execute immediately keep passing; production wiring should enable it.",
+    "validateLocalEndpoint still accepts any loopback port (the onboarding UI parity test expects http://127.0.0.1 to be valid). An Ollama-shaped /api/version check before sending chat is in chat.ts, which is not owned.",
+    "A drive letter mapped to a network share cannot be detected lexically: the realpath of a target inside a user-configured root on such a drive contacts the network before the post-resolution check refuses it. UNC/WebDAV/device paths themselves never reach the filesystem.",
+    "Newline denial is by owning process name (plus Explorer/Start hosts). Terminals embedded in other apps (for example an IDE terminal pane) and apps where Enter submits a form cannot be detected.",
+    "The executable/file fingerprint is size + mtime, not a content hash, and a very small window remains between the last check and the spawn call.",
+    "Cloud request cap is per process and per minute (30); it is a safeguard, not a billing control.",
+    "GPU, temperature and battery are reported as unavailable; no estimates are produced. Per-process Electron metrics are empty until the host supplies appMetrics.",
+    "Real Windows DPAPI, Electron safeStorage, a native confirmation dialog and live window focus were not exercised (injected fakes only; no desktop input by design).",
+    "electron/services/intent.ts (not owned) contains literal invisible/bidi characters in its sanitizer; harmless but worth replacing with escapes."
+  ],
+  "done": true
+}

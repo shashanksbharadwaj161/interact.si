@@ -1,8 +1,10 @@
 # Complete Windows companion roadmap
 
-Integration detail: [Integrations hub plan](integrations-hub-plan.md) adds explicit Spotify, browser, ChatGPT, Claude, and local-model support within the existing 140 scopes. Consumer-app handoffs and API connections are separate; cloud integrations require optional online mode.
+Integration detail: the Integrations hub plan (integrations-hub-plan.md) is not in this repository. Its intent, explicit Spotify, browser, ChatGPT, Claude, and local-model support within the existing 140 scopes, is reflected in the Optional online integrations scopes below. Consumer-app handoffs and API connections are separate; cloud integrations require optional online mode.
 
-13 October 2026. 140 planned scopes: 40 foundations, 68 expansion, 32 experimental. No application features implemented yet. These are release candidates; experiments require feasibility and license validation.
+13 October 2026; status refreshed 14 October 2026. 140 scopes: 40 foundations, 68 expansion, 32 experimental. Status at this refresh: 5 verified, 80 partial, 55 planned. The per-scope status, integration level, evidence and planned reason are in [feature matrix](feature-matrix.md) and `src/shared/feature-registry.json`.
+
+Application features do exist in this worktree, and this roadmap no longer says otherwise. The assistant, setup and settings, capsules, notes, tasks, memory search, routines, integrations, usage, models, clipboard and calendar screens, and the dashboard widgets are implemented in code with tests. Most scopes are partial: some parts are not reachable from the app, some screens still show "not connected" notices, and no scope is verified by a manual or packaged run. Gates G1–G8 are not recorded. These are release candidates; experiments require feasibility and license validation.
 
 Target: installable Windows desktop app with a rich web-style/native interface, strict offline default, optional customer-owned Haiku API key. Host framework decided after renderer/overlay tests. Development can use cloud tools. The $500 Claude credit budget does not guarantee completion of the entire roadmap.
 
@@ -197,5 +199,5 @@ Build order: three visual concepts and feasibility benchmarks; complete capsule/
 
 Combine project memory, supported workspace restoration, a coordinated visual scene, and verified actions in one project capsule. A user can ask to resume a past session, inspect evidence and a restoration preview, continue work, and receive a draft recap. This is a proposed combined experience, not a proven world-first. Local memory, workspaces, visual scenes, voice assistants, and avatars each have existing competitors. Universal restoration, universal undo, and realtime realistic avatars on every laptop are not promised.
 
-Research: [repository review](repository-review-and-product-direction.md), [voice review](voice-integration-and-component-shortlist.md), [design/module extension](motion-avatars-usage-and-design-plan.md).
+Research notes referenced here are not in this repository: repository review (repository-review-and-product-direction.md), voice review (voice-integration-and-component-shortlist.md), and design/module extension (motion-avatars-usage-and-design-plan.md). Existing repository references: [architecture](architecture.md), [feature matrix](feature-matrix.md), [autopilot coverage](autopilot-coverage.md).
 

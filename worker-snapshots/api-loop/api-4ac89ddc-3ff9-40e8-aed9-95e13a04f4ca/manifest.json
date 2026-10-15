@@ -1,0 +1,16 @@
+{
+  "task": "Loop 11: worklog-standup-drafts",
+  "sessionId": "api-4ac89ddc-3ff9-40e8-aed9-95e13a04f4ca",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/worklog.ts",
+      "bytes": 20454,
+      "sha256": "049e50da77ad0b4c1bcef072db4517b101628a607ab0153f4f9351e6da4dddd3"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

@@ -1,0 +1,316 @@
+/* Avatar Studio. Imported by src/components/AvatarStudio.tsx; relies on tokens from tokens.css. */
+.avatar-studio {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.avs-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.avs-stage-panel,
+.avs-controls {
+  min-width: 0;
+}
+
+.avs-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 420px;
+  min-height: 200px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(70% 70% at 50% 55%, var(--avs-glow, transparent), transparent 70%),
+    var(--sunken);
+}
+
+.avs-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.avs-status {
+  margin: 0;
+}
+
+.avs-field {
+  gap: 4px;
+}
+
+.avs-slider-row {
+  align-items: center;
+}
+
+.avs-value {
+  flex: 0 0 auto;
+  min-width: 52px;
+  text-align: right;
+  font: 600 12px var(--font-mono);
+  color: var(--text-2);
+}
+
+/* Range input, styled consistently with .input and the Motion Studio sliders */
+.avs-slider {
+  --avs-thumb: var(--accent);
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.avs-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-strong);
+}
+
+.avs-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--avs-thumb);
+  border: 2px solid var(--panel-solid);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: transform 0.12s var(--ease);
+}
+
+.avs-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+.avs-slider:focus-visible {
+  outline: none;
+}
+
+.avs-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--focus);
+}
+
+/* Expression, timeline and gate lists */
+.avs-list,
+.avs-gates,
+.avs-keyframes,
+.avs-import-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.avs-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.avs-item {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  font: 500 13px var(--font-ui);
+  color: var(--text);
+  text-align: left;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.avs-item:hover {
+  border-color: var(--line-strong);
+}
+
+.avs-item:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.avs-item.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.avs-item-name {
+  white-space: nowrap;
+}
+
+.avs-item-meta {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 500 11px var(--font-mono);
+  color: var(--muted);
+}
+
+.avs-gates li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.avs-gates strong {
+  display: block;
+  font: 600 13px var(--font-ui);
+  color: var(--text);
+}
+
+.avs-gates .field-hint {
+  display: block;
+  margin: 2px 0 0;
+}
+
+/* Timeline editor */
+.avs-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm);
+}
+
+.avs-keyframe {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 108px auto auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.avs-kf-at,
+.avs-kf-ease {
+  min-width: 0;
+}
+
+/* Voice meter, timeline review, contact sheet and import review */
+.avs-meter-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font: 500 13px var(--font-ui);
+  color: var(--text-2);
+}
+
+.avs-meter {
+  width: 100%;
+  height: 10px;
+}
+
+.avs-review,
+.avs-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.avs-pending {
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--raised);
+}
+
+.avs-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+}
+
+.avs-sheet img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+/* Pack import */
+.avs-import {
+  width: 100%;
+  min-height: 92px;
+  font: 500 12px var(--font-mono);
+  resize: vertical;
+}
+
+.avs-import-lines li {
+  font: 400 13px var(--font-ui);
+}
+
+.avs-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 10px;
+  font: 500 12px var(--font-ui);
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.avs-file:hover {
+  border-color: var(--line-strong);
+}
+
+.avs-file:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Reduced motion: no decorative transitions either */
+:root[data-motion="reduced"] .avs-slider::-webkit-slider-thumb,
+:root[data-motion="reduced"] .avs-item {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avs-slider::-webkit-slider-thumb,
+  .avs-item {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .avs-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .avs-keyframe {
+    grid-template-columns: 72px minmax(0, 1fr) auto auto;
+  }
+
+  .avs-kf-ease {
+    grid-column: 1 / 3;
+  }
+}

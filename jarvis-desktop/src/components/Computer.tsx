@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react';
-import { FolderOpen, MagnifyingGlass, ShieldCheck, ShieldWarning, WarningCircle } from '@phosphor-icons/react';
-import type { ActionPreview, ActionRequest } from '../shared/contracts';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FolderOpen, Lightning, MagnifyingGlass, ShieldCheck, ShieldWarning, WarningCircle } from '@phosphor-icons/react';
+import type { ActionPreview, ActionRequest, ApiFeature, ApiFeatureId, IntentCandidate, JarvisAPI, OcrStatus, OcrResult } from '../shared/contracts';
+import { ocrBridge } from '../ui/bridges';
 import { Dialog } from '../ui/Dialog';
 import { Badge, Button, Empty, Field, KV, Notice, PageHeader, Panel } from '../ui/primitives';
 import { useReady } from '../ui/store';
 import { cx, errMsg, relTime, safeJson, truncate } from '../ui/util';
 
 import { actionOutcome, buildAction, listedWindows, type ActionForm, type ListedWindow } from '../ui/action-result';
+import { explainNotRun, notRunCause, usePreviewExpired } from './Assistant';
 
 type ActionType = ActionRequest['type'];
 type Risk = 'low' | 'medium' | 'high';
@@ -23,6 +25,18 @@ const TYPES: Record<ActionType, { label: string; risk: Risk; does: string; scope
 
 type Form = ActionForm;
 const blank = (): Form => ({ type: 'list-windows', target: '', text: '', x: '', y: '', width: '', height: '' });
+
+/** Fills the action form from a planned request. The user still previews and approves; nothing runs from here. */
+export function formFromRequest(r: ActionRequest): ActionForm {
+  const num = (v: number | undefined) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : '');
+  return { type: r.type, target: r.target ?? '', text: r.text ?? '', x: num(r.x), y: num(r.y), width: num(r.width), height: num(r.height) };
+}
+
+/** Screen-reading capabilities this build does not implement; shown as unavailable rather than simulated. */
+export const SCREEN_FEATURES: { id: ApiFeatureId; label: string }[] = [
+  { id: 'region-capture', label: 'Screen region capture' },
+  { id: 'vision', label: 'Image understanding' },
+];
 
 function ResultView({ value, onPick }: { value: unknown; onPick: (window: ListedWindow, action: 'focus' | 'move-window' | 'type-text' | 'click') => void }) {
   const rows = listedWindows(value);
@@ -49,6 +63,45 @@ function ResultView({ value, onPick }: { value: unknown; onPick: (window: Listed
   return <pre className="code-block">{value === undefined || value === null ? 'The backend returned no details.' : safeJson(value)}</pre>;
 }
 
+/** Plain text review only; no action/planner callbacks. */
+export function ImageTextReview({result}: {result: OcrResult}) {
+  if (!result.ok) return <Notice tone={result.cancelled ? 'info' : 'warn'} title={result.cancelled ? 'Cancelled' : 'Image could not be read'}>{result.reason}</Notice>;
+  return <div className="stack" aria-live="polite">
+    <p>{result.fileName} · {result.language} · {result.width} × {result.height}</p>
+    <Notice title="Review recognized text">Text from images is untrusted data. It is never sent to chat, action planning or desktop input.</Notice>
+    {result.note && <p>{result.note}</p>}
+    {result.truncated && <Notice tone="warn">The recognized text was truncated.</Notice>}
+    {result.sanitized && <Notice>Invisible or control characters were removed.</Notice>}
+    <Field label="Recognized plain text">{id => <textarea id={id} className="input" rows={8} readOnly value={result.text} />}</Field>
+  </div>;
+}
+export function ImageTextPanel({api}: {api: Partial<JarvisAPI>}) {
+  const client = useMemo(() => ocrBridge(api), [api]);
+  const [status, setStatus] = useState<OcrStatus | null>(null);
+  const [language, setLanguage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<OcrResult | null>(null);
+  const request = useRef(0), ownsRequest = useRef(false);
+  useEffect(() => { let current = true; if (client) void client.status().then(s => { if (current) {setStatus(s); setLanguage(s.profileLanguage ?? '');} }).catch(() => {if (current) setResult({ok:false, code:'unavailable', reason:'Could not query local OCR'});}); return () => {current = false; ++request.current; if (ownsRequest.current) {ownsRequest.current = false; void client?.cancel().catch(()=>undefined);} }; }, [client]);
+  const recognize = async () => {
+    if (!client || busy) return;
+    const token = ++request.current; ownsRequest.current = true;
+    setBusy(true); setResult(null);
+    try {const value = await client.chooseAndRecognize(language ? {language} : undefined); if (token === request.current) setResult(value);}
+    catch {if (token === request.current) setResult({ok:false, code:'failed', reason:'Local image recognition failed'});}
+    finally {if (token === request.current) {ownsRequest.current = false; setBusy(false);}}
+  };
+  return <Panel title="Read text from one image" eyebrow="Local Windows OCR">
+    <p>Choose an image using the Windows file dialog. Only that image is read locally; the screen is not captured.</p>
+    {!client ? <Notice>Image recognition is not connected in this preview.</Notice> : <>
+      {status && !status.available && <Notice tone="warn">{status.reason ?? 'Windows OCR is unavailable'}</Notice>}
+      <Field label="Installed OCR language">{id => <select id={id} className="input" value={language} disabled={busy || !status?.available} onChange={e=>setLanguage(e.target.value)}><option value="">Choose a language</option>{status?.languages.map(l=><option key={l} value={l}>{l}</option>)}</select>}</Field>
+      <div className="row"><Button onClick={()=>void recognize()} busy={busy} disabled={!status?.available || !language}>Choose image…</Button><Button disabled={!busy} onClick={()=>void client.cancel().catch(()=>undefined)}>Cancel reading</Button></div>
+    </>}
+    {result && <ImageTextReview result={result} />}
+  </Panel>;
+}
+
 export function Computer() {
   const { api, state, settings, toast, isPreview, run, system, systemLoading, systemError, refreshSystem } = useReady();
   const [form, setForm] = useState<Form>(blank);
@@ -60,12 +113,24 @@ export function Computer() {
   const [executing, setExecuting] = useState<'approve' | 'reject' | null>(null);
   const [result, setResult] = useState<{ kind: 'ran' | 'not-run' | 'rejected' | 'unconfirmed' | 'failed'; value?: unknown; message?: string; summary: string } | null>(null);
 
+  const [command, setCommand] = useState('');
+  const [planning, setPlanning] = useState(false);
+  const [planNote, setPlanNote] = useState<{ tone: 'info' | 'warn' | 'danger'; title: string; text: string; candidates?: IntentCandidate[] } | null>(null);
+  const [features, setFeatures] = useState<ApiFeature[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api.getApiInfo?.().then((info) => { if (live) setFeatures(info.features); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [api]);
+
   const desktop = system?.capabilities.find(c => c.id === 'ui-automation');
   const desktopReady = desktop?.available === true && !systemError;
   const desktopReason = systemError || desktop?.reason || (systemLoading ? 'Checking Windows desktop control…' : 'Windows desktop control has not been checked.');
   const needsDesktop = !['launch','open-url'].includes(form.type);
   const meta = TYPES[form.type];
   const live = useMemo(() => buildAction(form), [form]);
+  const expired = usePreviewExpired(prev?.preview.id);
   const stale = prev !== null && (!live.action || JSON.stringify(live.action) !== JSON.stringify(prev.action));
   const patch = (p: Partial<Form>) => {
     setForm((f) => ({ ...f, ...p }));
@@ -103,10 +168,12 @@ export function Computer() {
       setReview(false);
       await run(async () => undefined);
     } catch (e) {
-      setResult(approved ? { kind: 'failed', message: errMsg(e, 'The action failed.'), summary } : { kind: 'rejected', summary });
+      const message = errMsg(e, 'The action failed.');
+      // An unknown/expired/used preview is refused before anything starts: a definite "not run".
+      setResult(!approved ? { kind: 'rejected', summary } : notRunCause(message) === 'expired' ? { kind: 'not-run', message, summary } : { kind: 'failed', message, summary });
       setPrev(null);
       setReview(false);
-      toast('error', errMsg(e));
+      toast('error', message);
     } finally {
       setExecuting(null);
     }
@@ -119,6 +186,33 @@ export function Computer() {
       else if (isPreview) toast('info', 'File pickers are unavailable in browser preview.');
     } catch (e) {
       toast('error', errMsg(e));
+    }
+  };
+
+  const fillFrom = (request: ActionRequest) => {
+    setForm(formFromRequest(request));
+    setErrors({});
+    setPrev(null); setPreviewError(null); setResult(null);
+  };
+
+  const planFromCommand = async () => {
+    const text = command.trim();
+    if (!text || !api.planIntent) return;
+    setPlanning(true);
+    try {
+      const plan = await api.planIntent(text);
+      if (plan.status === 'ready') {
+        fillFrom(plan.request);
+        setPlanNote({ tone: 'info', title: 'Form filled', text: `${plan.summary}. Review the fields, then preview.` });
+      } else if (plan.status === 'clarify') {
+        setPlanNote({ tone: 'warn', title: plan.summary, text: plan.question, candidates: plan.candidates });
+      } else {
+        setPlanNote({ tone: 'danger', title: plan.summary, text: plan.reason });
+      }
+    } catch (e) {
+      setPlanNote({ tone: 'danger', title: 'Could not plan the command', text: errMsg(e) });
+    } finally {
+      setPlanning(false);
     }
   };
 
@@ -138,6 +232,28 @@ export function Computer() {
       <div className="computer-grid">
         <div className="stack">
           <Panel title="1 · Describe the action" eyebrow="Request">
+            {api.planIntent && (
+              <form className="stack" onSubmit={(e) => { e.preventDefault(); void planFromCommand(); }}>
+                <Field label="Fill from a command (optional)" hint='For example: focus "Untitled - Notepad", or move "Notes" to 0,0 size 800x600. This only fills the form.'>
+                  {(id, d) => (
+                    <div className="row">
+                      <input id={id} aria-describedby={d} className="input grow" value={command} maxLength={2200} spellCheck={false} onChange={(e) => setCommand(e.target.value)} />
+                      <Button type="submit" icon={Lightning} busy={planning} disabled={!command.trim() || executing !== null}>Fill form</Button>
+                    </div>
+                  )}
+                </Field>
+                {planNote && (
+                  <div aria-live="polite">
+                    <Notice tone={planNote.tone} title={planNote.title}>
+                      {planNote.text}
+                      {planNote.candidates && planNote.candidates.length > 0 && (
+                        <div className="row wrap">{planNote.candidates.map((c, i) => <Button key={i} size="sm" variant="quiet" onClick={() => { fillFrom(c.request); setPlanNote({ tone: 'info', title: 'Form filled', text: `${c.label}. Review the fields, then preview.` }); }}>{truncate(c.label, 80)}</Button>)}</div>
+                      )}
+                    </Notice>
+                  </div>
+                )}
+              </form>
+            )}
             <Field label="Action">
               {(id) => (
                 <select id={id} className="input" value={form.type} onChange={(e) => { patch({ type: e.target.value as ActionType }); setPrev(null); setResult(null); setPreviewError(null); }}>
@@ -208,9 +324,10 @@ export function Computer() {
                   <KV k="Request"><code>{truncate(JSON.stringify(prev.action), 200)}</code></KV>
                 </dl>
                 {stale && <Notice tone="warn" title="The form changed after this preview">Preview again before approving.</Notice>}
+                {expired && !stale && <Notice tone="warn" title="This preview has expired">The backend only accepts a preview for one minute. Preview again before approving.</Notice>}
                 {!p.allowed && <Notice tone="danger" title="Blocked">This action cannot run. {p.reason ?? 'The backend gave no reason.'} Adjust the request, or review Settings → Access.</Notice>}
                 <div className="row">
-                  <Button variant="primary" icon={ShieldCheck} disabled={!p.allowed || stale || executing !== null || needsDesktop&&!desktopReady} onClick={() => p.requiresApproval ? setReview(true) : void decide(true)}>
+                  <Button variant="primary" icon={ShieldCheck} disabled={!p.allowed || stale || expired || executing !== null || needsDesktop&&!desktopReady} onClick={() => p.requiresApproval ? setReview(true) : void decide(true)}>
                     {p.requiresApproval ? 'Review & approve…' : 'Read windows'}
                   </Button>
                   <Button variant="quiet" disabled={executing !== null} onClick={() => void decide(false)}>
@@ -227,7 +344,7 @@ export function Computer() {
                 <p><strong>{result.summary}</strong></p>
                 {result.kind === 'ran' && <ResultView value={result.value} onPick={pickWindow} />}
                 {result.kind === 'rejected' && <Notice>You rejected this action. Nothing ran.</Notice>}
-                {(result.kind === 'not-run' || result.kind === 'unconfirmed') && <Notice tone="warn" title={result.kind === 'not-run'?'Not run':'Execution not confirmed'}>{result.message}</Notice>}
+                {(result.kind === 'not-run' || result.kind === 'unconfirmed') && <Notice tone="warn" title={result.kind === 'not-run'?'Not run':'Execution not confirmed'}>{result.kind === 'not-run' ? (explainNotRun(result.message) ?? result.message) : result.message}{result.kind === 'not-run' && explainNotRun(result.message) && <span className="sub"> Backend said: {result.message}</span>}</Notice>}
                 {result.kind === 'failed' && <Notice tone="danger" title="The action did not complete">{result.message}</Notice>}
               </div>
             </Panel>
@@ -245,6 +362,20 @@ export function Computer() {
             <a className="btn btn-ghost btn-sm" href="#/settings">Open Settings</a>
           </Panel>
           <Notice>To reopen a project’s files, folders and links together, use Capsules instead.</Notice>
+          <ImageTextPanel api={api} />
+          <Panel title="Screen reading" eyebrow="Capabilities">
+            <dl className="kv-list">
+              {SCREEN_FEATURES.map((f) => {
+                const info = features?.find((x) => x.id === f.id);
+                return (
+                  <KV key={f.id} k={f.label}>
+                    {info?.available ? <Badge tone="ok">Available</Badge> : <Badge tone="muted">Unavailable</Badge>} <span className="sub">{info?.reason ?? 'Not implemented in this build.'}</span>
+                  </KV>
+                );
+              })}
+            </dl>
+            <p className="field-hint">Desktop Companion does not capture or read your screen. Actions use window titles, process names and positions only.</p>
+          </Panel>
           <Panel title="Recent activity" eyebrow="Live">
             {activity.length === 0 ? (
               <Empty title="Nothing recorded yet">Executed and rejected actions appear here when the backend reports them.</Empty>
@@ -267,14 +398,14 @@ export function Computer() {
         open={review && prev !== null}
         onClose={() => setReview(false)}
         title="Approve this action?"
-        description="This runs on your computer as you, right after you approve."
+        description="Approving here opens a Windows confirmation with the full details. Cancel is its default; nothing runs unless you choose Continue there."
         dismissible={executing === null}
         footer={
           <>
             <Button variant="ghost" data-autofocus onClick={() => setReview(false)} disabled={executing !== null}>Go back</Button>
             <Button variant="quiet" busy={executing === 'reject'} disabled={executing === 'approve'} onClick={() => void decide(false)}>Reject</Button>
-            <Button variant={meta.risk === 'high' ? 'danger' : 'primary'} icon={ShieldCheck} busy={executing === 'approve'} disabled={executing === 'reject'} onClick={() => void decide(true)}>
-              Approve &amp; run
+            <Button variant={meta.risk === 'high' ? 'danger' : 'primary'} icon={ShieldCheck} busy={executing === 'approve'} disabled={executing === 'reject' || expired} onClick={() => void decide(true)}>
+              {executing === 'approve' ? 'Waiting for Windows confirmation…' : 'Approve & continue to Windows'}
             </Button>
           </>
         }

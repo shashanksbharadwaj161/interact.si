@@ -193,3 +193,106 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Scene composition (layers, templates, import and clip export) */
+.motion-layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.motion-layer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.motion-layer .motion-preset {
+  min-height: 32px;
+}
+
+.motion-layer-opacity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.motion-layer-opacity .motion-slider {
+  height: 24px;
+}
+
+.motion-layer-opacity .motion-value {
+  min-width: 36px;
+}
+
+.motion-import {
+  width: 100%;
+  min-height: 92px;
+  font: 500 12px var(--font-mono);
+  resize: vertical;
+}
+
+.motion-issues {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.motion-issues li {
+  font: 400 13px var(--font-ui);
+}
+
+.motion-schema {
+  margin: 0;
+  padding: 8px 10px;
+  font: 500 11px var(--font-mono);
+  color: var(--text-2);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.motion-clip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.motion-key-list {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.motion-key-list .row {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+
+.motion-controls select,
+.motion-controls input[type="file"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .motion-layer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .motion-layer-opacity {
+    grid-column: 1 / 3;
+  }
+}

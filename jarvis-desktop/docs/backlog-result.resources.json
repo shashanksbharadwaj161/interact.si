@@ -1,0 +1,72 @@
+{
+  "role": "resources",
+  "done": true,
+  "summary": "Resource policy module: bounded refresh and idle backoff, sustained low-memory, battery and motion-quality suggestions that only propose changes, and an injected battery reader on System.resources(). Not yet wired into the backend or the UI.",
+  "files": [
+    {"path": "electron/services/system.ts", "change": "modified", "note": "Adds exported BatteryReading, optional SystemDeps.battery reader, and ResourceSnapshot.battery (null when unmeasured). battery stays in unavailable unless a valid reading is returned."},
+    {"path": "src/ui/resource-policy.ts", "change": "added", "note": "Pure module: refreshDelayMs, POLICY_THRESHOLDS, createResourcePolicy with observe() and reset()."},
+    {"path": "tests/backlog-resources.test.mjs", "change": "added", "note": "16 behaviour tests bundling the real TypeScript with injected telemetry."},
+    {"path": "docs/backlog-result.resources.json", "change": "added", "note": "This result file."}
+  ],
+  "checks": [
+    {"command": "npm ci --ignore-scripts", "result": "pass", "note": "Local install of the locked dependencies; lifecycle scripts skipped, so no Electron binary download."},
+    {"command": "node --test tests/backlog-resources.test.mjs", "result": "pass", "note": "16 of 16."},
+    {"command": "npm run typecheck (tsc --noEmit)", "result": "pass", "note": "Exit 0; resource-policy.ts and system.ts are in the program."},
+    {"command": "npm test", "result": "pass", "note": "736 of 736, including the existing systemResources API test."}
+  ],
+  "interfaces": {
+    "refreshDelayMs": {
+      "module": "src/ui/resource-policy.ts",
+      "signature": "refreshDelayMs(state?: Partial<{idleSeconds: number; failures: number}>): number",
+      "behaviour": "Active 5000 ms. Doubles once per full idle minute and once per failure, at most 6 doublings. Clamped to 2000 to 300000 ms. Negative or non-finite inputs count as 0."
+    },
+    "createResourcePolicy": {
+      "module": "src/ui/resource-policy.ts",
+      "signature": "createResourcePolicy(thresholds?: typeof POLICY_THRESHOLDS): {observe(telemetry: ResourceTelemetry, current?: PolicyCurrent): Suggestion[]; reset(): void}",
+      "behaviour": "Call observe() once per measured snapshot. A suggestion appears only after sustainSamples (3) consecutive measured samples meet the condition. Unknown (null or absent) telemetry resets the streak and never counts as a reading. Inputs are not mutated."
+    },
+    "ResourceTelemetry": {
+      "module": "src/ui/resource-policy.ts",
+      "shape": "{memory?: {usedPercent: number} | null; cpuBusyPercent?: number | null; battery?: BatteryReading | null}",
+      "note": "A ResourceSnapshot from electron/services/system.ts can be passed directly."
+    },
+    "PolicyCurrent": {
+      "module": "src/ui/resource-policy.ts",
+      "shape": "{batteryMotionOn?: boolean; avatarQuality?: string; modelProfile?: string}",
+      "note": "Settings already in effect. A suggestion is not produced for a choice that is already active."
+    },
+    "Suggestion": {
+      "module": "src/ui/resource-policy.ts",
+      "shape": "{id: 'low-memory' | 'battery-motion' | 'motion-quality'; message: string; proposal: SuggestionProposal; requiresConfirmation: true}",
+      "proposals": [
+        {"id": "low-memory", "proposal": {"kind": "model-profile", "value": "low-memory"}, "apply": "modelsSetProfile('low-memory') after the user confirms"},
+        {"id": "battery-motion", "proposal": {"kind": "shell-pref", "key": "motion.onBattery", "value": true}, "apply": "the existing shell preference, after the user confirms"},
+        {"id": "motion-quality", "proposal": {"kind": "avatar-quality", "key": "avatar.quality", "value": "battery"}, "apply": "the existing avatar quality preference, after the user confirms"}
+      ]
+    },
+    "SystemDeps.battery": {
+      "module": "electron/services/system.ts",
+      "signature": "battery?: () => BatteryReading | null",
+      "behaviour": "Optional host reader. Null, a throw, a non-boolean charging flag, or a level that is not a finite number in 0 to 1 all mean unmeasured.",
+      "wiring": "The captain or native owner passes the reader when constructing System in electron/backend.ts. backend.ts was not edited by this worker."
+    },
+    "ResourceSnapshot.battery": {
+      "module": "electron/services/system.ts",
+      "shape": "BatteryReading | null",
+      "note": "New field. Only System.resources() builds this type; typecheck passes."
+    }
+  },
+  "dependencies": {
+    "added": [],
+    "note": "No new packages. esbuild and typescript were already devDependencies."
+  },
+  "limitations": [
+    "No battery-level source is wired into the main process. The reader is injected but none is supplied in backend.ts, so battery stays unavailable at runtime. This worker did not verify an Electron API that gives battery level.",
+    "The policy has no UI consumer yet. src/ui/bridges.ts and the screens are unchanged, so no refresh loop calls refreshDelayMs and no suggestion is shown.",
+    "The idle-seconds source is not implemented. The caller must supply it.",
+    "Thresholds are fixed conservative constants, not tuned on measured hardware. The module makes no device performance claims.",
+    "Tests use injected telemetry only. Nothing was measured on real Windows hardware, and no real power or memory state was read.",
+    "Electron was installed with --ignore-scripts and the Electron app was not launched. Verification is unit tests plus typecheck."
+  ],
+  "limitations_scope": "Outside this module's paths: native/main/backend wiring, the UI consumer and the shell preferences are the captain's or other owners' work."
+}

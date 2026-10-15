@@ -1,0 +1,66 @@
+{
+  "role": "usage",
+  "roadmap": "121-128 (Usage dashboard)",
+  "done": true,
+  "summary": "Local usage ledger module and real-data UsagePanel for roadmap 121-128. Module is pure (no network, console, or file I/O); persistence and IPC wiring are left to the captain.",
+  "files": [
+    "electron/services/usage.ts",
+    "src/components/UsagePanel.tsx",
+    "tests/autopilot-usage.test.mjs",
+    "docs/autopilot-result.usage.json"
+  ],
+  "checks": [
+    "npm ci --ignore-scripts in the worktree: completed, exit 0",
+    "npx tsc --noEmit: exit 0",
+    "node --test tests/autopilot-usage.test.mjs: 24 tests, 24 pass, 0 fail",
+    "npm test (full suite): 148 tests, 148 pass, 0 fail"
+  ],
+  "interfaces": {
+    "module": "electron/services/usage.ts",
+    "factory": "createUsageLedger(options?: {now?: () => Date; newId?: () => string}): UsageLedger",
+    "UsageLedger": {
+      "recordEvent": "(input: unknown) => UsageEvent. Input: runtime 'local'|'cloud', provider slug, model, optional project/worker labels, inputTokens/outputTokens, optional generationMs/promptMs, optional at. Cloud events are priced when a price exists, otherwise costState 'unpriced'. Local events are costState 'not-applicable'.",
+      "reserve": "(input: unknown) => Reservation. Input: provider, model, maxInputTokens, maxOutputTokens, optional project/worker. Holds a conservative maximum cost until settled.",
+      "settle": "(reservationId: string, usage: unknown) => UsageEvent. Converts a reservation into one recorded cloud event; throws for unknown or already-settled ids.",
+      "setPrices": "(prices: unknown) => Price[]. User-entered table keyed by provider and model, USD per million tokens.",
+      "declareBillingAdapter": "(provider: unknown) => void. Marks a provider as having a billing adapter. Undeclared providers report 'unsupported'.",
+      "recordBilling": "(snapshot: unknown) => BillingSnapshot. Requires a declared provider. Stores observedAt, balance, spent, and resetsAt; unreported fields stay null.",
+      "setBudget": "(budget: unknown | null) => Budget | null. period 'day'|'month' in UTC, amount in USD, optional thresholds (default 0.5, 0.8, 1).",
+      "report": "() => UsageReport. estimatedSpend, reservedSpend, unpricedEvents, totals, byModel, attribution, billing (status observed|stale|unknown|unsupported, reset countdown), reservations, budget (conservative total, pace, alerts), disclaimer.",
+      "performance": "(options?: {model?: string; limit?: number}) => rows of tokensPerSecond from local events with timing, newest first.",
+      "exportCsv": "(options?: {from?: string; to?: string}) => {content, rows, truncated}. Max 5000 rows and 1 MB; spreadsheet formulas neutralised.",
+      "exportJson": "(options?: {from?: string; to?: string}) => {content, rows, truncated}. Same bounds; includes format, schemaVersion, disclaimer, and events.",
+      "snapshot": "() => UsageState. Plain JSON for the caller to persist.",
+      "loadState": "(raw: unknown) => {accepted, rejected}. Validates each stored row individually, applies retention, and drops billing for undeclared providers."
+    },
+    "helpers": [
+      "parseOllamaMetrics(raw) for /api/chat final-chunk fields (prompt_eval_count, eval_count, durations in ns to ms)",
+      "parseCloudUsage(raw) for input_tokens/output_tokens",
+      "validateUsage, validatePrice, validateBilling, validateBudget, estimateCost, csvCell",
+      "UsageValidationError; USAGE_LIMITS; USAGE_SCHEMA_VERSION; USAGE_DISCLAIMER"
+    ],
+    "panel": "src/components/UsagePanel.tsx exports UsagePanel({report: UsageReport | null, performance?: UsagePerformanceRow[], onExport?: (format: 'csv'|'json') => void, exporting?: boolean}), plus fmtMoney and fmtDuration. Renders 'Unknown' for null money, never zero."
+  },
+  "dependencies": {
+    "runtime": "node:crypto (randomUUID) for the module. None added to package.json.",
+    "ui": "react, @phosphor-icons/react (DownloadSimple), and src/ui/primitives (Badge, Button, Empty, Notice, Panel).",
+    "types": "UsagePanel imports types from electron/services/usage.ts via import type. The renderer does not import runtime code from electron."
+  },
+  "limitations": [
+    "No provider billing adapter is implemented. Every provider reports 'unknown' or 'unsupported' until the API owner registers an adapter that calls recordBilling. No balance or spend is fabricated.",
+    "The module is not wired into electron/backend.ts, chat.ts, IPC, preload, or App navigation. The captain must call recordEvent/parseOllamaMetrics after chat completions, persist snapshot()/loadState() through the store, and expose report/export over IPC.",
+    "Export is returned as a string. The captain must add the save dialog and file write in the trusted main process.",
+    "Prices are user-entered. Without a matching price a cloud event is 'unpriced' and excluded from the estimate, which the UI flags as partial.",
+    "Local events are tokens and timing only. Electricity and hardware costs are not estimated.",
+    "Reservations are never auto-expired. An interrupted call stays in the reserved total until settled, which is conservative. There is no dismiss action yet.",
+    "Anthropic usage field names (input_tokens/output_tokens) follow the documented Messages API shape. They were not checked against a live response, because this module made no network calls.",
+    "The development $300 ledger in the Control Room runtime was not read and is not included. This module is product-side only.",
+    "The UsagePanel component is not mounted anywhere and has no CSS classes of its own (usage-panel, usage-kv, usage-meter, usage-table, usage-alerts, usage-list, usage-note). The captain needs to add styles, or reuse existing ones.",
+    "Export bounds use compact JSON, so the 1 MB bound is measured in characters, which is equal to bytes for ASCII content."
+  ],
+  "captain_notes": [
+    "Import createUsageLedger once in the backend and keep it alongside the store. Persist usage state under its own key or file, not inside contracts.ts AppState.",
+    "Call settle() from the cloud chat path only after a successful response. If the call fails or is interrupted, leave the reservation in place.",
+    "Use parseOllamaMetrics on the final chunk of local chat responses; it is the source for roadmap 127."
+  ]
+}

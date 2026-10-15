@@ -16,7 +16,7 @@ test('main requests retain assigned model/high effort without incompatible sampl
  assert.equal(input.temperature,0);assert.equal(input.model,'claude-sonnet-4-5');
 });
 test('forced-tool auxiliary requests use Haiku without weakening tool selection',()=>{
- for(const type of ['any','tool']){const choice={type,name:'summary'};const body=routeRequest({model:task.model,max_tokens:512,tool_choice:choice,tools:[{name:'summary',input_schema:{type:'object'}}],messages:[{role:'user',content:'Summarize',output_config:{effort:'max'}}]},task);assert.equal(body.model,'claude-haiku-5-5');assert.deepEqual(body.tool_choice,choice);assert.deepEqual(body.thinking,{type:'disabled'});assert.equal(body.messages[0].output_config.effort,'high');assert.equal(body.max_tokens,512);}
+ for(const type of ['any','tool']){const choice={type,name:'summary'};const body=routeRequest({model:task.model,max_tokens:512,tool_choice:choice,tools:[{name:'summary',input_schema:{type:'object'}}],messages:[{role:'user',content:'Summarize',output_config:{effort:'max'}}]},task);assert.equal(body.model,'claude-haiku-5-5');assert.deepEqual(body.tool_choice,choice);assert.deepEqual(body.thinking,{type:'disabled'});assert.equal(body.messages[0].output_config,undefined);assert.equal(body.output_config.effort,'high');assert.equal(body.max_tokens,512);}
 });
 test('legacy background Haiku is pinned but main Fable remains Fable',()=>{
  assert.equal(routeRequest({model:'claude-haiku-4-5-20251001',max_tokens:1024},task).model,'claude-haiku-5-5');
@@ -48,3 +48,5 @@ test('mixed main and auxiliary usage is priced per reported model, including his
  room.spending={state:{requests:[{taskId:'mixed',settled:true,charge:.01},{taskId:'mixed',settled:true,charge:.001},{taskId:'mixed',settled:false,charge:1},{taskId:'other',settled:true,charge:5}]}};
  room.recordUsage('mixed','claude-haiku-5-5',{input_tokens:10,output_tokens:1});assert.equal(item.cost,.011);
 });
+
+test('native inference removes rejected message metadata while preserving content and caller input',()=>{const input={model:task.model,messages:[{role:'user',content:[{type:'text',text:'Original task',cache_control:{type:'ephemeral'}}],output_config:{effort:'max'}},{role:'assistant',content:[{type:'tool_use',id:'tool-1',name:'read',input:{path:'src/main.ts'}}],output_config:{effort:'low'}}],max_tokens:1024};const body=routeRequest(input,task);assert.equal(body.messages.every(m=>m.output_config===undefined),true);assert.deepEqual(body.messages.map(m=>m.content),input.messages.map(m=>m.content));assert.equal(body.output_config.effort,'high');assert.equal(input.messages[0].output_config.effort,'max');assert.deepEqual(countRequest(body).messages,body.messages);});

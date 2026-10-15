@@ -1,0 +1,77 @@
+{
+  "role": "coverage",
+  "scope": "Refresh roadmap coverage: registry v4, feature matrix, coverage method, roadmap correction, and a reason for every planned scope",
+  "date": "2026-10-14",
+  "baseCommit": "84578df",
+  "done": true,
+  "doneNote": "Coverage refresh complete for the 140 scopes. No code, shared contract, package.json or AGENTS.md change. Changes are uncommitted for the captain.",
+  "files": {
+    "changed": [
+      "src/shared/feature-registry.json",
+      "docs/feature-matrix.md",
+      "docs/autopilot-coverage.md",
+      "docs/product-roadmap.md",
+      "docs/backlog-result.coverage.json"
+    ],
+    "temp": [
+      "Namespaced temp folder only (not in the repository): check-evidence.mjs, apply-refresh.mjs, gen-matrix.mjs, test.tap, tsc.log"
+    ],
+    "untouched": "All other paths, including src/shared/contracts.ts, package.json, AGENTS.md and every other worker's source and docs."
+  },
+  "status": {
+    "before": {"verified": 5, "partial": 66, "planned": 69, "integration": {"integrated": 45, "module-tested": 23, "runtime-verified": 3, "none": 69}},
+    "after": {"verified": 5, "partial": 80, "planned": 55, "integration": {"integrated": 72, "module-tested": 10, "runtime-verified": 3, "none": 55}},
+    "promotedPlannedToPartial": [31, 33, 34, 36, 45, 48, 55, 71, 129, 130, 131, 132, 134, 136],
+    "promotedModuleTestedToIntegrated": [14, 18, 19, 56, 59, 82, 83, 84, 85, 86, 87, 102, 105, 108, 121, 123, 124, 125, 126, 127, 128],
+    "verifiedAdded": [],
+    "verifiedUnchanged": [2, 3, 46, 51, 116]
+  },
+  "plannedReasons": {
+    "total": 55,
+    "experimental-gate": 17,
+    "licence-gate": 10,
+    "active-backlog": 13,
+    "gate-undefined": 9,
+    "account-gate": 4,
+    "hardware-gate": 2,
+    "note": "Every planned scope has a plannedReason in the registry and a backlog reason in the matrix. Sum is 55, equal to the planned count."
+  },
+  "checks": [
+    {"name": "npm ci --ignore-scripts", "result": "pass", "note": "Local repository dependencies only; no global install."},
+    {"name": "npx tsc --noEmit", "result": "pass", "note": "Exit 0, on the worktree before the doc edits."},
+    {"name": "npm test", "result": "pass", "note": "720 tests, 720 pass, 0 fail, 0 todo. Run before the doc edits; no test reads the registry or the docs (grep of tests, src and electron for feature-registry found nothing)."},
+    {"name": "evidence reference check (temp script)", "result": "pass", "note": "146 test refs; 146 exact test(...) literals and ok TAP lines; 0 smoke/doc refs missing; 28 truncated refs repaired to full titles."},
+    {"name": "registry invariants", "result": "pass", "note": "version 4, 140 entries, planned iff integration none, every partial/verified entry has a limitation, 55 plannedReason entries."},
+    {"name": "matrix generated from registry", "result": "pass", "note": "140 scope rows; counts match the registry."},
+    {"name": "wiring checks by grep", "result": "pass", "note": "Backend, preload, ipcCore, App.tsx imports and mounted components read for each promoted scope. Chat streaming and cancel absent (chatStart and chatCancel not in src or electron)."}
+  ],
+  "interfaces": {
+    "registry": "src/shared/feature-registry.json version 4. Entry fields: id, name, category, tier, status, integration, gates, owner, evidence, limitation, and plannedReason (planned only: category, gate, note). Top-level fields are unchanged.",
+    "evidenceRules": "test refs are 'tests/<file>.test.mjs: <exact title>'. smoke and doc refs name an existing repository file."
+  },
+  "limitations": [
+    "Test evidence is only as strong as the titles. Tests use injected fakes and server-rendered markup; they do not run Electron, speech, a microphone, desktop input or a live model or cloud call.",
+    "The integration claims for Calendar, Clipboard, Usage and Avatar depend on screens in App.tsx that still show 'not connected' notices (Calendar stub, Clipboard notice, Usage notice, Avatar notice). The captain or shell owner must reconcile these with the bridges before any release claim.",
+    "Calendar.tsx, Clipboard.tsx, AvatarStudio.tsx and Customization.tsx are not imported by App.tsx. Scopes 59, 56, 129–136, 71 and 72/75 stay partial until they are mounted. The accessibility stylesheet is not imported by the shell entry.",
+    "src/ui/roadmap.ts has its own hand-written labels ('Interface built') and does not read the registry. It must be aligned with the registry by the shell owner or captain. Not changed here (not assigned).",
+    "The milestone and continuation markers for productivity and calendar/clipboard are partly stale. The matrix notes each stale statement; the markers were not edited.",
+    "No gate document exists; G1–G8 are not-recorded. No scope is verified by a manual, packaged or hardware run in this refresh.",
+    "The four missing linked research docs (integrations-hub-plan, repository-review-and-product-direction, voice-integration-and-component-shortlist, motion-avatars-usage-and-design-plan) are not in the repository. The roadmap now names them as absent.",
+    "Evidence check is a one-off temp script; there is no automated test enforcing the registry's shape or evidence references.",
+    "Markers were read once at this refresh. No polling was done. Re-run the refresh when a new marker or captain integration commit lands."
+  ],
+  "dependencies": {
+    "requiresCaptainWiring": ["Calendar page replaces stub with Calendar.tsx and calendar bridge", "Clipboard component mount", "AvatarStudio mount", "Customization mount", "Accessibility stylesheet import in shell entry", "roadmap.ts aligned with registry"],
+    "gates": "G1–G8 hardware, licence, account or certificate work as listed in autopilot-coverage.md 'Next gate checks'."
+  },
+  "nextGateChecks": {
+    "G1": "Two-monitor run at 100/150/200% DPI: expand/collapse ≤ 150 ms, no focus steal over 10 toggles, idle delta ≤ 40 MB over 10 min.",
+    "G2": "8 GB and 16 GB laptops, fixed 5-prompt set: first token ≤ 5 s, ≥ 5 tok/s.",
+    "G3": "Fixed test set WER better than System.Speech; MIT/Apache/BSD licence checked.",
+    "G4": "Win32/UWP/Chromium fixture matrix ≥ 95%; zero injections into elevated or password targets.",
+    "G5": "Per-profile licence and safety review; reversal steps written; no bundled GPL.",
+    "G6": "desktopCapturer region capture and Windows.Media.Ocr; opt-in per capture; nothing stored by default.",
+    "G7": "Idle renderer cost within architecture §8 budget on a Windows device; off by default.",
+    "G8": "Signed NSIS build, verified update, rollback."
+  }
+}

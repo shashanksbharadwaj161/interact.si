@@ -1,0 +1,34 @@
+{
+  "role": "voice",
+  "done": true,
+  "files": [
+    {"path": "src/ui/audio.ts", "purpose": "Push-to-talk capture lifecycle (idle/starting/recording/stopping state, double-start refusal, cancel during the permission prompt, device loss, max-length auto-halt with grace, recorded-byte cap), in-app explicit microphone consent store, pure prepareClip bounds (silence, minimum length, 30 s / 480000-sample cap). Existing exports and ClipRecorder() usage are unchanged."},
+    {"path": "electron/services/speech.ts", "purpose": "Service-side audio gate (inspectWav/audioGateReason), wall-clock transcription timeout, selectEngine()/health() that choose only probed-available local engines, neural quality gate in status(), 'auto' engine, and an optional strict Whisper-style local executable adapter (checkLocalPath, parseLocalSpeechConfig, createWhisperCliEngine, buildLocalEngines, cleanTranscript)."},
+    {"path": "tests/backlog-voice.test.mjs", "purpose": "27 behaviour tests: consent, capture lifecycle with fake browser APIs, bounds, audio gate, timeout/cancel, health and quality gate, path/config contract, adapter argv/cleanup/failure modes, sha256 pin."},
+    {"path": "docs/backlog-result.voice.json", "purpose": "This result."}
+  ],
+  "checks": [
+    {"command": "node --test tests/backlog-voice.test.mjs", "result": "27/27 pass"},
+    {"command": "node --test tests/backend-native.test.mjs tests/autopilot-models.test.mjs tests/ui.test.mjs", "result": "85/85 pass (existing speech/audio tests unchanged)"},
+    {"command": "npm test", "result": "658/662 pass; the 4 failures (autopilot-integrations, autopilot-usage, milestone-a11y, milestone-calendar-ui) are esbuild 'Could not resolve @phosphor-icons/react' in unrelated UI bundles, not touched by this work"},
+    {"command": "npx tsc --noEmit -p . (filtered to speech.ts / audio.ts)", "result": "no type errors in assigned files; repo-wide output is dominated by missing node/electron type packages"}
+  ],
+  "interfaces": {
+    "audio.ts": ["new ClipRecorder({consent?})", "ClipRecorder.state / onDeviceLost / cancel() during start", "createMicConsent(storage?)", "MicConsentError", "RecordingCancelled", "prepareClip(samples, durationMs)", "MAX_SAMPLES, MAX_RECORDED_BYTES, LIMIT_GRACE_MS"],
+    "speech.ts": ["Speech.selectEngine('stt'|'tts')", "Speech.health()", "SpeechStatus.qualityGate + extraEngines[].quality", "speak/transcribe {engine: 'auto'}", "SpeechDeps.audioGate, SpeechDeps.transcribeTimeoutMs", "inspectWav, audioGateReason", "checkLocalPath, parseLocalSpeechConfig, createWhisperCliEngine, buildLocalEngines, cleanTranscript", "ExecRunner / LocalEngineDeps contracts"]
+  },
+  "captainWiring": [
+    "Assistant.tsx: construct ClipRecorder with {consent: createMicConsent(localStorage)} and show an explicit 'Allow microphone for voice input' control that calls consent.grant(); handle RecordingCancelled (ignore) and MicConsentError (show message); set recorder.onDeviceLost.",
+    "backend.ts: pass audioGate: true to new Speech(...); expose speech.health() through the API (no contract changes were made here) and use {engine: 'auto'} only if the user opted into local neural dictation.",
+    "backend.ts/main.ts: to enable the optional Whisper-style engine, read a user-provided config object, call buildLocalEngines(config, {exec, tmpDir, newId}) with a host ExecRunner (argv array, no shell, honours timeoutMs/signal/maxOutputBytes) and pass the result as SpeechDeps.engines; surface `problems` to the user. Without an ExecRunner configured engines report unavailable."
+  ],
+  "limitations": [
+    "No neural/Whisper engine is bundled or downloaded. With no configuration status().qualityGate.neuralStt is false and dictation quality stays 'basic' (Windows System.Speech). An engine is only reported available when its files pass probe(): PE header check, non-empty model, optional SHA-256 pin, and a host-supplied process runner. probe() never executes the program, so 'available' means 'present and plausible', not 'proven to transcribe'; the app cannot verify the model is truly neural.",
+    "The adapter targets a whisper.cpp-style command line (-m model -f wav -nt -np [-l] [-t]); its flags were not exercised against a real executable (no downloads or process spawning were allowed). Only fake runners were tested.",
+    "No neural TTS adapter: the native speak helper owns audio playback and there is no playback bridge for an external engine's output, so none is claimed. The LocalTtsEngine interface remains for a future host-provided engine.",
+    "Real microphone capture, MediaRecorder decoding and Windows speech recognition were not run; the capture lifecycle is tested with fake browser APIs. Service-side audioGate is opt-in (existing tests use tiny fixture clips) and must be enabled by the captain in backend.ts.",
+    "Native Windows transcription cannot be aborted: a user cancel waits for the helper's own timeout; only the wall-clock limit (default 60 s) stops waiting early, and the temp WAV is deleted after the helper actually settles.",
+    "In-app mic consent is separate from, and does not replace, the OS/Chromium microphone permission; it is only enforced when ClipRecorder receives a consent object (the Assistant UI is outside this task's paths).",
+    "Roadmap scope retained: no voice-related roadmap item is marked complete by this change; wake word, speaker features and cloud speech remain unavailable."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "task": "Loop 8: motion-scene-validation-export",
+  "sessionId": "api-cc198d15-78a9-4c7f-9a24-f7380c8c5de0",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/scene-validator.ts",
+      "bytes": 25583,
+      "sha256": "a6b5b67037b0e2b6a48f96abe07f680413c41064b5e101cf25cfdd0cd266d8a6"
+    },
+    {
+      "path": "src/ui/clip-export.ts",
+      "bytes": 8404,
+      "sha256": "9bdabebb8130e5b73091a1710f7c02ac5d30dbcfbd02cf0f0df1d7ac1ad6db37"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

@@ -3,14 +3,21 @@
 import * as nodePath from 'node:path';
 import type {ActionPreview, ActionRequest, Settings} from '../../src/shared/contracts';
 import type {NativeAdapter, WindowInfo} from '../native/adapter';
-import {FsLike, normalizeAbsolutePath, realFs} from './paths';
-import {Authorization, LaunchPlan, authorizeTarget, checkWindowPolicy, selectWindow, validateActionRequest} from './policy';
+import {FsLike, isBareExeName, normalizeAbsolutePath, realFs, visibleText} from './paths';
+import {Authorization, LaunchPlan, authorizeTarget, checkWindowPolicy, describeTypedText, selectWindow, validateActionRequest} from './policy';
 
 const w = nodePath.win32;
 
 export const PREVIEW_TTL_MS = 60_000;
 export const MAX_ACTIONS_PER_MINUTE = 30;
 const MAX_PREVIEWS = 100;
+export const MAX_PREVIEWS_PER_MINUTE = 120;
+/** After this many declined confirmations within DECLINE_WINDOW_MS, no further dialog is shown for DECLINE_COOLDOWN_MS. */
+export const DECLINE_LIMIT = 3;
+export const DECLINE_WINDOW_MS = 60_000;
+export const DECLINE_COOLDOWN_MS = 30_000;
+/** Recommended value for ActionDeps.minPreviewAgeMs: a preview cannot be executed in the same tick it was created. */
+export const RECOMMENDED_MIN_PREVIEW_AGE_MS = 500;
 
 export interface ShellAdapter {
   openExternal(url: string): Promise<void>;
@@ -31,12 +38,15 @@ export interface ActionDeps {
   newId: () => string;
   resolveExecutable?: (entry: string) => Promise<string | null>;
   confirm?: (summary: string, detail: string) => Promise<boolean>;
+  /** Previews younger than this are refused at execute time (default 0 = off; see RECOMMENDED_MIN_PREVIEW_AGE_MS). */
+  minPreviewAgeMs?: number;
 }
 
 type WindowTarget = {hwnd: number; pid: number; process: string; title: string};
 type Plan =
-  | Exclude<LaunchPlan, {kind: 'launch-app'}>
-  | {kind: 'launch-app'; entry: string; exe: string}
+  | Exclude<LaunchPlan, {kind: 'launch-app' | 'launch-path'}>
+  | {kind: 'launch-path'; path: string; isDirectory: boolean; sig?: string}
+  | {kind: 'launch-app'; entry: string; exe: string; sig?: string}
   | {kind: 'list-windows'}
   | {kind: 'focus'; win: WindowTarget}
   | {kind: 'move-window'; win: WindowTarget; x: number; y: number; width: number; height: number}
@@ -44,10 +54,14 @@ type Plan =
   | {kind: 'click'; win: WindowTarget; x: number; y: number};
 
 interface Evaluation { allowed: boolean; reason?: string; summary: string; requiresApproval: boolean; plan?: Plan }
-interface Entry { req: ActionRequest; ev: Evaluation; expiresAt: number }
+interface Entry { req: ActionRequest; ev: Evaluation; expiresAt: number; createdAt: number }
 
 const clip = (s: string, n = 80) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
-const label = (t: WindowTarget) => `"${clip(t.title)}" (${t.process})`;
+/** Window label for a trusted preview: hidden and direction-changing characters in the title are made visible. */
+const label = (t: WindowTarget) => `"${clip(visibleText(t.title))}" (${visibleText(t.process)})`;
+/** Identity of a file as approved: a replaced or rewritten file no longer matches its plan. */
+const fileSig = (st: {size?: number; mtimeMs?: number}): string | undefined =>
+  typeof st.size === 'number' && typeof st.mtimeMs === 'number' ? `${st.size}:${Math.round(st.mtimeMs)}` : undefined;
 
 /** Resolves an approved-app entry to an executable on disk. Never searches the current directory. */
 export async function resolveExecutable(entry: string, env: NodeJS.ProcessEnv = process.env, fs: Pick<FsLike, 'stat'> & Partial<Pick<FsLike, 'realpath'>> = realFs): Promise<string | null> {
@@ -59,7 +73,7 @@ export async function resolveExecutable(entry: string, env: NodeJS.ProcessEnv = 
       return 'error' in normalized || !/\.exe$/i.test(normalized.path) ? null : normalized.path;
     } catch { return null; }
   };
-  if (!/^[A-Za-z0-9._ -]+\.exe$/i.test(entry)) {
+  if (!isBareExeName(entry)) {
     const n = normalizeAbsolutePath(entry);
     if ('error' in n || !/\.exe$/i.test(n.path)) return null;
     return (await isFile(n.path)) ? canonical(n.path) : null;
@@ -74,9 +88,19 @@ export async function resolveExecutable(entry: string, env: NodeJS.ProcessEnv = 
   return null;
 }
 
+const RETURN_MARK = String.fromCharCode(0x23ce);
+const TAB_MARK = String.fromCharCode(0x21e5);
+const ANY_LINE_BREAK = new RegExp('\r\n|[\r\n' + String.fromCharCode(0x85, 0x2028, 0x2029) + ']', 'g');
+/** Full typed text for the trusted dialog: every line break ends a visible line and is marked, tabs are marked. */
+const describeLineBreaks = (text: string) => text.replace(ANY_LINE_BREAK, RETURN_MARK + '\n').replace(/\t/g, TAB_MARK);
+
 export class ActionService {
   private registry = new Map<string, Entry>();
   private executed: number[] = [];
+  private previewed: number[] = [];
+  private declines: number[] = [];
+  private cooldownUntil = 0;
+  private generation = 0;
   private fs: FsLike;
   private now: () => number;
 
@@ -94,7 +118,7 @@ export class ActionService {
   /** Builds the decision for a request using live settings and (for window actions) live window data. */
   private async evaluate(req: ActionRequest): Promise<Evaluation> {
     const deny = (summary: string, reason: string, requiresApproval = true): Evaluation => ({allowed: false, reason, summary, requiresApproval});
-    if (this.d.safeLaunch()) return deny(`Blocked ${req.type}`, 'Safe launch is active: actions are disabled until Jarvis is restarted normally');
+    if (this.d.safeLaunch()) return deny(`Blocked ${req.type}`, 'Safe launch is active: actions are disabled until Desktop Companion is restarted normally');
     const s = this.d.settings();
     switch (req.type) {
       case 'list-windows':
@@ -153,11 +177,10 @@ export class ActionService {
       }
       case 'type-text': {
         const text = req.text ?? '';
-        const summary = `Type into ${label(t)}: ${clip(text.replace(/\r\n|\r|\n/g, '⏎').replace(/\t/g, '⇥'), 200)}`;
+        const summary = `Type into ${label(t)}: ${describeTypedText(text, 200)}`;
         if (!text) return deny(summary, 'text is required');
-        if (/[\r\n]/.test(text) && (/^(cmd|powershell|pwsh|windowsterminal|openconsole|conhost|wt|bash|wsl|mintty)(\.exe)?$/i.test(win.process) || (/^explorer(\.exe)?$/i.test(win.process) && /^run$/i.test(win.title)))) return deny(summary, 'Newline input into command windows is blocked');
         // Preview does not send input. Foreground is enforced after trusted confirmation and exact-target focus.
-        const why = checkWindowPolicy({...win, foreground: true}, type, this.d.selfPids());
+        const why = checkWindowPolicy({...win, foreground: true}, type, this.d.selfPids(), text);
         return why ? deny(summary, why) : {allowed: true, summary, requiresApproval: true, plan: {kind: 'type-text', win: t, text}};
       }
       case 'click': {
@@ -175,10 +198,14 @@ export class ActionService {
 
   async preview(raw: unknown): Promise<ActionPreview> {
     const req = validateActionRequest(raw);
+    const t = this.now();
+    this.previewed = this.previewed.filter((x) => t - x < 60_000);
+    if (this.previewed.length >= MAX_PREVIEWS_PER_MINUTE) throw new Error(`Too many action previews (max ${MAX_PREVIEWS_PER_MINUTE} per minute)`);
+    this.previewed.push(t);
     const ev = await this.evaluate(req);
     this.prune();
     const id = this.d.newId();
-    this.registry.set(id, {req, ev, expiresAt: this.now() + PREVIEW_TTL_MS});
+    this.registry.set(id, {req, ev, expiresAt: this.now() + PREVIEW_TTL_MS, createdAt: t});
     if (!ev.allowed) await this.d.activity('action', `Denied: ${ev.summary}`, ev.reason);
     const p: ActionPreview = {id, summary: ev.summary, requiresApproval: ev.requiresApproval, allowed: ev.allowed};
     if (ev.reason) p.reason = ev.reason;
@@ -193,21 +220,62 @@ export class ActionService {
     return false;
   }
 
+  /**
+   * Cancels every pending preview and any execution that is waiting in the native confirmation. Call it when
+   * settings, mode or safe-launch state change: an approval given under old permissions must not carry over.
+   */
+  cancelPending(): void {
+    this.registry.clear();
+    this.generation++;
+  }
+
+  /** True while repeated declines have paused confirmations (the dialog is not shown again until the cooldown ends). */
+  get confirmationsPaused(): boolean { return this.now() < this.cooldownUntil; }
+
+  private recordDecline() {
+    const t = this.now();
+    this.declines = this.declines.filter((x) => t - x < DECLINE_WINDOW_MS);
+    this.declines.push(t);
+    if (this.declines.length >= DECLINE_LIMIT) {
+      this.cooldownUntil = t + DECLINE_COOLDOWN_MS;
+      this.declines = [];
+    }
+  }
+
   /** Shared limiter for capsule item launches and window moves. */
   claimAction(): boolean { return !this.rateLimited(); }
 
   private async bindLaunch(plan: LaunchPlan): Promise<Plan | null> {
+    if (plan.kind === 'launch-path') {
+      let sig: string | undefined;
+      if (!plan.isDirectory) { try { sig = fileSig(await this.fs.stat(plan.path)); } catch { /* no fingerprint available */ } }
+      return sig ? {...plan, sig} : plan;
+    }
     if (plan.kind !== 'launch-app') return plan;
     const resolved = await (this.d.resolveExecutable ?? ((e) => resolveExecutable(e)))(plan.entry);
     if (!resolved) return null;
     const normalized = normalizeAbsolutePath(resolved);
     if ('error' in normalized || !/\.exe$/i.test(normalized.path)) return null;
-    return {kind: 'launch-app', entry: plan.entry, exe: normalized.path};
+    // Bind the exact file: its path (shown in the summary and the dialog) and its size/mtime, so a binary that is
+    // swapped between preview, confirmation and launch no longer matches the approved plan.
+    let sig: string | undefined;
+    try { sig = fileSig(await this.fs.stat(normalized.path)); } catch { /* no fingerprint available */ }
+    return {kind: 'launch-app', entry: plan.entry, exe: normalized.path, ...(sig ? {sig} : {})};
   }
 
+  /** Full, unabbreviated detail for the trusted dialog. Hidden and direction-changing characters are shown as U+XXXX markers. */
   private detail(plan: Plan): string {
-    if (plan.kind === 'type-text') return `Window: ${plan.win.title}\nProcess: ${plan.win.process}, PID ${plan.win.pid}\nFull text (line breaks shown as ⏎, tabs as ⇥):\n${plan.text.replace(/\r\n|\r|\n/g, '⏎\n').replace(/\t/g, '⇥')}`;
-    return JSON.stringify(plan, null, 2);
+    if (plan.kind === 'type-text') {
+      const full = visibleText(describeLineBreaks(plan.text));
+      return `Window: ${visibleText(plan.win.title)}\nProcess: ${visibleText(plan.win.process)}, PID ${plan.win.pid}\nFull text (line breaks shown as ${RETURN_MARK}, tabs as ${TAB_MARK}):\n${full}`;
+    }
+    if (plan.kind === 'focus' || plan.kind === 'move-window' || plan.kind === 'click') {
+      return visibleText(JSON.stringify({...plan, win: {...plan.win, title: visibleText(plan.win.title), process: visibleText(plan.win.process)}}, null, 2));
+    }
+    // The fingerprint binds the plan but means nothing to a person reading the dialog.
+    const shown: Record<string, unknown> = {...plan};
+    delete shown.sig;
+    return visibleText(JSON.stringify(shown, null, 2));
   }
 
   /** Re-checks the live state against what was approved. Returns a denial reason or null. */
@@ -253,13 +321,33 @@ export class ActionService {
       await this.d.activity('action', `Denied: ${summary}`, entry.ev.reason);
       return {executed: false, reason: entry.ev.reason ?? 'Not allowed'};
     }
+    const minAge = this.d.minPreviewAgeMs ?? 0;
+    if (minAge > 0 && this.now() - entry.createdAt < minAge) {
+      await this.d.activity('action', `Refused: ${summary}`, 'The preview was executed faster than a person could review it');
+      return {executed: false, reason: 'The preview was approved too quickly; request a new preview and review it'};
+    }
+    if (entry.ev.requiresApproval && this.confirmationsPaused) {
+      const wait = Math.ceil((this.cooldownUntil - this.now()) / 1000);
+      await this.d.activity('action', `Paused: ${summary}`, `Confirmations are paused for ${wait} s after repeated declines`);
+      return {executed: false, reason: `Confirmations are paused for ${wait} seconds after repeated declines`};
+    }
     if (this.rateLimited()) {
       await this.d.activity('action', `Rate limited: ${summary}`, `More than ${MAX_ACTIONS_PER_MINUTE} actions in one minute`);
       return {executed: false, reason: `Rate limit reached (${MAX_ACTIONS_PER_MINUTE} actions per minute)`};
     }
-    if (entry.ev.requiresApproval && !(await this.d.confirm?.(summary, this.detail(entry.ev.plan)))) {
-      await this.d.activity('action', `Declined in native confirmation: ${summary}`);
-      return {executed: false, reason: 'Native confirmation declined or unavailable'};
+    const generation = this.generation;
+    if (entry.ev.requiresApproval) {
+      // A confirmation that throws (dialog error, destroyed window) is a refusal, never an approval.
+      const ok = await Promise.resolve(this.d.confirm?.(summary, this.detail(entry.ev.plan))).then((v) => v === true, () => false);
+      if (!ok) {
+        if (this.d.confirm) this.recordDecline();
+        await this.d.activity('action', `Declined in native confirmation: ${summary}`);
+        return {executed: false, reason: 'Native confirmation declined or unavailable'};
+      }
+      if (generation !== this.generation) {
+        await this.d.activity('action', `Cancelled: ${summary}`, 'Permissions or state changed while the confirmation was open');
+        return {executed: false, reason: 'Cancelled because settings or state changed while the confirmation was open'};
+      }
     }
     const check = await this.revalidate(entry);
     if (!check.plan) {
@@ -275,6 +363,10 @@ export class ActionService {
         if (!focus.focused) throw new Error('Windows did not allow the approved target to take focus');
         const win = (await this.d.native.listWindows()).find((v) => v.hwnd === target.hwnd);
         if (!win || win.pid !== target.pid || win.process.toLowerCase() !== target.process.toLowerCase() || !win.foreground || win.minimized || win.elevated !== 0 || this.d.selfPids().includes(win.pid)) throw new Error('The approved target changed or could not be safely focused');
+        // The live window (its title may have changed while the dialog was open) must still pass the full window policy,
+        // including the rule against line breaks into terminals, Explorer and Start search.
+        const live = checkWindowPolicy(win, check.plan.kind, this.d.selfPids(), check.plan.kind === 'type-text' ? check.plan.text : undefined);
+        if (live) throw new Error(live);
         if (this.d.safeLaunch()) throw new Error('Safe launch is active');
       }
       const result = await this.perform(check.plan);
@@ -344,7 +436,11 @@ export class ActionService {
   async openItem(kind: 'file' | 'folder' | 'url' | 'app', target: string): Promise<{ok: true} | {ok: false; reason: string}> {
     const item = await this.prepareItem(kind, target);
     if (!item.ok) return item;
-    if (!(await this.d.confirm?.('Open capsule item', item.detail))) return {ok: false, reason: 'Native confirmation declined or unavailable'};
+    if (this.confirmationsPaused) return {ok: false, reason: 'Confirmations are paused after repeated declines'};
+    if (!(await Promise.resolve(this.d.confirm?.('Open capsule item', item.detail)).then((v) => v === true, () => false))) {
+      if (this.d.confirm) this.recordDecline();
+      return {ok: false, reason: 'Native confirmation declined or unavailable'};
+    }
     return item.run();
   }
 

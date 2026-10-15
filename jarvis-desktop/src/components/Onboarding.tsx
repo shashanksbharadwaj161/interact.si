@@ -196,6 +196,17 @@ export function Onboarding() {
     } else setFinishFailed(true);
   };
 
+  // Saves only the local endpoint and model (not "onboarded"), so the live check can run against the draft
+  // before setup finishes. Windows may ask to confirm a changed model address, as it does in Settings.
+  const [checkingDraft, setCheckingDraft] = useState(false);
+  const saveAndCheck = async () => {
+    if (endpointError || modelError) return;
+    setCheckingDraft(true);
+    const ok = await mutate(() => api.saveSettings({ localEndpoint: draft.localEndpoint.trim(), localModel: draft.localModel.trim() }));
+    if (ok) await check.recheck();
+    setCheckingDraft(false);
+  };
+
   const canNext = step !== 2 || !(endpointError || modelError || cloudError);
 
   return (
@@ -322,7 +333,16 @@ export function Onboarding() {
                   (draftMatchesSaved ? (
                     <ModelReadinessNotice readiness={readiness} checking={check.checking} onRecheck={() => void check.recheck()} />
                   ) : (
-                    <Notice title="Not checked yet">The check uses saved settings. Your new endpoint and model are checked after you finish setup, and the result then shows on Home.</Notice>
+                    <Notice
+                      title="Not checked yet"
+                      action={
+                        <Button size="sm" busy={checkingDraft} disabled={Boolean(endpointError || modelError)} onClick={() => void saveAndCheck()}>
+                          Save and check now
+                        </Button>
+                      }
+                    >
+                      The check uses saved settings. Save the endpoint and model now to see whether Ollama answers, or finish setup and the result then shows on Home.
+                    </Notice>
                   ))}
               </Panel>
               {online && (
@@ -368,6 +388,20 @@ export function Onboarding() {
                   <div className="kv"><dt>Allowed folders</dt><dd>{draft.allowedRoots.length ? draft.allowedRoots.join(', ') : 'none'}</dd></div>
                   <div className="kv"><dt>Approved apps</dt><dd>{draft.approvedApps.length ? draft.approvedApps.join(', ') : 'none'}</dd></div>
                   <div className="kv"><dt>{online ? 'Cloud model' : 'Local model'}</dt><dd>{online ? draft.cloudModel : `${draft.localModel} at ${draft.localEndpoint}`}</dd></div>
+                  <div className="kv">
+                    <dt>Ready to answer</dt>
+                    <dd>
+                      {online || draftMatchesSaved ? (
+                        <>
+                          <Badge tone={readiness.level === 'ready' ? 'ok' : readiness.level === 'blocked' ? 'warn' : 'muted'}>{readiness.level === 'ready' ? 'Yes' : readiness.level === 'blocked' ? 'Not yet' : 'Not checked'}</Badge> {readiness.title}
+                        </>
+                      ) : (
+                        <>
+                          <Badge>Not checked</Badge> The new endpoint and model are checked after you finish.
+                        </>
+                      )}
+                    </dd>
+                  </div>
                 </dl>
               </Panel>
               {online && cloudConfigured !== true && (

@@ -1,0 +1,68 @@
+{
+  "role": "models",
+  "files": [
+    "electron/services/chat.ts (modified)",
+    "electron/services/speech.ts (modified)",
+    "electron/services/models.ts (new)",
+    "src/components/Models.tsx (new)",
+    "src/ui/audio.ts (modified)",
+    "tests/autopilot-models.test.mjs (new)",
+    "docs/autopilot-result.models.json (new)"
+  ],
+  "checks": {
+    "typecheck": "npx tsc --noEmit: clean",
+    "tests": "npm test: 170 tests, 170 pass (46 new in tests/autopilot-models.test.mjs; the existing backend-core and backend-native chat/speech tests still pass unchanged)",
+    "build": "npx vite build succeeded (Models.tsx only imports types from the main-process service); node scripts/build-main.mjs ran without error",
+    "mutation_check": "Removing the online-mode gate in downloadsStatus makes the new tests fail",
+    "method": "Real TypeScript bundled in memory with esbuild; fake guarded-fetch route tables over the real netGuard; model-pack tests use a namespaced temp folder under the OS temp dir that is removed afterwards. No network, no microphone, no real Ollama, no downloads."
+  },
+  "interfaces": {
+    "chat.ts": {
+      "unchanged": "sendChat(deps, text), ollamaChat(gf, settings, history), cloudChat(gf, settings, key, history, origin), probeLocalModel, buildHistory keep their behaviour and call shape (extra trailing options are optional).",
+      "ChatService": "new ChatService(deps: ChatDeps). start(text, {onDelta?}) returns {id, cancel(), done: Promise<ChatMessage>}; cancel(id?) returns boolean; busy getter. One generation at a time (a second start rejects 'already being generated'). Wire to IPC as chat:start (push deltas to the renderer from onDelta, return id) and chat:cancel.",
+      "cancel_behaviour": "Partial text is stored as an assistant message (source local|cloud) followed by a system note 'Stopped by you...'. The note says whether the cloud provider may have the message. System notes are never sent back to a model.",
+      "ChatDeps.profile": "optional () => {keepAlive, numCtx} | undefined; applies to local chats only. Pass ModelRuntime.chatProfile.",
+      "resolveChatRoute(settings, keyConfigured)": "pure; online without key is denied and never becomes a local request.",
+      "helpers": "readLines, readNdjson, readSseData, withIdleSignal (120 s idle timeout for streams), ChatCancelled, STREAM_IDLE_MS"
+    },
+    "models.ts": {
+      "ModelRuntime": "new ModelRuntime({fetch: guardedFetch, settings, ramGB?, guard?, io?, adapters?, newId, now?, onJob?, onProfile?, initialProfile?}). Methods: version(), list(), running(), health(), select(name,{warm?,unloadOthers?}) -> settings patch only (does NOT save settings), unload(name?), profile(), setProfile(id), chatProfile, capabilities(), downloadsStatus(), overview(), validatePack(dir), startImport(dir,name?), startPull(model), jobs(), cancelJob(id).",
+      "ModelsClient": "Type for the renderer-facing IPC bridge; methods map 1:1 to ModelRuntime (overview, select, unload, setProfile, validatePack, startImport, startPull, cancelJob, optional pickPackFolder).",
+      "ModelActionGuard": "async ({kind:'pull'|'import', model, endpoint, detail}) => {allowed, reason?}. Must be supplied by native main as a trusted dialog.showMessageBox callback (Cancel default). Never a renderer boolean. Without it downloads are refused; import runs without it but may use it.",
+      "resource_profiles": "default (legacy: Ollama default context, 2m keep_alive), low-memory, balanced, performance; recommendProfile(ramGB, modelBytes).",
+      "model_pack": "Folder with modelpack.json {format:'desktop-companion-modelpack', version:1, name, files:[{path,sha256,bytes}], template?, system?, parameters?}. Only .gguf, plain relative paths, no symlinks; sizes and SHA-256 verified before any upload. Import = HEAD/POST /api/blobs then POST /api/create with files digests, all via the loopback 'ollama' purpose.",
+      "adapter_contracts": "VisionAdapter, EmbeddingAdapter, FineTuneAdapter, ModelAdapters (types only; no implementation)."
+    },
+    "speech.ts": {
+      "unchanged": "new Speech({native, settings, tmpDir, newId, ...}); speak(text), transcribe(audio), capabilities(), probe() keep their shapes. cancel() now returns boolean.",
+      "added": "status() -> SpeechStatus {tts, stt, extraEngines, speaking, transcribing, cloud:false}; cancelTranscribe(); speak/transcribe accept {engine}; optional deps.engines {tts?: LocalTtsEngine[], stt?: LocalSttEngine[]} adapter contracts (none bundled). Selected voice that is not installed => tts unavailable with a reason and speak is refused before the helper runs. Engine choice never falls back silently."
+    },
+    "audio.ts": "Added micSupport(), micPermission(), listMicrophones() (none opens the microphone), clipQuality(), trimSilence(); ClipRecorder.start(deviceId?) and stop() now trims silence and uses clipQuality messages (same error texts as before).",
+    "Models.tsx": "<Models client={ModelsClient|null} currentModel onUseModel={(patch)=>Promise<void>} /> plus presentational ModelsView (props only, used by tests). Uses existing primitives and CSS classes (page, two-col, stack, cap-list, cap-row, row, field-hint, input, mono); the 'row' class and the native <progress> element have no dedicated styling from this module. Shows a browser-preview state when client is null."
+  },
+  "dependencies": {
+    "runtime": "No new npm dependencies. Uses node:fs, node:crypto, global fetch/ReadableStream/TransformStream/AbortSignal.any (Node 20+, Electron 44).",
+    "needs_from_captain": [
+      "IPC handlers in main/preload for ModelsClient and chat start/cancel/delta (shared contracts and backend are not owned by this module).",
+      "A trusted guard callback for ModelRuntime (dialog.showMessageBox, Cancel default) and a pickPackFolder bridge using the native folder picker.",
+      "Saving the settings patch returned by ModelRuntime.select through the existing saveSettings path (AI connection change confirmation applies).",
+      "Navigation entry and a Settings/ModelRuntime profile persistence hook (onProfile) if the profile should survive restart; Settings has no profile field so it is in memory only.",
+      "Optionally route system.ts local-llm probing and speech capabilities through ModelRuntime/Speech.status for consistent reasons."
+    ]
+  },
+  "limitations": [
+    "Offline pack import, pull, unload and switch are verified only against fake Ollama servers. They were not run against a real Ollama; the /api/blobs + /api/create 'files' flow depends on the installed Ollama version and a 404 from create is reported as unsupported. No minimum version is enforced.",
+    "Model download is performed by the local Ollama process, not by this app; the network guard only sees loopback traffic. The offline/online and guard checks live in ModelRuntime.startPull and must stay wired to a trusted native dialog.",
+    "Importing a pack reads each file twice (hash, then upload), and a file changed between the two steps is rejected by Ollama's own digest check rather than by this module.",
+    "Resource profile is held in memory (no Settings field, shared contracts not editable here) and resets to 'default' on restart unless the captain persists it.",
+    "Streaming chat is implemented and tested in the service, but the current backend still calls the non-streaming sendChat; the UI gets no tokens or Stop button until the captain wires ChatService over IPC.",
+    "Cancelling a local generation closes the HTTP request; Ollama stops generating on disconnect, but this was not confirmed against a real server. Cancelling a native transcription only discards the result: the PowerShell helper runs until its own timeout.",
+    "Local vision, embeddings and fine-tuning are reported unsupported. The model's reported capabilities are shown, but there is no image, embedding or training pipeline; adapters are type contracts only.",
+    "Speech remains Windows System.Speech only (basic dictation quality). No neural TTS or Whisper engine is bundled; the engine adapter contracts are exercised only with test doubles.",
+    "Microphone helpers (permission, device list, recorder) are untested against real hardware by design; only their pure logic and degraded paths are covered.",
+    "defaults stay generic: localModel remains llama3.2:3b in validation.ts (not owned here). The recorded qwen3.5:2b setup is documented in docs only and was not re-run.",
+    "Models.tsx was verified by static markup tests and a successful vite build, not in a live window or with a screen reader; no CSS was added, so progress bars and the 'row' layout use whatever styles the shell provides.",
+    "missingModelHelp text now also mentions starting a download in online mode (existing test regex still matches); docs/local-model-setup.md quotes the old text and is not updated here."
+  ],
+  "done": true
+}

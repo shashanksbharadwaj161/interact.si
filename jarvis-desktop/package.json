@@ -11,7 +11,8 @@
     "start": "electron .",
     "dev": "npm run build && electron .",
     "test": "node --test tests/*.test.mjs",
-    "package:win": "npm run build && electron-builder --win nsis --x64"
+    "package:win": "npm run build && electron-builder --win nsis --x64",
+    "smoke": "node scripts/run-smoke.mjs"
   },
   "dependencies": {
     "react": "19.2.0",
@@ -41,7 +42,9 @@
       "dist/**",
       "dist-electron/**",
       "native/**",
-      "package.json"
+      "package.json",
+      "!node_modules{,/**/*}",
+      "!**/node_modules{,/**/*}"
     ],
     "asar": true,
     "win": {

@@ -1,0 +1,109 @@
+{
+  "at": "2026-10-14T07:48:32.508Z",
+  "validated": false,
+  "modules": [
+    {
+      "role": "shell",
+      "reportedDone": true,
+      "files": [
+        "src/components/App.tsx",
+        "src/ui/nav.tsx",
+        "src/components/Notes.tsx",
+        "src/components/Capsules.tsx",
+        "tests/autopilot-shell-runtime.test.mjs",
+        "src/styles/shell.css"
+      ],
+      "partial": false
+    },
+    {
+      "role": "data-api",
+      "reportedDone": false,
+      "files": [
+        "electron/backend.ts",
+        "electron/preload.ts",
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/ipcCore.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "electron/services/sidecar.ts",
+        "tests/milestone-data-api.test.mjs"
+      ],
+      "partial": true
+    },
+    {
+      "role": "visual",
+      "reportedDone": true,
+      "files": [
+        "src/components/AvatarStudio.tsx",
+        "src/components/MotionStudio.tsx",
+        "src/ui/avatar-editor.ts",
+        "src/ui/motion-presets.ts",
+        "src/styles/avatar-studio.css",
+        "src/styles/motion-studio.css",
+        "tests/autopilot-visual.test.mjs"
+      ],
+      "partial": false
+    },
+    {
+      "role": "assistant",
+      "reportedDone": true,
+      "files": [
+        "src/components/Assistant.tsx",
+        "src/components/Computer.tsx",
+        "tests/milestone-assistant.test.mjs"
+      ],
+      "partial": false
+    },
+    {
+      "role": "calendar",
+      "reportedDone": true,
+      "files": [
+        "src/components/Calendar.tsx",
+        "tests/milestone-calendar-ui.test.mjs"
+      ],
+      "partial": false
+    },
+    {
+      "role": "clipboard",
+      "reportedDone": true,
+      "files": [
+        "src/components/Clipboard.tsx",
+        "tests/milestone-clipboard-ui.test.mjs"
+      ],
+      "partial": false
+    },
+    {
+      "role": "widgets",
+      "reportedDone": true,
+      "files": [
+        "src/components/Home.tsx",
+        "src/components/WidgetPicker.tsx",
+        "tests/milestone-home-widgets.test.mjs"
+      ],
+      "partial": false
+    },
+    {
+      "role": "a11y",
+      "reportedDone": true,
+      "files": [
+        "src/ui/primitives.tsx",
+        "src/ui/accessibility.ts",
+        "src/styles/accessibility.css",
+        "tests/milestone-a11y.test.mjs"
+      ],
+      "partial": false
+    },
+    {
+      "role": "acceptance",
+      "reportedDone": true,
+      "files": [
+        "docs/milestone-acceptance.md",
+        "docs/release-checklist.md",
+        "docs/feature-matrix.md",
+        "src/shared/feature-registry.json"
+      ],
+      "partial": false
+    }
+  ]
+}

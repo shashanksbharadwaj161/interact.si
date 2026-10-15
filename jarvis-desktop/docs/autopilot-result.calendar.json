@@ -1,0 +1,49 @@
+{
+  "role": "calendar",
+  "done": true,
+  "files": [
+    {"path": "electron/services/calendar.ts", "change": "added", "purpose": "Pure .ics parser, escaped exporter, and event-store helpers"},
+    {"path": "tests/autopilot-calendar.test.mjs", "change": "added", "purpose": "22 node:test cases bundling the real module through esbuild"},
+    {"path": "docs/autopilot-result.calendar.json", "change": "added", "purpose": "Result signal for the captain"}
+  ],
+  "checks": [
+    {"command": "node --test tests/autopilot-calendar.test.mjs", "result": "pass", "detail": "22 tests, 0 failures"},
+    {"command": "npx tsc --noEmit", "result": "pass", "detail": "exit 0, repository typecheck"},
+    {"command": "npm ci --ignore-scripts", "result": "pass", "detail": "installed locked dependencies in this worktree only; node_modules is gitignored"}
+  ],
+  "interfaces": {
+    "constants": ["MAX_ICS_BYTES=1000000", "MAX_LINE_CHARS=4096", "MAX_EVENTS=2000", "MAX_TEXT_CHARS=1000", "MIN_YEAR=1900", "MAX_YEAR=2100"],
+    "types": {
+      "CalendarEvent": {"id": "string", "title": "string", "start": "string", "end": "string|null", "allDay": "boolean", "floating": "boolean", "location": "string", "description": "string", "url": "string|null"},
+      "IcsParseResult": {"events": "CalendarEvent[]", "skipped": "{code: SkipCode, count: number}[]", "error": "'too-large'|'not-calendar' (optional)"},
+      "SkipCode": "'missing-start'|'bad-date'|'date-out-of-range'|'unsupported-timezone'|'unsupported-recurrence'|'line-too-long'|'too-many-events'"
+    },
+    "functions": {
+      "parseIcs(text: string): IcsParseResult": "Bounded parse. Never throws on malformed input.",
+      "toIcs(events: readonly CalendarEvent[], stamp: Date): string": "CRLF output, escaped text, 75-octet folding, http(s) URLs only",
+      "eventsInRange(events, fromMs, toMs): CalendarEvent[]": "Half-open range overlap",
+      "mergeEvents(existing, incoming): {events, added, dropped}": "Keyed by id plus start; incoming wins; sorted by start; capped at MAX_EVENTS",
+      "parseIcsTime(value, params): ParsedTime": "DATE, UTC date-time, UTC TZID, or floating date-time",
+      "unfoldLines, parseProperty, unescapeText, escapeText, startMs, eventKey": "Lower-level helpers, exported for tests and reuse"
+    },
+    "notes": [
+      "Module has no Electron, fs, or network imports. The captain wires persistence in store.ts and the IPC/contract types.",
+      "CalendarEvent is defined locally and is not in src/shared/contracts.ts. Adding it to contracts is a captain or main-API decision."
+    ]
+  },
+  "dependencies": {
+    "added": [],
+    "runtime": "none",
+    "testOnly": "esbuild (existing devDependency)"
+  },
+  "limitations": [
+    "No recurrence expansion. RRULE, RDATE, EXDATE and RECURRENCE-ID events are skipped and counted, not expanded.",
+    "Only UTC (Z or UTC/GMT TZID) and floating times are accepted. Other TZIDs are skipped as unsupported-timezone because there is no timezone database here.",
+    "Floating times are read as UTC for range checks, so range results can be off by the local offset for floating events.",
+    "DURATION is ignored. An event with only DURATION gets end null.",
+    "Only http(s) URLs are kept. Nothing fetches URLs, and the module has no network access.",
+    "Import reports counts per skip reason, not per-item detail, to keep results bounded.",
+    "No personal calendar access. Tests use only in-memory .ics strings, and nothing reads a user calendar or account.",
+    "No UI, IPC, or persistence wiring. The captain must wire these helpers into the store and main process."
+  ]
+}

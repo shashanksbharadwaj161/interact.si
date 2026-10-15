@@ -1,0 +1,51 @@
+{
+  "role": "workspace",
+  "session": "jarvis-desktop-97",
+  "date": "2026-10-15",
+  "summary": "Memory and writing workbenches plus bounded prompt tools. Everything reads and writes through the existing productivity namespace and assistant route; no new IPC channels, contracts, dependencies or CSS files.",
+  "screens": [
+    {
+      "export": "MemoryWorkbench",
+      "file": "src/components/MemoryWorkbench.tsx",
+      "props": "{ initialSection?: 'overview'|'projects'|'checkpoints'|'shelf'|'timeline'|'recap'|'privacy'|'portability' }",
+      "suggestedNav": { "id": "memory", "label": "Memory", "eyebrow": "Workspace" },
+      "requires": ["useStore() from src/ui/store (status, loadError, reload, state, settings, api, productivityApi, productivity, productivityError, applyProductivity, refreshProductivity, toast)", "api.pickPath (shelf browse)", "productivityApi.apply (portability import applies ops one by one)"],
+      "optional": ["productivityApi.forgetHistory (privacy section, already handled by MemoryControls)"],
+      "states": ["loading (status loading or sidecar not yet read)", "app-error with Try again (reload)", "disconnected sidecar: notice + chat clearing only", "memory-error with Reload memory (refreshProductivity)", "ready"]
+    },
+    {
+      "export": "WritingWorkbench",
+      "file": "src/components/WritingWorkbench.tsx",
+      "props": "{ initialNoteId?: string }",
+      "suggestedNav": { "id": "writing", "label": "Writing", "eyebrow": "Workspace" },
+      "requires": ["useStore() (status, loadError, reload, state, settings, api, mutate, toast)", "api.saveNote, api.deleteNote, api.getState", "window.confirm for discarding unsaved edits"],
+      "optional": ["api.documentsChoose + documentsSave + documentsDiscard (captain API v2.4): mounts the DocumentImport panel; otherwise the panel says 'Document import is not connected'. Also exported: DocumentImport, localDocumentsBridge, DocumentPreview, DocumentsBridgeLike (structural twins of documentsBridge/ApprovedDocumentPreview; captain may swap imports on integration)."],
+      "states": ["loading", "error with Try again", "empty notes (scratch pad still usable)", "note deleted elsewhere (text kept, Save as new note)", "ready"]
+    },
+    {
+      "export": "PromptTools",
+      "file": "src/components/PromptTools.tsx",
+      "props": "{ input: { text: string; selection?: string; noteId?: string; noteTitle?: string }; onInsert?: (text: string, mode: 'append'|'replace-selection') => void }",
+      "requires": ["useStore() (api, state, productivity, settings, cloudConfigured, toast, reload)", "api.chat (always)"],
+      "optional": ["api.getApiInfo (reads the chat-streaming feature flag)", "api.chatStreamStart + api.onChatStream + api.chatStreamCancel (streamed reply with Stop; falls back to api.chat when absent)"],
+      "guarantees": ["Nothing is sent until the user presses Send to assistant.", "The textarea shows the exact text that will be sent; the user may edit it.", "Reply text is whatever the route returned, bounded to 20000 characters in the panel; the chat history remains the source of truth.", "Sources are only app-owned notes, tasks and checkpoints, cited as [kind:id]."]
+    }
+  ],
+  "pureModules": [
+    { "file": "src/ui/workbench.ts", "exports": ["workbenchStatus", "filterCheckpoints", "EMPTY_CHECKPOINT_FILTER", "isFiltered", "checkpointEvidence", "localDayKey", "fmtWhen", "groupTimeline", "fmtDuration", "MEMORY_SHORTCUTS", "WRITING_SHORTCUTS", "matchShortcut", "useReducedMotion", "UNAVAILABLE_SOURCES"] },
+    { "file": "src/ui/prompt-tools.ts", "exports": ["PROMPT_LIMITS", "TOOLS", "TONES", "LANGUAGE_SUGGESTIONS", "toolById", "listSourceCandidates", "collectSources", "buildPrompt", "reduceReply", "IDLE_REPLY", "createDraftSender", "describeRoute", "errorText"] }
+  ],
+  "backendAdditions": [
+    { "file": "electron/services/store.ts", "exports": ["PORTABLE_VERSION", "PORTABLE_LIMITS", "exportPortable(prod, capsules, now?)", "parsePortable(raw, {prod, capsules, noteIds?, taskIds?}, now?) -> {ok, problems, ops, counts, exportedAt?}"], "note": "Renderer-side pure functions bundled with the UI (same pattern as search helpers). Import applies the returned ProductivityOps through the existing validated productivityApply channel; no new IPC." },
+    { "file": "electron/services/search.ts", "exports": ["resolveEvidence(ref, state, prod?)", "filterRecap(recap, {kinds?, query?})", "draftWorklogVerified(recap, state, prod?, {withSources?}) -> {text, stale}"] }
+  ],
+  "keyboard": {
+    "memory": ["Alt+N new checkpoint", "Alt+F filter checkpoints", "Alt+] next section", "Alt+[ previous section"],
+    "writing": ["Ctrl+S save note", "Alt+N new note", "Alt+E jump to editor", "Alt+T jump to draft tools"],
+    "note": "Handled by onKeyDown on the page root; the captain should check they do not collide with global shell chords (Alt+1..0 view shortcuts are untouched)."
+  },
+  "reducedMotion": "Each page root carries data-motion=\"reduced|full\" from Windows prefers-reduced-motion OR settings.reduceMotion. The streaming cursor gets data-cursor=\"static\" under reduced motion. No animation is defined by this module; the captain may key CSS off these attributes.",
+  "cssClassesUsed": ["page page-wide", "split", "split-list panel", "split-detail", "stack", "stack tight", "row", "row align-end", "grid2", "list", "list compact", "list-row", "select-list", "select-item", "chips", "chip", "chip on", "chip-x", "input", "input narrow", "input mono", "input input-title", "input note-body", "field-hint", "sub", "sub block", "sub pad", "mono", "eyebrow", "sr-only", "search", "grow"],
+  "optionalCssHooks": ["[data-prompt-tools]", "[data-cursor=\"blink\"] (a blink keyframe if desired; nothing is required)", "kbd.mono"],
+  "navIntegration": "Add two views to src/ui/nav.tsx / App.tsx mounting <MemoryWorkbench/> and <WritingWorkbench/>. MemorySearch onNavigate for 'note' results could open WritingWorkbench with initialNoteId. No API, contract, preload or backend change is needed."
+}

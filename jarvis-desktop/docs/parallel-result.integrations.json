@@ -1,0 +1,56 @@
+{
+  "role": "integrations",
+  "session": "jarvis-desktop-106",
+  "done": true,
+  "at": "2026-10-15",
+  "changedFiles": [
+    "electron/services/integrations.ts",
+    "src/components/Integrations.tsx",
+    "tests/parallel-integrations.test.mjs",
+    "docs/parallel-result.integrations.json"
+  ],
+  "summary": [
+    "Provider families in the UI: Local model, Claude, ChatGPT, Spotify, Browser (+ Other). A 'Providers at a glance' panel lists each way of reaching a provider separately: Provider API, Website, App launch, On this device, Not available. Each row has its own status from the existing service views. A Provider filter works together with the existing method filter.",
+    "Spotify app-launch route: 'Start the Spotify app' sends {type:'launch', target:'Spotify.exe'} through the existing previewAction/executeAction approval flow. The real preview shows whether Spotify.exe is in Approved apps and exists; nothing starts without approval. The UI says this is not an account connection.",
+    "Stale states: a session check result counts as connected/check-failed only while it is current. It is out of date after checkMaxAgeMs (default 30 min) or once the checked origin changes (for example a new local endpoint in Settings). The state then goes back to ready-to-check and lastCheck is kept as history. The UI shows an 'out of date, check again' warning, a Refresh status button and the time the status was read. A failed reload keeps the last statuses and marks them as possibly out of date.",
+    "Local check errors: a refused or timed-out loopback request now says 'Ollama is not answering at <origin>', with a start-Ollama / check-Settings hint instead of the internet/VPN hint. Provider APIs keep the network hint.",
+    "Selected-model detection (optional dep localModel): the Ollama check detail says whether the model chosen in Settings is installed. A bare name matches the ':latest' tag. The model list is parsed defensively: 1 MB cap, names only, control characters dropped.",
+    "Strict local URL validation: the new exported checkLocalEndpoint accepts only http on 127.0.0.0/8, ::1 or localhost. It rejects credentials, paths, queries, fragments, backslashes, whitespace and lookalike hosts. resolveCheckOrigin uses it, so an unsafe endpoint blocks the check before any request. A throwing Settings getter is reported, not crashed on."
+  ],
+  "unchangedGuarantees": [
+    "Offline is still the default. list/view/preview never fetch or confirm (tested in both modes). Provider APIs are blocked offline without a prompt.",
+    "Every online check still needs the user's opt-in, online mode, their own key and the trusted main-process confirm (Cancel default). A declined confirmation sends nothing.",
+    "Website handoffs and setup-required connectors (claude-web, chatgpt-web, spotify-web, browser, spotify-api) can never be checked, keyed, turned on or reach 'connected'.",
+    "No OAuth, account access, client secrets, new origins or automatic cloud calls were added. netGuard and the catalog are unchanged."
+  ],
+  "checks": [
+    {"command": "node --test tests/parallel-integrations.test.mjs", "tests": 16, "pass": 16, "fail": 0},
+    {"command": "node --test tests/*.test.mjs", "tests": 1094, "pass": 1094, "fail": 0},
+    {"command": "npx tsc --noEmit", "result": "clean"},
+    {"command": "npm run build (typecheck + vite build + scripts/build-main.mjs)", "result": "exit 0"}
+  ],
+  "interfaceProposals": [
+    {
+      "owner": "captain (electron/backend.ts)",
+      "proposal": "Pass localModel: () => settings.model (the Ollama model name already in Settings) to createIntegrationService so the local check can report whether the selected model is installed. Optional and backwards compatible; until it is wired, the detail text stays as before.",
+      "requiresContractChange": false
+    },
+    {
+      "owner": "captain (src/ui/integration-catalog.ts / contracts)",
+      "proposal": "Optional: add a 'stale' ConnectionState, or a lastCheck 'current: boolean' flag, to IntegrationView. The service currently reports out-of-date results as 'ready-to-check' with lastCheck kept, and the UI infers 'out of date'. A dedicated state would make that explicit for other consumers such as Home.",
+      "requiresContractChange": true,
+      "status": "proposal only; not implemented"
+    },
+    {
+      "owner": "captain / settings owner",
+      "proposal": "Optional: reuse svc.checkLocalEndpoint in validateLocalEndpoint (validation.ts). It currently strips paths and queries silently instead of rejecting them, so the Settings field would show the same reason the check does.",
+      "requiresContractChange": false
+    }
+  ],
+  "limitations": [
+    "No real provider, Ollama or Spotify was contacted. All network, keys, prefs and confirmations in tests are injected mocks. The Spotify app-launch button depends on the existing launch action and the Approved apps list; it was checked only by static render, not by clicking it in a running Electron window.",
+    "The UI tests use renderToStaticMarkup only. The interactive approve/cancel flow of the app-launch control reuses the existing ApprovedLink component, which this slice did not test again in an interactive renderer.",
+    "Staleness covers age and origin changes. A mode switch is already handled by the 'offline' state. A key replaced outside this service (for example via Settings' cloud key) relies on the existing onKeyChange/refresh path.",
+    "ChatGPT chat routing is still not built; only the OpenAI connection check exists, and the UI says so. Spotify playback/OAuth remains setup-required with no sign-in."
+  ]
+}

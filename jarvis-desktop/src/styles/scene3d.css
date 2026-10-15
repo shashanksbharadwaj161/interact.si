@@ -1,0 +1,187 @@
+/* Scene 3D studio. Imported by src/components/Scene3D.tsx; relies on tokens from tokens.css. */
+.scene3d {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.scene3d-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.scene3d-stage-panel {
+  min-width: 0;
+  position: sticky;
+  top: 0;
+}
+
+.scene3d-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+
+.scene3d-canvas,
+.scene3d-fallback {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scene3d-canvas.is-hidden {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scene3d-fallback {
+  position: absolute;
+  inset: 0;
+}
+
+.scene3d[data-status='lost'] .scene3d-stage::after,
+.scene3d[data-status='error'] .scene3d-stage::after {
+  content: attr(data-status);
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  text-transform: capitalize;
+  color: var(--text);
+  background: var(--panel-solid);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+}
+
+.scene3d-status,
+.scene3d-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.scene3d-transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.scene3d-scrub {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+  font-size: 12px;
+}
+
+.scene3d-scrub input[type='range'],
+.scene3d-slider input[type='range'] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.scene3d-exports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.scene3d-file {
+  position: relative;
+  cursor: pointer;
+}
+
+.scene3d-file input[type='file'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.scene3d-file:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.scene3d-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px 12px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--raised);
+  font-size: 12px;
+}
+
+.scene3d-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scene3d-stats dt {
+  color: var(--text-2);
+}
+
+.scene3d-stats dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.scene3d-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.scene3d-controls .panel + .panel {
+  margin-top: 0;
+}
+
+.scene3d-json {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .scene3d-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scene3d-stage-panel {
+    position: static;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene3d-scrub input[type='range'],
+  .scene3d-slider input[type='range'] {
+    transition: none;
+  }
+}

@@ -1,0 +1,312 @@
+{
+  "createdAt": "2026-10-14T04:36:44.449Z",
+  "originalRepository": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop",
+  "sourceTrees": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop",
+  "sharedCap": 300,
+  "concurrency": 18,
+  "workers": [
+    {
+      "role": "shell",
+      "name": "Fable · complete application UX",
+      "model": "claude-fable-5-1",
+      "budget": 20,
+      "files": [
+        "src/components/App.tsx",
+        "src/components/Home.tsx",
+        "src/components/Settings.tsx",
+        "src/components/Onboarding.tsx",
+        "src/ui/nav.tsx",
+        "src/styles/shell.css",
+        "src/styles/views.css",
+        "tests/autopilot-shell.test.mjs"
+      ],
+      "taskId": "3667d11e-6a39-4509-b159-f40bcc7526b9",
+      "sessionId": "jarvis-desktop-31",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-31",
+      "status": "running"
+    },
+    {
+      "role": "visual",
+      "name": "Fable · avatar and motion studio",
+      "model": "claude-fable-5-1",
+      "budget": 20,
+      "files": [
+        "src/components/AvatarStudio.tsx",
+        "src/components/MotionStudio.tsx",
+        "src/ui/avatar-editor.ts",
+        "src/ui/motion-presets.ts",
+        "src/styles/avatar-studio.css",
+        "src/styles/motion-studio.css",
+        "tests/autopilot-visual.test.mjs"
+      ],
+      "taskId": "7eb0029a-b18e-4ba0-a289-a3449c574596",
+      "sessionId": "jarvis-desktop-32",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-32",
+      "status": "running"
+    },
+    {
+      "role": "api",
+      "name": "Opus · secure API and assistant integration",
+      "model": "claude-opus-5-5",
+      "budget": 18,
+      "files": [
+        "src/shared/contracts.ts",
+        "electron/backend.ts",
+        "electron/preload.ts",
+        "electron/ipc.ts",
+        "electron/ipcCore.ts",
+        "electron/channels.ts",
+        "src/components/Assistant.tsx",
+        "src/components/Computer.tsx",
+        "tests/autopilot-api.test.mjs"
+      ],
+      "taskId": "868a20fe-85c0-4a1d-9430-afea4bd51351",
+      "sessionId": "jarvis-desktop-33",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-33",
+      "status": "running"
+    },
+    {
+      "role": "integrations",
+      "name": "Opus · provider and application integrations",
+      "model": "claude-opus-5-5",
+      "budget": 18,
+      "files": [
+        "electron/services/integrations.ts",
+        "src/components/Integrations.tsx",
+        "src/ui/integration-catalog.ts",
+        "tests/autopilot-integrations.test.mjs"
+      ],
+      "taskId": "e15a1701-79d9-46fb-8b9c-80bc647e7ca7",
+      "sessionId": "jarvis-desktop-34",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-34",
+      "status": "running"
+    },
+    {
+      "role": "routines",
+      "name": "Opus · durable routines and computer planning",
+      "model": "claude-opus-5-5",
+      "budget": 18,
+      "files": [
+        "electron/services/intent.ts",
+        "electron/services/routines.ts",
+        "src/components/Routines.tsx",
+        "tests/backend-intent.test.mjs",
+        "tests/autopilot-routines.test.mjs"
+      ],
+      "taskId": "41c5d6cc-e291-4dcc-8c85-b8268c039aca",
+      "sessionId": "jarvis-desktop-35",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-35",
+      "status": "running"
+    },
+    {
+      "role": "models",
+      "name": "Sonnet · local model and speech runtime",
+      "model": "claude-sonnet-5-5",
+      "budget": 20,
+      "files": [
+        "electron/services/chat.ts",
+        "electron/services/speech.ts",
+        "electron/services/models.ts",
+        "src/components/Models.tsx",
+        "src/ui/audio.ts",
+        "tests/autopilot-models.test.mjs"
+      ],
+      "taskId": "475d8132-49c8-4290-bc8a-eb3fd396c335",
+      "sessionId": "jarvis-desktop-36",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-36",
+      "status": "running"
+    },
+    {
+      "role": "native",
+      "name": "Sonnet · native lifecycle and packaging",
+      "model": "claude-sonnet-5-5",
+      "budget": 20,
+      "files": [
+        "electron/main.ts",
+        "electron/native",
+        "native",
+        "electron/services/lifecycle.ts",
+        "electron/services/reminders.ts",
+        "scripts/build-main.mjs",
+        "scripts/smoke.cjs",
+        "scripts/local-ai-smoke.cjs",
+        "tests/autopilot-native.test.mjs"
+      ],
+      "taskId": "2814ddbf-e736-40f8-ae66-35bf4c7ddc87",
+      "sessionId": "jarvis-desktop-37",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-37",
+      "status": "running"
+    },
+    {
+      "role": "productivity",
+      "name": "Sonnet · workspace and productivity modules",
+      "model": "claude-sonnet-5-5",
+      "budget": 20,
+      "files": [
+        "electron/services/store.ts",
+        "electron/services/search.ts",
+        "electron/services/capsules.ts",
+        "src/components/Capsules.tsx",
+        "src/components/Notes.tsx",
+        "src/components/Tasks.tsx",
+        "src/components/MemorySearch.tsx",
+        "src/ui/store.tsx",
+        "tests/autopilot-productivity.test.mjs"
+      ],
+      "taskId": "c6ffe798-2597-444c-a142-513c7a6b43dc",
+      "sessionId": "jarvis-desktop-48",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-48",
+      "status": "running",
+      "retries": 1
+    },
+    {
+      "role": "security",
+      "name": "Sonnet · security, validation and resource controls",
+      "model": "claude-sonnet-5-5",
+      "budget": 20,
+      "files": [
+        "electron/services/actions.ts",
+        "electron/services/policy.ts",
+        "electron/services/paths.ts",
+        "electron/services/validation.ts",
+        "electron/services/netGuard.ts",
+        "electron/services/secrets.ts",
+        "electron/services/system.ts",
+        "tests/autopilot-security.test.mjs"
+      ],
+      "taskId": "84890652-3d8c-41f3-95c6-cd3d3d7d508b",
+      "sessionId": "jarvis-desktop-38",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-38",
+      "status": "running"
+    },
+    {
+      "role": "widgets",
+      "name": "Haiku · widget registry",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "src/ui/widgets.ts",
+        "src/components/WidgetPicker.tsx",
+        "tests/autopilot-widgets.test.mjs"
+      ],
+      "taskId": "a6b0ca18-1a99-4d6e-aa47-c5c88dc64822",
+      "sessionId": "jarvis-desktop-39",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-39",
+      "status": "running"
+    },
+    {
+      "role": "usage",
+      "name": "Haiku · usage and cost data module",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "electron/services/usage.ts",
+        "src/components/UsagePanel.tsx",
+        "tests/autopilot-usage.test.mjs"
+      ],
+      "taskId": "13e3cf2c-3825-4d43-95fd-170036f79d7d",
+      "sessionId": "jarvis-desktop-40",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-40",
+      "status": "running"
+    },
+    {
+      "role": "clipboard",
+      "name": "Haiku · opt-in clipboard history",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "electron/services/clipboard.ts",
+        "tests/autopilot-clipboard.test.mjs"
+      ],
+      "taskId": "9fab6390-1be9-4222-bf8c-63770d0c9dfa",
+      "sessionId": "jarvis-desktop-41",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-41",
+      "status": "running"
+    },
+    {
+      "role": "calendar",
+      "name": "Haiku · offline calendar import",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "electron/services/calendar.ts",
+        "tests/autopilot-calendar.test.mjs"
+      ],
+      "taskId": "6e20956b-45ed-4dc1-8c37-922beea7016c",
+      "sessionId": "jarvis-desktop-42",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-42",
+      "status": "running"
+    },
+    {
+      "role": "mods",
+      "name": "Haiku · Windows customization catalog",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "src/ui/mod-catalog.ts",
+        "src/components/Customization.tsx",
+        "tests/autopilot-mods.test.mjs"
+      ],
+      "taskId": "a4c8f5f4-e9ba-46ae-a803-25995c7a6f62",
+      "sessionId": "jarvis-desktop-43",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-43",
+      "status": "running"
+    },
+    {
+      "role": "accessibility",
+      "name": "Haiku · high contrast and motion controls",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "src/styles/accessibility.css",
+        "src/ui/accessibility.ts",
+        "tests/autopilot-accessibility.test.mjs"
+      ],
+      "taskId": "fa4cb372-d2df-43ad-bc43-4f3eb85c99f7",
+      "sessionId": "jarvis-desktop-44",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-44",
+      "status": "running"
+    },
+    {
+      "role": "roadmap",
+      "name": "Haiku · honest roadmap evidence",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "src/shared/feature-registry.json",
+        "docs/feature-matrix.md",
+        "docs/autopilot-coverage.md"
+      ],
+      "taskId": "0a0f3200-a001-45fd-aa1e-d32d106b0893",
+      "sessionId": "jarvis-desktop-45",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-45",
+      "status": "running"
+    },
+    {
+      "role": "release",
+      "name": "Haiku · portable release verification",
+      "model": "claude-haiku-5-5",
+      "budget": 3,
+      "files": [
+        "docs/release-checklist.md",
+        "docs/THIRD-PARTY-NOTICES.md",
+        "docs/autopilot-release.md"
+      ],
+      "taskId": "3fd97638-e678-44a1-a5c1-bc93774e0c82",
+      "sessionId": "jarvis-desktop-46",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-46",
+      "status": "running"
+    },
+    {
+      "role": "captain",
+      "name": "Fable · integration captain",
+      "model": "claude-fable-5-1",
+      "budget": 20,
+      "files": [],
+      "taskId": "a63d88cf-05e2-4108-8275-cf20af76a8c8",
+      "sessionId": "jarvis-desktop-47",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-47",
+      "status": "running"
+    }
+  ]
+}

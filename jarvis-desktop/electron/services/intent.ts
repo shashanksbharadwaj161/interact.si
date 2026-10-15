@@ -1,6 +1,7 @@
 // Offline, deterministic intent planner. Turns one typed command (or a local model's JSON plan) into a single
 // ActionRequest candidate for previewAction. Pure: never executes, never fetches, never touches the filesystem,
 // never builds a shell command. A 'ready' plan is only a preview candidate; authorization stays with the action service.
+// Routine planners (planRoutineLines, parseModelRoutine) return several such candidates for the routine editor.
 import type {ActionRequest} from '../../src/shared/contracts';
 import {describeTypedText, validateActionRequest, validateOpenUrl} from './policy';
 import {LIMITS, ValidationError} from './validation';
@@ -318,13 +319,27 @@ const MODEL_FIELDS: Record<PlannedType, readonly string[]> = {
 export function parseModelPlan(raw: unknown, opts: PlanOptions = {}): IntentPlan {
   const src: IntentSource = 'model';
   const deny = (reason: string) => blocked(src, 'Blocked model plan', reason);
-  if (typeof raw !== 'string') return deny('The model plan must be JSON text');
-  if (raw.length > MAX_MODEL_PLAN_CHARS) return deny(`The model plan is too long (max ${MAX_MODEL_PLAN_CHARS})`);
+  const value = parseModelJson(raw);
+  if ('error' in value) return deny(value.error);
+  if (Array.isArray(value.json)) return deny('The model plan must contain exactly one action');
+  return modelObjectPlan(value.json, sanitizeWindows(opts.windows));
+}
+
+/** Strict JSON text (optionally inside one ```json fence), bounded in size. Never evaluates anything. */
+function parseModelJson(raw: unknown): {json: unknown} | {error: string} {
+  if (typeof raw !== 'string') return {error: 'The model plan must be JSON text'};
+  if (raw.length > MAX_MODEL_PLAN_CHARS) return {error: `The model plan is too long (max ${MAX_MODEL_PLAN_CHARS})`};
   const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(raw.trim());
-  let value: unknown;
-  try { value = JSON.parse(fenced ? fenced[1] : raw); } catch { return deny('The model plan is not valid JSON'); }
-  if (Array.isArray(value)) return deny('The model plan must contain exactly one action');
-  if (typeof value !== 'object' || value === null) return deny('The model plan must be a JSON object');
+  try { return {json: JSON.parse(fenced ? fenced[1] : raw)}; } catch { return {error: 'The model plan is not valid JSON'}; }
+}
+
+const safeKey = (k: string) => clip(k.replace(/[^ -~]/g, '?'), 30);
+
+/** One flat model action object → plan. Shared by single plans and routine plans. */
+function modelObjectPlan(value: unknown, windows: IntentWindow[]): IntentPlan {
+  const src: IntentSource = 'model';
+  const deny = (reason: string) => blocked(src, 'Blocked model plan', reason);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return deny('The model plan must be a JSON object');
   const o = value as Record<string, unknown>;
   if (o.type === 'click') return deny('Clicking is not planned from model output');
   if (typeof o.type !== 'string' || !(PLANNED_TYPES as readonly string[]).includes(o.type)) return deny(`Unsupported action type; allowed: ${PLANNED_TYPES.join(', ')}`);
@@ -332,8 +347,7 @@ export function parseModelPlan(raw: unknown, opts: PlanOptions = {}): IntentPlan
   const allowed = MODEL_FIELDS[type];
   for (const k of Object.keys(o)) {
     if (k === 'type' || k === 'summary') continue;
-    const name = clip(k.replace(/[^\x20-\x7e]/g, '?'), 30);
-    if (!allowed.includes(k)) return deny(`Field "${name}" is not allowed for ${type}; tools, commands and extra fields are refused`);
+    if (!allowed.includes(k)) return deny(`Field "${safeKey(k)}" is not allowed for ${type}; tools, commands and extra fields are refused`);
   }
   if (o.summary !== undefined && (typeof o.summary !== 'string' || o.summary.length > 300)) return deny('summary must be a short string');
   const req: ActionRequest = {type};
@@ -347,5 +361,114 @@ export function parseModelPlan(raw: unknown, opts: PlanOptions = {}): IntentPlan
     if (typeof o[k] !== 'number' || !Number.isFinite(o[k])) return deny(`${k} must be a number`);
     req[k] = o[k] as number;
   }
+  return finalize(src, req, windows);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Routine step candidates. Several validated, single-action steps proposed for the routine editor. Still preview
+// candidates only: nothing here schedules, saves or runs anything, and each step is executed later through its own
+// ActionService preview and trusted native confirmation.
+
+export const MAX_ROUTINE_STEPS = 20;
+export const MAX_WAIT_SECONDS = 300;
+
+export type RoutineStepCandidate =
+  | {kind: 'action'; request: ActionRequest; summary: string}
+  | {kind: 'wait'; seconds: number; summary: string};
+
+export type RoutinePlan =
+  | {status: 'ready'; source: IntentSource; name?: string; steps: RoutineStepCandidate[]; previewOnly: true}
+  | {status: 'clarify' | 'blocked'; source: IntentSource; step: number | null; summary: string; reason: string; plan?: IntentPlan};
+
+const routineStop = (source: IntentSource, step: number | null, reason: string, plan?: IntentPlan, status: 'clarify' | 'blocked' = 'blocked'): RoutinePlan =>
+  plan ? {status, source, step, summary: plan.summary, reason, plan} : {status, source, step, summary: step === null ? 'Blocked routine' : `Step ${step}`, reason};
+
+const waitCandidate = (seconds: number): RoutineStepCandidate => ({kind: 'wait', seconds, summary: `Wait ${seconds} second${seconds === 1 ? '' : 's'}`});
+
+/** Turns a step plan into a candidate, or the stop result naming which step needs attention. */
+function stepFromPlan(source: IntentSource, index: number, plan: IntentPlan): RoutineStepCandidate | RoutinePlan {
+  if (plan.status === 'ready') return {kind: 'action', request: plan.request, summary: plan.summary};
+  if (plan.status === 'clarify') return routineStop(source, index, `Step ${index}: ${plan.question}`, plan, 'clarify');
+  return routineStop(source, index, `Step ${index}: ${plan.reason}`, plan);
+}
+
+/**
+ * Re-checks one stored or edited routine step request with the same rules as typed commands. Used by the routine
+ * engine before saving, so a stored step can never hold a click, a shell string or fields previewAction refuses.
+ */
+export function checkPlannedRequest(raw: unknown, opts: PlanOptions = {}): IntentPlan {
+  const src: IntentSource = 'rules';
+  let req: ActionRequest;
+  try { req = validateActionRequest(raw); } catch (e) { return blocked(src, 'Blocked step', e instanceof ValidationError ? e.message : 'The step is invalid'); }
+  if (req.type === 'click') return blocked(src, 'Click', 'Clicking is not available in routines (experimental input gate G4)');
   return finalize(src, req, sanitizeWindows(opts.windows));
+}
+
+const WAIT_RE = /^(?:wait|pause|sleep)(?: for)? ([0-9]{1,3}) ?(?:s|sec|secs|seconds?)$/i;
+
+/**
+ * Rule planner for a short list of commands, one per line (blank lines and lines starting with # are ignored).
+ * Each line is planned by planIntent, so chaining inside a line is still refused. "wait 5 seconds" adds a pause.
+ */
+export function planRoutineLines(input: unknown, opts: PlanOptions = {}): RoutinePlan {
+  const src: IntentSource = 'rules';
+  if (typeof input !== 'string') return routineStop(src, null, 'The steps must be text');
+  if (input.length > MAX_ROUTINE_STEPS * MAX_COMMAND_CHARS) return routineStop(src, null, 'The step list is too long');
+  const lines = input.split(/\r\n|\r|\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  if (!lines.length) return routineStop(src, null, 'Write at least one command, one per line', undefined, 'clarify');
+  if (lines.length > MAX_ROUTINE_STEPS) return routineStop(src, null, `A routine can have at most ${MAX_ROUTINE_STEPS} steps`);
+  const steps: RoutineStepCandidate[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const w = WAIT_RE.exec(lines[i].replace(/[.]+$/, ''));
+    if (w) {
+      const n = Number(w[1]);
+      if (n < 1 || n > MAX_WAIT_SECONDS) return routineStop(src, i + 1, `Step ${i + 1}: a wait must be 1–${MAX_WAIT_SECONDS} seconds`);
+      steps.push(waitCandidate(n));
+      continue;
+    }
+    const r = stepFromPlan(src, i + 1, planIntent(lines[i], opts));
+    if ('status' in r) return r;
+    steps.push(r);
+  }
+  return {status: 'ready', source: src, steps, previewOnly: true};
+}
+
+/**
+ * Parses a local model's routine proposal: exactly {"name"?: string, "steps": [ ... ]} where each step is either a
+ * flat action object accepted by parseModelPlan or {"type":"wait","seconds":n}. Schedules, tools, shell commands,
+ * recordings and any other field are refused; the user sets schedules in the editor. Candidates only.
+ */
+export function parseModelRoutine(raw: unknown, opts: PlanOptions = {}): RoutinePlan {
+  const src: IntentSource = 'model';
+  const value = parseModelJson(raw);
+  if ('error' in value) return routineStop(src, null, value.error);
+  const json = value.json;
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) return routineStop(src, null, 'The routine must be a JSON object with a "steps" list');
+  const o = json as Record<string, unknown>;
+  for (const k of Object.keys(o)) if (k !== 'name' && k !== 'steps') return routineStop(src, null, `Field "${safeKey(k)}" is not allowed; schedules, tools and commands are set only by you in the editor`);
+  let name: string | undefined;
+  if (o.name !== undefined) {
+    if (typeof o.name !== 'string' || !o.name.trim() || o.name.length > 80) return routineStop(src, null, 'name must be a short string (max 80)');
+    const bad = unsafeChars(o.name, false);
+    if (bad) return routineStop(src, null, `The name ${bad}`);
+    name = o.name.trim();
+  }
+  if (!Array.isArray(o.steps) || !o.steps.length) return routineStop(src, null, 'steps must be a non-empty list');
+  if (o.steps.length > MAX_ROUTINE_STEPS) return routineStop(src, null, `A routine can have at most ${MAX_ROUTINE_STEPS} steps`);
+  const windows = sanitizeWindows(opts.windows);
+  const steps: RoutineStepCandidate[] = [];
+  for (let i = 0; i < o.steps.length; i++) {
+    const s = o.steps[i] as Record<string, unknown> | null;
+    if (s && typeof s === 'object' && !Array.isArray(s) && s.type === 'wait') {
+      const extra = Object.keys(s).find((k) => k !== 'type' && k !== 'seconds');
+      if (extra) return routineStop(src, i + 1, `Step ${i + 1}: field "${safeKey(extra)}" is not allowed for wait`);
+      if (typeof s.seconds !== 'number' || !Number.isInteger(s.seconds) || s.seconds < 1 || s.seconds > MAX_WAIT_SECONDS) return routineStop(src, i + 1, `Step ${i + 1}: seconds must be a whole number from 1 to ${MAX_WAIT_SECONDS}`);
+      steps.push(waitCandidate(s.seconds));
+      continue;
+    }
+    const r = stepFromPlan(src, i + 1, modelObjectPlan(s, windows));
+    if ('status' in r) return r;
+    steps.push(r);
+  }
+  return name === undefined ? {status: 'ready', source: src, steps, previewOnly: true} : {status: 'ready', source: src, name, steps, previewOnly: true};
 }

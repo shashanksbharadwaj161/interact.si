@@ -1,11 +1,59 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { starShadow } from '../ui/scenes';
+
+/**
+ * Ambient motion policy for the backdrop. Pure so it can be tested without a DOM.
+ * - `reduced` comes from the root data-motion attribute, which App derives from the setting, Windows and the battery rule.
+ * - `hidden` is the document visibility; a hidden window gets no animation work at all.
+ * Returns the value for the `data-ambient` attribute the stylesheet keys on.
+ */
+export function ambientMode(reduced: boolean, hidden: boolean): 'off' | 'paused' | 'on' {
+  if (reduced) return 'off';
+  if (hidden) return 'paused';
+  return 'on';
+}
+
+/** Reads the root motion attribute App writes; true when it says 'reduced'. Safe to call without a document. */
+function readReduced(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.documentElement.dataset.motion === 'reduced';
+}
+
+function readHidden(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.visibilityState === 'hidden';
+}
+
+/**
+ * Tracks visibility and the root motion attribute while mounted, and removes both listeners on unmount.
+ * The attribute is watched with a MutationObserver so a settings change or a battery drop stops the drift
+ * without a reload; the first render uses the current values so there is no flash of motion.
+ */
+function useAmbient(): 'off' | 'paused' | 'on' {
+  const [reduced, setReduced] = useState(readReduced);
+  const [hidden, setHidden] = useState(readHidden);
+  useEffect(() => {
+    const onVisibility = () => setHidden(readHidden());
+    document.addEventListener('visibilitychange', onVisibility);
+    const observer = typeof MutationObserver === 'function' ? new MutationObserver(() => setReduced(readReduced())) : null;
+    observer?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
+    setReduced(readReduced());
+    setHidden(readHidden());
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      observer?.disconnect();
+    };
+  }, []);
+  return ambientMode(reduced, hidden);
+}
 
 export function SceneBackdrop({ scene, className = '' }: { scene: string; className?: string }) {
   const stars = useMemo(() => ({ a: starShadow(46, 11), b: starShadow(22, 29) }), []);
+  const ambient = useAmbient();
   return (
-    <div className={`scene ${className}`} data-scene={scene} aria-hidden="true">
+    <div className={`scene ${className}`} data-scene={scene} data-ambient={ambient} aria-hidden="true">
       <div className="scene-wash" />
+      <div className="scene-drift" />
       {(scene === 'deep-space' || scene === 'orbit') && (
         <>
           <i className="scene-stars scene-stars-a" style={{ boxShadow: stars.a }} />

@@ -28,6 +28,40 @@ export function hasControlChars(s: string): boolean {
 }
 
 /**
+ * Bidirectional overrides, zero-width and other invisible format characters. NTFS accepts them in names, which lets
+ * a path read differently from what it is (a right-to-left override before "fdp.exe"), so they are refused in paths and shown as visible
+ * markers wherever text is previewed to the user (see visibleText below).
+ */
+export const INVISIBLE_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0xad, 0xad], [0x34f, 0x34f], [0x61c, 0x61c], [0x115f, 0x1160], [0x17b4, 0x17b5], [0x180b, 0x180e], [0x200b, 0x200f],
+  [0x202a, 0x202e], [0x2060, 0x206f], [0x3164, 0x3164], [0xfe00, 0xfe0f], [0xfeff, 0xfeff], [0xffa0, 0xffa0], [0xfff9, 0xfffb],
+  [0xe0000, 0xe0fff],
+];
+
+export function isInvisibleFormatChar(cp: number): boolean {
+  return INVISIBLE_RANGES.some(([lo, hi]) => cp >= lo && cp <= hi);
+}
+
+export function hasInvisibleFormatChars(s: string): boolean {
+  for (const ch of s) if (isInvisibleFormatChar(ch.codePointAt(0)!)) return true;
+  return false;
+}
+
+/**
+ * Text for a trusted preview: invisible, direction-changing and control characters are replaced by visible
+ * U+XXXX markers (in square brackets) so a label or typed text cannot read differently from what it is.
+ */
+export function visibleText(s: string): string {
+  let out = "";
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    const hidden = isInvisibleFormatChar(cp) || (cp <= 0x1f && cp !== 0x09 && cp !== 0x0a && cp !== 0x0d) || (cp >= 0x7f && cp <= 0x9f && cp !== 0x85);
+    out += hidden ? "[U+" + cp.toString(16).toUpperCase().padStart(4, "0") + "]" : ch;
+  }
+  return out;
+}
+
+/**
  * Lexically validates and normalizes an absolute local Windows path (drive letter only). Forward slashes are
  * converted first so every check sees the same string Windows would. Returns the path or a reason.
  */
@@ -39,6 +73,7 @@ export function normalizeAbsolutePath(input: unknown): {path: string} | {error: 
   if (input.length > 520) return {error: 'Path is too long'};
   if (hasControlChars(input)) return {error: 'Path contains control characters'};
   if (/^\s|\s$/.test(input)) return {error: 'Path must not start or end with whitespace'};
+  if (hasInvisibleFormatChars(input)) return {error: 'Path contains invisible or direction-changing characters'};
   const raw = input.replace(/\//g, '\\');
   if (/^\\\\[?.]/.test(raw)) return {error: 'Device paths are not allowed'};
   if (raw.startsWith('\\\\')) return {error: 'Network (UNC and WebDAV) paths are not allowed; use a local drive path'};
@@ -54,6 +89,17 @@ export function normalizeAbsolutePath(input: unknown): {path: string} | {error: 
   let norm = w.normalize(raw);
   if (!/^[a-zA-Z]:\\$/.test(norm)) norm = norm.replace(/\\+$/, '');
   return {path: norm};
+}
+
+/**
+ * A bare executable name such as "notepad.exe" (no directory). Bare names are only ever resolved from fixed system
+ * folders; anything that fails this test is treated as a path and must be an absolute local drive path.
+ */
+export function isBareExeName(s: string): boolean {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._ -]{0,100}\.exe$/i.test(s)) return false;
+  const stem = s.slice(0, -4);
+  if (/[. ]$/.test(stem) || stem.includes('..')) return false;
+  return !RESERVED_NAMES.test(s);
 }
 
 export function isDriveRoot(p: string): boolean {
@@ -83,7 +129,8 @@ export function isDangerousFileExtension(p: string): boolean {
 
 export interface FsLike {
   realpath(p: string): Promise<string>;
-  stat(p: string): Promise<{isDirectory(): boolean; isFile(): boolean}>;
+  /** size and mtimeMs are present on real stats; they let a plan notice that a file was replaced after approval. */
+  stat(p: string): Promise<{isDirectory(): boolean; isFile(): boolean; size?: number; mtimeMs?: number}>;
 }
 
 export const realFs: FsLike = {realpath: (p) => fsp.realpath(p), stat: (p) => fsp.stat(p)};

@@ -1,0 +1,35 @@
+{
+  "role": "routines",
+  "phase": "continuation",
+  "done": true,
+  "files": [
+    {"path": "electron/services/routines.ts", "change": "modified", "summary": "Re-exports RoutinePlan and RoutineStepCandidate (type-only, from the existing ./intent import) so src/shared/contracts.ts `import type {RoutinesView, UndoOutcome, RoutinePlan} from '../../electron/services/routines'` resolves. No behaviour change."},
+    {"path": "tests/autopilot-routines.test.mjs", "change": "extended", "summary": "+4 tests: persisted routines reloaded from storage start through createRoutinesApi with injected action confirmation (decline stops the run before the shell, approval runs one confirmation per sensitive step); double-start through the API yields exactly one run, pause-all then cancel keep partial results and free the routine without raising a confirmation; a run in flight at app close is marked interrupted, never auto-resumed, and the routine starts fresh; TypeScript-program check that contracts.ts type imports from routines.ts resolve and routines.ts exports RoutinePlan/RoutineStepCandidate/RoutinesView/UndoOutcome/RoutinesApi/createRoutinesApi."},
+    {"path": "docs/continuation-result.routines.json", "change": "new"}
+  ],
+  "unchangedAssigned": ["electron/services/intent.ts", "src/components/Routines.tsx"],
+  "checks": [
+    {"command": "npm ci --ignore-scripts", "result": "pass", "detail": "repo-local"},
+    {"command": "node --test tests/autopilot-routines.test.mjs tests/backend-intent.test.mjs", "result": "pass", "detail": "36/36 (22 routine tests, run 3x for stability)"},
+    {"command": "npx tsc --noEmit", "result": "pass for routines scope", "detail": "RoutinePlan import error gone. The only remaining error is electron/backend.ts(201) missing the routines* (and other) JarvisAPI methods: API owner wiring, not this module."}
+  ],
+  "interfaces": {
+    "typeExports": "electron/services/routines.ts exports: Routine, RoutineStep, ActionStep, WaitStep, Schedule, StepCondition, RunRecord, StepResult, RunStatus, StepStatus, RoutineData, RoutineStorage, RoutineActionPort, RoutineDeps, RoutineView, RoutinesView, UndoOutcome, UndoRecord, RoutineGate, RoutinesApi, RoutinePlan, RoutineStepCandidate; values RoutineEngine, RoutineError, createRoutinesApi, ROUTINE_GATES, validateRoutine/validateStep/validateSchedule.",
+    "apiOwnerWiring": {
+      "construct": "const routines = new RoutineEngine({storage, actions: {preview: (r) => actions.preview(r), execute: (id, ok) => actions.execute(id, ok)}, now: Date.now, newId, windows: () => native.listWindows(), confirm: env.confirm, activity, safeLaunch}); await routines.init(); on quit: routines.dispose(); const api = createRoutinesApi(routines).",
+      "storage": "RoutineStorage {load(): Promise<unknown>; save(data: RoutineData): Promise<void>}; suggest userData/routines.json with the existing atomic write. Corrupt data is dropped and reported via view().loadError; save failures via view().saveError.",
+      "actions": "MUST be the real ActionService (its trusted dialog.showMessageBox confirm gates every sensitive step). The engine refuses any non-list-windows preview that does not require approval.",
+      "confirm": "Must be the trusted main-process BackendEnv.confirm (Cancel default, full detail), never a renderer boolean. Without it scheduled starts are recorded as declined; manual start still gets per-step action confirmations.",
+      "jarvisApiMethods": "routinesList() -> api.list(); routinesSave(draft) -> api.save; routinesRemove(id) -> api.remove; routinesStart(id) -> api.start (returns {runId}); routinesCancel(runId) -> api.cancel; routinesPauseAll() -> api.pauseAll; routinesResumeAll() -> api.resumeAll; routinesUndo(runId) -> api.undo; routinesPlanText(text) -> api.planText; routinesPlanModel(json) -> api.planModel. Contract already declares these optional methods. Arguments are untrusted renderer input; the engine validates them. Add matching preload bridges and ipcMain handlers.",
+      "ui": "src/components/Routines.tsx takes an injected api prop (or window.jarvis routines methods); the shell must map the flat routines* methods to that RoutinesApi shape."
+    }
+  },
+  "limitations": [
+    "Not wired: no ipcMain handlers, preload bridge, storage file or nav entry exist in this worktree; electron/backend.ts still fails typecheck until the API owner adds routines* (and the other missing) methods.",
+    "Verified with a mock native adapter, the real ActionService and a stub trusted confirmation only; no real desktop action and no Electron runtime check.",
+    "Only one routine runs at a time; overlapping scheduled slots are recorded as skipped.",
+    "Cancellation takes effect before the next step or retry; it cannot dismiss an open native confirmation.",
+    "Undo covers only window moves marked undoable. Recording (89) and semantic drag (90) stay gated (G4); richer adapters (88) are partial.",
+    "Test run ids are harness-generated and restart per engine, so the lifecycle tests address runs by position; the new tests use 5 ms settle waits and passed 3 consecutive runs."
+  ]
+}

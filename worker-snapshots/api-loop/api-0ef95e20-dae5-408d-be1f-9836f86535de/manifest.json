@@ -1,0 +1,21 @@
+{
+  "task": "Loop 10: worklog-drafts",
+  "sessionId": "api-0ef95e20-dae5-408d-be1f-9836f86535de",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/worklog.ts",
+      "bytes": 11102,
+      "sha256": "28f22a4089a5ea85bc7c5ba661847e3c5c688e3d1ae381f03301375349bbf7c1"
+    },
+    {
+      "path": "src/components/MemoryWorkbench.tsx",
+      "bytes": 11,
+      "sha256": "83acce8cff053ecb1dd5f36bf2fad7bc51ee4720e1d17b0c43afa1b029264ec3"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

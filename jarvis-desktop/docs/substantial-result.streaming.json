@@ -1,0 +1,104 @@
+{
+  "role": "streaming",
+  "session": "jarvis-desktop-93",
+  "branch": "ao/jarvis-desktop-93/root",
+  "baseCommit": "47a8092",
+  "done": true,
+  "files": [
+    "electron/services/ollama.ts (new)",
+    "electron/services/cloud.ts (new)",
+    "electron/ipcCore.ts",
+    "electron/backend.ts",
+    "electron/channels.ts",
+    "electron/preload.ts",
+    "src/shared/contracts.ts",
+    "src/ui/bridges.ts",
+    "src/components/Assistant.tsx",
+    "tests/substantial-streaming.test.mjs (new)",
+    "tests/autopilot-api.test.mjs",
+    "docs/substantial-result.streaming.json"
+  ],
+  "notTouched": [
+    "electron/ipc.ts",
+    "electron/main.ts",
+    "electron/services/chat.ts",
+    "electron/services/netGuard.ts",
+    "package.json",
+    "App/nav",
+    "3D/avatar owner paths"
+  ],
+  "checks": [
+    {
+      "command": "npm ci --ignore-scripts",
+      "result": "pass (repo-local)"
+    },
+    {
+      "command": "npx tsc --noEmit -p .",
+      "result": "pass"
+    },
+    {
+      "command": "node --test tests/substantial-streaming.test.mjs",
+      "result": "pass 19/19 (~2 s; 3 consecutive runs stable after fixing a test-side race)"
+    },
+    {
+      "command": "node --test tests/autopilot-api.test.mjs",
+      "result": "pass 22/22"
+    },
+    {
+      "command": "npm test (full suite)",
+      "result": "pass 974/974 (baseline 955 + 19 new)"
+    },
+    {
+      "command": "npm run build",
+      "result": "pass (typecheck, vite build, main/preload bundle)"
+    }
+  ],
+  "interfaces": {
+    "contract": "src/shared/contracts.ts v2.3 additions, all optional on JarvisAPI (older/preview bridges still type-check): ChatStreamRoute, ChatStreamStart {streamId, generation, route}, ChatStreamOutcome 'complete'|'truncated'|'cancelled'|'incomplete'|'failed', ChatStreamEvent (status|delta|done|lost, each tagged streamId/generation/seq), ChatStreamBatch {events, next, ended}; methods chatStreamStart(text), chatStreamRead(streamId, cursor), chatStreamCancel(streamId), onChatStream(start, handler) => unsubscribe.",
+    "ipc": "channels.ts adds chatStreamStart(1), chatStreamRead(2), chatStreamCancel(1). ipcCore ARG_SPECS: text <= LIMITS.chat, stream id exactly 36 chars (hub re-checks UUID format), cursor via new 'integer' ArgSpec (0..1e6). Untrusted senders rejected by the existing dispatch. No change to ipc.ts/main.ts was needed: events travel back only in the invoking caller's own invoke replies (long-poll), so there is no broadcast channel to leak across windows.",
+    "lifecycle": "ipcCore.ChatStreamHub (pure, unit tested) owns each stream's AbortController, bounded event queue, generation counter, long-poll cursor (a read acknowledges everything before its cursor; future/acknowledged cursors rejected), abandonment timer (no reads for 45 s aborts upstream), retain timer, abortRoute/abortAll and dispose. Sinks drop status/delta after any stop request or abort and finish exactly once.",
+    "backend": "createBackend wires chatStreamStart/Read/Cancel. Route = mode ('online' -> cloud only with a stored key; otherwise local). User message stored once at start; the outcome (partial reply + note, full reply, or truncated reply + cap note) stored once at the end, re-checked inside the serialized store mutation. clearChat/importData abort with 'cleared' and dispose with 'disposed': nothing is written after either. saveSettings leaving online mode aborts cloud streams ('Stopped because online mode was switched off.'). A provider that settles successfully after a stop is treated as cancelled, keeping only text the hub accepted before the stop. getApiInfo now reports chat-streaming and chat-cancel available with truthful reasons. Legacy chat() unchanged.",
+    "providers": "electron/services/ollama.ts: LineSplitter (fatal UTF-8 decoder, fragmented multi-byte reassembly, 256 KiB line cap, 8 MiB body cap), pumpLines (abort cancels reader, idle timeout 120 s, end marker cancels the rest), parseOllamaFrame, readBoundedText (error bodies read to a byte bound then cancelled), streamOllamaChat (guardedFetch purpose 'ollama', timeoutMs 10 min). electron/services/cloud.ts: SseParser (bounded data), AnthropicStreamValidator (message_start -> sequential content blocks -> message_delta -> message_stop; ping anywhere; anything after stop rejected; event name must match data.type), streamCloudChat (guardedFetch purpose 'cloud-chat'; status-only HTTP errors; provider error events surface only the machine-readable error type). StreamResult has explicit truncated flag; reply cap 60 000 chars unchanged.",
+    "usage": "Only when the provider reported both token counts (Ollama prompt_eval_count/eval_count on the done frame; Anthropic input_tokens from message_start plus output_tokens from message_delta) is one event recorded in the existing usage ledger. Cancelled, incomplete, failed and truncated replies record nothing: unknown counts stay unknown.",
+    "preload": "onChatStream uses src/ui/bridges.ts subscribeChatStream: long-polls chatStreamRead, validates every event's shape, streamId, generation and contiguous seq; skips duplicates from a retried read; reports 'lost' for foreign/out-of-order/malformed events or 3 consecutive read failures; nothing is delivered after done/lost or unsubscribe.",
+    "ui": "Assistant uses streaming only when the bridge exposes it and getApiInfo reports chat-streaming available, else the unchanged api.chat path. Live assistant bubble with connecting/writing/stopping status, Stop button (calls chatStreamCancel), notices for truncated and interrupted streams, reload of stored chat at the end (stored chat is the record, so nothing is duplicated). Leaving the Assistant screen cancels a reply in flight. Exported pure helpers applyStreamEvent (ignores stale generations/other streams), streamFinalNotice; classifyReply now recognises 'Stopped because ...' and the cap note. Microphone consent, inline avatar, command preview and native confirmation flows are untouched."
+  },
+  "security": [
+    "All provider traffic goes through the existing guardedFetch; no new origins, purposes or dependencies.",
+    "The API key is placed only in the x-api-key header of the cloud request; HTTP and SSE error text never includes provider free text; tests assert the key is absent from errors, stored state and activity.",
+    "Stream ids are random UUIDs returned only to the starting caller; events are delivered only through that caller's invoke replies.",
+    "Hard caps: chat text 16 KiB, line 256 KiB, body 8 MiB, reply 60 000 chars, delta event 16 384 chars, 256 undelivered events, idle 120 s, request 10 min."
+  ],
+  "dependencies": "none added",
+  "limitations": [
+    "Stream ownership is capability-based (unguessable id) rather than bound to a webContents id, because the dispatcher in ipc.ts (not owned) does not pass sender identity to handlers. Binding to event.sender.id would be a small follow-up in ipc.ts/main.ts.",
+    "Leaving the Assistant screen (unmount) cancels the reply and the stored note reads 'Stopped by you.'; a window that closes without unmounting is caught by the 45 s abandonment timer ('Stopped because no window was receiving the reply.').",
+    "Cancelled or truncated cloud replies may still be billed by the provider, but no usage is recorded because the provider did not report final counts.",
+    "electron/services/chat.ts still contains the older ChatService/streaming helpers (not owned, not used by the new path); legacy chat() keeps using sendChat.",
+    "Not exercised against a real Ollama or Anthropic endpoint in this session (offline rules); all tests use injected mock fetch and fake bodies."
+  ],
+  "integrationReview": {
+    "date": "2026-10-15",
+    "status": "integrated-local-checks-pass",
+    "fixes": [
+      "Fixed 2-second absolute deadline and abort cancellation for byte-bounded HTTP error reads.",
+      "Stopped arbitrary cloud transport exception and invalid SSE event names from entering stored error messages.",
+      "Assistant start now disables composer while awaiting the stream ID; resolving after unmount cancels the orphan stream."
+    ],
+    "checks": [
+      "Original repository npm run typecheck PASS.",
+      "Original repository streaming + API suites 44/44 PASS.",
+      "Final streaming-only run 22/22 PASS after deadline refinement."
+    ],
+    "noNewApiSpend": true,
+    "pending": [
+      "Root final full suite, build and packaged runtime smoke.",
+      "Real provider endpoint cancellation/streaming remains untested; mocks only.",
+      "Manual Assistant mount/unmount interaction not executed."
+    ],
+    "boundaries": [
+      "Stream handles are capability IDs, not webContents-bound; main dispatcher sender validation still required.",
+      "App/lazy navigation, microphone consent and native confirmations preserved."
+    ]
+  }
+}

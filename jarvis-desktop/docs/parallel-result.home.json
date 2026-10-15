@@ -1,0 +1,36 @@
+{
+  "role": "home",
+  "done": true,
+  "date": "2026-10-15",
+  "completedLocally": true,
+  "ownedChangedPaths": [
+    "src/components/Home.tsx",
+    "src/components/SceneBackdrop.tsx",
+    "src/styles/parallel-home.css",
+    "tests/parallel-home.test.mjs",
+    "docs/parallel-result.home.json"
+  ],
+  "checks": [
+    {
+      "command": "npm run typecheck",
+      "result": "pass, zero diagnostics"
+    },
+    {
+      "command": "node --test tests/parallel-home.test.mjs tests/milestone-home-widgets.test.mjs",
+      "result": "38 tests,38 pass,0 fail,0 skipped"
+    }
+  ],
+  "delivered": [
+    "Capability/model-aware status hierarchy and navigation shortcuts driven by saved data; no invented activity.",
+    "Local quick task/note capture through existing bridge, submission lock and disabled mode switch while saving.",
+    "Overdue/today/week task triage and serialized completion controls, recent capsules/notes and grouped activity.",
+    "Existing saved widget layouts preserved; status grid has narrow viewport fallback.",
+    "Ambient backdrop drift stops under reduced motion and pauses while hidden, with observer/listener cleanup."
+  ],
+  "limitations": [
+    "Static render/pure logic tests; click handlers and real Electron visuals have not been interactively verified in this worktree.",
+    "Home calendar day refreshes on focus/visibility; continuously visible midnight rollover is not implemented.",
+    "Parent/captain owns integration, production build, full-suite and installer validation."
+  ],
+  "paidApiCalls": 0
+}

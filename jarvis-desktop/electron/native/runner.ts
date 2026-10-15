@@ -1,17 +1,19 @@
 // Bounded PowerShell runner. execFile only (no shell), JSON on stdin, one JSON line on stdout.
 import {execFile, type ChildProcess} from 'node:child_process';
 import * as path from 'node:path';
+import {promises as fsp} from 'node:fs';
 import {toUnpackedPath} from '../services/paths';
+import {IntegrityError, SHARED_HELPERS, getNativeIntegrity, verifyFiles, type IntegrityConfig, type ReadFileFn} from './integrity';
 
 export const SCRIPTS = [
-  'list-windows', 'focus-window', 'move-window', 'type-text', 'click', 'speak', 'transcribe', 'probe-speech', 'dpapi',
+  'list-windows', 'focus-window', 'move-window', 'type-text', 'click', 'speak', 'transcribe', 'probe-speech', 'dpapi', 'OcrLocal',
 ] as const;
 export type ScriptName = (typeof SCRIPTS)[number];
 
 export interface RunOptions { timeoutMs?: number; maxStdoutBytes?: number; signal?: AbortSignal }
 
 export class NativeError extends Error {
-  constructor(message: string, readonly kind: 'timeout' | 'cancelled' | 'output-too-large' | 'exit' | 'bad-output' | 'unavailable' = 'exit') { super(message); }
+  constructor(message: string, readonly kind: 'timeout' | 'cancelled' | 'output-too-large' | 'exit' | 'bad-output' | 'unavailable' | 'integrity' = 'exit') { super(message); }
 }
 
 export type ExecFileFn = typeof execFile;
@@ -22,6 +24,10 @@ export interface RunnerOptions {
   powershellPath?: string;
   execFileImpl?: ExecFileFn;
   concurrency?: number;
+  /** Helper integrity check. Defaults to the manifest main.ts configured; tests pass their own. */
+  integrity?: IntegrityConfig;
+  /** Test seam for reading helper bytes. */
+  readFileImpl?: ReadFileFn;
 }
 
 export const DEFAULT_TIMEOUT_MS = 15_000;
@@ -46,6 +52,8 @@ export class NativeRunner {
   private ps: string;
   private exec: ExecFileFn;
   private limit: number;
+  private integrity?: IntegrityConfig;
+  private readFile: ReadFileFn;
   private active = 0;
   private waiting: Array<() => void> = [];
   private children = new Set<ChildProcess>();
@@ -55,6 +63,23 @@ export class NativeRunner {
     this.ps = opts.powershellPath ?? defaultPowerShellPath();
     this.exec = opts.execFileImpl ?? execFile;
     this.limit = opts.concurrency ?? 2;
+    this.integrity = opts.integrity;
+    this.readFile = opts.readFileImpl ?? ((f) => fsp.readFile(f));
+  }
+
+  /** Hashes the script and its shared module against the build-time manifest; throws NativeError('integrity') on any mismatch. */
+  private async verify(script: ScriptName): Promise<void> {
+    const cfg = this.integrity ?? getNativeIntegrity();
+    if (!cfg.manifest) {
+      if (cfg.required) throw new NativeError('Native helpers are disabled: the integrity manifest is missing', 'integrity');
+      return;
+    }
+    try {
+      await verifyFiles(cfg.manifest, [`${script}.ps1`, ...SHARED_HELPERS], (n) => path.win32.join(this.nativeDir, n), this.readFile);
+    } catch (e) {
+      if (e instanceof IntegrityError) throw new NativeError(e.message, 'integrity');
+      throw e;
+    }
   }
 
   get runningChildren(): number { return this.children.size; }
@@ -87,6 +112,7 @@ export class NativeRunner {
     const timeout = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const maxBuffer = opts.maxStdoutBytes ?? DEFAULT_MAX_STDOUT;
     if (opts.signal?.aborted) throw new NativeError('Native helper was cancelled', 'cancelled');
+    await this.verify(script);
     await this.acquire();
     try {
       // Cancelled while waiting for a free slot: never start the helper.

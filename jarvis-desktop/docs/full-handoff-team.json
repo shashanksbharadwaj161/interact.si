@@ -1,0 +1,104 @@
+{
+  "at": "2026-10-14T17:06:11.926Z",
+  "ceiling": 350,
+  "buffer": 35,
+  "allocation": 46,
+  "protectedAtStart": 268.59414556,
+  "originalRepository": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop",
+  "workers": [
+    {
+      "role": "workspace",
+      "model": "claude-fable-5-1",
+      "budget": 28,
+      "files": [
+        "electron/services/store.ts",
+        "electron/services/search.ts",
+        "src/components/MemoryWorkbench.tsx",
+        "src/components/WritingWorkbench.tsx",
+        "src/components/Capsules.tsx",
+        "src/components/MemorySearch.tsx",
+        "src/ui/workbench.ts",
+        "src/ui/prompt-tools.ts",
+        "src/components/PromptTools.tsx",
+        "tests/full-workspace.test.mjs"
+      ],
+      "id": "a10b2c8f-123a-4ff5-aa18-209856cbfa7a",
+      "status": "running",
+      "sessionId": "jarvis-desktop-97",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-97"
+    },
+    {
+      "role": "captain",
+      "model": "claude-opus-5-5",
+      "budget": 18,
+      "files": [
+        "src/components/App.tsx",
+        "src/ui/nav.ts",
+        "src/ui/bridges.ts",
+        "src/shared/contracts.ts",
+        "electron/backend.ts",
+        "electron/channels.ts",
+        "electron/ipcCore.ts",
+        "electron/preload.ts",
+        "electron/main.ts",
+        "docs",
+        "scripts",
+        "tests/full-integration.test.mjs",
+        "package.json"
+      ],
+      "id": "d2793758-22c0-48bb-829e-3757d2d73f71",
+      "status": "running",
+      "sessionId": "jarvis-desktop-98",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-98"
+    },
+    {
+      "role": "guidance",
+      "model": "claude-opus-5-5",
+      "budget": 20,
+      "files": [
+        "src/components/GuidedSetup.tsx",
+        "src/ui/guidance.ts",
+        "tests/full-guidance.test.mjs",
+        "docs/full-result.guidance.json",
+        "docs/full-interface.guidance.json"
+      ],
+      "id": "074e5219-3529-41c2-bac5-37ce94fda28d",
+      "status": "running",
+      "sessionId": "jarvis-desktop-99",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-99"
+    },
+    {
+      "role": "acceptance",
+      "model": "claude-opus-5-5",
+      "budget": 20,
+      "files": [
+        "tests/full-acceptance.test.mjs",
+        "tests/full-security-regressions.test.mjs",
+        "docs/full-result.acceptance.json",
+        "docs/full-security-findings.md"
+      ],
+      "id": "e08e9c34-3da0-46c7-a991-f7503e90877f",
+      "status": "running",
+      "sessionId": "jarvis-desktop-100",
+      "worktree": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-100"
+    }
+  ],
+  "baseline": {
+    "sourceCommit": "1256faf",
+    "appTests": 989,
+    "controlRoomTests": 47
+  },
+  "requestedComposition": {
+    "fable": 1,
+    "opus": 3
+  },
+  "taskCapSum": 86,
+  "taskCapsAreNotFundingAllocation": true,
+  "lastProtectedSnapshot": {
+    "limit": 350,
+    "safety": 35,
+    "committed": 284.31318926,
+    "remaining": 30.68681074,
+    "uncertain": 184
+  }
+}

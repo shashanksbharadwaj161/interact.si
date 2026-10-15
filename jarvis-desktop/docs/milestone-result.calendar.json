@@ -1,0 +1,68 @@
+{
+  "role": "calendar",
+  "module": "Calendar view: .ics import preview, errors, date sorting, clear (roadmap scope 59, UI part)",
+  "done": true,
+  "files": [
+    {"path": "src/components/Calendar.tsx", "change": "added", "purpose": "Calendar view with injected CalendarClient, .ics preview, skipped-item summary, day-grouped event list, clear confirmation, unavailable fallback"},
+    {"path": "tests/milestone-calendar-ui.test.mjs", "change": "added", "purpose": "22 node:test cases: pure preview/sort/group/import helpers, SSR markup for states, escaping, list cap, and renderer-safety source checks"},
+    {"path": "docs/milestone-result.calendar.json", "change": "added", "purpose": "Result signal and interface description for the captain and shell owner"}
+  ],
+  "checks": [
+    {"command": "node --test tests/milestone-calendar-ui.test.mjs", "result": "pass", "detail": "22 tests, 0 failures, no React warnings in output"},
+    {"command": "TZ=America/Los_Angeles / TZ=Pacific/Kiritimati / TZ=UTC node --test tests/milestone-calendar-ui.test.mjs", "result": "pass", "detail": "22/22 under each zone"},
+    {"command": "npx tsc --noEmit", "result": "pass", "detail": "exit 0, whole repository typecheck"},
+    {"command": "esbuild bundle of src/components/Calendar.tsx for platform browser", "result": "pass", "detail": "Only project inputs are electron/services/calendar.ts (pure), src/ui/util.ts, src/ui/primitives.tsx, src/ui/Dialog.tsx and the view itself. No Node built-ins."},
+    {"command": "npm ci --ignore-scripts", "result": "pass", "detail": "Repo-local install in this worktree only; node_modules is gitignored"}
+  ],
+  "interfaces": {
+    "component": "export function Calendar(props: { api?: CalendarClient | null; initialEvents?: CalendarEvent[] })",
+    "componentNotes": [
+      "api missing or null renders a 'Calendar is not connected' notice with no file input and no import or clear controls.",
+      "Pass a memoized client. The view loads list() when the api identity changes.",
+      "initialEvents seeds the list before list() resolves. It is for tests and first paint only."
+    ],
+    "proposedClient": {
+      "CalendarClient": {
+        "list": "(): Promise<CalendarEvent[]>  Stored events from the main process store. The view sorts them.",
+        "importIcs": "(text: string): Promise<CalendarImportResult>  Main process parses the text with electron/services/calendar.parseIcs, merges with mergeEvents, persists, and returns counts. Must enforce MAX_ICS_BYTES itself.",
+        "clear": "(): Promise<void>  Removes imported events only. Does not touch .ics files."
+      },
+      "CalendarImportResult": {"added": "number", "dropped": "number", "total": "number"},
+      "matchesDataApiProposal": false,
+      "matchesDataApiProposalNote": "No calendar entries exist yet in src/shared/contracts.ts, electron/preload.ts or electron/channels.ts in the API worktree (jarvis-desktop-33) at check time. This client is the proposal. The API owner or captain should either adopt these names or adapt a bridge in src/ui/bridges.ts (for example calendarBridge(api) that returns null when calendarList, calendarImport and calendarClear are missing)."
+    },
+    "exports": [
+      "Calendar", "CalendarClient", "CalendarImportResult", "CalendarPreview",
+      "EventList", "PreviewPanel", "previewText", "readPreview", "importPreview",
+      "groupByDay", "sortEvents", "compareEvents", "dayKey", "whenLabel",
+      "MAX_LIST_ROWS (200)", "MAX_PREVIEW_ROWS (50)"
+    ],
+    "rendererImports": {
+      "runtime": ["parseIcs", "MAX_ICS_BYTES", "MAX_EVENTS from electron/services/calendar"],
+      "types": ["CalendarEvent", "IcsParseResult", "SkipCode from electron/services/calendar"],
+      "ui": ["src/ui/primitives.tsx", "src/ui/Dialog.tsx", "src/ui/util.ts"]
+    },
+    "shellWiring": [
+      "Add a navigation entry and route that renders <Calendar api={...} /> (shell owner; this file does not mount it).",
+      "Calendar is not in App.tsx or nav yet, so it is unreachable in the app until the shell wires it."
+    ]
+  },
+  "dependencies": {
+    "added": [],
+    "runtime": "none added",
+    "reuses": ["@phosphor-icons/react (existing)", "electron/services/calendar.ts (existing, pure)"]
+  },
+  "limitations": [
+    "Not mounted anywhere. The shell must add the route, and the captain must supply the client through the IPC bridge. No calendar IPC channel exists yet.",
+    "Recurrence is not expanded. Repeating events are skipped and counted, and the preview says so.",
+    "Only UTC and floating times are supported. Other time zones are skipped and counted.",
+    "Floating and all-day events are grouped by the day written in the file. UTC events are grouped by local day. When a file mixes both, the order between them can differ from the real instant.",
+    "Stored events beyond the first 200 are not shown. There is no pagination, and the view says how many are hidden.",
+    "The preview shows at most 50 events. Skipped items and totals are still counted.",
+    "Import sends the same text that was previewed. The main process must parse it again and enforce the size limit, because the renderer parse is only a preview.",
+    "Tests use server-rendered markup and pure helpers. Effect-driven loading, file selection and the confirm dialog are not exercised in a DOM. The repo has no DOM test runtime, and adding one needs a dependency change this worker did not make.",
+    "Not checked in the running Electron app or with a screen reader. Accessibility coverage is markup-level only: labelled file input, aria-live status region, labelled day groups, disabled import with a stated reason.",
+    "Observation outside this worker's paths: src/ui/Dialog.tsx sets aria-labelledby to a title id that is absent while the dialog is closed. The dialog owner should check this.",
+    "No personal calendar access, accounts, OAuth or network. Nothing reads a user calendar."
+  ]
+}

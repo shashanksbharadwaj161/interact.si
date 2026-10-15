@@ -1,0 +1,55 @@
+{
+  "role": "assistant",
+  "session": "jarvis-desktop-61",
+  "branch": "ao/jarvis-desktop-61/root",
+  "baseCommit": "590aa55",
+  "done": true,
+  "files": [
+    "src/components/Assistant.tsx",
+    "src/components/Computer.tsx",
+    "tests/milestone-assistant.test.mjs",
+    "docs/milestone-result.assistant.json"
+  ],
+  "verifiedAgainst": "Merged createBackend (electron/backend.ts) with injected native/shell/fetch/confirm mocks; no real desktop input, no network, no Electron.",
+  "changes": {
+    "assistantChat": [
+      "System notes the backend stores instead of rejecting are now typed: 'Local/Cloud model unavailable: <reason>' (danger, with System status + Check again), 'Stopped by you.' (info), 'The connection ended before the reply was finished.' (warn). Previously every system note was titled 'The model did not answer'.",
+      "A partial reply followed by a stopped/incomplete note gets an 'Incomplete' badge.",
+      "Model route panel and the waiting indicator report the backend's own reasons for chat-streaming and chat-cancel (both unavailable); no stop button and no fake streaming."
+    ],
+    "intentFlow": [
+      "Execution refusals are typed (declined native confirmation, expired/used preview, paused confirmations, rate limit, safe launch) and explained as 'Nothing ran', with the backend's wording kept visible.",
+      "An unknown/expired/used preview on execute is a definite 'not run', not 'unconfirmed'. Unknown thrown errors and bare resolved promises stay 'unconfirmed'.",
+      "Waiting state while the Windows confirmation is open; approval is disabled and 'Preview again' offered once a preview is older than 59 s (backend TTL is 60 s).",
+      "Copy states that the trusted Windows confirmation (Cancel default) decides; the in-page dialog in Computer no longer says 'This runs ... right after you approve' and its button reads 'Approve & continue to Windows'."
+    ],
+    "exportsAdded": ["classifyReply", "incompleteReplyIds", "unavailableDetail", "notRunCause", "explainNotRun", "usePreviewExpired", "PREVIEW_VALID_MS", "CommandFlow", "types ReplyKind, NotRunCause"],
+    "contractsUnchanged": "No JarvisAPI/contract change. CommandStep.outcome gained an optional 'cause' (renderer-local type)."
+  },
+  "checks": {
+    "tsc --noEmit": "clean",
+    "node --test tests/milestone-assistant.test.mjs": "12/12 pass",
+    "npm test": "591 tests, 587 pass, 0 fail, 4 pre-existing TODO (route deep links / Routines / Integrations reachability: owned by shell, not this module)",
+    "vite build": "pass",
+    "setup": "npm ci --ignore-scripts (repo-local, node_modules was absent)"
+  },
+  "streamingProposal": {
+    "forOwner": "data-api (electron/backend.ts, electron/channels.ts, electron/ipcCore.ts, electron/preload.ts, src/shared/contracts.ts)",
+    "status": "Not implemented in the UI: JarvisAPI has no stream/cancel methods; getApiInfo reports chat-streaming and chat-cancel as unavailable. ChatService (electron/services/chat.ts: start(text,{onDelta}) -> {id,cancel,done}; cancel(id?)) already exists and is not wired.",
+    "proposal": {
+      "contracts": "chatStart?(text:string):Promise<{id:string}>; chatCancel?(id?:string):Promise<boolean>; onChatDelta?(handler:(e:{id:string;delta:string})=>void):()=>void; onChatDone?(handler:(e:{id:string;message:ChatMessage})=>void):()=>void. All optional, like the other v2 methods.",
+      "backend": "chatStart wraps ChatService.start: push onDelta to the renderer over a jarvis:chatDelta event, resolve done to jarvis:chatDone with the stored final ChatMessage (system note for stop/incomplete/provider errors, as today). Busy start rejects with 'A reply is already being generated. Stop it first'. chatCancel returns ChatService.cancel(id). Keep chat() unchanged for compatibility.",
+      "ipc": "Strict arg specs: chatStart [string<=4000], chatCancel [optional string<=100]. Events go only to the sender window from a trusted origin.",
+      "apiInfo": "Flip chat-streaming and chat-cancel to available only when the methods are wired.",
+      "uiFollowUp": "Assistant.tsx would show the growing reply while pending and a Stop button that calls chatCancel; the already-typed 'Stopped by you' and 'cut off' notes then render without further UI work."
+    }
+  },
+  "limitations": [
+    "No stop button or streaming until the proposal above is implemented by the data-api owner.",
+    "System notes are typed by the backend's message text (classifyReply). If chat.ts wording changes, the tests in tests/milestone-assistant.test.mjs against the real backend will fail first for 'unavailable'; 'stopped'/'incomplete' are only covered by literal strings because the backend cannot produce them without a stream.",
+    "Preview expiry is a renderer timer (59 s) mirroring the backend's 60 s PREVIEW_TTL_MS; the backend remains the authority and its refusal is typed 'expired'.",
+    "Computer.tsx imports its shared helpers from Assistant.tsx; moving them to src/ui would need a shell-owner change.",
+    "CommandFlow is rendered to static markup in tests (no DOM, effects do not run); the expiry timer itself is not exercised.",
+    "No real desktop input, speech, microphone or Electron window was exercised."
+  ]
+}

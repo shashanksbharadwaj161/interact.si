@@ -1,0 +1,65 @@
+{
+  "role": "coverage",
+  "session": "jarvis-desktop-56",
+  "date": "2026-10-14",
+  "done": true,
+  "denominator": "140 roadmap scopes from src/shared/feature-registry.json (version 3). Owner split: main-api 61, native 40, ui-shell 39; 0 unassigned.",
+  "method": "Status from completed module result files (autopilot-result.<role>.json in each owner source tree, read for this pass), the test titles they report, and the combined tree at this worktree. Each test evidence reference was checked against the named file and against the TAP output of npm test (103 references, 0 missing, 0 failing). Module-only code is partial, never verified. Integration level is separate: none, module-tested, integrated, runtime-verified.",
+  "status": {
+    "verified": 5,
+    "partial": 66,
+    "planned": 69,
+    "baselineBefore": {"verified": 5, "partial": 39, "planned": 96}
+  },
+  "integration": {
+    "integrated": 45,
+    "module-tested": 23,
+    "runtime-verified": 3,
+    "none": 69
+  },
+  "verifiedScopes": [2, 3, 46, 51, 116],
+  "moduleTestedScopes": [14, 18, 19, 56, 59, 72, 75, 82, 83, 84, 85, 86, 87, 102, 105, 108, 121, 123, 124, 125, 126, 127, 128],
+  "files": [
+    "src/shared/feature-registry.json",
+    "docs/feature-matrix.md",
+    "docs/autopilot-coverage.md",
+    "docs/continuation-result.coverage.json"
+  ],
+  "completedModuleEvidence": [
+    {"role": "shell", "scopes": "1-10, 62-65, 67, 68", "tests": 20, "integrated": true, "note": "Integrated at e653f5c; 61 and 66 not built."},
+    {"role": "api", "scopes": "supports 3, 46, 81", "tests": 15, "integrated": true, "note": "Contract v2, IPC validation, planner, search, local model list."},
+    {"role": "integrations", "scopes": "101, 102, 105, 106, 108", "tests": 31, "integrated": false, "note": "IPC and backend methods declared but not implemented; 103, 104, 107, 109, 110 unbuilt or gated."},
+    {"role": "routines", "scopes": "82-87", "tests": 18, "integrated": false, "note": "Engine only; backend IPC missing; 89 and 90 refused by validation."},
+    {"role": "models", "scopes": "12, 13, 14, 17, 18, 19, 21, 22", "tests": 46, "integrated": "partial", "note": "Streaming service and pack import tested; 2 cancellation tests fail in the combined tree; 15, 16, 20 reported unsupported."},
+    {"role": "native", "scopes": "9, 52, 115", "tests": 25, "integrated": true, "note": "Helper integrity, login item, hotkey, reminders, launch guard."},
+    {"role": "security", "scopes": "4, 60, 81, 88, 113", "tests": 43, "integrated": true, "note": "Policy, paths, netGuard, secrets, system metrics."},
+    {"role": "widgets", "scopes": "60, 68", "tests": 29, "integrated": false, "note": "Picker not mounted."},
+    {"role": "usage", "scopes": "121-128", "tests": 24, "integrated": false, "note": "Module only; UsagePanel not mounted."},
+    {"role": "clipboard", "scopes": "56", "tests": 28, "integrated": false, "note": "Service only; no IPC, UI or capture loop."},
+    {"role": "calendar", "scopes": "59", "tests": 22, "integrated": false, "note": "ICS helpers only; no view, no recurrence."},
+    {"role": "mods", "scopes": "72, 75", "tests": 28, "integrated": false, "note": "Catalog and compatibility logic; no installable mod; 71, 73, 74, 76-80 unbuilt."},
+    {"role": "accessibility", "scopes": "8, 64", "tests": 21, "integrated": false, "note": "Module not imported by App.tsx; shell shortcuts integrated separately."},
+    {"role": "roadmap", "scopes": "registry v2", "tests": null, "integrated": null, "note": "Superseded by registry version 3 from this pass."},
+    {"role": "release", "scopes": "none", "tests": null, "integrated": null, "note": "Release checks only; no scope status change."},
+    {"role": "visual", "scopes": "none", "tests": null, "integrated": null, "note": "No result file yet; avatar and motion scopes unchanged."},
+    {"role": "productivity", "scopes": "none", "tests": null, "integrated": null, "note": "No result file yet; projects, notes, capsules and search scopes unchanged."}
+  ],
+  "checks": [
+    {"command": "npm ci --ignore-scripts", "result": "pass (repo-local, lifecycle scripts skipped)"},
+    {"command": "npx tsc --noEmit", "result": "FAIL: electron/backend.ts misses 38 JarvisAPI methods; contracts.ts imports RoutinePlan not exported by routines.ts"},
+    {"command": "npm test", "result": "477 tests, 475 pass, 2 fail (tests/autopilot-models.test.mjs cancellation tests)"},
+    {"command": "evidence check (temp script, not in repo)", "result": "103 test refs: 0 missing titles, 0 failing in TAP; 0 planned entries with evidence; all integration values valid"}
+  ],
+  "interfaces": {
+    "registry": "Each entry now has integration: none | module-tested | integrated | runtime-verified. Top-level integrationVocabulary and statusDefinitions define them. Gate status unchanged (all not-recorded)."
+  },
+  "dependencies": ["Captain: wire routines, models, integrations and usage IPC in electron/backend.ts before any of those scopes can move to integrated", "Captain: fix tsc failures and the two cancellation tests before release-grade claims"],
+  "limitations": [
+    "No Electron run, packaged build, real speech, microphone, desktop input or live provider/local-model call was performed for this pass.",
+    "Recorded smoke runs (scopes 2, 3, 51) predate this continuation and were not repeated.",
+    "No result file exists for visual or productivity workers; their scopes are unchanged from baseline.",
+    "docs/product-roadmap.md, docs/release-checklist.md and docs/acceptance.md were not edited or re-checked here.",
+    "Evidence-reference check is a one-off script in the temp folder; npm test does not enforce registry shape.",
+    "Verified count is unchanged at 5; no new manual acceptance is claimed and no gate is recorded as passed."
+  ]
+}

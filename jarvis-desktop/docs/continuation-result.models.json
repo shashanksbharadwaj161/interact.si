@@ -1,0 +1,63 @@
+{
+  "role": "models",
+  "continuation": true,
+  "files": [
+    "electron/services/chat.ts (modified)",
+    "electron/services/models.ts (modified)",
+    "tests/autopilot-models.test.mjs (modified)",
+    "docs/continuation-result.models.json (new)"
+  ],
+  "unchanged_but_reviewed": ["electron/services/speech.ts", "src/components/Models.tsx", "src/ui/audio.ts"],
+  "fixes": [
+    {
+      "bug": "Baseline failures at tests/autopilot-models.test.mjs lines 124 and 203 (cancel did not append the system note; cloud cancel omitted 'may have reached the cloud provider').",
+      "cause": "On abort, readLines cancelled the reader. ReadableStreamDefaultReader.read() then reports a normal end (done:true), so the stream finished 'successfully': partial text came back as a complete reply and the user cancel (and an idle timeout) was never noticed.",
+      "fix": "readLines now throws the abort reason when the signal is aborted, so ChatCancelled / TimeoutError surface correctly. Assertions were not weakened."
+    },
+    {
+      "bug": "A stream that ended without its end marker (Ollama done:true, Anthropic message_stop), e.g. a dropped connection, was returned as a complete reply.",
+      "fix": "New exported ChatIncomplete(partial). The partial text is stored as an assistant message followed by a system note saying the reply is incomplete and whether the cloud provider may have the message. Cap-truncated replies still count as complete."
+    },
+    {
+      "bug": "A throwing onJob / onProfile observer in ModelRuntime would throw inside the background job runner (unhandled rejection, job left 'running') or undo setProfile.",
+      "fix": "Observers are best-effort (private emit(); try/catch around onProfile)."
+    }
+  ],
+  "checks": {
+    "typecheck": "npx tsc --noEmit: 2 errors, both outside this module's paths and pre-existing: electron/backend.ts(201) missing 38 JarvisAPI methods (backend owner/captain), src/shared/contracts.ts(1) imports RoutinePlan which routines.ts does not export (routines owner). No errors in chat.ts, speech.ts, models.ts, Models.tsx, audio.ts.",
+    "tests": "node --test tests/autopilot-models.test.mjs: 49/49 (3 new: abort is an error not a normal end; dropped stream keeps partial and reports incomplete, local and cloud; throwing observers). Full npm test: 480/480.",
+    "interface_check": "ModelRuntime.select/unload/setProfile/validatePack/startImport/startPull/cancelJob/overview signatures match the JarvisAPI models* methods in src/shared/contracts.ts (ModelsOverview, PackValidation, ResourceProfileId, Result are exported by models.ts).",
+    "setup": "npm ci --ignore-scripts (repo-local, node_modules was absent in this worktree). No Ollama started, no model download, no network, no microphone."
+  },
+  "interfaces": {
+    "chat.ts": {
+      "sendChat": "sendChat(deps: ChatDeps, text: unknown): Promise<ChatMessage>  (unchanged)",
+      "ChatService": "new ChatService(deps: ChatDeps); start(text, {onDelta?}): {id: string; cancel(): void; done: Promise<ChatMessage>}; cancel(id?: string): boolean; get busy(): boolean",
+      "ChatDeps": "{store: Store; secrets: Pick<Secrets,'configured'|'reveal'>; fetch: GuardedFetch; cloudOrigin?: string; profile?: () => ChatProfile | undefined}",
+      "errors": "ChatCancelled(partial), ChatIncomplete(partial) (new)",
+      "other_exports": "ollamaChat, cloudChat, probeLocalModel, buildHistory, resolveChatRoute, readLines, readNdjson, readSseData, withIdleSignal, missingModelHelp, STREAM_IDLE_MS, LOCAL_KEEP_ALIVE, ANTHROPIC_VERSION"
+    },
+    "models.ts": {
+      "ModelRuntime": "new ModelRuntime({fetch, settings, ramGB?, guard?, io?, adapters?, newId, now?, onJob?, onProfile?, initialProfile?}); overview(), select(name,{warm?,unloadOthers?}) -> Result<{patch:{localModel}; warmed}> (does not save settings), unload(name?), setProfile(id), validatePack(dir), startImport(dir,name?), startPull(model), cancelJob(id), chatProfile",
+      "ModelActionGuard": "must be a trusted native dialog.showMessageBox callback (Cancel default), never a renderer boolean",
+      "ModelsClient": "renderer-facing shape; map 1:1 onto JarvisAPI modelsOverview/modelsSelect/modelsUnload/modelsSetProfile/modelsValidatePack/modelsStartImport/modelsStartPull/modelsCancelJob/modelsPickPackFolder"
+    },
+    "speech.ts": "Speech: speak(text,{engine?}), transcribe(audio,{engine?}), capabilities(), status(), probe(), cancel(): boolean, cancelTranscribe(): boolean (unchanged this continuation)",
+    "audio.ts": "micSupport, micPermission, listMicrophones, clipQuality, trimSilence, ClipRecorder (unchanged this continuation)",
+    "Models.tsx": "<Models client currentModel onUseModel/> and presentational ModelsView (unchanged this continuation)"
+  },
+  "for_api_owner": [
+    "Wire chat start/cancel over IPC with ChatService (start -> push onDelta to renderer, return id; cancel(id)); the JarvisAPI contract has no chat stream methods yet, so 'chat-streaming'/'chat-cancel' ApiFeatures should report unavailable until this is wired.",
+    "Pass ModelRuntime.chatProfile as ChatDeps.profile and save the select() patch through the normal saveSettings confirmation path.",
+    "Supply the ModelActionGuard from main via dialog.showMessageBox (Cancel default, full detail)."
+  ],
+  "limitations": [
+    "Verified only against fake Ollama/Anthropic servers and an in-memory guarded fetch; not against a real Ollama, real microphone or real Windows speech (RAM pressure: nothing was started or downloaded).",
+    "Cancelling a native transcription only discards the result; the PowerShell helper runs until its own timeout, and a new transcription is refused until it returns.",
+    "Resource profile is in memory only; no Settings field exists to persist it.",
+    "Local vision, embeddings and fine-tuning remain reported unsupported (adapter types only). Speech is Windows System.Speech only.",
+    "Models.tsx verified by static markup tests and vite build earlier, not in a live window; no new CSS.",
+    "Remaining typecheck errors (backend.ts missing API methods, RoutinePlan export) belong to other owners."
+  ],
+  "done": true
+}

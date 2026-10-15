@@ -2,7 +2,7 @@
 import * as nodePath from 'node:path';
 import type {ActionRequest, Settings} from '../../src/shared/contracts';
 import type {WindowInfo} from '../native/adapter';
-import {FsLike, hasControlChars, normalizeAbsolutePath, realFs, resolveInsideRoots, samePath} from './paths';
+import {FsLike, hasControlChars, hasInvisibleFormatChars, isBareExeName, normalizeAbsolutePath, realFs, resolveInsideRoots, samePath, visibleText} from './paths';
 import {LIMITS, ValidationError} from './validation';
 
 const w = nodePath.win32;
@@ -86,7 +86,7 @@ export function validateOpenUrl(target: unknown): {ok: true; url: string} | {ok:
   if (typeof target !== 'string' || !target.trim()) return {ok: false, reason: 'A URL is required'};
   const t = target.trim();
   if (t.length > 2048) return {ok: false, reason: 'URL is too long'};
-  if (hasControlChars(t) || /\s/.test(t)) return {ok: false, reason: 'URL contains whitespace or control characters'};
+  if (hasControlChars(t) || /\s/.test(t) || hasInvisibleFormatChars(t)) return {ok: false, reason: 'URL contains whitespace, control or invisible characters'};
   let u: URL;
   try { u = new URL(t); } catch { return {ok: false, reason: 'URL is not valid'}; }
   if (u.protocol === 'mailto:') return rebuildMailto(u);
@@ -103,7 +103,7 @@ export function matchApprovedApp(target: string, approvedApps: string[]): string
   if (/[\\/]/.test(t) || /^[a-zA-Z]:/.test(t)) {
     const n = normalizeAbsolutePath(t);
     if ('error' in n) return null;
-    return approvedApps.find((e) => !/^[A-Za-z0-9._ -]+\.exe$/i.test(e) && samePath(e, n.path)) ?? null;
+    return approvedApps.find((e) => !isBareExeName(e) && samePath(e, n.path)) ?? null;
   }
   const lower = t.toLowerCase();
   const withExe = lower.endsWith('.exe') ? lower : lower + '.exe';
@@ -163,7 +163,7 @@ export function selectWindow(target: string | undefined, windows: WindowInfo[], 
     const fg = windows.find((x) => x.foreground);
     return fg ? {ok: true, window: fg} : {ok: false, reason: 'No foreground window was found'};
   }
-  const m = /^hwnd:(\d{1,18})$/i.exec(t);
+  const m = /^hwnd:(\d{1,15})$/i.exec(t);
   if (m) {
     const win = windows.find((x) => x.hwnd === Number(m[1]));
     return win ? {ok: true, window: win} : {ok: false, reason: 'No visible window has that handle'};
@@ -175,12 +175,34 @@ export function selectWindow(target: string | undefined, windows: WindowInfo[], 
   return {ok: true, window: hits[0]};
 }
 
-/** Processes whose input line runs commands. Typing a line break into them is refused. */
-export const TERMINAL_PROCESSES = ['cmd.exe', 'powershell.exe', 'pwsh.exe', 'windowsterminal.exe', 'openconsole.exe', 'conhost.exe', 'wt.exe', 'bash.exe', 'wsl.exe', 'mintty.exe'];
+/**
+ * Processes whose input line or default action runs something when Enter is typed: shells, terminals and REPLs,
+ * plus Explorer (Enter opens the selected file, and the Run dialog is an Explorer window whose title is localized)
+ * and the Start/Search surfaces (Enter launches the top result). Typing a line break into them is refused.
+ */
+export const TERMINAL_PROCESSES = [
+  'cmd.exe', 'powershell.exe', 'powershell_ise.exe', 'pwsh.exe', 'windowsterminal.exe', 'openconsole.exe', 'conhost.exe', 'wt.exe',
+  'bash.exe', 'wsl.exe', 'wslhost.exe', 'mintty.exe', 'sh.exe', 'zsh.exe', 'git-bash.exe', 'ubuntu.exe', 'debian.exe', 'kali.exe',
+  'conemu.exe', 'conemu64.exe', 'cmder.exe', 'alacritty.exe', 'wezterm-gui.exe', 'wezterm.exe', 'putty.exe', 'kitty.exe', 'mobaxterm.exe',
+  'hyper.exe', 'tabby.exe', 'python.exe', 'pythonw.exe', 'py.exe', 'ipython.exe', 'node.exe',
+  'explorer.exe', 'searchhost.exe', 'searchapp.exe', 'searchui.exe', 'startmenuexperiencehost.exe', 'shellexperiencehost.exe',
+];
 
-/** Typed text for an approval summary: first `max` characters with visible markers for line breaks and tabs. */
+/** Every character a text field or terminal may treat as "submit": CR, LF, NEL, and the Unicode line/paragraph separators. */
+const LINE_BREAK = new RegExp('[\\r\\n' + String.fromCharCode(0x85, 0x2028, 0x2029) + ']');
+
+export function hasLineBreak(text: string): boolean {
+  return LINE_BREAK.test(text);
+}
+
+/** True when typing a line break into this window could run a command or launch something. */
+export function isCommandSurface(win: Pick<WindowInfo, 'process'>): boolean {
+  return TERMINAL_PROCESSES.includes(win.process.toLowerCase().replace(/(\.exe)?$/, '.exe'));
+}
+
+/** Typed text for an approval summary: first `max` characters with visible markers for line breaks, tabs and hidden characters. */
 export function describeTypedText(text: string, max = 200): string {
-  const shown = text.replace(/\r\n|\r|\n/g, '⏎').replace(/\t/g, '⇥');
+  const shown = visibleText(text.replace(new RegExp('\\r\\n|[\\r\\n' + String.fromCharCode(0x85, 0x2028, 0x2029) + ']', 'g'), String.fromCharCode(0x23ce)).replace(/\t/g, String.fromCharCode(0x21e5)));
   return shown.length > max ? shown.slice(0, max - 1) + '…' : shown;
 }
 
@@ -200,11 +222,8 @@ export function checkWindowPolicy(win: WindowInfo, type: ActionRequest['type'], 
     if (win.minimized) return 'The window is minimized';
     if (!win.foreground) return 'The window is not in the foreground';
   }
-  if (type === 'type-text' && text !== undefined && /[\r\n]/.test(text)) {
-    const proc = win.process.toLowerCase();
-    if (TERMINAL_PROCESSES.includes(proc) || (proc === 'explorer.exe' && win.title.trim().toLowerCase() === 'run')) {
-      return 'Typing a line break into a terminal or the Run dialog could run a command; remove the line breaks';
-    }
+  if (type === 'type-text' && text !== undefined && hasLineBreak(text) && isCommandSurface(win)) {
+    return 'Typing a line break into a terminal, Explorer, the Run dialog or Start search could run a command or open a file; remove the line breaks';
   }
   return null;
 }

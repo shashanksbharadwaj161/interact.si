@@ -1,0 +1,49 @@
+{
+  "role": "routines",
+  "session": "jarvis-desktop-35",
+  "roadmap": [81, 82, 83, 84, 85, 86, 87, 88, 89, 90],
+  "done": true,
+  "files": [
+    {"path": "electron/services/routines.ts", "change": "new", "summary": "RoutineEngine: validated routines (max 50, 20 steps), manual/once/daily/interval schedules with a single unref'd next-due timer, persisted exactly-once slots, 10-minute missed-slot grace, bounded retries (0-3, fresh preview each attempt, declines/policy/rate-limit never retried), duplicate and overlap prevention, conditions (previous step, window present/absent, weekday, time window), pause-all/resume, cancellation, per-step partial results (history max 50), undo for explicitly undoable window moves, restart marks in-flight runs interrupted. createRoutinesApi() for IPC. ROUTINE_GATES for 88-90."},
+    {"path": "electron/services/intent.ts", "change": "extended", "summary": "parseModelPlan refactored onto shared parseModelJson/modelObjectPlan (behavior unchanged). New checkPlannedRequest (re-validates stored steps, refuses click), planRoutineLines (one rule command per line + 'wait N seconds'), parseModelRoutine (strict {name?, steps[]} JSON; schedules/tools/commands/recording refused). All return preview candidates only."},
+    {"path": "src/components/Routines.tsx", "change": "new", "summary": "Visual editor and run console: library with Run/Edit/Delete, schedule picker, step editor (type, target, text, rect, retries, on-failure, conditions, undoable for moves, reorder/remove), 'Plan steps' from text via planText, active-run polling with Cancel, history with per-step results and 'Undo moves', Pause/Resume all, honest 'Not available yet' gates. API injected by prop or window.jarvis.routines; shows 'not connected' with no controls otherwise. Imports only types from electron/."},
+    {"path": "tests/backend-intent.test.mjs", "change": "extended", "summary": "+3 tests: routine lines, model routine JSON, checkPlannedRequest."},
+    {"path": "tests/autopilot-routines.test.mjs", "change": "new", "summary": "18 tests using the REAL ActionService with a mock NativeAdapter/shell and stub trusted confirm: validation, schedule math, per-step native confirmation and decline stop, refusal of a port without confirmation, retries, partial results/conditions, duplicate/overlap/safe-launch/pause refusal, schedule exactly-once across restarts + missed + grace, scheduled start needs trusted confirm, pause/resume, cancel, undo, restart recovery, gates, storage errors, editor helpers, static render, source purity."},
+    {"path": "docs/autopilot-result.routines.json", "change": "new"}
+  ],
+  "checks": [
+    {"command": "npm test", "result": "pass", "detail": "145/145 (18 routine engine/editor tests, 3 new intent tests)"},
+    {"command": "npx tsc --noEmit", "result": "pass"},
+    {"command": "npx vite build", "result": "pass", "detail": "Routines.tsx not yet referenced by App, so additionally bundled standalone for browser with esbuild: 35.6 kB, no node:/child_process imports"},
+    {"command": "npm ci --ignore-scripts", "result": "pass", "detail": "repo-local only"}
+  ],
+  "interfaces": {
+    "backend": {
+      "construct": "import {RoutineEngine, createRoutinesApi} from './services/routines'; const routines = new RoutineEngine({storage, actions: {preview: (r) => actions.preview(r), execute: (id, ok) => actions.execute(id, ok)}, now: Date.now, newId: () => store.id(), windows: () => native.listWindows(), confirm: env.confirm, activity, safeLaunch}); await routines.init(); // routines.dispose() on quit",
+      "RoutineStorage": "{ load(): Promise<unknown>; save(data: RoutineData): Promise<void> } - captain/store owner chooses the file (suggest userData/routines.json with the existing atomic write). Corrupt or invalid data is dropped with view().loadError; save failures surface as view().saveError.",
+      "RoutineActionPort": "{ preview(req: ActionRequest): Promise<ActionPreview>; execute(previewId: string, approved: boolean): Promise<unknown> } - MUST be ActionService. The engine passes approved=true only as 'user started this routine'; ActionService's trusted dialog.showMessageBox confirm remains the gate for every sensitive step. The engine refuses any non-list-windows preview with requiresApproval=false.",
+      "confirm": "BackendEnv.confirm (trusted main-process dialog, Cancel default). Required for scheduled starts; without it scheduled runs are recorded as declined. Never a renderer boolean.",
+      "windows": "Read-only native.listWindows snapshot; used for window conditions and to capture the exact HWND/rect of undoable moves."
+    },
+    "ipc": {
+      "RoutinesApi": "list(): RoutinesView; save(draft): RoutinesView; remove(id): RoutinesView; start(id): {runId}; cancel(runId): RoutinesView; pauseAll(): RoutinesView; resumeAll(): RoutinesView; undo(runId): UndoOutcome; planText(text): RoutinePlan; planModel(json): RoutinePlan",
+      "suggested channels": "jarvis:routines:list|save|remove|start|cancel|pause-all|resume-all|undo|plan-text|plan-model -> createRoutinesApi(engine) methods. All arguments are untrusted; the engine validates. Contract owner adds `routines: RoutinesApi` (types exported from electron/services/routines.ts) to JarvisAPI and preload.",
+      "planModel": "Feed local model output text only; this module never calls a model. Output is preview candidates for the editor, never saved or run automatically."
+    },
+    "ui": "import {Routines} from './Routines'; <Routines api={window.jarvis.routines} /> as a nav page (UI shell owner). Uses existing primitives/classes; optional `.routine-step` class for styling.",
+    "featureRegistry": "81-87: implemented in module, pending captain wiring (IPC/contract/nav/storage). 88: partial - approved app/file launch and links via ActionService only; richer adapters gated G4. 89 and 90: not implemented, gated G4 (ROUTINE_GATES, available:false)."
+  },
+  "dependencies": ["electron/services/actions.ts (ActionService, unchanged)", "electron/services/policy.ts (validateActionRequest, unchanged)", "electron/services/validation.ts (LIMITS, unchanged)", "src/ui/primitives.tsx, src/ui/Dialog.tsx, src/ui/util.ts (unchanged)", "no new packages"],
+  "limitations": [
+    "Not wired: no IPC channels, contract method, preload bridge, nav entry or storage file yet (owned by captain/main API/UI shell owners).",
+    "Verified only with a mock native adapter and stub confirmation; no real desktop input was performed and no Electron runtime check of the screen (static server render only).",
+    "Only one routine runs at a time; overlapping scheduled slots are recorded as skipped.",
+    "Scheduled runs show a trusted start confirmation and then one native confirmation per sensitive step; unattended execution is intentionally impossible.",
+    "Cancellation takes effect before the next step or retry; it cannot dismiss a native confirmation that is already open.",
+    "Undo is limited to window moves marked undoable (restores the captured HWND rect through a new confirmed move). Launch, open-url, focus and type-text are not reversible.",
+    "Slots missed by more than 10 minutes (app closed/asleep) are recorded as missed and not run late; slots during pause-all are skipped on resume.",
+    "Runs interrupted by app exit are marked interrupted and never resumed automatically.",
+    "Schedules use local time via Date; DST transitions follow the JS Date behaviour.",
+    "Clicks, keyboard/mouse recording (89) and semantic drag (90) are not implemented and are refused by validation and planners."
+  ]
+}

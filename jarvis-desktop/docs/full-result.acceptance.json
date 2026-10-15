@@ -1,0 +1,38 @@
+{
+  "role": "acceptance",
+  "session": "jarvis-desktop-100",
+  "date": "2026-10-15",
+  "done": false,
+  "stage": "checkpoint: baseline + workspace review complete; guidance module pending (no owner result marker yet)",
+  "summary": "Independent security and acceptance tests driving real sources: electron/main.ts booted against a recording Electron stub in a child process (child_process stubbed), whole-backend offline egress sweep, UI route statement vs. real backend routing truth table, hostile portable-memory imports into the real ProductivityStore, 3D GPU allocation/disposal and hostile scene import. Open findings are todo tests asserting the safe behaviour.",
+  "files": [
+    {"path": "tests/full-security-regressions.test.mjs", "change": "added", "purpose": "main.ts harness: window privileges, menu/devtools, navigation/redirect/window-open/webview, session request filter (offline renderer egress), permissions, dev URL policy, IPC sender trust, cloud key via IPC; SEC-01..04 todo tests; ipcCore redaction and file-request edge cases."},
+    {"path": "tests/full-acceptance.test.mjs", "change": "added", "purpose": "Cross-module acceptance with ACCEPTANCE_SOURCE_ROOT support (absent modules SKIP with reason, never pass): offline egress sweep, endpoint/online-consent policy, route truth table (SEC-05), no silent fallback, portable import hostility and SEC-06, guidance capability truth (pending module), 3D renderer allocation/dispose and scene clamping."},
+    {"path": "docs/full-security-findings.md", "change": "added", "purpose": "Findings SEC-01..06 with trigger, path, evidence, impact, fix and owner; verified-safe list; gaps."},
+    {"path": "docs/full-result.acceptance.json", "change": "added", "purpose": "This marker."}
+  ],
+  "findings": [
+    {"id": "SEC-01", "severity": "medium", "status": "open", "owner": "captain (main.ts/backend) + 3D owner (Scene3D.tsx, MotionStudio.tsx)", "one_line": "main.ts cancels every will-download; studio exports via <a download> still report 'Exported ...'."},
+    {"id": "SEC-02", "severity": "low", "status": "open", "owner": "captain (main.ts)", "one_line": "web-contents-created guard lacks will-redirect."},
+    {"id": "SEC-03", "severity": "low", "status": "open", "owner": "captain (backend.ts, main.ts)", "one_line": "Electron safeStorage supported by secrets.ts but never passed; every key use spawns the DPAPI PowerShell helper."},
+    {"id": "SEC-04", "severity": "low", "status": "open", "owner": "captain (ipcCore.ts)", "one_line": "safeErrorMessage misses file:///C:/Users/x, C:/Users/x and JSON-escaped profile paths."},
+    {"id": "SEC-05", "severity": "medium", "status": "open", "owner": "workspace (prompt-tools.ts, PromptTools.tsx); captain if a backend route API is added", "one_line": "describeRoute says 'local model answers / nothing leaves the computer' when online without key (backend refuses) and when key status is unknown (backend sends to cloud)."},
+    {"id": "SEC-06", "severity": "low", "status": "open", "owner": "workspace (store.ts parsePortable)", "one_line": "Portable import preview counts targets the store refuses; one bad reference fails the whole capsule.setMeta."}
+  ],
+  "checks": [
+    {"command": "node --test tests/full-security-regressions.test.mjs", "result": "13 tests: 9 pass, 0 fail, 4 todo (SEC-01..04)"},
+    {"command": "node --test tests/full-acceptance.test.mjs", "result": "13 tests: 5 pass, 0 fail, 8 skipped (workspace/guidance modules absent at base 3f63718)"},
+    {"command": "ACCEPTANCE_SOURCE_ROOT=<jarvis-desktop-97> node --test tests/full-acceptance.test.mjs", "result": "9 pass, 0 fail, 1 skipped (guidance), 3 todo (SEC-05 x2, SEC-06)"},
+    {"command": "ACCEPTANCE_SOURCE_ROOT=<jarvis-desktop-98> node --test tests/full-acceptance.test.mjs tests/full-security-regressions.test.mjs", "result": "18 pass, 0 fail, 1 skipped (guidance), 7 todo"}
+  ],
+  "captain_notes": [
+    "Both test files run against any checkout via ACCEPTANCE_SOURCE_ROOT (read only); after integration run them without it in the original repository.",
+    "When a finding is fixed its todo test starts passing: remove the {todo} option so it becomes a hard regression.",
+    "SEC-01 test asserts the main-side fix (app-page blob download reaches a save dialog). If you choose the save-IPC route instead, replace that test with one for the new IPC."
+  ],
+  "limitations": [
+    "No Electron binary was run (npm ci --ignore-scripts): main.ts behaviour is proven against its real handlers with a stub; Electron's own semantics (download cancel, permission prompts, GPU) are documented, not executed.",
+    "Guidance module (jarvis-desktop-99) had no result marker at this checkpoint; its capability test skips with the reason.",
+    "Streaming abort/late-write/redaction was reviewed in source; the existing substantial-streaming tests already cover it closely, so no duplicate tests were added."
+  ]
+}

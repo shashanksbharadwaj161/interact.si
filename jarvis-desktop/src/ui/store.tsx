@@ -1,13 +1,48 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AppState, JarvisAPI, Settings, SystemInfo } from '../shared/contracts';
 import { errMsg } from './util';
+// Type-only imports: erased at build time, so no Node-side module reaches the renderer bundle.
+import type { ProductivityOp, ProductivityState } from '../../electron/services/store';
+import type { PackImport, PathMapping, PathRoot, RestorePreview } from '../../electron/services/capsules';
+import type { ExternalDoc } from '../../electron/services/search';
 
 export type ToastKind = 'ok' | 'error' | 'info';
 export type Toast = { id: number; kind: ToastKind; text: string };
 export type LoadStatus = 'loading' | 'ready' | 'error';
 
+/**
+ * Optional local productivity API (window.jarvis.productivity). The main process exposes it when the sidecar store is
+ * wired; until then the views that need it say so instead of pretending. Every call is validated in the main process.
+ */
+export interface ProductivityAPI {
+  get(): Promise<ProductivityState>;
+  apply(op: ProductivityOp): Promise<ProductivityState>;
+  /** Forget chat and/or activity history (optionally older than an ISO date). Resolves with the counts removed. */
+  forgetHistory?(opts: { chat?: boolean; activity?: boolean; before?: string }): Promise<{ removed: { chat: number; activity: number } }>;
+  capsule?: {
+    previewRestore(id: string): Promise<RestorePreview>;
+    /** Lists open windows the user may tick to save their positions. Reads titles and process names only. */
+    listWindows?(): Promise<{ hwnd: number; title: string; process: string }[]>;
+    captureGeometry?(id: string, hwnds: number[]): Promise<{ saved: number; skipped: { process: string; reason: string }[] }>;
+    exportPack?(id: string, roots: PathRoot[]): Promise<{ saved: boolean; unmapped: string[] }>;
+    /** Main-process open dialog; resolves with the chosen pack's text (at most 1 MB) or null when cancelled. */
+    readPack?(): Promise<string | null>;
+    /** Validates pack text and applies path mappings (parseCapsulePack). Saves nothing. */
+    parsePack?(raw: string, mappings: PathMapping[]): Promise<PackImport>;
+  };
+  /** Records owned by the calendar and clipboard modules, shared only when the user enabled those modules. */
+  signals?(): Promise<ExternalDoc[]>;
+}
+
 type Store = {
   api: JarvisAPI;
+  productivityApi: ProductivityAPI | null;
+  /** Sidecar data; null until loaded or when the API is not connected. */
+  productivity: ProductivityState | null;
+  productivityError: string | null;
+  /** Apply one validated sidecar operation, then refresh. Resolves true on success. */
+  applyProductivity: (op: ProductivityOp, okMessage?: string) => Promise<boolean>;
+  refreshProductivity: () => Promise<void>;
   isPreview: boolean;
   status: LoadStatus;
   loadError: string | null;
@@ -30,6 +65,11 @@ type Store = {
 };
 
 const Ctx = createContext<Store | null>(null);
+
+/** The store when rendered inside AppProvider, otherwise null. For components that also work with props alone. */
+export function useOptionalStore(): Store | null {
+  return useContext(Ctx);
+}
 
 export function useStore(): Store {
   const s = useContext(Ctx);
@@ -55,6 +95,12 @@ export function AppProvider({ api, isPreview, children }: { api: JarvisAPI; isPr
   const [systemLoading, setSystemLoading] = useState(false);
   const [cloudConfigured, setCloudConfigured] = useState<boolean | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const productivityApi = useMemo<ProductivityAPI | null>(() => {
+    const p = (api as JarvisAPI & { productivity?: ProductivityAPI }).productivity;
+    return p && typeof p.get === 'function' && typeof p.apply === 'function' ? p : null;
+  }, [api]);
+  const [productivity, setProductivity] = useState<ProductivityState | null>(null);
+  const [productivityError, setProductivityError] = useState<string | null>(null);
   const timers = useRef(new Map<number, number>());
 
   const dismissToast = useCallback((id: number) => {
@@ -105,6 +151,39 @@ export function AppProvider({ api, isPreview, children }: { api: JarvisAPI; isPr
       throw e;
     }
   }, [api]);
+
+  const refreshProductivity = useCallback(async () => {
+    if (!productivityApi) return;
+    try {
+      setProductivity(await productivityApi.get());
+      setProductivityError(null);
+    } catch (e) {
+      setProductivityError(errMsg(e, 'Local productivity data could not be loaded.'));
+    }
+  }, [productivityApi]);
+
+  useEffect(() => {
+    void refreshProductivity();
+  }, [refreshProductivity]);
+
+  const applyProductivity = useCallback(
+    async (op: ProductivityOp, okMessage?: string) => {
+      if (!productivityApi) {
+        toast('error', 'Local productivity storage is not connected in this build.');
+        return false;
+      }
+      try {
+        setProductivity(await productivityApi.apply(op));
+        setProductivityError(null);
+        if (okMessage) toast('ok', okMessage);
+        return true;
+      } catch (e) {
+        toast('error', errMsg(e));
+        return false;
+      }
+    },
+    [productivityApi, toast],
+  );
 
   useEffect(() => {
     reload().catch(() => undefined);
@@ -164,6 +243,11 @@ export function AppProvider({ api, isPreview, children }: { api: JarvisAPI; isPr
   const value = useMemo<Store>(
     () => ({
       api,
+      productivityApi,
+      productivity,
+      productivityError,
+      applyProductivity,
+      refreshProductivity,
       isPreview,
       status,
       loadError,
@@ -182,7 +266,7 @@ export function AppProvider({ api, isPreview, children }: { api: JarvisAPI; isPr
       mutate,
       run,
     }),
-    [api, isPreview, status, loadError, state, system, systemError, systemLoading, cloudConfigured, toasts, toast, dismissToast, reload, refreshSystem, refreshCloud, mutate, run],
+    [api, productivityApi, productivity, productivityError, applyProductivity, refreshProductivity, isPreview, status, loadError, state, system, systemError, systemLoading, cloudConfigured, toasts, toast, dismissToast, reload, refreshSystem, refreshCloud, mutate, run],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

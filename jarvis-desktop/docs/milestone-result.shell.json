@@ -1,0 +1,43 @@
+{
+  "role": "shell",
+  "session": "jarvis-desktop-59",
+  "date": "2026-10-14",
+  "done": true,
+  "files": [
+    "src/components/App.tsx",
+    "src/ui/nav.tsx",
+    "src/components/Notes.tsx",
+    "src/components/Capsules.tsx",
+    "src/styles/shell.css",
+    "tests/autopilot-shell-runtime.test.mjs",
+    "docs/milestone-result.shell.json"
+  ],
+  "checks": [
+    {"command": "node --test tests/autopilot-shell-runtime.test.mjs", "result": "pass", "detail": "27 tests, 0 fail, 0 todo (the four wire-up todos are removed; each passes)"},
+    {"command": "node --test tests/autopilot-shell-runtime.test.mjs tests/autopilot-shell.test.mjs tests/ui.test.mjs tests/autopilot-security.test.mjs", "result": "pass", "detail": "100 tests, 0 fail"},
+    {"command": "npx tsc --noEmit", "result": "pass", "detail": "exit 0"},
+    {"command": "npx vite build", "result": "pass", "detail": "renderer bundle builds; existing chunk-size warning only"},
+    {"command": "mutation check", "result": "pass", "detail": "removing initialItem from the Notes route made the note deep-link test fail; restored"},
+    {"command": "npm ci --ignore-scripts", "result": "pass", "detail": "repo-local install only"}
+  ],
+  "summary": [
+    "Notes and Capsules take an initialItem prop. App passes loc.params.item, so #/notes?item=n_2 and #/capsules?item=c_2 select that record on first render, and a later hash change to another item opens it (through the existing unsaved-changes dialog). An unknown id keeps the default first record.",
+    "Seven new routes, appended to VIEWS so existing Alt+1..0 shortcuts do not move: Avatar (Cockpit), Routines, Clipboard history, Calendar (Work), Models, Integrations, Usage (System).",
+    "Routines, Integrations, Models, Usage and Clipboard build their clients with routinesBridge, integrationsBridge, modelsBridge, usageBridge and clipboardBridge from src/ui/bridges.ts, memoised on the api. Each adapter returns null unless every method of its list exists; the page then shows a 'not connected' notice and disabled controls rather than a fake state.",
+    "Models passes currentModel from settings and saves the localModel patch through api.saveSettings (the main process owns the AI-connection confirmation). Usage uses the real UsagePanel with report, performance and CSV/JSON export through the bridge. Clipboard is a small inline view: opt-in switch (native confirmation happens in main), list, copy back, remove, delete all.",
+    "Calendar and Avatar have no connected backend or editor component in this tree, so they are honest 'not connected' pages with a disabled Import .ics file and Edit avatar button. Avatar also shows the live avatar and links to Companion.",
+    "Tests: heading table covers all 20 views; a connected-api fixture built from the real method lists feeds the accessible-name audits; new tests cover reachability, not-connected states, connected states, and one missing method disconnecting only its own page."
+  ],
+  "interfaces_requested_from_captain": [
+    "Calendar: an IPC bridge and a view component. Needed: bridge methods to import an .ics file (main-process open dialog, text bounded by MAX_ICS_BYTES), list events in a range, and clear events, plus calendarBridge(api) in src/ui/bridges.ts and a component taking the client. CalendarEvent is not in src/shared/contracts.ts. Until then CalendarView in App.tsx stays a disabled stub.",
+    "Avatar: src/components/AvatarStudio.tsx does not exist in the original repository or the visual worker's tree yet (only src/ui/avatar-editor.ts). Needed: its exported component and props, then replace AvatarView's notice with it.",
+    "Clipboard: no component exists, so ClipboardView lives inside App.tsx. The captain may move it to its own file. The native main must call capture() on a timer while history is on; the renderer cannot.",
+    "Usage: UsageClient.setPrices and setBudget are bridged but UsagePanel has no inputs for them, so prices and the budget cannot be edited from this page.",
+    "docs/autopilot-shell-runtime.md still describes five todo tests and the 13-view table; it is not in this task's paths."
+  ],
+  "limitations": [
+    "Server rendering only: effects do not run, so the loaded states of Usage, Clipboard, Models and Routines (data returned by the bridge) and every click are not exercised; only the connected/not-connected initial render is.",
+    "Static imports, not lazy: server rendering and the test bundle need the content in the first render, and the renderer chunk-size warning predates this change.",
+    "Nothing here changes backend, shared contracts or package.json. Nothing was committed or pushed."
+  ]
+}

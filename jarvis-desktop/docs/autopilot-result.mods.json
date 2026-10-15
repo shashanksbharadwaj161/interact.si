@@ -1,0 +1,49 @@
+{
+  "role": "mods",
+  "module": "Optional Windows customization catalog, presets and preference export (roadmap scopes 71-80)",
+  "files": [
+    "src/ui/mod-catalog.ts",
+    "src/components/Customization.tsx",
+    "tests/autopilot-mods.test.mjs",
+    "docs/autopilot-result.mods.json"
+  ],
+  "checks": [
+    "npm ci --ignore-scripts in this worktree (lockfile install, no scripts run): exit 0",
+    "npx tsc --noEmit: exit 0",
+    "node --test tests/autopilot-mods.test.mjs: 28 of 28 pass",
+    "npm test (full suite, tests/*.test.mjs): 152 of 152 pass after this result file was written"
+  ],
+  "limitations": [
+    "The catalog names no third-party project. Every profile is an original description of a tool category, with licence 'unverified', no homepage and no tested Windows builds, CPU architectures or tool version. Real listings need a person to verify the licence, pin a version and record reversal steps (gate G5).",
+    "Compatibility cannot return 'compatible' for any shipped profile, because nothing has been tested. Off Windows it returns 'incompatible'. Before the system is loaded it returns 'unknown'.",
+    "SystemInfo has no Windows build number, so build-range checks report 'unknown' until the native owner adds a build field. Pass windowsBuild through checkCompatibility's environment argument once that exists; the component currently passes null.",
+    "All five preference effects are marked unsupported and rendered disabled with their reason. No adapter exists, so previews never change a Windows setting, and the export always records appliesToWindows: false.",
+    "Preferences are saved through usePref under localStorage key 'jarvis.ui.customization' (UI-only, non-sensitive, validated on read). The export is a user-initiated JSON download using an anchor with a blob URL. Electron has no will-download handler in this repo, so the save location and prompt come from Electron defaults and were not verified in the desktop app.",
+    "Restore (roadmap 75 import) is not built and its button is disabled. Roadmap 76-80 are listed as not built and have no controls.",
+    "The component is not wired into App.tsx or any navigation. The captain must add the route and pass the system prop.",
+    "Visual layout was not checked in the Electron window. Verification is the unit tests and a static-markup render of the real component in Node, which checks text, disabled states and labels, not pixels.",
+    "No copied third-party code, GPL/AGPL material or dependency was added. The only imports are the existing repo modules, React primitives and the existing icon package."
+  ],
+  "interfaces": {
+    "src/components/Customization.tsx": "export function Customization({ system }: { system?: Pick<SystemInfo, 'platform' | 'arch'> | null }). Pass useReady().system from the store. No other props and no backend calls.",
+    "src/ui/mod-catalog.ts": "Pure exports: CATALOG (ModProfile[]), LISTING_RULES, EFFECTS (CustomEffect[]), PRESETS, DEFAULT_PRESET_ID, CUSTOMIZATION_SCOPES (roadmap rows 71-80), PREFS_SCHEMA_VERSION, EXPORT_FORMAT, MAX_EXPORT_CHARS, projectLink(profile), checkCompatibility(profile, env), normalizePrefs(raw, effects?, presets?), setEffect(prefs, id, on, effects?), applyPreset(presetId, effects?, presets?), previewPrefs(prefs, effects?), exportPrefs(prefs, effects?), parseExport(text, effects?, presets?). Types: ModProfile, CompatEnvironment, CompatResult, CustomEffect, CustomPreset, CustomizationPrefs, Preview, PreviewLine, ModTouch, Risk, LicenceState, Compatibility.",
+    "localStorage": "Key 'jarvis.ui.customization' (via usePref in src/ui/prefs.ts). Stored value is the CustomizationPrefs object and is always passed through normalizePrefs on read."
+  },
+  "dependencies": {
+    "runtime": [
+      "src/ui/roadmap.ts (ROADMAP, for scope names and tiers 71-80)",
+      "src/ui/prefs.ts (usePref)",
+      "src/ui/primitives.tsx (Badge, Button, Field, KV, Notice, PageHeader, Panel, Segmented, Switch)",
+      "src/shared/contracts.ts (type-only SystemInfo import, erased at build)",
+      "@phosphor-icons/react (DownloadSimple, already a dependency)",
+      "react 19.2.0 (existing)"
+    ],
+    "test": [
+      "esbuild (existing devDependency, in-memory bundles only)",
+      "react-dom/server (existing, server-side render of the component in Node)",
+      "node:test and node:assert (built in)"
+    ],
+    "new_packages": []
+  },
+  "done": true
+}

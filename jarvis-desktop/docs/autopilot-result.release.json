@@ -1,0 +1,57 @@
+{
+  "role": "release",
+  "baseline": "b0f5c1b",
+  "preparedOn": "2026-10-14",
+  "files": [
+    {"path": "docs/release-checklist.md", "change": "modified", "summary": "Refreshed against b0f5c1b: validation commands, corrected section 0 gates, native matrix with code state (section 5)."},
+    {"path": "docs/THIRD-PARTY-NOTICES.md", "change": "added", "summary": "Declared-licence inventory for 380 locked packages; unresolved items U1-U10; embedded regeneration script."},
+    {"path": "docs/autopilot-release.md", "change": "added", "summary": "Module report: changes, validation, blockers, interfaces, limitations."},
+    {"path": "docs/autopilot-result.release.json", "change": "added", "summary": "This result."}
+  ],
+  "artifactsOutsideRepo": [
+    "jarvis-desktop-46/licence-inventory.tsv (session artifacts folder; 380 rows plus header)"
+  ],
+  "gitignoredOutputsCreated": ["node_modules/", "dist/", "dist-electron/"],
+  "checks": [
+    {"name": "npm ci --ignore-scripts", "result": "pass", "detail": "exit 0; lockfile unchanged (git status clean)"},
+    {"name": "npm run typecheck", "result": "pass", "detail": "exit 0"},
+    {"name": "npm run build", "result": "pass", "detail": "exit 0; vite transformed 4604 modules"},
+    {"name": "npm test", "result": "pass", "detail": "124 of 124 tests pass"},
+    {"name": "A2 egress scan (Select-String fetch/net.request/https.request in electron/)", "result": "pass", "detail": "0 hits"},
+    {"name": "X8 whole-word Jarvis scan (src, electron, index.html; 58 files)", "result": "fail", "detail": "3 hits: electron/main.ts:20,22 (internal legacy folder name, acceptable); electron/services/actions.ts:97 (user-visible denial reason, must be reworded)"},
+    {"name": "Renderer has no Electron imports (grep src/)", "result": "pass", "detail": "0 files"},
+    {"name": "Licence inventory reproduced from documented script", "result": "pass", "detail": "identical to saved TSV; 380 locked packages; 4 prod, 327 dev installed, 49 platform-specific not installed"},
+    {"name": "Bundled licence comments in dist/ and dist-electron/", "result": "info", "detail": "0 @license or /*! markers in the renderer bundle and the main and preload bundles"},
+    {"name": "Electron smoke test (scripts/smoke.cjs)", "result": "not-run", "detail": "Electron binary absent: --ignore-scripts skipped its download, which is outside the authorized scope"},
+    {"name": "npm run package:win and asar list", "result": "not-run", "detail": "needs Electron runtime and electron-builder helper downloads (outside scope)"},
+    {"name": "Native checks N1-N18", "result": "not-run", "detail": "manual matrix; requires a real Windows desktop, which this worker must not touch"},
+    {"name": "npm audit", "result": "not-run", "detail": "needs network access to advisory services (outside scope)"}
+  ],
+  "limitations": [
+    "No installer was built or inspected; no SHA-256 exists.",
+    "The Electron runtime and its third-party notices are not present in this worktree.",
+    "Licence fields are declared values from package.json, not reviewed conclusions; no licence text was read or copied. Acceptance A5 stays open.",
+    "NSR-05 (executable and code-running file types) is absent from the code: release blocker N7.",
+    "User-visible 'Jarvis' string at electron/services/actions.ts:97 (X8).",
+    "Microphone permission grant (electron/main.ts:156-160) is not gated on push-to-talk; wording or code decision open.",
+    "Project licence is not declared (U1)."
+  ],
+  "interfaces": {
+    "releaseGates": "docs/release-checklist.md section 0 (gates) and section 5 blocking rows N1, N7; any failure in N2, N5 or N8",
+    "validationCommands": "docs/release-checklist.md 'Validation commands' (repo-local PowerShell, run from the repository root)",
+    "inventory": "docs/THIRD-PARTY-NOTICES.md 'Regenerating the inventory' (embedded Node script, Node built-ins only)",
+    "codeInterfaces": "none"
+  },
+  "dependencies": {
+    "requiresFromOtherModules": [
+      {"owner": "backend", "item": "reword electron/services/actions.ts:97 denial text (X8)"},
+      {"owner": "native/main or backend", "item": "add an executable and code-running type denylist for launch-path and open file plans (NSR-05, N7)"},
+      {"owner": "native/main", "item": "gate the microphone grant in electron/main.ts on push-to-talk, or reword B4 (decision)"}
+    ],
+    "requiresOwnerDecision": ["project licence (U1, root owns package.json)"],
+    "requiresReleaseMachine": ["npm ci with scripts", "npm run package:win", "Electron smoke test with JARVIS_TEST_MODE=1", "installer SHA-256", "Electron runtime notice capture (U4)"]
+  },
+  "done": true,
+  "doneScope": "Release documentation and licence inventory module complete and validated as far as possible in this worker. Release is NOT ready: section 0 gates and blocking rows N1 and N7 remain open.",
+  "releaseReady": false
+}

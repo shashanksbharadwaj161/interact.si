@@ -1,0 +1,26 @@
+{
+  "role": "control-status",
+  "done": true,
+  "files": [
+    "server/room.mjs",
+    "server/status-errors.mjs",
+    "tests/status-errors.test.mjs",
+    "docs/status-errors-review.md",
+    "docs/continuation-result.control-status.json"
+  ],
+  "checks": [
+    "node --test tests/status-errors.test.mjs tests/room.test.mjs: 16 pass, 0 fail (12 new behavior tests, 4 existing room tests)"
+  ],
+  "limitations": [
+    "control-room root is not a git repository; changes are uncommitted file edits in place and cannot be diffed with git.",
+    "No service restart; root activates after review.",
+    "Classification is text-pattern based on explicit error fields and task events; unrecognized wording falls back to review.",
+    "Not verified against live Orchestrator or gateway responses; test uses a fake adapter."
+  ],
+  "interfaces": {
+    "server/status-errors.mjs": ["classifyStop(session, events) -> {outcome, kind, reason, retry}", "stopReport(session, events) -> null | {outcome, kind, reason, retry}", "RETRY {budget, context, error}"],
+    "server/room.mjs": ["deriveStatus(session, events = [])", "task.stopReport (poll-maintained, redacted)", "resume refuses stopReport.kind budget|context with retry text"]
+  },
+  "dependencies": [],
+  "budgetEffect": "none; no budget reset, no auto-spend, ledger and gateway unchanged"
+}

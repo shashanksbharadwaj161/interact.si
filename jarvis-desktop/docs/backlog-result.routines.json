@@ -1,0 +1,37 @@
+{
+  "role": "routines",
+  "phase": "backlog",
+  "done": true,
+  "roadmapItems": [82, 83, 84, 85, 86, 87, 88, 89, 90],
+  "files": [
+    {"path": "electron/services/routines.ts", "change": "extended", "summary": "Persisted per-routine schedule status (lastSlot/lastRunId/lastRunAt/lastResult/missedCount/overdueSlot) exposed as RoutineView.scheduleStatus {state: manual|disabled|paused|running|overdue|completed|scheduled, nextDueAt}. Slots missed while closed, skipped by overlap/safe-launch, or passed while paused are recorded as overdue (counted with the bounded countSlots) and are never run late by themselves. New engine methods: retry(runId) (new run of only the unfinished steps, same guards, fresh per-step native confirmations, seeds the previous-step condition), recover(id) (user-requested run of an overdue slot, requires the trusted start confirmation first), dismissOverdue(id), exportText(id), importPreview(text). Pure exports: exportRoutine, parseRoutineImport (64 KB cap, strict keys, <=20 steps, same step validation as the editor so only http/https/mailto links, planned action types, no click/shell/record/drag; ids, schedule and enabled flag never imported; risky steps listed as warnings), countSlots. RunRecord.retryOf added. RoutinesApi gains OPTIONAL retry/recover/dismissOverdue/exportRoutine/importPreview. RoutineData gains status (loaded defensively, old stores still load)."},
+    {"path": "src/components/Routines.tsx", "change": "extended", "summary": "Overdue notices with 'Run now…' (trusted confirmation in main) and Dismiss; schedule state badge, last run/result and missed count per routine; per-routine Pause/Resume schedule via the existing lossless save (past slots never run); history filter (All / Needs attention / Scheduled), step counts, duration, retry/recovery labels, Retry unfinished steps, Cancel also for paused runs; Export (JSON text) and Import-from-file box in the editor that only fills the editor after engine validation; weekday/time conditions are now kept on edit instead of silently dropped. Every new control is hidden when the injected API lacks the optional method, so older bridges render as before."},
+    {"path": "tests/backlog-routines.test.mjs", "change": "new", "summary": "16 tests: overdue persisted across restarts and recovered with injected clock; recovery refused when declined/no trusted confirm/safe launch; dismiss/edit/manual-run clears overdue; interval missed counting (bounded); paused and overlap-skipped slots become overdue; persisted status incl. malformed and interrupted; retry repeats only unfinished steps with fresh confirmations and guards (clean, active, paused, deleted routine, duplicate, cancelled); export/import round trip; import validation matrix (size, JSON, format, extra fields, step bounds, bad URLs, click/shell/record/drag, retries, undoable, ids ignored, warnings); condition-preserving editor and schedule pause; history helpers; screen render with and without the new API methods; source-scan for shell/fs/network/Electron/input and Date.now."},
+    {"path": "docs/backlog-result.routines.json", "change": "new"}
+  ],
+  "unchangedAssigned": ["electron/services/intent.ts"],
+  "checks": [
+    {"command": "node --test tests/backlog-routines.test.mjs", "result": "pass", "detail": "16/16"},
+    {"command": "node --test tests/autopilot-routines.test.mjs tests/backend-intent.test.mjs", "result": "pass", "detail": "existing routine/intent suites unchanged and green (22 routine tests)"},
+    {"command": "node --test tests/*.test.mjs", "result": "647/651", "detail": "4 failing files (autopilot-integrations, autopilot-usage, milestone-a11y, milestone-calendar-ui) fail to build because @phosphor-icons/react is not installed in this worktree (no node_modules); unrelated to routines."},
+    {"command": "npx tsc --noEmit (filtered to routines.ts, Routines.tsx, intent.ts)", "result": "clean", "detail": "only the pre-existing missing-module error for @phosphor-icons/react from the absent node_modules"}
+  ],
+  "interfaces": {
+    "compatible": "All existing RoutinesApi members, RoutineEngine methods and exports are unchanged. RoutineView/RoutinesView only gain fields; RoutinesApi additions are optional. UI icon imports stay within the set the existing UI test stubs.",
+    "captainWiring": {
+      "contractsAndIpc": "To light up the new controls, add optional JarvisAPI methods and handlers: routinesRetry(runId)->api.retry, routinesRecover(id)->api.recover, routinesDismissOverdue(id)->api.dismissOverdue, routinesExport(id)->api.exportRoutine, routinesImportPreview(text: string, max 70_000 chars)->api.importPreview. Arg schemas: [ID] for the first three, [{kind:'string', max: 70000}] for import; add the five names to ROUTINE_METHODS in src/ui/bridges.ts so routinesBridge maps them (missing ones are simply omitted from the bridge and the UI hides the control). No other renderer-side change needed.",
+      "lifecycleHook": "Call routines.fire() from Electron powerMonitor 'resume' (and 'unlock-screen') in the main owner so slots that came due during sleep are recorded as missed/overdue or run within the grace window immediately instead of waiting for the next timer tick. fire() is already idempotent per slot.",
+      "trustedConfirm": "recover() and scheduled starts rely on the injected env.confirm (trusted dialog.showMessageBox, Cancel default). It must stay main-process; without it recovery is refused."
+    }
+  },
+  "limitations": [
+    "Per-routine pause/resume is the schedule on/off toggle (a lossless save). A running routine still pauses only through the global Pause all.",
+    "Retry re-runs unfinished steps using the routine's current definition; steps deleted since the run are ignored, and 'previous step' conditions are seeded from the original run's preceding step.",
+    "Undo remains limited to window moves marked undoable; every other action type is not reversible and is never offered for undo.",
+    "Overdue state is tracked per routine for the latest missed slot; earlier missed slots are counted (capped at 1000) but only the latest can be recovered.",
+    "Import/export is copy-paste JSON text only; there is no file picker or clipboard access in the engine. Imports never carry schedules or enable themselves.",
+    "Gates unchanged and honest: 88 (richer file/browser adapters), 89 (watch-once recording) and 90 (semantic drag) stay unavailable behind the input-injection gate; no input recording or arbitrary shell exists.",
+    "Verified with a mock native adapter, the real ActionService and stub trusted confirmations only; no real desktop action and no Electron runtime or visual check (react static-markup render only).",
+    "Not wired in this worktree: the five new bridge methods above wait for the captain."
+  ]
+}

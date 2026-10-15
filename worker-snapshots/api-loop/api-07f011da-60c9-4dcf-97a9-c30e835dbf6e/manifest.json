@@ -1,0 +1,16 @@
+{
+  "task": "Loop 15: error-diagnosis-service",
+  "sessionId": "api-07f011da-60c9-4dcf-97a9-c30e835dbf6e",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/shared/contracts.ts",
+      "bytes": 15506,
+      "sha256": "8007ebd6a9eae0599201c5795f2663435fb49a9b3d93b8555e91baa5b26af0d6"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

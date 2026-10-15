@@ -1,0 +1,52 @@
+{
+  "role": "workspace",
+  "session": "jarvis-desktop-97",
+  "date": "2026-10-15",
+  "done": true,
+  "summary": "Coherent local productivity and writing workspace on top of the existing ProductivityStore/bridge: a Memory workbench (projects, checkpoints, shelf, opt-in timeline, evidence-backed recap and worklog drafts, retention/forget, bounded JSON portability) and a Writing workbench (notes first, scratch pad, selection-aware bounded draft tools with exact-prompt review and explicit Send through the existing assistant route). No new dependencies, channels, contracts, CSS files or upstream code. Changes are uncommitted for the captain.",
+  "files": [
+    { "path": "electron/services/store.ts", "change": "modified", "purpose": "checkpoint.update accepts refs (validated by pRefs; title/note/createdAt untouched). New PORTABLE_VERSION/PORTABLE_LIMITS, exportPortable (checkpoints, capsule goals/references, shelf only) and parsePortable (bounded, validated, plans ordinary ProductivityOps; keeps original createdAt, clamps future times, matches capsules by id then name, dedups by id and by time+title, drops references to records absent here and reports every skip)." },
+    { "path": "electron/services/search.ts", "change": "modified", "purpose": "resolveEvidence (honest status for note/task/capsule/activity/focus/checkpoint/session refs), filterRecap (kind + folded words), draftWorklogVerified (worklog draft that marks lines whose source was deleted)." },
+    { "path": "src/ui/workbench.ts", "change": "added", "purpose": "Pure helpers: workbenchStatus, checkpoint filtering, evidence per checkpoint, local day keys, timeline grouping, duration/time formatting, MEMORY_/WRITING_ shortcuts + matchShortcut, useReducedMotion, UNAVAILABLE_SOURCES." },
+    { "path": "src/ui/prompt-tools.ts", "change": "added", "purpose": "Four bounded tools (translate, tone cleanup, explain selection, diagnose error): source candidates/collection with real ids, deterministic buildPrompt with limits and warnings, reduceReply (bounded, every outcome), createDraftSender (stream with Stop when available, one-shot chat otherwise; sends only on call), describeRoute." },
+    { "path": "src/components/PromptTools.tsx", "change": "added", "purpose": "Tool/options/source picker, exact editable prompt, route statement, explicit Send/Stop/Copy, reply panel with outcome text, append/replace-selection insertion. Reduced motion: static cursor." },
+    { "path": "src/components/WritingWorkbench.tsx", "change": "added", "purpose": "Notes list with filter, scratch pad (unsaved, labelled), editor with selection tracking, save/delete (two-step), deleted-elsewhere recovery, loading/error/empty states, keyboard labels, unavailable sources list, PromptTools mounted. Captain follow-up: DocumentImport panel (Import .txt/.md) via a structural localDocumentsBridge over documentsChoose/documentsSave/documentsDiscard: honest 'not connected' state, plain-text read-only preview (escaped, never HTML/Markdown rendered, never passed to actions), editable title prefilled from suggestedTitle (max 200), Save/Discard, unsupported reason and errors shown verbatim, no path ever shown; after save it reloads and opens the new note." },
+    { "path": "src/components/MemoryWorkbench.tsx", "change": "added", "purpose": "Sections: overview, projects (reuses ProjectMemory + stale reference cleanup), checkpoints (add with evidence, filter, edit, two-step delete, drop missing refs), shelf/recents, timeline (opt-in state explained, delete entries), recap (day/kind/word filters, verified worklog draft, copy), privacy (MemoryControls), portability (export text, preview-then-apply import). Loading/app-error/disconnected/memory-error/ready states." },
+    { "path": "tests/full-workspace.test.mjs", "change": "added", "purpose": "22 tests: portable export/import (refusals, round trip, cross-machine re-homing, real store apply), checkpoint.update refs, evidence/recap helpers, workbench helpers, prompt assembly bounds and citations, reply reducer, sender (streams only on send, cancel, fallback, errors), route description, and static renders of all three screens in every state." },
+    { "path": "docs/full-interface.workspace.json", "change": "added", "purpose": "Minimal interface needs for the captain (exports, props, store members used, nav suggestion, keyboard chords, data-motion attributes, CSS classes used)." },
+    { "path": "docs/full-result.workspace.json", "change": "added", "purpose": "This marker." }
+  ],
+  "unchangedAssignedPaths": {
+    "src/components/Capsules.tsx": "ProjectMemory is reused as-is inside the Projects section; no change was needed.",
+    "src/components/MemorySearch.tsx": "MemoryControls is reused as-is in the Privacy section and in the disconnected state; no change was needed."
+  },
+  "checks": [
+    { "command": "npx tsc --noEmit", "result": "pass (0 errors)" },
+    { "command": "node --test tests/full-workspace.test.mjs", "result": "pass 23/23 (includes the document import test with a fake documents bridge: not-connected, ready preview escaped as plain text, unsupported reason verbatim, cancelled, nothing stored before Save, token/options forwarded)" },
+    { "command": "node --test tests/*.test.mjs", "result": "pass 1012/1012, 0 skipped (rerun after the document import addition)" },
+    { "command": "npm ci --ignore-scripts", "result": "repo-local install in this worktree only" }
+  ],
+  "interfaces": "See docs/full-interface.workspace.json. Captain wiring needed: two nav entries mounting <MemoryWorkbench/> and <WritingWorkbench/>; optionally route MemorySearch note results to WritingWorkbench initialNoteId. No backend, preload, contract or package change.",
+  "behaviourGuarantees": [
+    "Nothing is sent to any model unless the user presses Send to assistant; the exact prompt text is shown and editable first; the route (local vs cloud) is stated from settings and confirmed from the stream start.",
+    "No model output is invented: the panel shows only what api.chat / the stream returned, with the real outcome (complete, truncated, cancelled, incomplete, failed) and errors.",
+    "Sources are only app-owned notes, tasks and checkpoints, cited by real ids; deleted picks are reported and dropped, never fabricated.",
+    "Recaps and worklog drafts come from local records only (existing buildDailyRecap); lines whose evidence was deleted are marked.",
+    "Checkpoint original timestamps are never changed by edits or reference cleanup; imports keep original times and never accept future times.",
+    "Timeline collection stays opt-in in the existing policy; the screens record nothing by themselves and say so.",
+    "Retention preview and two-step forgetting are the existing MemoryControls; privacy guards and native confirmations in the backend are untouched.",
+    "PDF, Word, screen/window text and web pages are listed as unavailable with reasons; plain text and notes are the only inputs."
+  ],
+  "limitations": [
+    "Not mounted in the app: App/nav glue is the captain's. The screens have not been run in the Electron window; verification is typecheck plus static server renders and logic tests (browser-only paths such as clipboard, selection tracking, matchMedia change events and window.confirm are guarded but untested interactively).",
+    "No new CSS: layouts reuse existing classes (split, list, chips, grid2). A blink keyframe for [data-cursor=\"blink\"] and kbd styling are optional captain additions; nothing breaks without them.",
+    "Portability is copy/paste text only (no file dialog from this module); it carries checkpoints, goals/references and shelf, not focus/timeline/reminders/recents. Paths/links are exported as written.",
+    "Explain selection relies on textarea selection (onSelect/keyup/mouseup); rich-text selection outside the editor is not read.",
+    "The writing editor does not edit note tags; tags are preserved on save.",
+    "Streaming availability is read from getApiInfo's chat-streaming flag; when absent the one-shot chat call is used, which cannot be stopped mid-reply.",
+    "The scratch pad is in-memory until saved as a note; navigating away without saving discards it after a confirm.",
+    "Dropping a missing checkpoint reference requires the new checkpoint.update refs field; older main-process builds would ignore refs rather than fail.",
+    "Document import is typed against a local structural copy (DocumentPreview, DocumentsBridgeLike, localDocumentsBridge in WritingWorkbench.tsx) because this worktree lacks the captain bridge; shapes match docs/full-interface.documents.md (documentsChoose/documentsSave/documentsDiscard). The captain may swap in documentsBridge/ApprovedDocumentPreview on integration. Save/Discard click paths are exercised through the bridge functions, not through a DOM click, since tests render statically."
+  ],
+  "budget": "Within the USD 28 task cap; no cloud, research or paid calls were made."
+}

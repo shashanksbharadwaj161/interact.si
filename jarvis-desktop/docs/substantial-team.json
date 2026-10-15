@@ -1,0 +1,77 @@
+{
+  "at": "2026-10-14T11:37:40.876Z",
+  "sourceCommit": "47a8092",
+  "originalRepository": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop",
+  "sharedCap": 300,
+  "buffer": 30,
+  "consoleSpendObserved": 159.57,
+  "totalTaskCaps": 22,
+  "unresolvedRequestsPreserved": true,
+  "workers": [
+    {
+      "role": "scene3d",
+      "model": "claude-fable-5-1",
+      "budget": 12,
+      "files": [
+        "src/components/Scene3D.tsx",
+        "src/ui/scene3d.ts",
+        "src/styles/scene3d.css",
+        "tests/substantial-scene3d.test.mjs"
+      ],
+      "status": "cancelled",
+      "taskId": "1338b4dd-ad20-4da4-86f3-03f25d7967e5",
+      "sessionId": "jarvis-desktop-94",
+      "worktree": "outputs/control-room/.controlroom/orchestrator/worktrees/jarvis-desktop/jarvis-desktop-94",
+      "previousTaskIds": [
+        "84018618-3de9-40f2-ac19-6a4f892678f5"
+      ],
+      "retries": 1,
+      "authorized": false
+    },
+    {
+      "role": "streaming",
+      "model": "claude-opus-5-5",
+      "budget": 10,
+      "files": [
+        "electron/backend.ts",
+        "electron/channels.ts",
+        "electron/ipcCore.ts",
+        "electron/preload.ts",
+        "electron/services/cloud.ts",
+        "electron/services/ollama.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "src/components/Assistant.tsx",
+        "tests/substantial-streaming.test.mjs",
+        "tests/autopilot-api.test.mjs"
+      ],
+      "status": "awaiting input",
+      "taskId": "3db4b037-f5bb-49f2-b5a6-4775d53e95e0",
+      "sessionId": "jarvis-desktop-93",
+      "worktree": "outputs/control-room/.controlroom/orchestrator/worktrees/jarvis-desktop/jarvis-desktop-93",
+      "authorized": false
+    }
+  ],
+  "recoveryWorker": {
+    "role": "scene3d-finish",
+    "taskId": "b267390c-4575-4363-8576-ee91fe0aff0a",
+    "budget": 4,
+    "source": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\orchestrator\\worktrees\\jarvis-desktop\\jarvis-desktop-94",
+    "status": "awaiting input"
+  },
+  "checkedAt": "2026-10-14T16:52:51.279Z",
+  "protectedBudget": {
+    "limit": 300,
+    "safety": 30,
+    "committed": 268.59414556,
+    "remaining": 1.4058544399999846,
+    "uncertain": 178
+  },
+  "writingToolsAttempt": {
+    "taskId": "c4f315c7-d267-4561-86bf-a4ee5662b037",
+    "sessionId": "jarvis-desktop-96",
+    "cap": 2,
+    "status": "awaiting input"
+  },
+  "paidActive": 0
+}

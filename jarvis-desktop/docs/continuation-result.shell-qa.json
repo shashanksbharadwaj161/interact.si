@@ -1,0 +1,73 @@
+{
+  "role": "shell-qa",
+  "worktree": "jarvis-desktop-55",
+  "files": [
+    "tests/autopilot-shell-runtime.test.mjs",
+    "docs/autopilot-shell-runtime.md",
+    "docs/continuation-result.shell-qa.json"
+  ],
+  "checks": [
+    "node --test tests/autopilot-shell-runtime.test.mjs: 25 tests, 20 pass, 0 fail, 5 todo (todo = expected failures for real wire-up gaps; exit 0)",
+    "npm test (node --test tests/*.test.mjs): 502 tests, 495 pass, 2 fail, 5 todo. The 2 failures are tests/autopilot-models.test.mjs lines 124 and 203 (streaming cancellation), already recorded in docs/continuation-baseline.md; not caused by this module",
+    "npm ci --ignore-scripts run in this worktree (repo-local, no global installs)",
+    "git status: only the new test file and the two docs are added; no shell source changed; nothing committed"
+  ],
+  "limitations": [
+    "Server rendering only (react-dom/server). No DOM library is in the lockfile and package.json was not changed, so clicks, keyboard focus, effects, hash-change navigation and the Computer preview/approval flow are not exercised",
+    "Store seam: the store context is exported from the bundled copy of src/ui/store.tsx at bundle time (esbuild onLoad). The file on disk is not modified",
+    "Capability states are fixtures (unchecked, unavailable, available); they test how the shell presents states, not whether the system service reports them correctly",
+    "Mutation checks were not run; sensitivity relies on rendered exact values and minimum counts in the audits",
+    "Not run on Electron: the Electron binary is not installed under --ignore-scripts; scripts/smoke.cjs is not wired into npm test"
+  ],
+  "interfaces": {
+    "testSeams": {
+      "storeContext": "src/ui/store.tsx Ctx, exposed to tests as TestStoreContext by in-memory bundling only",
+      "app": "src/components/App.tsx App (renders Gate, then Shell, with CompanionProvider)",
+      "nav": "src/ui/nav.tsx VIEWS, VIEW_IDS, hashFor, parseHash, shortcutAction, navGroups"
+    },
+    "unresolvedWireUps": [
+      {
+        "id": "W1",
+        "summary": "Notes, Capsules and Tasks ignore the item route parameter; Home recent lists and memory search results pass { item }",
+        "where": ["src/components/App.tsx:382 (search navigate)", "src/components/Home.tsx:193 and :214", "src/components/App.tsx:453, :456, :459 (no props)"],
+        "todoTests": ["a note deep link selects the note it names", "a capsule deep link selects the capsule it names"],
+        "owner": "shell UI owner / captain",
+        "decision": "Tasks has no selection model (Tasks.tsx has no selection markup); decide whether ?item= applies there"
+      },
+      {
+        "id": "W2",
+        "summary": "Routines and Integrations have headings and UI but no route, no ViewId and no switch case",
+        "where": ["src/components/Routines.tsx (props: api, initialView)", "src/components/Integrations.tsx (props: bridge)", "src/ui/nav.tsx ViewId and VIEWS", "src/components/App.tsx Shell switch"],
+        "todoTests": ["the routines page is reachable from a route", "the integrations page is reachable from a route"],
+        "owner": "captain"
+      },
+      {
+        "id": "W3",
+        "summary": "Models, Customization, UsagePanel, WidgetPicker and AvatarStudio have no importer and cannot be reached",
+        "where": ["src/components/Models.tsx", "src/components/Customization.tsx", "src/components/UsagePanel.tsx", "src/components/WidgetPicker.tsx", "src/components/AvatarStudio.tsx"],
+        "todoTests": [],
+        "owner": "captain"
+      },
+      {
+        "id": "W4",
+        "summary": "Assistant unavailable copy doubles the full stop when a capability reason ends in '.'",
+        "where": ["src/components/Assistant.tsx:417"],
+        "todoTests": ["an unavailable reason that already ends in a full stop is not followed by a second one"],
+        "owner": "shell UI owner"
+      },
+      {
+        "id": "W5",
+        "summary": "Developer renders an external target=_blank link to the Control Room; decision D3 in docs/resume-integration-plan.md is open",
+        "where": ["src/components/Developer.tsx:68"],
+        "todoTests": [],
+        "owner": "root decision"
+      }
+    ]
+  },
+  "dependencies": {
+    "added": [],
+    "existingUsed": ["esbuild", "react", "react-dom/server", "node:test"]
+  },
+  "done": true,
+  "doneNote": "Shell runtime contract module complete with passing tests and todo tests pinning W1, W2 and W4. Captain should wire W1/W2/W4 and remove the todo markers when those tests pass. No commit or push."
+}

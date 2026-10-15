@@ -1,0 +1,45 @@
+{
+  "role": "accessibility",
+  "milestone": "a11y",
+  "done": true,
+  "files": [
+    { "path": "src/ui/primitives.tsx", "change": "modified", "summary": "Switch names its button with aria-labelledby (visible label id), links the description with aria-describedby, and hides the knob with aria-hidden. Props unchanged." },
+    { "path": "src/ui/accessibility.ts", "change": "modified", "summary": "Adds exported ACCESSIBILITY_STYLESHEET = './styles/accessibility.css' and a doc comment stating the shell import requirement. No other logic changed." },
+    { "path": "src/styles/accessibility.css", "change": "modified", "summary": "Forced-colors block: switch track gets a ButtonText border, knob gets a ButtonText fill (off and on), disabled knob gets GrayText. Rules are placed before the checked and disabled state rules so those still win." },
+    { "path": "tests/milestone-a11y.test.mjs", "change": "added", "summary": "20 static tests: rendered Switch markup via react-dom/server (bundled in memory), CSS forced-colors and reduced-motion declarations, focus outline, and src/main.tsx import order." },
+    { "path": "docs/milestone-result.a11y.json", "change": "added", "summary": "This result file." }
+  ],
+  "checks": [
+    { "command": "npm ci --ignore-scripts", "result": "pass", "note": "Repo-local install in this worktree; node_modules is git-ignored." },
+    { "command": "node --test tests/milestone-a11y.test.mjs", "result": "pass", "tests": 20, "pass": 20, "fail": 0, "todo": 0 },
+    { "command": "mutation check: HEAD primitives.tsx and accessibility.css in place of the edits, then restored", "result": "7 of 20 new tests fail on the original code, as expected", "note": "Confirms the new tests discriminate. Restored files verified again at 20/20." },
+    { "command": "node --test tests/ui.test.mjs tests/autopilot-accessibility.test.mjs tests/autopilot-shell.test.mjs tests/autopilot-shell-runtime.test.mjs tests/autopilot-mods.test.mjs tests/backend-search.test.mjs tests/onboarding.test.mjs tests/milestone-a11y.test.mjs", "result": "pass", "tests": 151, "pass": 147, "fail": 0, "todo": 4, "note": "The 4 todos are the pre-existing shell-runtime wire-up gaps (note/capsule deep links, Routines, Integrations)." },
+    { "command": "npx tsc --noEmit", "result": "pass" }
+  ],
+  "interfaces": [
+    {
+      "name": "Switch",
+      "module": "src/ui/primitives.tsx",
+      "props": "{ checked: boolean; onChange: (v: boolean) => void; label: string; description?: string; disabled?: boolean }",
+      "markup": "<label id=\"{id}-label\" for=\"{id}\"> names <button id=\"{id}\" role=\"switch\" aria-labelledby=\"{id}-label\" aria-describedby=\"{id}-description\"> (description only when given). The knob span is aria-hidden.",
+      "note": "Callers need no change. Disabled switches keep the same name."
+    },
+    {
+      "name": "ACCESSIBILITY_STYLESHEET",
+      "module": "src/ui/accessibility.ts",
+      "value": "./styles/accessibility.css",
+      "requirement": "The shell entry must import this stylesheet after every component stylesheet. src/main.tsx already does (last of the style imports). The test checks this order."
+    }
+  ],
+  "dependencies": [],
+  "limitations": [
+    "The unnamed-Switch finding was not reproduced in static markup. The existing shell-runtime audit already resolved these names through <label for>, and it passed before this change. The change makes the name explicit with aria-labelledby and aria-describedby. It is a robustness fix, not a demonstrated bug fix.",
+    "Tests are static: react-dom/server markup and stylesheet text. No DOM, no computed styles, no browser forced-colors or reduced-motion rendering, and no screen reader. Nothing here claims what assistive technology announces.",
+    "Click, keyboard toggling and focus behaviour of Switch are unchanged and not exercised by these tests.",
+    "Icon-only Button usages are not audited by this milestone. Only Switch naming was in scope.",
+    "docs/autopilot-shell-runtime.md, tests/autopilot-shell-runtime.test.mjs and docs/autopilot-result.accessibility.json are not owned by this milestone and were not edited.",
+    "The result file uses the path assigned in the task prompt (docs/milestone-result.a11y.json), not the docs/autopilot-result.<role>.json convention from AGENTS.md. The captain should confirm which path it reads."
+  ],
+  "commit": null,
+  "publishing": "none; changes left uncommitted in the worktree for captain review"
+}

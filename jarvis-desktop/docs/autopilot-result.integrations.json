@@ -1,0 +1,110 @@
+{
+  "role": "integrations",
+  "session": "jarvis-desktop-34",
+  "date": "2026-10-14",
+  "done": true,
+  "scope": "Roadmap 101-110 optional provider/connector foundation, plus the requested Spotify, browser, ChatGPT and Claude items. Website/app handoffs are kept separate from real developer-API connections.",
+  "files": [
+    "src/ui/integration-catalog.ts",
+    "electron/services/integrations.ts",
+    "src/components/Integrations.tsx",
+    "tests/autopilot-integrations.test.mjs",
+    "docs/autopilot-result.integrations.json"
+  ],
+  "checks": [
+    {
+      "command": "node --test tests/autopilot-integrations.test.mjs",
+      "result": "31/31 pass (revised: guard tests use a self-contained fake guard, no dependency on netGuard policy)"
+    },
+    {
+      "command": "npm test",
+      "result": "155/155 pass (whole suite in this worktree)"
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "result": "pass (previous run; only the test file changed since)"
+    },
+    {
+      "command": "npx vite build && node scripts/build-main.mjs",
+      "result": "pass (previous run; outputs are git-ignored)"
+    },
+    {
+      "command": "tsc scratch check: netGuard GuardedFetch assignable to IntegrationFetchFn",
+      "result": "pass (against this worktree's netGuard)"
+    },
+    {
+      "command": "mutation: disable trusted-confirm gate in check()",
+      "result": "caught by test 'declined or missing trusted confirmation sends nothing', then restored"
+    }
+  ],
+  "coverage": {
+    "101 Anthropic BYOK": "byok: GET /v1/models connection check with x-api-key + anthropic-version; key slot aliased to the existing Secrets vault (no second copy). Chat transport stays in chat.ts.",
+    "102 Additional AI providers": "byok: OpenAI developer API GET /v1/models check with bearer key. Chat routing to OpenAI NOT built.",
+    "103 Web research": "not-built: no search provider chosen.",
+    "104 Calendar connectors": "setup-required: needs owner-registered OAuth clients; no account contacted.",
+    "105 Issue tracker": "local Markdown draft export works (formatIssueDraft + copy). GitHub posting: token connection check only (GET /user); approved posting NOT built.",
+    "106 Weather/news": "keyless Open-Meteo connection check only (fixed coordinates 0,0); widget NOT built. News not-built.",
+    "107 Model/update downloads": "not-built: no signed channel or verification.",
+    "108 Data previews and usage history": "local: preview() lists destination, method, header names, key-sent flag, response handling; usage() ring (200 entries) with id/origin/status/outcome only.",
+    "109 Encrypted sync": "gated (experimental, cannot be enabled).",
+    "110 Marketplace": "gated (experimental, cannot be enabled).",
+    "Claude": "Two separate items: 'anthropic' (API, your key) and 'claude-web' (opens claude.ai via approved open-url; not an integration).",
+    "ChatGPT": "Two separate items: 'openai' (API, your key) and 'chatgpt-web' (opens chatgpt.com via approved open-url; not an integration).",
+    "Spotify": "'spotify-web' opens open.spotify.com via approved open-url (not an integration); 'spotify-api' playback control is setup-required (no scope, OAuth PKCE owner client, Premium).",
+    "Browser": "'browser' opens a user-entered http(s) link via approved open-url. Tabs/profiles/page content not read (47/88 planned).",
+    "Local model": "'ollama' loopback GET /api/tags check works offline, no confirmation, reports installed model count."
+  },
+  "interfaces": {
+    "catalog (src/ui/integration-catalog.ts, pure, renderer- and main-safe)": [
+      "INTEGRATIONS: readonly IntegrationDefinition[]; findIntegration(id); isCheckable(def)",
+      "AVAILABILITY_LABEL; IntegrationAvailability = 'local'|'byok'|'keyless'|'handoff'|'setup-required'|'not-built'|'gated'",
+      "egressRequirements(): {id, origin, purpose, online, key}[]  -- origins/purposes netGuard must allow",
+      "validateHandoffUrl(raw, allowHttp?); handoffAction(def, userUrl?) -> {ok, action:{type:'open-url', target}}",
+      "formatIssueDraft(input): string (local, never posts)",
+      "Types: IntegrationsBridge, IntegrationView, ConnectionState, CheckResult, EgressPreview, UsageEntry"
+    ],
+    "service (electron/services/integrations.ts, no Electron imports)": [
+      "createIntegrationService({fetch, mode, keys, confirm, localEndpoint?, prefs?, audit?, now?, definitions?, checkTimeoutMs?, cooldownMs?}) -> {list, view, preview, check, setKey, removeKey, setEnabled, usage, clearUsage, definitions}",
+      "IntegrationFetchFn = (url, init & {timeoutMs?}, purpose) => Promise<Response>; pass createGuardedFetch(...) directly",
+      "KeyAdapter {has, store, remove, use(slot, fn)} -- key exists only inside use()",
+      "createDpapiKeyVault({native, dir, fs?, aliases?}) -> KeyAdapter; files at <userData>/secrets/integrations/<slot>.bin (ciphertext only)",
+      "PrefsStore {load(): unknown, save(IntegrationPrefs)}; sanitizePrefs(raw)",
+      "INTEGRATION_METHODS, INTEGRATION_ARITY, integrationHandlers(service) -> Record<method, handler>; validateIntegrationId; describeStatus"
+    ],
+    "renderer (src/components/Integrations.tsx)": [
+      "Integrations({bridge?: IntegrationsBridge}) -- store-connected page; uses api.previewAction/executeAction for handoffs (main shows native confirmation)",
+      "IntegrationsPanel({mode, bridge?, previewAction, executeAction, notify}) -- store-free, SSR-tested",
+      "filterIntegrations(filter), stateText(def, view, mode)"
+    ]
+  },
+  "captain_wiring": [
+    "main/backend: const keys = createDpapiKeyVault({native, dir: userDataDir, aliases: {anthropic: secrets}}); const integrations = createIntegrationService({fetch: guardedFetch, mode: () => settings.mode, keys, confirm: env.confirm /* trusted dialog.showMessageBox, Cancel default */, localEndpoint: () => settings.localEndpoint, prefs: <store-backed PrefsStore>, audit: (s) => activity('integration', s)}).",
+    "IPC: register each INTEGRATION_METHODS entry as channel('<method>') behind the existing dispatch sender/frame checks with INTEGRATION_ARITY; preload exposes them as an IntegrationsBridge (e.g. window.jarvis.integrations*). Contract additions are the API owner's call.",
+    "UI shell owner: add a nav route rendering <Integrations bridge={...} />. Without a bridge the page still renders and says checks are not wired; website handoffs work through the existing action approval.",
+    "API owner: done in the combined repo per captain (Purpose 'provider-check', online GET, exact origins/paths). Keep it in sync with egressRequirements(); the Ollama check uses the existing 'ollama' loopback purpose.",
+    "Optional: replace ROADMAP UI_NOTES for 101-110 with catalog-derived notes once wired."
+  ],
+  "dependencies": {
+    "added": [],
+    "reads (no edits)": [
+      "src/shared/contracts.ts (Mode, ActionRequest, ActionPreview)",
+      "electron/services/netGuard.ts (NetworkDenied, GuardedFetch type)",
+      "electron/services/secrets.ts (validateCloudKey)",
+      "electron/services/validation.ts (ValidationError, isLoopbackHost)",
+      "electron/native/adapter.ts (NativeAdapter.dpapi type)",
+      "src/ui/primitives.tsx, src/ui/store.tsx, src/ui/action-result.ts, src/ui/util.ts"
+    ],
+    "npm": "npm ci --ignore-scripts in this worktree only; no new packages"
+  },
+  "limitations": [
+    "Not wired in this worktree: no IPC channels, preload bridge or nav route (outside my owned paths). Captain/UI shell owner must wire per captain_wiring.",
+    "Connection checks verify reachability/key acceptance only. OpenAI chat, GitHub issue posting, weather widget, web research, calendar, news, downloads, sync and marketplace are not built; each is labelled with its blockers in the catalog.",
+    "No real provider, account or website was contacted during development; all network, DPAPI, filesystem and dialog behavior is tested with injected mocks. Real DPAPI round-trip for integration slots is untested here (same helper as the existing cloud key).",
+    "Last-check status and usage history are in memory (session only); enable preferences persist only if the captain supplies a PrefsStore.",
+    "Spotify desktop-app launch relies on the existing approved-apps + launch action; this module only documents it. spotify: URIs are not supported because open-url accepts http/https/mailto only.",
+    "Integrations.tsx reuses existing CSS classes; no new styles were added (styles are not in my paths).",
+    "This worktree's netGuard is the old version (no 'provider-check'); I could not see the security owner's new guard. Tests model the guard with a fake fetch, so an end-to-end check against the real new guard must run in the combined repository.",
+    "Tests depend on netGuard exporting the NetworkDenied class (the service imports it to label guard denials)."
+  ],
+  "revision": "2026-10-14: per captain note, replaced the old-guard denial test with fake-guard tests: offline / missing key never reach fetch; with trusted confirmation online, anthropic/openai/issue-post/weather go to exact origin+path with GET, purpose provider-check, credential header only where a key is required; a modelled guard denial is reported as blocked and nothing is sent. Tests still use netGuard.NetworkDenied (the error class the service recognises), not its policy."
+}

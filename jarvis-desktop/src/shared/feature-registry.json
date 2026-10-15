@@ -1,208 +1,3132 @@
 {
-  "version": 1,
+  "version": 5,
   "productName": "Desktop Companion (temporary name)",
   "technicalName": "jarvis-desktop",
   "source": "docs/product-roadmap.md",
-  "sourceDate": "13 October 2026",
-  "statusVocabulary": ["planned"],
+  "sourceDate": "14 October 2026",
+  "statusVocabulary": [
+    "planned",
+    "partial",
+    "verified"
+  ],
   "gates": {
     "G1": {
       "name": "Overlay",
       "question": "Transparent, frameless, always-on-top Electron island on Win11 at 100/150/200% DPI, multi-monitor, fullscreen-app detection",
       "passCriteria": "Expand/collapse ≤ 150 ms, no focus stealing, idle delta ≤ 40 MB",
       "status": "not-recorded",
-      "blocks": [61, 63, 65, 66, 67]
+      "blocks": [
+        61,
+        63,
+        65,
+        66,
+        67
+      ]
     },
     "G2": {
       "name": "Local model sizing",
       "question": "Which Ollama models run on 8/16 GB RAM, no GPU",
       "passCriteria": "First token ≤ 5 s, ≥ 5 tok/s on reference laptop",
       "status": "not-recorded",
-      "blocks": [11, 15, 16, 17, 18, 19]
+      "blocks": [
+        11,
+        15,
+        16,
+        17,
+        18,
+        19
+      ]
     },
     "G3": {
       "name": "Local ASR upgrade",
       "question": "Permissively licensed Whisper-class runtime, bundled or imported offline",
       "passCriteria": "WER better than System.Speech on test set; licence MIT/Apache/BSD",
       "status": "not-recorded",
-      "blocks": [12, 23, 40]
+      "blocks": [
+        12,
+        23,
+        40
+      ]
     },
     "G4": {
       "name": "Input injection",
       "question": "Reliable click/type-text across Win32/UWP/Chromium apps",
       "passCriteria": "≥ 95% on fixture matrix, never into elevated or password targets",
       "status": "not-recorded",
-      "blocks": [88, 89, 90]
+      "blocks": [
+        88,
+        89,
+        90
+      ]
     },
     "G5": {
       "name": "Windows mods",
       "question": "Licence and safety of each third-party mod (Windhawk-style mods are often GPL)",
       "passCriteria": "Catalog links/launches external tools only; no bundled GPL code; reversible",
       "status": "not-recorded",
-      "blocks": [71, 72, 73, 74, 75, 76, 77, 78, 79, 80]
+      "blocks": [
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ]
     },
     "G6": {
       "name": "Screen capture",
       "question": "desktopCapturer region capture + local OCR (Windows.Media.Ocr via WinRT)",
       "passCriteria": "Opt-in per capture, nothing stored by default",
       "status": "not-recorded",
-      "blocks": [24, 25, 29, 39, 40]
+      "blocks": [
+        24,
+        25,
+        29,
+        39,
+        40
+      ]
     },
     "G7": {
       "name": "Avatars/motion",
       "question": "Renderer cost of 2D/3D avatar and motion scenes",
       "passCriteria": "Within architecture §8 budget when idle; off by default",
       "status": "not-recorded",
-      "blocks": [69, 70, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140]
+      "blocks": [
+        69,
+        70,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140
+      ]
     },
     "G8": {
       "name": "Signing",
       "question": "Code-signing certificate and update channel",
       "passCriteria": "Signed NSIS + verified update + rollback",
       "status": "not-recorded",
-      "blocks": [117]
+      "blocks": [
+        117
+      ]
     }
   },
   "entries": [
-    { "id": 1, "name": "First-run setup wizard", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 2, "name": "Hardware and dependency checks", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 3, "name": "Offline/online mode selection", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 4, "name": "Permission setup and review", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 5, "name": "Main application dashboard", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 6, "name": "Searchable settings", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 7, "name": "Personal profiles and preferences", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 8, "name": "Keyboard and accessibility controls", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 9, "name": "Tray, startup, notification preferences", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 10, "name": "Help, tutorials, diagnostic status", "category": "Application & onboarding", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 11, "name": "Local text reasoning", "category": "Local AI & voice", "tier": "First", "status": "planned", "gates": ["G2"], "gateNote": "G2 sets the default model choice and sizing." },
-    { "id": 12, "name": "Local speech recognition", "category": "Local AI & voice", "tier": "First", "status": "planned", "gates": ["G3"], "gateNote": "G3 gates the higher-quality ASR upgrade; the System.Speech baseline is first release." },
-    { "id": 13, "name": "Local speech playback", "category": "Local AI & voice", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 14, "name": "Local model-pack setup and offline import", "category": "Local AI & voice", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 15, "name": "Local vision model support", "category": "Local AI & voice", "tier": "Expansion", "status": "planned", "gates": ["G2"] },
-    { "id": 16, "name": "Local embeddings and retrieval", "category": "Local AI & voice", "tier": "Expansion", "status": "planned", "gates": ["G2"] },
-    { "id": 17, "name": "Model switching and version pinning", "category": "Local AI & voice", "tier": "Expansion", "status": "planned", "gates": ["G2"] },
-    { "id": 18, "name": "CPU/GPU and memory budgets", "category": "Local AI & voice", "tier": "Expansion", "status": "planned", "gates": ["G2"] },
-    { "id": 19, "name": "Model download verification and removal", "category": "Local AI & voice", "tier": "Expansion", "status": "planned", "gates": ["G2"] },
-    { "id": 20, "name": "Personal model fine-tuning experiments", "category": "Local AI & voice", "tier": "Experimental", "status": "planned", "gates": [], "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work. Architecture §11 marks it not planned." },
-    { "id": 21, "name": "Text chat with streaming", "category": "Assistant & screen tools", "tier": "First", "status": "planned", "gates": [], "gateNote": "Contract has no streaming method; first release ships non-streaming." },
-    { "id": 22, "name": "Push-to-talk conversation", "category": "Assistant & screen tools", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 23, "name": "Clean dictation with insertion preview", "category": "Assistant & screen tools", "tier": "First", "status": "planned", "gates": ["G3"], "gateNote": "Architecture §10 lists G3 as blocking; §11 plans System.Speech first. Confirm which path ships." },
-    { "id": 24, "name": "Selected screen-region questions", "category": "Assistant & screen tools", "tier": "First", "status": "planned", "gates": ["G6"] },
-    { "id": 25, "name": "OCR and otherwise unselectable text extraction", "category": "Assistant & screen tools", "tier": "Expansion", "status": "planned", "gates": ["G6"] },
-    { "id": 26, "name": "Translation and app-specific writing tone", "category": "Assistant & screen tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 27, "name": "Approved document explanations", "category": "Assistant & screen tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 28, "name": "Error diagnosis with proposed actions", "category": "Assistant & screen tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 29, "name": "Explicit screen/app context controls", "category": "Assistant & screen tools", "tier": "Expansion", "status": "planned", "gates": ["G6"] },
-    { "id": 30, "name": "Conversation history and export", "category": "Assistant & screen tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 31, "name": "Explicit project checkpoints", "category": "Memory & journal", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 32, "name": "Searchable project notes and references", "category": "Memory & journal", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 33, "name": "Opt-in application session timeline", "category": "Memory & journal", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 34, "name": "Evidence-backed daily recaps", "category": "Memory & journal", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 35, "name": "Draft worklog and standup updates", "category": "Memory & journal", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 36, "name": "Correctable task/session association", "category": "Memory & journal", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 37, "name": "Memory edit, forget, retention controls", "category": "Memory & journal", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 38, "name": "Coding-session adapters", "category": "Memory & journal", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 39, "name": "Continuous screen history", "category": "Memory & journal", "tier": "Experimental", "status": "planned", "gates": ["G6"] },
-    { "id": 40, "name": "Meeting/system-audio capture and summaries", "category": "Memory & journal", "tier": "Experimental", "status": "planned", "gates": ["G3", "G6"], "gateNote": "Architecture §10 lists G3 and §11 lists G6; both apply until the owner confirms." },
-    { "id": 41, "name": "Project capsules with goals and references", "category": "Projects & workspaces", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 42, "name": "Launch apps, files, and URLs together", "category": "Projects & workspaces", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 43, "name": "Save and restore supported window geometry", "category": "Projects & workspaces", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 44, "name": "Project-specific visual scene", "category": "Projects & workspaces", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 45, "name": "Resume recap with source references", "category": "Projects & workspaces", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 46, "name": "Cross-project search", "category": "Projects & workspaces", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 47, "name": "Browser-profile and tab adapters", "category": "Projects & workspaces", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 48, "name": "Portable capsule export with path mapping", "category": "Projects & workspaces", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 49, "name": "Deep app-state restoration adapters", "category": "Projects & workspaces", "tier": "Experimental", "status": "planned", "gates": [], "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work." },
-    { "id": 50, "name": "Spatial project map with historical branches", "category": "Projects & workspaces", "tier": "Experimental", "status": "planned", "gates": [], "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work." },
-    { "id": 51, "name": "Tasks and checklists", "category": "Everyday productivity", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 52, "name": "Reminders and timers", "category": "Everyday productivity", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 53, "name": "Focus sessions with history", "category": "Everyday productivity", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 54, "name": "Quick notes and snippets", "category": "Everyday productivity", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 55, "name": "File shelf with references", "category": "Everyday productivity", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 56, "name": "Optional clipboard history", "category": "Everyday productivity", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 57, "name": "Application launcher and recent items", "category": "Everyday productivity", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 58, "name": "Media and per-app volume controls", "category": "Everyday productivity", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 59, "name": "Calendar view and local calendar import", "category": "Everyday productivity", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 60, "name": "System, battery, and device widgets", "category": "Everyday productivity", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 61, "name": "Movable expanding desktop island", "category": "Visuals & motion", "tier": "First", "status": "planned", "gates": ["G1"], "gateNote": "If G1 fails, the panel stays in the main window." },
-    { "id": 62, "name": "Original color, typography, material themes", "category": "Visuals & motion", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 63, "name": "Interruptible status and panel animations", "category": "Visuals & motion", "tier": "First", "status": "planned", "gates": ["G1"] },
-    { "id": 64, "name": "Reduced motion, battery, fullscreen controls", "category": "Visuals & motion", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 65, "name": "Companion with assistant-state animations", "category": "Visuals & motion", "tier": "Expansion", "status": "planned", "gates": ["G1"] },
-    { "id": 66, "name": "Audio-reactive waveforms and effects", "category": "Visuals & motion", "tier": "Expansion", "status": "planned", "gates": ["G1"] },
-    { "id": 67, "name": "Animated project/scene transitions", "category": "Visuals & motion", "tier": "Expansion", "status": "planned", "gates": ["G1"] },
-    { "id": 68, "name": "Widget layout editor and live preview", "category": "Visuals & motion", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 69, "name": "Live wallpaper/shader scenes", "category": "Visuals & motion", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 70, "name": "Physics-driven desktop and window effects", "category": "Visuals & motion", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 71, "name": "Curated optional mod catalog", "category": "Windows customization", "tier": "First", "status": "planned", "gates": ["G5"], "gateNote": "First release is a read-only catalog of external tools only." },
-    { "id": 72, "name": "Mod version and compatibility checks", "category": "Windows customization", "tier": "First", "status": "planned", "gates": ["G5"] },
-    { "id": 73, "name": "Taskbar and Start menu presets", "category": "Windows customization", "tier": "Expansion", "status": "planned", "gates": ["G5"] },
-    { "id": 74, "name": "Explorer and notification presets", "category": "Windows customization", "tier": "Expansion", "status": "planned", "gates": ["G5"] },
-    { "id": 75, "name": "Save and restore customization settings", "category": "Windows customization", "tier": "Expansion", "status": "planned", "gates": ["G5"] },
-    { "id": 76, "name": "Advanced window borders, corners, transparency", "category": "Windows customization", "tier": "Experimental", "status": "planned", "gates": ["G5"] },
-    { "id": 77, "name": "Dock/genie/wobble animation packs", "category": "Windows customization", "tier": "Experimental", "status": "planned", "gates": ["G5"] },
-    { "id": 78, "name": "Resource and icon redirection packs", "category": "Windows customization", "tier": "Experimental", "status": "planned", "gates": ["G5"] },
-    { "id": 79, "name": "Virtual-desktop behavior modifications", "category": "Windows customization", "tier": "Experimental", "status": "planned", "gates": ["G5"] },
-    { "id": 80, "name": "AI-composed validated scene specifications", "category": "Windows customization", "tier": "Experimental", "status": "planned", "gates": ["G5"] },
-    { "id": 81, "name": "Approved app-launch action tools", "category": "Routines & automation", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 82, "name": "Durable scheduled routines", "category": "Routines & automation", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 83, "name": "Visual editable workflow steps", "category": "Routines & automation", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 84, "name": "Conditions, bounded retries, duplicate prevention", "category": "Routines & automation", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 85, "name": "Execution results and partial-failure history", "category": "Routines & automation", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 86, "name": "Cancellation and pause-all controls", "category": "Routines & automation", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 87, "name": "Undo for explicitly reversible steps", "category": "Routines & automation", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 88, "name": "Selected file/browser action adapters", "category": "Routines & automation", "tier": "Expansion", "status": "planned", "gates": ["G4"] },
-    { "id": 89, "name": "Watch-once routine recording", "category": "Routines & automation", "tier": "Experimental", "status": "planned", "gates": ["G4"] },
-    { "id": 90, "name": "Cross-app semantic drag-to-action workflows", "category": "Routines & automation", "tier": "Experimental", "status": "planned", "gates": ["G4"] },
-    { "id": 91, "name": "Task board and worker status", "category": "Agents & developer tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 92, "name": "Isolated project workspaces", "category": "Agents & developer tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 93, "name": "Model/worker role selection", "category": "Agents & developer tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 94, "name": "Persistent resumable agent sessions", "category": "Agents & developer tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 95, "name": "Scoped tools and context policies", "category": "Agents & developer tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 96, "name": "Agent logs and result inspection", "category": "Agents & developer tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 97, "name": "Budgets and bounded task execution", "category": "Agents & developer tools", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 98, "name": "Local specialist multi-agent execution", "category": "Agents & developer tools", "tier": "Experimental", "status": "planned", "gates": [], "gateNote": "Experimental with no gate defined in architecture §10. Acceptance N3 keeps agents absent or experimental until a gate document exists." },
-    { "id": 99, "name": "Animated worker/crew visualization", "category": "Agents & developer tools", "tier": "Experimental", "status": "planned", "gates": [], "gateNote": "Experimental with no gate defined in architecture §10. Acceptance N3 keeps agents absent or experimental until a gate document exists." },
-    { "id": 100, "name": "Suggested reusable skills from past runs", "category": "Agents & developer tools", "tier": "Experimental", "status": "planned", "gates": [], "gateNote": "Experimental with no gate defined in architecture §10. Acceptance N3 keeps agents absent or experimental until a gate document exists." },
-    { "id": 101, "name": "Anthropic BYOK provider", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode", "customer-owned API key"] },
-    { "id": 102, "name": "Additional optional AI providers", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode"] },
-    { "id": 103, "name": "Web research with cited sources", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode"] },
-    { "id": 104, "name": "Calendar account connectors", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode"] },
-    { "id": 105, "name": "Issue-tracker draft export and approved posting", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode"] },
-    { "id": 106, "name": "Weather/news feed widgets", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode"] },
-    { "id": 107, "name": "Optional model/update downloads", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode"] },
-    { "id": 108, "name": "Per-provider data previews and usage history", "category": "Optional online integrations", "tier": "Expansion", "status": "planned", "gates": [], "requires": ["online mode"] },
-    { "id": 109, "name": "Encrypted cross-device sync", "category": "Optional online integrations", "tier": "Experimental", "status": "planned", "gates": [], "requires": ["online mode"], "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work." },
-    { "id": 110, "name": "Community scene/widget marketplace", "category": "Optional online integrations", "tier": "Experimental", "status": "planned", "gates": [], "requires": ["online mode"], "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work." },
-    { "id": 111, "name": "Windows installer and uninstaller", "category": "Installation & ownership", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 112, "name": "Bundled runtime and offline installation option", "category": "Installation & ownership", "tier": "First", "status": "planned", "gates": [], "gateNote": "Ollama and model packs install separately from the app." },
-    { "id": 113, "name": "Local encrypted sensitive-data storage", "category": "Installation & ownership", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 114, "name": "Export/import and backup recovery", "category": "Installation & ownership", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 115, "name": "Crash recovery and safe launch", "category": "Installation & ownership", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 116, "name": "Network-denial/offline verification", "category": "Installation & ownership", "tier": "First", "status": "planned", "gates": [] },
-    { "id": 117, "name": "Signed updates with rollback", "category": "Installation & ownership", "tier": "Expansion", "status": "planned", "gates": ["G8"] },
-    { "id": 118, "name": "Validated x64/ARM64 compatibility tiers", "category": "Installation & ownership", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 119, "name": "Commercial licensing without mandatory cloud check-in", "category": "Installation & ownership", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 120, "name": "Enterprise policy and managed deployment", "category": "Installation & ownership", "tier": "Experimental", "status": "planned", "gates": [], "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work." },
-    { "id": 121, "name": "Unified usage dashboard", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 122, "name": "Supported provider quota/balance adapters", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 123, "name": "Reset countdown and stale-data indicators", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 124, "name": "Local token and estimated cost ledger", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 125, "name": "Project/worker cost attribution", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 126, "name": "Budget pace and threshold alerts", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 127, "name": "Local inference performance history", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 128, "name": "Usage report export", "category": "Usage dashboard", "tier": "Expansion", "status": "planned", "gates": [] },
-    { "id": 129, "name": "2D avatar geometry editor", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 130, "name": "Expression authoring library", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 131, "name": "Avatar animation timeline editor", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 132, "name": "Portable avatar pack import/export", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 133, "name": "3D avatar/model customization", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 134, "name": "Voice-driven avatar mouth/pose states", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 135, "name": "Realistic portrait animation adapter", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 136, "name": "Avatar quality/hardware profile manager", "category": "Avatar studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 137, "name": "Procedural motion scene editor", "category": "Motion studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 138, "name": "Original scene/template library", "category": "Motion studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 139, "name": "AI-to-validated-scene generation", "category": "Motion studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] },
-    { "id": 140, "name": "Local animation/clip export", "category": "Motion studio", "tier": "Experimental", "status": "planned", "gates": ["G7"] }
-  ]
+    {
+      "id": 1,
+      "name": "First-run setup wizard",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/onboarding.test.mjs: onboarding blocks Next on the model step and keeps Finish from sending bad settings"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell.test.mjs: onboarding can check a draft model before finishing and still blocks bad settings"
+        }
+      ],
+      "limitation": "Wizard steps and the draft-model check exist; no recorded end-to-end run of the full wizard flow."
+    },
+    {
+      "id": 2,
+      "name": "Hardware and dependency checks",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "verified",
+      "integration": "runtime-verified",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/onboarding.test.mjs: offline readiness follows the live Ollama check, not whether the fields are filled in"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-native.test.mjs: speech capabilities are honest: missing voices/recognizers/helper are reported unavailable with a reason"
+        },
+        {
+          "type": "smoke",
+          "ref": "docs/current-verification.md: real Electron smoke, Windows TTS and recognizer detected"
+        }
+      ],
+      "limitation": "Checks only; no dependency installer. Recorded smoke predates this continuation; re-run after integration."
+    },
+    {
+      "id": 3,
+      "name": "Offline/online mode selection",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "verified",
+      "integration": "runtime-verified",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: offline guard denies every external endpoint, lookalike host and cloud origin"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: online without a key answers with a system message and makes zero local or cloud requests"
+        },
+        {
+          "type": "smoke",
+          "ref": "docs/current-verification.md: offline default in smoke"
+        }
+      ],
+      "limitation": "Online mode needs a user-provided key; no automatic fallback. Recorded smoke predates this continuation; re-run after integration."
+    },
+    {
+      "id": 4,
+      "name": "Permission setup and review",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-approval.test.mjs: settings decline leaves state unchanged; import retains permissions and forces offline"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: approved apps and allowed folders reject network and device locations"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-security.test.mjs: describePermissionChanges lists every widening change and nothing for removals"
+        }
+      ],
+      "limitation": "Backend permission gating and permission-change descriptions are tested; the review UI is not."
+    },
+    {
+      "id": 5,
+      "name": "Main application dashboard",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/ui/roadmap.ts: Home overview built from saved data only"
+        }
+      ],
+      "limitation": "Home screen with widget arrangement exists; no visual or runtime check recorded for the shell changes."
+    },
+    {
+      "id": 6,
+      "name": "Searchable settings",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell.test.mjs: the settings index is consistent and search matches titles, tab names and keywords"
+        }
+      ],
+      "limitation": "Searches section titles, tab names and keywords, not every field label; no runtime check recorded."
+    },
+    {
+      "id": 7,
+      "name": "Personal profiles and preferences",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/ui/prefs.ts: theme, reduce-motion and motion presets"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell.test.mjs: display names are trimmed, collapsed and bounded"
+        }
+      ],
+      "limitation": "Display name and preferences exist; no personal profiles."
+    },
+    {
+      "id": 8,
+      "name": "Keyboard and accessibility controls",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "docs/keyboard-audit.md: static audit; findings open"
+        },
+        {
+          "type": "test",
+          "ref": "tests/onboarding.test.mjs: the shell labels icon-only navigation and shows the safe-launch banner"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-accessibility.test.mjs: VIEW_SHORTCUTS maps positions 1 to 10 once each, with Alt+0 for position 10"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell.test.mjs: global shortcuts: Alt+digit, Ctrl+K and F1, and nothing at all while a dialog is open"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-accessibility.test.mjs: reduced motion only shortens animation, transition and smooth scrolling"
+        }
+      ],
+      "limitation": "Shell shortcuts are tested; the accessibility module is not imported by App.tsx; no keyboard-only or screen-reader run recorded."
+    },
+    {
+      "id": 9,
+      "name": "Tray, startup, notification preferences",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "electron/main.ts: tray, start-in-tray setting, global hotkey"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-native.test.mjs: reminders: announces a due task once, with one unref'd timer aimed at the next due time"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-native.test.mjs: login item: only the packaged Windows app registers, always with --hidden"
+        }
+      ],
+      "limitation": "Tray, hotkey and login-item helpers exist; no Settings control for login item or notifications; no Windows notifications."
+    },
+    {
+      "id": 10,
+      "name": "Help, tutorials, diagnostic status",
+      "category": "Application & onboarding",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Status.tsx: system status; src/components/Developer.tsx: diagnostics"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell.test.mjs: help lists every view, every shortcut and the keys the shell actually handles"
+        }
+      ],
+      "limitation": "Help dialog and diagnostic status exist; no tutorials."
+    },
+    {
+      "id": 11,
+      "name": "Local text reasoning",
+      "category": "Local AI & voice",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G2"
+      ],
+      "gateNote": "G2 sets the default model choice and sizing.",
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: offline chat talks only to the loopback model and never touches the cloud, even with a stored key"
+        },
+        {
+          "type": "smoke",
+          "ref": "docs/local-model-setup.md: recorded run with one model on one machine"
+        }
+      ],
+      "limitation": "Gate G2 not recorded; no default-model sizing."
+    },
+    {
+      "id": 12,
+      "name": "Local speech recognition",
+      "category": "Local AI & voice",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G3"
+      ],
+      "gateNote": "G3 gates the higher-quality ASR upgrade; the System.Speech baseline is first release.",
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-native.test.mjs: transcribe without a recognizer or with probe failure writes no file"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/voice-acceptance.md: F3a and F4 checks not run"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: transcription writes a temp file, always removes it, and can be cancelled"
+        }
+      ],
+      "limitation": "Basic recognizer only; manual acceptance not run."
+    },
+    {
+      "id": 13,
+      "name": "Local speech playback",
+      "category": "Local AI & voice",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-native.test.mjs: speak validates before any native call and passes text as a value"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/voice-acceptance.md: F1a audible check not run"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: speaking a new text cancels the previous one, and cancel() stops the current speech"
+        }
+      ],
+      "limitation": "Audible playback not recorded."
+    },
+    {
+      "id": 14,
+      "name": "Local model-pack setup and offline import",
+      "category": "Local AI & voice",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: a good pack validates with exact sizes and checksums"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: offline import uploads verified bytes, then creates the model from blob digests; the app never leaves loopback"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Model-pack validation, folder import and the mounted Models page run through the backend. No recorded run with a real GGUF pack exists and G2 sizing is not recorded."
+    },
+    {
+      "id": 15,
+      "name": "Local vision model support",
+      "category": "Local AI & voice",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G2"
+      ],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Reported as unsupported; no vision model pipeline. Gate G2 open.",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G2",
+        "note": "Local vision model needs the G2 sizing run on 8/16 GB machines first."
+      }
+    },
+    {
+      "id": 16,
+      "name": "Local embeddings and retrieval",
+      "category": "Local AI & voice",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G2"
+      ],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented; embeddings are reported as unsupported. Gate G2 open.",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G2",
+        "note": "Local embeddings need the G2 sizing run first."
+      }
+    },
+    {
+      "id": 17,
+      "name": "Model switching and version pinning",
+      "category": "Local AI & voice",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G2"
+      ],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/shared/contracts.ts: Settings.localModel is editable"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: select verifies the model is installed and only returns a settings patch"
+        }
+      ],
+      "limitation": "Switching by model name in Settings works; the select flow is module-tested only; no version pinning. Gate G2 open."
+    },
+    {
+      "id": 18,
+      "name": "CPU/GPU and memory budgets",
+      "category": "Local AI & voice",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G2"
+      ],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: resource profiles: default keeps legacy values, profile feeds chat, recommendations follow memory"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: resource profile reaches the request: keep_alive and num_ctx"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The resource profile is selectable on the mounted Models page through the backend. Budgets are enforced as profiles, not measured on a reference laptop (G2 not recorded)."
+    },
+    {
+      "id": 19,
+      "name": "Model download verification and removal",
+      "category": "Local AI & voice",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G2"
+      ],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: pack validation rejects bad checksums, wrong sizes, missing files and non-local folders"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: downloads are refused offline and without a trusted guard, with zero requests"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Pack checksum and size validation and pack removal are reachable through the backend. Live model pulls need a local Ollama; no recorded download run exists."
+    },
+    {
+      "id": 20,
+      "name": "Personal model fine-tuning experiments",
+      "category": "Local AI & voice",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work. Architecture §11 marks it not planned.",
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined in architecture section 10. Fine-tuning is reported unsupported; adapters are type contracts only.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Experimental with no gate in architecture section 10; a written gate is required before work."
+      }
+    },
+    {
+      "id": 21,
+      "name": "Text chat with streaming",
+      "category": "Assistant & screen tools",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "gateNote": "Contract has no streaming method; first release ships non-streaming.",
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: offline chat talks only to the loopback model and never touches the cloud, even with a stored key"
+        },
+        {
+          "type": "doc",
+          "ref": "electron/services/chat.ts: stream false"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: streaming local chat joins fragments split across chunks and reports each delta"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: a stream error line or a malformed line fails honestly instead of inventing text"
+        }
+      ],
+      "limitation": "Streaming lives in the chat service, but the backend still uses non-streaming chat, so the UI gets no tokens or Stop button. Two cancellation tests fail in the combined tree (tests/autopilot-models.test.mjs)."
+    },
+    {
+      "id": 22,
+      "name": "Push-to-talk conversation",
+      "category": "Assistant & screen tools",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Assistant.tsx: push-to-talk records WAV for transcribe"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/voice-acceptance.md: F4 checks not run"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-models.test.mjs: transcription writes a temp file, always removes it, and can be cancelled"
+        }
+      ],
+      "limitation": "Manual microphone checks not run."
+    },
+    {
+      "id": 23,
+      "name": "Clean dictation with insertion preview",
+      "category": "Assistant & screen tools",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G3"
+      ],
+      "gateNote": "Architecture §10 lists G3 as blocking; §11 plans System.Speech first. Confirm which path ships.",
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "docs/voice-acceptance.md: F4k transcript appended to message box"
+        }
+      ],
+      "limitation": "Raw transcript only; no clean-up. Gate G3 open."
+    },
+    {
+      "id": 24,
+      "name": "Selected screen-region questions",
+      "category": "Assistant & screen tools",
+      "tier": "First",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G6"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "No region capture. Gate G6 open.",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G6",
+        "note": "Region capture needs the G6 screen-capture gate; nothing is captured by default."
+      }
+    },
+    {
+      "id": 25,
+      "name": "OCR and otherwise unselectable text extraction",
+      "category": "Assistant & screen tools",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G6"
+      ],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Computer.tsx: ImageTextPanel mounts local OCR image selection and untrusted text review"
+        },
+        {
+          "type": "test",
+          "ref": "tests/expansion-ocr-ui.test.mjs: dialog is the sole source of paths; recognition changes no application records or network"
+        }
+      ],
+      "limitation": "One user-selected image can be recognized locally through Windows OCR, with installed language check, cancel and plain-text review. Screen capture, real-image Windows acceptance and G6 remain open."
+    },
+    {
+      "id": 26,
+      "name": "Translation and app-specific writing tone",
+      "category": "Assistant & screen tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Writing tone and translation need model output that is not verified; buildable next on the assistant path."
+      }
+    },
+    {
+      "id": 27,
+      "name": "Approved document explanations",
+      "category": "Assistant & screen tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Approved-document explanations need an approved-document source and model output; backlog."
+      }
+    },
+    {
+      "id": 28,
+      "name": "Error diagnosis with proposed actions",
+      "category": "Assistant & screen tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Error diagnosis with proposed actions is backlog; any action must still use the confirmation path."
+      }
+    },
+    {
+      "id": 29,
+      "name": "Explicit screen/app context controls",
+      "category": "Assistant & screen tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G6"
+      ],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "No screen or app context capture. Gate G6 open.",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G6",
+        "note": "Explicit screen and app context needs the G6 capture gate."
+      }
+    },
+    {
+      "id": 30,
+      "name": "Conversation history and export",
+      "category": "Assistant & screen tools",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "electron/backend.ts: exportData and clearChat"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: a valid import replaces content but keeps current permissions; a failed save during import rolls back"
+        }
+      ],
+      "limitation": "Chat is one thread; export is whole-state JSON only."
+    },
+    {
+      "id": 31,
+      "name": "Explicit project checkpoints",
+      "category": "Memory & journal",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: ProjectMemory shows saved goals, checkpoints, references and a recap built from them"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: search finds checkpoints, shelf items, capsule goals and references; history and chat stay opt-in"
+        }
+      ],
+      "limitation": "Checkpoints are saved per capsule in the productivity store, reachable through backend IPC and shown on the mounted Capsules screen. Checkpoints are explicit only; nothing is captured automatically."
+    },
+    {
+      "id": 32,
+      "name": "Searchable project notes and references",
+      "category": "Memory & journal",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-search.test.mjs: ranks title exact > tag > title prefix/task > body mentions, deterministically"
+        },
+        {
+          "type": "smoke",
+          "ref": "docs/current-verification.md: note CRUD in smoke"
+        }
+      ],
+      "limitation": "Notes are not linked to projects."
+    },
+    {
+      "id": 33,
+      "name": "Opt-in application session timeline",
+      "category": "Memory & journal",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: the application timeline is off until enabled, and titles need a second opt-in"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: MemoryControls starts with the timeline off, offers per-scope forgetting and marks screen/audio capture unavailable"
+        }
+      ],
+      "limitation": "The timeline is opt-in and stored through backend productivity operations. No source reports application sessions, so it stays empty; no screen offers timeline entries."
+    },
+    {
+      "id": 34,
+      "name": "Evidence-backed daily recaps",
+      "category": "Memory & journal",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "module-tested",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: daily recap lists only recorded evidence for that local day, each line with its source"
+        }
+      ],
+      "limitation": "buildDailyRecap in the search module lists only recorded evidence for a local day, each line with its source. No screen or backend call uses it, so it is not reachable. No drafted summary text."
+    },
+    {
+      "id": 35,
+      "name": "Draft worklog and standup updates",
+      "category": "Memory & journal",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Worklog and standup drafts depend on evidence-backed recaps (34), which are not reachable yet."
+      }
+    },
+    {
+      "id": 36,
+      "name": "Correctable task/session association",
+      "category": "Memory & journal",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: associations need an existing session, can be corrected, and go away with the session"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: association suggestions are word-based, skip finished tasks and never claim certainty"
+        }
+      ],
+      "limitation": "Session associations and word-based suggestions are stored through backend productivity operations. No screen offers an add or edit control, and no session timeline data exists to associate."
+    },
+    {
+      "id": 37,
+      "name": "Memory edit, forget, retention controls",
+      "category": "Memory & journal",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "electron/services/store.ts: applyRetention drops old chat and activity"
+        },
+        {
+          "type": "doc",
+          "ref": "src/components/Settings.tsx: retain days setting"
+        }
+      ],
+      "limitation": "applyRetention has no test; no per-memory forget control."
+    },
+    {
+      "id": 38,
+      "name": "Coding-session adapters",
+      "category": "Memory & journal",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Coding-session adapters are backlog; no adapter exists."
+      }
+    },
+    {
+      "id": 39,
+      "name": "Continuous screen history",
+      "category": "Memory & journal",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G6"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental; no capture. Gate G6 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G6",
+        "note": "Continuous screen history needs the G6 gate and a retention design."
+      }
+    },
+    {
+      "id": 40,
+      "name": "Meeting/system-audio capture and summaries",
+      "category": "Memory & journal",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G3",
+        "G6"
+      ],
+      "gateNote": "Architecture §10 lists G3 and §11 lists G6; both apply until the owner confirms.",
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental; no capture. Gates G3 and G6 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G3,G6",
+        "note": "Meeting and system-audio capture needs the G3 ASR gate and the G6 capture gate."
+      }
+    },
+    {
+      "id": 41,
+      "name": "Project capsules with goals and references",
+      "category": "Projects & workspaces",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "smoke",
+          "ref": "docs/current-verification.md: capsule CRUD in smoke"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-approval.test.mjs: capsule decline and safe launch never open or move anything; single full-target confirmation"
+        }
+      ],
+      "limitation": "No goals or references yet (src/ui/roadmap.ts note)."
+    },
+    {
+      "id": 42,
+      "name": "Launch apps, files, and URLs together",
+      "category": "Projects & workspaces",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-approval.test.mjs: capsule launches share limiter, and safe launch enabled during confirmation prevents all actions"
+        },
+        {
+          "type": "smoke",
+          "ref": "docs/current-verification.md: empty capsule restore only"
+        }
+      ],
+      "limitation": "Successful launch on Windows not recorded."
+    },
+    {
+      "id": 43,
+      "name": "Save and restore supported window geometry",
+      "category": "Projects & workspaces",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-approval.test.mjs: capsule decline and safe launch never open or move anything; single full-target confirmation"
+        },
+        {
+          "type": "doc",
+          "ref": "src/components/Capsules.tsx: geometry is kept, not captured by the UI"
+        }
+      ],
+      "limitation": "Restore only when window data exists; UI does not capture geometry."
+    },
+    {
+      "id": 44,
+      "name": "Project-specific visual scene",
+      "category": "Projects & workspaces",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Capsules.tsx: per-capsule scene from src/ui/scenes.ts"
+        }
+      ],
+      "limitation": "Scene choice only; no project-specific visual logic."
+    },
+    {
+      "id": 45,
+      "name": "Resume recap with source references",
+      "category": "Projects & workspaces",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: resume recap covers open goals, latest checkpoints, focus time, linked notes/tasks and last restore"
+        }
+      ],
+      "limitation": "The resume recap on the mounted Capsules screen is built from saved goals, checkpoints, focus time, linked notes and tasks, and the last restore, each with its source. No export and no recorded run with real project data."
+    },
+    {
+      "id": 46,
+      "name": "Cross-project search",
+      "category": "Projects & workspaces",
+      "tier": "Expansion",
+      "status": "verified",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-search.test.mjs: capsule items are searchable by label and, more weakly, by target"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-search.test.mjs: all terms must match; multi-word phrase in title outranks scattered words"
+        }
+      ],
+      "limitation": "Searches in-app data only; chat excluded by default."
+    },
+    {
+      "id": 47,
+      "name": "Browser-profile and tab adapters",
+      "category": "Projects & workspaces",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Browser-profile and tab adapters are backlog; each browser needs its own adapter work."
+      }
+    },
+    {
+      "id": 48,
+      "name": "Portable capsule export with path mapping",
+      "category": "Projects & workspaces",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: a capsule pack replaces the project root with a token, reports unmapped paths and round-trips through a new root"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: importing a hostile or malformed pack skips unsafe items and rejects non-packs"
+        }
+      ],
+      "limitation": "Capsule packs export with a project-root token and import through backend IPC with user path mappings. Unmapped paths are reported. No recorded run through the packaged app."
+    },
+    {
+      "id": 49,
+      "name": "Deep app-state restoration adapters",
+      "category": "Projects & workspaces",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work.",
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Experimental with no gate in architecture section 10; a written gate is required before work."
+      }
+    },
+    {
+      "id": 50,
+      "name": "Spatial project map with historical branches",
+      "category": "Projects & workspaces",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work.",
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Experimental with no gate in architecture section 10; a written gate is required before work."
+      }
+    },
+    {
+      "id": 51,
+      "name": "Tasks and checklists",
+      "category": "Everyday productivity",
+      "tier": "First",
+      "status": "verified",
+      "integration": "runtime-verified",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "smoke",
+          "ref": "docs/current-verification.md: task CRUD in smoke"
+        },
+        {
+          "type": "test",
+          "ref": "tests/ui.test.mjs: due buckets group tasks by local date, treating empty or invalid dates as undated"
+        }
+      ],
+      "limitation": "Flat checklist; no nested sub-items. Recorded smoke predates this continuation; re-run after integration."
+    },
+    {
+      "id": 52,
+      "name": "Reminders and timers",
+      "category": "Everyday productivity",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-native.test.mjs: reminders: announces a due task once, with one unref'd timer aimed at the next due time"
+        },
+        {
+          "type": "doc",
+          "ref": "src/components/Tasks.tsx: in-app focus timer"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-native.test.mjs: reminders: resync after sleep announces what came due while the timer was stalled, then re-aims"
+        }
+      ],
+      "limitation": "Due-task reminders tested; the focus timer has no test."
+    },
+    {
+      "id": 53,
+      "name": "Focus sessions with history",
+      "category": "Everyday productivity",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Tasks.tsx: finished sessions are not saved"
+        }
+      ],
+      "limitation": "Timer runs; no session history."
+    },
+    {
+      "id": 54,
+      "name": "Quick notes and snippets",
+      "category": "Everyday productivity",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/ui/roadmap.ts: notes cover quick text; no snippet expansion"
+        }
+      ],
+      "limitation": "Quick notes only."
+    },
+    {
+      "id": 55,
+      "name": "File shelf with references",
+      "category": "Everyday productivity",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-productivity.test.mjs: shelf and recents hold references only, dedupe, and recents stay bounded"
+        }
+      ],
+      "limitation": "Shelf and recent-item references are stored and bounded through backend productivity operations. No add or edit control exists and no screen shows the shelf."
+    },
+    {
+      "id": 56,
+      "name": "Optional clipboard history",
+      "category": "Everyday productivity",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-clipboard.test.mjs: history is off by default and never reads the clipboard"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-clipboard.test.mjs: credential-shaped text is never stored"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-clipboard.test.mjs: the service module never imports Electron or touches a real clipboard API"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The mounted Clipboard history page reads status and entries through backend IPC. It is off by default, needs the native confirmation and keeps memory only. No copy-back and no full-text view."
+    },
+    {
+      "id": 57,
+      "name": "Application launcher and recent items",
+      "category": "Everyday productivity",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-intent.test.mjs: launch: single explicit target, no arguments, scripts, shell operators, links or network paths"
+        }
+      ],
+      "limitation": "Launch of approved apps only; no recent items."
+    },
+    {
+      "id": 58,
+      "name": "Media and per-app volume controls",
+      "category": "Everyday productivity",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "hardware-gate",
+        "gate": null,
+        "note": "Per-app volume needs Windows audio-session APIs verified on real audio hardware; no such run exists."
+      }
+    },
+    {
+      "id": 59,
+      "name": "Calendar view and local calendar import",
+      "category": "Everyday productivity",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-calendar.test.mjs: parses UTC, all-day and floating events with correct start values"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-calendar.test.mjs: eventsInRange returns overlapping events and excludes those that end exactly at the range start"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Backend IPC and preload expose .ics list, import and clear, so the calendar is integrated at the bridge. The mounted Calendar page is still a stub that says it is not connected; Calendar.tsx is not mounted. No recurrence expansion and no account connectors."
+    },
+    {
+      "id": 60,
+      "name": "System, battery, and device widgets",
+      "category": "Everyday productivity",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-security.test.mjs: real measurements come from the OS and process; unconnected sources are reported unavailable"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-widgets.test.mjs: summarizeWidget system: counts available capabilities from the last check only"
+        }
+      ],
+      "limitation": "RAM and CPU only; GPU, temperature and battery are reported unavailable; battery and device widgets are not built; the widget picker module is not mounted."
+    },
+    {
+      "id": 61,
+      "name": "Movable expanding desktop island",
+      "category": "Visuals & motion",
+      "tier": "First",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G1"
+      ],
+      "gateNote": "If G1 fails, the panel stays in the main window.",
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Gate G1 open.",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G1",
+        "note": "Overlay needs the G1 gate: transparent window on Win11 at 100/150/200% DPI and multi-monitor."
+      }
+    },
+    {
+      "id": 62,
+      "name": "Original color, typography, material themes",
+      "category": "Visuals & motion",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/shared/contracts.ts: three themes"
+        }
+      ],
+      "limitation": "Color themes only; no material themes."
+    },
+    {
+      "id": 63,
+      "name": "Interruptible status and panel animations",
+      "category": "Visuals & motion",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G1"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/ui/motion-presets.ts: in-window animation presets"
+        }
+      ],
+      "limitation": "In-window only. Gate G1 open."
+    },
+    {
+      "id": 64,
+      "name": "Reduced motion, battery, fullscreen controls",
+      "category": "Visuals & motion",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Settings.tsx: reduce-motion switch"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell.test.mjs: battery-aware reduced motion only triggers when enabled, known, discharging and low"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-accessibility.test.mjs: resolveReducedMotion: either the OS or the in-app setting requests reduction, and only literal true counts"
+        }
+      ],
+      "limitation": "Reduce motion (app and Windows), a battery rule where navigator.getBattery exists, and a manual fullscreen toggle; automatic fullscreen detection needs Gate G1."
+    },
+    {
+      "id": 65,
+      "name": "Companion with assistant-state animations",
+      "category": "Visuals & motion",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G1"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Companion.tsx: procedural 2D avatar reacts to state"
+        }
+      ],
+      "limitation": "In-window only. Gate G1 open."
+    },
+    {
+      "id": 66,
+      "name": "Audio-reactive waveforms and effects",
+      "category": "Visuals & motion",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G1"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/Assistant.tsx: LevelMeter during recording"
+        }
+      ],
+      "limitation": "Level meter only, no waveform effects. Gate G1 open."
+    },
+    {
+      "id": 67,
+      "name": "Animated project/scene transitions",
+      "category": "Visuals & motion",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G1"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/styles/views.css"
+        }
+      ],
+      "limitation": "Whole-scene cross-fade in CSS (opacity only, removed under reduced motion); no per-capsule transition; no runtime check recorded. Gate G1 open."
+    },
+    {
+      "id": 68,
+      "name": "Widget layout editor and live preview",
+      "category": "Visuals & motion",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell.test.mjs: moving widgets respects the edges and keeps hidden widgets in place"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-widgets.test.mjs: moveWidget swaps neighbours and refuses to move past either end"
+        }
+      ],
+      "limitation": "Arrange mode reorders, hides and resets widgets on the live dashboard; no free drag or resize; the widget picker module is not mounted."
+    },
+    {
+      "id": 69,
+      "name": "Live wallpaper/shader scenes",
+      "category": "Visuals & motion",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Experimental. Gate G7 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G7",
+        "note": "Live wallpaper and shader scenes need the G7 renderer-cost gate."
+      }
+    },
+    {
+      "id": 70,
+      "name": "Physics-driven desktop and window effects",
+      "category": "Visuals & motion",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G7"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental. In-app motion presets are not desktop effects. Gate G7 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G7",
+        "note": "Physics-driven desktop effects need the G7 renderer-cost gate and an overlay path."
+      }
+    },
+    {
+      "id": 71,
+      "name": "Curated optional mod catalog",
+      "category": "Windows customization",
+      "tier": "First",
+      "status": "partial",
+      "integration": "module-tested",
+      "gates": [
+        "G5"
+      ],
+      "gateNote": "First release is a read-only catalog of external tools only.",
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-mods.test.mjs: shipped catalog profiles are original, unverified and carry no project link or tested claims"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-mods.test.mjs: component renders the catalog with honest compatibility and licence labels"
+        }
+      ],
+      "limitation": "The catalog data and Customization component exist, but Customization.tsx is not mounted, so no screen shows it. Every profile is an original description with licence unverified (G5); nothing is verified or tested on Windows."
+    },
+    {
+      "id": 72,
+      "name": "Mod version and compatibility checks",
+      "category": "Windows customization",
+      "tier": "First",
+      "status": "partial",
+      "integration": "module-tested",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-mods.test.mjs: compatibility is compatible only when every recorded constraint passes"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-mods.test.mjs: compatibility reports out-of-range builds and unlisted architectures as incompatible"
+        }
+      ],
+      "limitation": "Module-only: not wired to IPC or a mounted screen. Check logic only: no profile can return compatible because none is tested, and SystemInfo has no Windows build number yet. Gate G5 open."
+    },
+    {
+      "id": 73,
+      "name": "Taskbar and Start menu presets",
+      "category": "Windows customization",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Preset selection exists in the catalog module, but every effect is unsupported and nothing is applied to Windows. Gate G5 open.",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": "G5",
+        "note": "Taskbar presets: only preview data exists; every effect is unsupported until G5 is recorded."
+      }
+    },
+    {
+      "id": 74,
+      "name": "Explorer and notification presets",
+      "category": "Windows customization",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Preset selection exists in the catalog module, but every effect is unsupported and nothing is applied to Windows. Gate G5 open.",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": "G5",
+        "note": "Explorer and notification presets: preview data only; every effect is unsupported until G5 is recorded."
+      }
+    },
+    {
+      "id": 75,
+      "name": "Save and restore customization settings",
+      "category": "Windows customization",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "module-tested",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-mods.test.mjs: export writes only validated fields and marks the file as not applying to Windows"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-mods.test.mjs: normalizePrefs falls back to defaults for untrusted input and keeps only literal true values"
+        }
+      ],
+      "limitation": "Module-only: not wired to IPC or a mounted screen. Save (UI-only preference) and JSON export work in the module; restore is not built and its control is disabled; nothing is applied to Windows. Gate G5 open."
+    },
+    {
+      "id": 76,
+      "name": "Advanced window borders, corners, transparency",
+      "category": "Windows customization",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental. Gate G5 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": "G5",
+        "note": "Window border and transparency changes need G5 (licence and safety of each mod)."
+      }
+    },
+    {
+      "id": 77,
+      "name": "Dock/genie/wobble animation packs",
+      "category": "Windows customization",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental. Gate G5 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": "G5",
+        "note": "Dock and animation packs need G5 (licence and safety of each mod)."
+      }
+    },
+    {
+      "id": 78,
+      "name": "Resource and icon redirection packs",
+      "category": "Windows customization",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental. Gate G5 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": "G5",
+        "note": "Resource and icon redirection needs G5 and a reversal design."
+      }
+    },
+    {
+      "id": 79,
+      "name": "Virtual-desktop behavior modifications",
+      "category": "Windows customization",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G5"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental. Gate G5 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": "G5",
+        "note": "Virtual-desktop modifications need G5 and a reversal design."
+      }
+    },
+    {
+      "id": 80,
+      "name": "AI-composed validated scene specifications",
+      "category": "Windows customization",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G5"
+      ],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Experimental. Gate G5 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": "G5",
+        "note": "AI-composed scene specifications need G5 and the validated scene path (139)."
+      }
+    },
+    {
+      "id": 81,
+      "name": "Approved app-launch action tools",
+      "category": "Routines & automation",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-intent.test.mjs: launch: single explicit target, no arguments, scripts, shell operators, links or network paths"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-approval.test.mjs: renderer approval cannot bypass missing or declined native confirmation"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-security.test.mjs: launch binds the exact executable; a binary replaced during the dialog is refused"
+        }
+      ],
+      "limitation": "Preview and approval tested with native stubs; real launch not recorded."
+    },
+    {
+      "id": 82,
+      "name": "Durable scheduled routines",
+      "category": "Routines & automation",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: schedules: trusted start confirmation, exactly-once slots across restarts, missed and grace handling"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: restart marks in-flight runs interrupted, drops invalid stored routines, and bounds history"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The routine engine persists and starts routines through backend IPC and the mounted Routines page. Runs go through preview and native confirmation. No Windows scheduler run is recorded."
+    },
+    {
+      "id": 83,
+      "name": "Visual editable workflow steps",
+      "category": "Routines & automation",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: editor helpers: draft round-trip, client checks, planner candidates and labels"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Steps are edited on the mounted Routines page through the backend. No visual graph editor is built; the editor is a step list."
+    },
+    {
+      "id": 84,
+      "name": "Conditions, bounded retries, duplicate prevention",
+      "category": "Routines & automation",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: bounded retries use a fresh preview and confirmation each attempt; declines and policy blocks are not retried"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: duplicate prevention: one run per routine, no overlapping routines, safe launch and pause refuse starts"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Conditions, bounded retries and one-run-per-routine duplicate prevention are reachable through the backend and tested in the engine. No recorded run on Windows."
+    },
+    {
+      "id": 85,
+      "name": "Execution results and partial-failure history",
+      "category": "Routines & automation",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: partial results, conditions and onFailure continue are recorded per step"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: routines screen renders library, partial history with undo, pause state and honest gates"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Run results and the bounded run history are kept by the engine and reachable through the backend. A restart marks in-flight runs interrupted and never auto-resumes them."
+    },
+    {
+      "id": 86,
+      "name": "Cancellation and pause-all controls",
+      "category": "Routines & automation",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: pause-all holds a running routine between steps and skips slots that came due while paused"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: cancellation stops before the next step and keeps partial results"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Cancel, pause-all and resume are reachable through backend IPC and tested in the engine. No recorded Windows run."
+    },
+    {
+      "id": 87,
+      "name": "Undo for explicitly reversible steps",
+      "category": "Routines & automation",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-routines.test.mjs: undo reverses only explicitly reversible moves, through confirmation, once"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The engine keeps undo records for explicitly reversible steps, but the mounted Routines page has no undo control and undo is not exercised end to end. Only the engine and API are reachable."
+    },
+    {
+      "id": 88,
+      "name": "Selected file/browser action adapters",
+      "category": "Routines & automation",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G4"
+      ],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-intent.test.mjs: open: explicit http(s)/mailto only; schemes, credentials and bare names never guessed"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-security.test.mjs: mailto keeps only safe parameters; attachments, repeated and invisible content are rejected"
+        }
+      ],
+      "limitation": "Open-URL and mailto only. Gate G4 open for typing and clicks."
+    },
+    {
+      "id": 89,
+      "name": "Watch-once routine recording",
+      "category": "Routines & automation",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G4"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental. Gate G4 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G4",
+        "note": "Watch-once recording needs the G4 input-injection gate (95% fixture matrix)."
+      }
+    },
+    {
+      "id": 90,
+      "name": "Cross-app semantic drag-to-action workflows",
+      "category": "Routines & automation",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G4"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Experimental. Gate G4 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G4",
+        "note": "Cross-app semantic drag needs the G4 input-injection gate."
+      }
+    },
+    {
+      "id": 91,
+      "name": "Task board and worker status",
+      "category": "Agents & developer tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Agent scope; held by acceptance N3 until an agent gate document exists."
+      }
+    },
+    {
+      "id": 92,
+      "name": "Isolated project workspaces",
+      "category": "Agents & developer tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Agent scope; held by acceptance N3 until an agent gate document exists."
+      }
+    },
+    {
+      "id": 93,
+      "name": "Model/worker role selection",
+      "category": "Agents & developer tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Agent scope; held by acceptance N3 until an agent gate document exists."
+      }
+    },
+    {
+      "id": 94,
+      "name": "Persistent resumable agent sessions",
+      "category": "Agents & developer tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Agent scope; held by acceptance N3 until an agent gate document exists."
+      }
+    },
+    {
+      "id": 95,
+      "name": "Scoped tools and context policies",
+      "category": "Agents & developer tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Agent scope; held by acceptance N3 until an agent gate document exists."
+      }
+    },
+    {
+      "id": 96,
+      "name": "Agent logs and result inspection",
+      "category": "Agents & developer tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Agent scope; held by acceptance N3 until an agent gate document exists."
+      }
+    },
+    {
+      "id": 97,
+      "name": "Budgets and bounded task execution",
+      "category": "Agents & developer tools",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "active-backlog",
+        "gate": null,
+        "note": "Agent budgets are backlog; usage budgets (126) exist but no agent runs are reported."
+      }
+    },
+    {
+      "id": 98,
+      "name": "Local specialist multi-agent execution",
+      "category": "Agents & developer tools",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Experimental with no gate defined in architecture §10. Acceptance N3 keeps agents absent or experimental until a gate document exists.",
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined. Acceptance N3 keeps agents absent.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Experimental with no gate in architecture section 10; a written gate is required before work."
+      }
+    },
+    {
+      "id": 99,
+      "name": "Animated worker/crew visualization",
+      "category": "Agents & developer tools",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Experimental with no gate defined in architecture §10. Acceptance N3 keeps agents absent or experimental until a gate document exists.",
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Experimental with no gate in architecture section 10; a written gate is required before work."
+      }
+    },
+    {
+      "id": 100,
+      "name": "Suggested reusable skills from past runs",
+      "category": "Agents & developer tools",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Experimental with no gate defined in architecture §10. Acceptance N3 keeps agents absent or experimental until a gate document exists.",
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Experimental with no gate in architecture section 10; a written gate is required before work."
+      }
+    },
+    {
+      "id": 101,
+      "name": "Anthropic BYOK provider",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "requires": [
+        "online mode",
+        "customer-owned API key"
+      ],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: online mode still allows only the cloud origin, with a key and for chat"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: cloud failures never claim nothing was sent, never fall back to local, and the key stays in the header"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-integrations.test.mjs: approved Anthropic check sends one request with the key header and never exposes the key"
+        }
+      ],
+      "limitation": "Chat uses the existing cloud path; the Anthropic connection check is module-tested and its IPC is not implemented in backend.ts. Fake-fetch tests only; no live provider call recorded."
+    },
+    {
+      "id": 102,
+      "name": "Additional optional AI providers",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-integrations.test.mjs: OpenAI check uses a bearer header and maps a rejected key honestly"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The mounted Integrations page and backend cover the optional providers (Spotify, browser, ChatGPT, Claude, local model entries). Keys stay in DPAPI storage, nothing is sent outside online mode, and no live provider call is recorded."
+    },
+    {
+      "id": 103,
+      "name": "Web research with cited sources",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not built: no search provider chosen.",
+      "plannedReason": {
+        "category": "account-gate",
+        "gate": null,
+        "note": "Cited web research needs a user-provided search or model provider key and online mode."
+      }
+    },
+    {
+      "id": 104,
+      "name": "Calendar account connectors",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Setup required: needs owner-registered OAuth clients; no account contacted.",
+      "plannedReason": {
+        "category": "account-gate",
+        "gate": null,
+        "note": "Calendar account connectors need a user calendar account; only local .ics import exists (59)."
+      }
+    },
+    {
+      "id": 105,
+      "name": "Issue-tracker draft export and approved posting",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-integrations.test.mjs: formatIssueDraft formats locally and requires a title"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Issue draft formatting (formatIssueDraft) is used by the mounted Integrations page. Approved posting is not built, so drafts are local text only."
+    },
+    {
+      "id": 106,
+      "name": "Weather/news feed widgets",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Only a keyless weather connection check exists; no widget and no news feed.",
+      "plannedReason": {
+        "category": "account-gate",
+        "gate": null,
+        "note": "Weather and news feeds need a provider account and online mode."
+      }
+    },
+    {
+      "id": 107,
+      "name": "Optional model/update downloads",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not built: no signed download channel or verification.",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": null,
+        "note": "Optional downloads need source licence and integrity checks; no download source is approved."
+      }
+    },
+    {
+      "id": 108,
+      "name": "Per-provider data previews and usage history",
+      "category": "Optional online integrations",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-integrations.test.mjs: preview describes what leaves without sending anything"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-integrations.test.mjs: usage history records requests without content, newest first, bounded, and clearable"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Per-provider data previews (integrationsPreview) and bounded usage history are reachable through backend IPC and the Integrations page. No live provider call is recorded."
+    },
+    {
+      "id": 109,
+      "name": "Encrypted cross-device sync",
+      "category": "Optional online integrations",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work.",
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Cross-device sync needs an account and encryption design; experimental with no gate."
+      }
+    },
+    {
+      "id": 110,
+      "name": "Community scene/widget marketplace",
+      "category": "Optional online integrations",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "requires": [
+        "online mode"
+      ],
+      "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work.",
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "A community marketplace needs licence, review and account decisions; experimental with no gate."
+      }
+    },
+    {
+      "id": 111,
+      "name": "Windows installer and uninstaller",
+      "category": "Installation & ownership",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "smoke",
+          "ref": "docs/current-verification.md: NSIS x64 development installer builds, unsigned"
+        }
+      ],
+      "limitation": "Install and uninstall not verified; unsigned."
+    },
+    {
+      "id": 112,
+      "name": "Bundled runtime and offline installation option",
+      "category": "Installation & ownership",
+      "tier": "First",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Ollama and model packs install separately from the app.",
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": null,
+        "note": "Bundling a runtime needs a licence review and an offline packaging run; no packaged build exists."
+      }
+    },
+    {
+      "id": 113,
+      "name": "Local encrypted sensitive-data storage",
+      "category": "Installation & ownership",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: an undecryptable stored key fails honestly without any request"
+        },
+        {
+          "type": "doc",
+          "ref": "electron/services/secrets.ts: only the cloud key uses DPAPI"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-security.test.mjs: key is stored only as ciphertext, never in the vault object, JSON or errors"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-security.test.mjs: atomic file write: unique temp, no leftovers, failed write keeps the old file, concurrent writers do not corrupt"
+        }
+      ],
+      "limitation": "Cloud key and integration slots use safeStorage or DPAPI with a fallback; state.json and persisted clipboard history are plain JSON."
+    },
+    {
+      "id": 114,
+      "name": "Export/import and backup recovery",
+      "category": "Installation & ownership",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: malformed imports and duplicate ids are rejected with no state change, no backup and no write"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-approval.test.mjs: settings decline leaves state unchanged; import retains permissions and forces offline"
+        }
+      ],
+      "limitation": "Import tested; export and backup recovery have no recorded run."
+    },
+    {
+      "id": 115,
+      "name": "Crash recovery and safe launch",
+      "category": "Installation & ownership",
+      "tier": "First",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "native",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-native.test.mjs: launch guard: two unclean starts enter safe launch; clean quit resets"
+        },
+        {
+          "type": "doc",
+          "ref": "electron/services/store.ts: corrupt state restored from newest valid backup"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-native.test.mjs: launch guard: two unclean starts enter safe launch, a clean exit clears it, the sync end clears markers"
+        }
+      ],
+      "limitation": "Recovery path not recorded in a run; acceptance J2 unchecked."
+    },
+    {
+      "id": 116,
+      "name": "Network-denial/offline verification",
+      "category": "Installation & ownership",
+      "tier": "First",
+      "status": "verified",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: offline guard denies every external endpoint, lookalike host and cloud origin"
+        },
+        {
+          "type": "test",
+          "ref": "tests/backend-core.test.mjs: a tampered non-loopback local endpoint is denied before any request"
+        }
+      ],
+      "limitation": "Guard-level tests; packaged network-denial run not recorded."
+    },
+    {
+      "id": 117,
+      "name": "Signed updates with rollback",
+      "category": "Installation & ownership",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G8"
+      ],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "No updater. Gate G8 open.",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G8",
+        "note": "Signed updates need the G8 code-signing certificate and update channel."
+      }
+    },
+    {
+      "id": 118,
+      "name": "Validated x64/ARM64 compatibility tiers",
+      "category": "Installation & ownership",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "native",
+      "evidence": [],
+      "limitation": "Only x64 is configured; no validation.",
+      "plannedReason": {
+        "category": "hardware-gate",
+        "gate": null,
+        "note": "ARM64 and x64 tiers need validated devices; none are available for testing here."
+      }
+    },
+    {
+      "id": 119,
+      "name": "Commercial licensing without mandatory cloud check-in",
+      "category": "Installation & ownership",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Not implemented.",
+      "plannedReason": {
+        "category": "licence-gate",
+        "gate": null,
+        "note": "Commercial licensing needs a licence decision; no licence design exists."
+      }
+    },
+    {
+      "id": 120,
+      "name": "Enterprise policy and managed deployment",
+      "category": "Installation & ownership",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "gateNote": "Experimental with no gate defined in architecture §10; a written gate is needed before any work.",
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "Experimental; no gate defined.",
+      "experimentalGate": "missing",
+      "plannedReason": {
+        "category": "gate-undefined",
+        "gate": null,
+        "note": "Enterprise policy needs an account model and a gate; experimental with no gate."
+      }
+    },
+    {
+      "id": 121,
+      "name": "Unified usage dashboard",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: panel shows Unknown, never zero, for unavailable money"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: panel renders an empty state instead of invented figures when no report is loaded"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The mounted Usage page (UsagePanel) reads the usage ledger through backend IPC. Spend is an estimate from user-entered prices, not provider billing."
+    },
+    {
+      "id": 122,
+      "name": "Supported provider quota/balance adapters",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "planned",
+      "integration": "none",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [],
+      "limitation": "No provider billing adapter; every provider reports unknown or unsupported. The Control Room usage view is external.",
+      "plannedReason": {
+        "category": "account-gate",
+        "gate": null,
+        "note": "Provider quota and balance adapters need provider accounts and keys; none are tested."
+      }
+    },
+    {
+      "id": 123,
+      "name": "Reset countdown and stale-data indicators",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: billing is observed only when a snapshot exists; unknown, unsupported and stale stay visibly different"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The reset countdown and stale-data indicators are reachable on the Usage page. Provider quota data is not fetched because scope 122 is not built."
+    },
+    {
+      "id": 124,
+      "name": "Local token and estimated cost ledger",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: cloud events are priced from the user table; unpriced events are counted, never shown as zero"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: local events are tokens only: not charged and not counted as unpriced"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "The local token and estimated cost ledger is reachable through usageReport and persisted. Costs are estimates from user prices, not provider billing."
+    },
+    {
+      "id": 125,
+      "name": "Project/worker cost attribution",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: attribution groups spend by project and worker and marks a row unknown when any event is unpriced"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Project and worker attribution is in the ledger report. No worker runs exist yet (agent scopes 91-100 are not built), so attribution holds only what other code records."
+    },
+    {
+      "id": 126,
+      "name": "Budget pace and threshold alerts",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: budget alerts fire at thresholds and pace turns over-pace when projection exceeds the amount"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: monthly budget reports conservative spend, threshold alerts and pace from elapsed period"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Budget and threshold settings are reachable through usageSetBudget and checked locally. Alerts are only as accurate as the ledger."
+    },
+    {
+      "id": 127,
+      "name": "Local inference performance history",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: Ollama final-chunk metrics are parsed from nanoseconds and yield tokens per second history"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Local inference performance history is reachable through usage.performance() and filled by requests made through the local runtime. No Windows measurement is recorded."
+    },
+    {
+      "id": 128,
+      "name": "Usage report export",
+      "category": "Usage dashboard",
+      "tier": "Expansion",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [],
+      "owner": "main-api",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: CSV export is bounded, escapes cells and neutralises spreadsheet formulas"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-usage.test.mjs: JSON export respects the byte bound and the requested time range"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-shell-runtime.test.mjs: the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled"
+        }
+      ],
+      "limitation": "Usage report export (CSV or JSON, bounded, with a truncated flag) is reachable through usageExport on the Usage page."
+    },
+    {
+      "id": 129,
+      "name": "2D avatar geometry editor",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: avatar import rejects non-JSON, arrays, scalars, wrong versions and missing geometry"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: avatar shapes are finite and the painter only issues canvas calls"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: hostile text can never become markup, script or an external reference in the SVG export"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/local-ui-completion.md: Avatar Studio mounted and local controls integrated"
+        }
+      ],
+      "limitation": "Original 2D geometry editor mounted. Full 3D/portrait authoring and G7 benchmark remain open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 130,
+      "name": "Expression authoring library",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: avatar import caps expressions, timelines and keyframes and says so"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/local-ui-completion.md: Avatar Studio mounted and local controls integrated"
+        }
+      ],
+      "limitation": "Expression controls mounted; manual animation/editor acceptance and G7 benchmark remain open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 131,
+      "name": "Avatar animation timeline editor",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: avatar import caps expressions, timelines and keyframes and says so"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/local-ui-completion.md: Avatar Studio mounted and local controls integrated"
+        }
+      ],
+      "limitation": "Bounded animation timeline editor mounted; manual interaction and G7 benchmark remain open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 132,
+      "name": "Portable avatar pack import/export",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: avatar import rejects non-JSON, arrays, scalars, wrong versions and missing geometry"
+        },
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: avatar import caps expressions, timelines and keyframes and says so"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/local-ui-completion.md: Avatar Studio mounted and local controls integrated"
+        }
+      ],
+      "limitation": "Validated portable JSON avatar pack import/export controls mounted; manual export/import roundtrip and G7 benchmark remain open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 133,
+      "name": "3D avatar/model customization",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Avatar studio not built. Gate G7 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G7",
+        "note": "3D avatar customization needs the G7 renderer-cost gate and a 3D asset licence; shown as unavailable."
+      }
+    },
+    {
+      "id": 134,
+      "name": "Voice-driven avatar mouth/pose states",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: voice level is injected and bounded, and never reads a microphone"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/local-ui-completion.md: Avatar Studio mounted and local controls integrated"
+        }
+      ],
+      "limitation": "Explicit Assistant recording forwards actual bounded amplitude to an inline avatar preview including quiet zero. No real microphone acceptance or TTS amplitude; navigating away stops capture. G7 benchmark remains open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 135,
+      "name": "Realistic portrait animation adapter",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Avatar studio not built. Gate G7 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G7",
+        "note": "Portrait animation needs the G7 gate and a licensed model; shown as unavailable."
+      }
+    },
+    {
+      "id": 136,
+      "name": "Avatar quality/hardware profile manager",
+      "category": "Avatar studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/autopilot-visual.test.mjs: quality profiles bound frame rate and pixel ratio and unknown ids fall back"
+        },
+        {
+          "type": "doc",
+          "ref": "docs/local-ui-completion.md: Avatar Studio mounted and local controls integrated"
+        }
+      ],
+      "limitation": "Manual quality presets mounted, bounding frame rate and pixel ratio. Automatic hardware detection and G7 benchmark remain open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 137,
+      "name": "Procedural motion scene editor",
+      "category": "Motion studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "doc",
+          "ref": "src/components/MotionStudio.tsx: procedural wave, particle and orbit scenes"
+        }
+      ],
+      "limitation": "Preview and save only; no timeline. Gate G7 open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 138,
+      "name": "Original scene/template library",
+      "category": "Motion studio",
+      "tier": "Experimental",
+      "status": "partial",
+      "integration": "integrated",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [
+        {
+          "type": "test",
+          "ref": "tests/motion-presets.test.mjs: built-in presets are valid, distinct, cover every kind and use the reserved id prefix"
+        }
+      ],
+      "limitation": "Built-in presets only. Gate G7 open.",
+      "experimentalGate": "gate-defined"
+    },
+    {
+      "id": 139,
+      "name": "AI-to-validated-scene generation",
+      "category": "Motion studio",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "Not implemented. Gate G7 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G7",
+        "note": "AI-to-scene generation needs the G7 gate and a model path; no generated output exists."
+      }
+    },
+    {
+      "id": 140,
+      "name": "Local animation/clip export",
+      "category": "Motion studio",
+      "tier": "Experimental",
+      "status": "planned",
+      "integration": "none",
+      "gates": [
+        "G7"
+      ],
+      "owner": "ui-shell",
+      "evidence": [],
+      "limitation": "No export in MotionStudio. Gate G7 open.",
+      "experimentalGate": "gate-defined",
+      "plannedReason": {
+        "category": "experimental-gate",
+        "gate": "G7",
+        "note": "Clip export needs the G7 gate and a renderer export path; only JSON scene export exists."
+      }
+    }
+  ],
+  "statusDefinitions": {
+    "planned": "No behavior in the repository beyond placeholders and unavailable-capability notices.",
+    "partial": "Some behavior exists in the repository (module-tested or integrated), but part of the scope is missing, untested on its real path, not wired into the app, or gated.",
+    "verified": "Every part of the scope is implemented, reachable through the app, and covered by a passing npm test or a recorded run in an existing doc. No open gap contradicts it. Module-only code never qualifies."
+  },
+  "evidenceSchema": {
+    "evidence": "Array of {type, ref}. type is test (test file and title), smoke (recorded run in docs/current-verification.md), or doc (repo file reference).",
+    "limitation": "Required string naming what is missing or unrecorded. Empty only in spirit: use \"none\" when verified with no gap.",
+    "owner": "Owner area: main-api, native or ui-shell (see moduleOwnership).",
+    "experimentalGate": "Experimental entries only: gate-defined when gates lists a G-id, missing when architecture section 10 defines no gate.",
+    "integration": "none | module-tested | integrated | runtime-verified (see integrationVocabulary)."
+  },
+  "gateStatusVocabulary": [
+    "not-recorded",
+    "passed",
+    "failed"
+  ],
+  "moduleOwnership": {
+    "main-api": "Shared contracts, backend services, IPC, store, chat, capsules, search and policy.",
+    "native": "Electron main process, PowerShell helpers, speech, window and input helpers, DPAPI, packaging, tray and hotkey.",
+    "ui-shell": "Navigation, dashboard, onboarding and settings screens, motion and avatar screens."
+  },
+  "ownershipCoverage": {
+    "scopes": 140,
+    "unassigned": 0
+  },
+  "integrationVocabulary": {
+    "none": "No behavior in the repository for this scope.",
+    "module-tested": "Code and passing tests exist, but no part is reachable through the app (not in backend, IPC, preload or a mounted screen).",
+    "integrated": "At least one part is reachable through the app (backend, IPC, preload or a mounted screen). Module-only parts are named in the limitation.",
+    "runtime-verified": "A run recorded in an existing doc exercised the reachable behavior on Windows. Recorded runs predate the continuation and were not repeated."
+  }
 }

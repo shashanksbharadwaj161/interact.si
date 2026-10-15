@@ -1,0 +1,36 @@
+{
+  "role": "roadmap",
+  "done": true,
+  "files": [
+    {"path": "src/shared/feature-registry.json", "change": "modified", "summary": "Version 2. Audited all 140 entries; added status vocabulary (planned, partial, verified), status definitions, evidence and limitation fields, owner area per scope, gate status vocabulary, and experimentalGate for Experimental scopes."},
+    {"path": "docs/feature-matrix.md", "change": "modified", "summary": "Replaced the false 'no scope is implemented' claim with counts from the registry (5 verified, 39 partial, 96 planned), added evidence and owner columns, and recorded conflicts for root."},
+    {"path": "docs/autopilot-coverage.md", "change": "added", "summary": "Module ownership coverage (61 main-api, 40 native, 39 ui-shell, 140 total), status summary, experimental gate table and limits of this audit."},
+    {"path": "docs/autopilot-result.roadmap.json", "change": "added", "summary": "This result file."}
+  ],
+  "checks": [
+    {"name": "npm ci --ignore-scripts", "result": "pass", "note": "331 packages installed; lifecycle scripts skipped as the brief requires."},
+    {"name": "npm test (node --test tests/*.test.mjs)", "result": "pass", "note": "124 tests, 124 pass, 0 fail, before and after the edits. Run at commit b0f5c1b."},
+    {"name": "npm run typecheck (tsc --noEmit)", "result": "pass", "note": "No errors after the registry rewrite."},
+    {"name": "Registry integrity", "result": "pass", "note": "140 entries, 140 unique ids, every entry has status, owner, evidence and limitation; 96 planned, 39 partial, 5 verified; 0 unassigned owners."},
+    {"name": "Evidence references", "result": "pass", "note": "Each test reference matches a real title in tests/*.test.mjs; each doc or source reference points at an existing file. Checked with a one-off script kept outside the repository. No test in npm test enforces this."},
+    {"name": "Gate-dependent claims", "result": "pass", "note": "No gate-dependent scope is verified; all gates G1–G8 are not-recorded."}
+  ],
+  "limitations": [
+    "Only four files are owned. Root must update src/ui/roadmap.ts (its 'Interface built' label maps to partial or verified here), docs/product-roadmap.md (still says no features are implemented) and docs/release-checklist.md (stale claims about trusted confirmation and reminders).",
+    "The registry shape is not enforced by an automated test. A test in tests/ would need a module this worker does not own.",
+    "No Electron run, packaged install, real speech or microphone check, real window or input action, or live cloud call was performed. Verified status rests on npm test and the recorded smoke in docs/current-verification.md.",
+    "docs/acceptance.md has no passed items (0 of 80). Scopes that depend on those manual checks are partial, not verified.",
+    "Gate documents G1–G8 do not exist. Nine Experimental scopes (20, 49, 50, 98, 99, 100, 109, 110, 120) have no gate and need one before work.",
+    "Owner areas are the three roles in docs/autopilot-18.md. The captain must map them to session IDs from docs/autopilot-manifest.json; the manifest was not read by this worker."
+  ],
+  "interfaces": [
+    {"name": "feature-registry.json", "kind": "data", "shape": "entries[] with id, name, category, tier, status (planned|partial|verified), owner (main-api|native|ui-shell), gates[], experimentalGate (Experimental only), evidence[] {type: test|smoke|doc, ref}, limitation (string). Top-level statusVocabulary, statusDefinitions, evidenceSchema, gateStatusVocabulary, moduleOwnership, ownershipCoverage."},
+    {"name": "docs/feature-matrix.md", "kind": "doc", "shape": "Human view generated from the registry."},
+    {"name": "docs/autopilot-coverage.md", "kind": "doc", "shape": "Ownership coverage and gate summary for the captain."}
+  ],
+  "dependencies": [
+    "Reads src/shared/feature-registry.json only as a source; no import from src/ui/roadmap.ts.",
+    "Evidence cites tests/backend-core, backend-approval, backend-intent, backend-native, backend-search, onboarding, ui and motion-presets test files, and docs/current-verification.md, docs/voice-acceptance.md, docs/keyboard-audit.md, docs/local-model-setup.md.",
+    "Other workers' results are not assumed. A scope changes status only when its owner's module ships with passing tests and an updated evidence entry."
+  ]
+}

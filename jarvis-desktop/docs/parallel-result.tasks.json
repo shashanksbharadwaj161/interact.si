@@ -1,0 +1,36 @@
+{
+  "role": "tasks",
+  "done": true,
+  "ownedChangedPaths": [
+    "src/components/Tasks.tsx",
+    "tests/parallel-tasks.test.mjs",
+    "docs/parallel-result.tasks.json"
+  ],
+  "checks": [
+    { "command": "npx tsc --noEmit", "result": "clean" },
+    { "command": "node --test tests/parallel-tasks.test.mjs", "result": "13 tests, 13 pass, 0 fail (also under TZ=Asia/Kolkata)" },
+    { "command": "node --test tests/*.test.mjs", "result": "1091 tests, 1091 pass, 0 fail" },
+    { "command": "npm ci --ignore-scripts", "result": "repo-local install only; package.json untouched" }
+  ],
+  "delivered": [
+    "Status filter chips (All, Open, Overdue, Due today, Upcoming, No date, Completed), each with a live count, plus a case-insensitive title search and a 'no tasks match' state with reset",
+    "Selected-task details panel: due status in words (overdue by N days / due today / due in N days / no date), created time, explicit Mark complete / Reopen, Edit, Delete (existing confirm dialog), Close details",
+    "Completed tasks are never reported overdue; the completed-at time is stated as 'not recorded' because Task has no such field",
+    "Day-rollover truth: 'today' refreshes at the next local midnight (single setTimeout, no polling) and when the window becomes visible again",
+    "Keyboard alternative: each title is a focusable button; Up/Down move selection and focus between tasks across groups; Enter/Space/click select; selection moves to the neighbour after delete so focus is not lost",
+    "Overdue badge carries text, not colour alone",
+    "Pure helpers exported from Tasks.tsx: taskGroup, taskMatches, filterCounts, daysBetween, dueSummary, groupTasks, TASK_FILTERS"
+  ],
+  "interfaceProposals": [
+    "No contract/schema change needed. If a completion time or manual order is wanted later, Task would need optional completedAt and order fields plus saveTask support; captain decision. Until then the UI states that completion time is not recorded and that ordering is by due date only."
+  ],
+  "limitations": [
+    "No drag/reorder existed and none was added: there is no persisted order. UI says so.",
+    "Tests are static-render plus pure-logic plus source checks; there is no DOM in the repo test stack, so click/keydown handlers are not executed in tests. Typecheck covers them.",
+    "A due value stored as a full timestamp is bucketed by its date part (same as Home and search via dueKey), not converted to local time.",
+    "Selected-row highlight and title-button reset use inline styles because CSS files are not owned by this task; captain may move them into views.css.",
+    "'Clear completed' still deletes all completed tasks regardless of the active filter (the confirm dialog states the total count).",
+    "Task details sit in the right column, so on narrow single-column layouts they appear below the list.",
+    "Not run in the real Electron app or a browser; no screenshots taken."
+  ]
+}

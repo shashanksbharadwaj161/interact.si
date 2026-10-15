@@ -1,0 +1,54 @@
+{
+  "role": "avatar",
+  "session": "jarvis-desktop-76",
+  "date": "2026-10-14",
+  "done": true,
+  "files": [
+    "src/ui/avatar-editor.ts",
+    "src/components/AvatarStudio.tsx",
+    "src/styles/avatar-studio.css",
+    "tests/backlog-avatar.test.mjs",
+    "docs/backlog-result.avatar.json"
+  ],
+  "checks": {
+    "npm test (node --test tests/*.test.mjs)": "748 pass, 0 fail, 0 skipped (includes the 35 existing avatar and motion tests and 28 new ones)",
+    "tsc --noEmit": "0 errors (run through a read-only junction to the original repository's node_modules; no install was performed)",
+    "component render": "AvatarStudio is bundled with React and server-rendered in three modes (host voice, simulated voice, reduced motion) inside tests/backlog-avatar.test.mjs",
+    "visual check": "not performed: the AO desktop render check was unavailable. Frames are verified by data (determinism, distinct frames, finite shapes), not by eye. Sample contact sheets were generated under the session artifacts directory."
+  },
+  "interfaces": {
+    "component": "AvatarStudio({ reducedMotion: boolean; className?: string; voiceLevel?: number | null }) is unchanged. voiceLevel is a host-injected amplitude 0..1; null means no source and only the labelled simulation slider is available.",
+    "storage_keys": {
+      "avatar.pack": "Pack schema version stays 1. Additive only: keyframe ease may now also be in, out, anticipate, overshoot or spring. An older reader maps unknown ease names to ease.",
+      "avatar.quality": "unchanged",
+      "avatar.idle": "new boolean, default false, preview only, ignored under reduced motion"
+    },
+    "model_exports_added": [
+      "EASE_OPTIONS, applyEase, blendExpressions",
+      "analyzeTimeline, poseDistance, SEAM_WARN, timelineFrameTimes, renderContactSheetSvg",
+      "idleLayer, applyIdle, NO_IDLE, IDLE, hashUnit, seedFromText, IDLE_PREF_KEY",
+      "smoothVoiceLevel, voiceBand",
+      "summarizePack, mergeAvatarPacks, safeFileStem",
+      "AvatarFx (optional last argument of drawAvatar and fourth of renderAvatarSvg), AVATAR_EXPORTS"
+    ],
+    "built_ins_added": "Poses: curious, proud, confused, blink. Timelines: Attentive nod, Startle and settle, Speaking cadence loop.",
+    "mounting": "No new styles file and no new route; the existing src/styles/avatar-studio.css import inside the component is kept."
+  },
+  "changes": [
+    "Motion: eight named eases including anticipation, overshoot and a damped spring; poses blend past their target and stay inside every limit; same time gives the same frame; reduced motion still steps between keyframe poses.",
+    "Timeline review: loop seam percentage, gaps, duplicate times and flicker warnings; an eight frame contact sheet preview and SVG export derived only from keyframes.",
+    "Idle preview: seeded blink and breathing as a pure function of time, off by default, never exported, disabled under reduced motion.",
+    "Voice: injected amplitude is smoothed with attack and release; the stage labels Host voice or Simulated voice; the simulation slider is disabled while a host amplitude is attached and no longer shows the host value.",
+    "Pack flow: imports are staged for review (nothing saved until Replace or Add is chosen), Add merges poses and timelines with id remapping and limits, Undo covers import, merge and reset, BOM tolerant parsing, Windows safe export file names.",
+    "Editing fixes: keyframe and duration number inputs commit on blur or Enter (previously the keyframe row remounted on every keystroke and clamped half typed values); Show button seeks to a keyframe.",
+    "Notice no longer wraps lists in a paragraph for import messages."
+  ],
+  "limitations": [
+    "Still 2D vector geometry only. No 3D runtime or model format and no portrait animation adapter are bundled; gates 133 and 135 remain unavailable and are shown as such.",
+    "No GIF, MP4 or PNG sequence encoder is bundled. Exports are pack JSON, a pose SVG and a timeline contact sheet SVG; the UI lists video as unavailable.",
+    "Voice reaction depends on the host passing voiceLevel. Nothing in this module opens a microphone; until the captain wires a real amplitude the studio only offers the labelled simulation.",
+    "Quality profiles are manual; there is no automatic hardware detection (gate 136).",
+    "Idle preview uses one frame loop at the profile frame rate while enabled, voice is active or a timeline plays; it stops itself when nothing moves and pauses while the window is hidden.",
+    "Pack names seed the idle rhythm, so renaming a pack changes the blink pattern."
+  ]
+}

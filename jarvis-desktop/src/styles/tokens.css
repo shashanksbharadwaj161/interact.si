@@ -17,6 +17,7 @@
   --sunken: #090b0e;
   --line: #262c35;
   --line-strong: #38414e;
+  --field-line: #66717f; /* text-field boundary: 3:1 or better on --panel-solid, --sunken and --raised (WCAG 1.4.11) */
   --text: #e8ebf0;
   --text-2: #b5bdc9;
   --muted: #8591a1;
@@ -45,6 +46,7 @@
   --sunken: #090814;
   --line: #2b2848;
   --line-strong: #403b66;
+  --field-line: #74709a;
   --text: #ebe9f7;
   --text-2: #bcb8d6;
   --muted: #8f8bb0;
@@ -65,13 +67,14 @@
   --sunken: #e9edf1;
   --line: #d3d9e0;
   --line-strong: #b4bdc8;
+  --field-line: #717d8b;
   --text: #171c23;
   --text-2: #39424f;
   --muted: #5a6574;
   --accent: #1f5fbf;
   --accent-ink: #ffffff;
   --accent-soft: rgba(31, 95, 191, 0.1);
-  --amber: #a86a0a;
+  --amber: #946000; /* same as paper --warn; 4.63:1 on --bg, 5.34:1 on --panel-solid (the lighter #a86a0a was 3.85:1) */
   --amber-soft: rgba(168, 106, 10, 0.12);
   --ok: #17784f;
   --ok-soft: rgba(23, 120, 79, 0.1);

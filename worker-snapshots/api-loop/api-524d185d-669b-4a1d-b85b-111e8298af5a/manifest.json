@@ -1,0 +1,26 @@
+{
+  "task": "Loop 13: motion-clip-export",
+  "sessionId": "api-524d185d-669b-4a1d-b85b-111e8298af5a",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/motion-clip.ts",
+      "bytes": 26571,
+      "sha256": "0ef77eab8a64939a93d83a9510e1b66c5f9d4b18544442452251795837d46855"
+    },
+    {
+      "path": "src/ui/scenes.ts",
+      "bytes": 4072,
+      "sha256": "0d02e900ae703d80ac32c555868484d445c2b921edf7e70682e883fa795687a2"
+    },
+    {
+      "path": "tests/round13-motion-clip.test.mjs",
+      "bytes": 14481,
+      "sha256": "4fb7426bb82646ad05b30dba0f03d983d61a9b5583227d88ed92012091f82ca4"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+}

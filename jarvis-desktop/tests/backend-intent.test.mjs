@@ -22,7 +22,7 @@ const out = await build({
   logLevel: 'silent',
 });
 const mod = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
-const {planIntent, parseModelPlan, validateActionRequest, MAX_CANDIDATES, MAX_COMMAND_CHARS, MAX_MODEL_PLAN_CHARS} = mod;
+const {planIntent, parseModelPlan, validateActionRequest, MAX_CANDIDATES, MAX_COMMAND_CHARS, MAX_MODEL_PLAN_CHARS, planRoutineLines, parseModelRoutine, checkPlannedRequest, MAX_ROUTINE_STEPS} = mod;
 
 const windows = [
   {hwnd: 101, title: 'Untitled - Notepad', process: 'notepad.exe'},
@@ -178,4 +178,67 @@ test('planner source stays pure: no process, shell, filesystem or network access
   for (const re of [/child_process/, /\bfetch\s*\(/, /node:fs/, /node:net|node:http/, /\beval\s*\(/, /new Function/, /require\s*\(/, /\bspawn\w*\s*\(/, /\bexec(File|Sync)\b/, /openExternal|openPath|shell\./]) assert.doesNotMatch(src, re);
   const imports = [...src.matchAll(/from '([^']+)'/g)].map((m) => m[1]).sort();
   assert.deepEqual(imports, ['../../src/shared/contracts', './policy', './validation']);
+});
+
+test('routine lines: one validated candidate per line, waits, comments, and the failing line is named', () => {
+  const plan = planRoutineLines('# morning\nopen https://example.com/a\n\nwait 5 seconds\nfocus mail\nmove hwnd:201 to 0,0 size 800x600', {windows});
+  assert.equal(plan.status, 'ready', JSON.stringify(plan));
+  assert.equal(plan.previewOnly, true);
+  assert.deepEqual(plan.steps.map((s) => s.kind === 'wait' ? `wait:${s.seconds}` : s.request.type), ['open-url', 'wait:5', 'focus', 'move-window']);
+  assert.deepEqual(plan.steps[2].request, {type: 'focus', target: 'hwnd:201'});
+  for (const s of plan.steps) if (s.kind === 'action') assert.deepEqual(validateActionRequest(s.request), s.request);
+  const amb = planRoutineLines('list windows\nfocus notepad', {windows});
+  assert.equal(amb.status, 'clarify');
+  assert.equal(amb.step, 2);
+  assert.equal(amb.plan.candidates.length, 2);
+  const chained = planRoutineLines('open https://example.com then launch calc');
+  assert.equal(chained.status, 'blocked');
+  assert.match(chained.reason, /Step 1: Only one action/);
+  for (const [input, re] of [['click 10,10', /Clicking/], ['launch "C:\\Tools\\run.bat"', /Scripts/], ['wait 0 seconds', /1–300/], ['wait 999 seconds', /1–300/], ['', /at least one/], [Array(MAX_ROUTINE_STEPS + 1).fill('list windows').join('\n'), /at most 20/]]) {
+    const p = planRoutineLines(input);
+    assert.notEqual(p.status, 'ready', input);
+    assert.match(p.reason, re, input);
+  }
+  assert.equal(planRoutineLines(42).status, 'blocked');
+});
+
+test('model routine JSON: strict shape, per-step validation, no schedules/tools/recording, candidates only', () => {
+  const ok = parseModelRoutine('```json\n{"name":"Start work","steps":[{"type":"open-url","target":"https://example.com"},{"type":"wait","seconds":3},{"type":"focus","target":"mail"}]}\n```', {windows});
+  assert.equal(ok.status, 'ready', JSON.stringify(ok));
+  assert.equal(ok.source, 'model');
+  assert.equal(ok.name, 'Start work');
+  assert.equal(ok.previewOnly, true);
+  assert.deepEqual(ok.steps.map((s) => s.kind), ['action', 'wait', 'action']);
+  assert.deepEqual(ok.steps[2].request, {type: 'focus', target: 'hwnd:201'});
+  const refused = [
+    ['{"steps":[{"type":"open-url","target":"https://e.com"}],"schedule":{"kind":"daily"}}', /schedules, tools and commands/],
+    ['{"steps":[{"type":"open-url","target":"https://e.com"}],"tool_calls":[]}', /not allowed/],
+    ['[{"type":"list-windows"}]', /JSON object/],
+    ['{"steps":[]}', /non-empty/],
+    ['{"steps":[{"type":"click","x":1,"y":1}]}', /Step 1: Clicking/],
+    ['{"steps":[{"type":"record"}]}', /Step 1: Unsupported action type/],
+    ['{"steps":[{"type":"list-windows"},{"type":"launch","target":"powershell.exe -c x"}]}', /Step 2/],
+    ['{"steps":[{"type":"wait","seconds":2.5}]}', /whole number/],
+    ['{"steps":[{"type":"wait","seconds":3,"then":"x"}]}', /field "then"/],
+    ['{"steps":[{"type":"open-url","target":"https://e.com","command":"calc"}]}', /field "command"/i],
+    ['{"name":"a\u202eb","steps":[{"type":"list-windows"}]}', /bidirectional/],
+    [JSON.stringify({steps: Array(MAX_ROUTINE_STEPS + 1).fill({type: 'list-windows'})}), /at most 20/],
+    ['not json', /valid JSON/],
+  ];
+  for (const [raw, re] of refused) {
+    const p = parseModelRoutine(raw, {windows});
+    assert.notEqual(p.status, 'ready', raw);
+    assert.match(p.reason, re, raw);
+  }
+  const clar = parseModelRoutine('{"steps":[{"type":"focus","target":"notepad"}]}', {windows});
+  assert.equal(clar.status, 'clarify');
+  assert.equal(clar.step, 1);
+});
+
+test('checkPlannedRequest re-validates stored steps with the planner rules', () => {
+  ready(checkPlannedRequest({type: 'open-url', target: 'https://example.com'}), {type: 'open-url', target: 'https://example.com/'});
+  status(checkPlannedRequest({type: 'click', x: 1, y: 1}), 'blocked', /G4/);
+  status(checkPlannedRequest({type: 'launch', target: 'a.exe', shell: true}), 'blocked', /Unknown action field/);
+  status(checkPlannedRequest({type: 'focus', target: 'that'}), 'clarify', /ambiguous/);
+  status(checkPlannedRequest('launch calc'), 'blocked', /object/);
 });

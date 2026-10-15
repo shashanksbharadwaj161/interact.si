@@ -1,0 +1,66 @@
+{
+  "role": "connectors",
+  "session": "jarvis-desktop-71",
+  "date": "2026-10-14",
+  "done": true,
+  "scope": "Spotify / browser / ChatGPT / Claude integrations end to end inside the existing injection contracts: clear secure setup, real consumer-app handoffs kept distinct from OAuth/API, optional online provider check with data preview, persistence, error next-steps and disconnect. No netGuard edits, no new IPC methods, no new origins.",
+  "files": [
+    "src/ui/integration-catalog.ts",
+    "electron/services/integrations.ts",
+    "src/components/Integrations.tsx",
+    "tests/backlog-connectors.test.mjs",
+    "docs/backlog-result.connectors.json"
+  ],
+  "changes": {
+    "integration-catalog.ts": [
+      "HandoffSpec.userLink: a pasted link restricted to exact hosts (Spotify accepts only https open.spotify.com links; spotify: URIs, lookalike hosts, http and userinfo are refused). Fixed handoffs (Claude, ChatGPT) ignore any pasted value.",
+      "KeySpec.pageUrl + keyPageAction(): fixed https key-creation pages (Anthropic, OpenAI, GitHub) opened only through the approved open-url action.",
+      "related[]: each API item and its consumer-subscription counterpart name each other (anthropic<->claude-web, openai<->chatgpt-web, spotify-web<->spotify-api) so a subscription is never mistaken for an API key.",
+      "inspectLink(): plain-language warnings (http, punycode lookalike, bare IP, non-standard port, query data) shown before the user approves a link. Pure; never fetches.",
+      "keyWarnings(): pasted 'Bearer', NAME=value, quotes, whitespace, wrong-provider key (sk-ant-, github_pat_, ghp_), prefix mismatch. Warn only; never contains the key.",
+      "setupChecklist(): real per-item progress (turn on, online mode, key, check) derived from the backend view and mode.",
+      "CheckResult.hint and IntegrationView.previousCheck (optional, backward compatible).",
+      "Browser definition states manual handoff only: no extension, no automation; 'Copy link' is the route for another browser or profile. spotify-api stays setup-required with an added blocker that no sign-in, token storage or api.spotify.com allowance exists."
+    ],
+    "integrations.ts": [
+      "describeStatus returns a fixed next-step hint (rejected key, endpoint change, rate limit, provider error, redirect never followed); network and timeout failures get hints too. No response body or request data is ever included.",
+      "Persistence: the outcome of each check (ok, time, status, reason) is saved in the same prefs sidecar under optional lastChecks, shown next session only as previousCheck ('Earlier session ...'), never as connected. Best effort: a failed save never fails a check, nothing is written when saved choices were unreadable, and the entry is dropped on removeKey, setKey and turn-off. Empty history is not written, so the file shape is unchanged for existing users. sanitizePrefs validates and trims every saved outcome.",
+      "setKey warnings come from the shared keyWarnings().",
+      "Pure OAuth authorization-code + PKCE helpers (validateOAuthConfig, createPkce, createOAuthState, buildAuthorizeUrl, stateMatches, redactOAuthText). RFC 7636 vector tested. They never open a browser, fetch, listen, store tokens or log, and are not wired to IPC. Spotify and calendar remain setup-required; no sign-in or account request exists."
+    ],
+    "Integrations.tsx": [
+      "Shared ApprovedLink flow (preview via existing action approval, link warnings, Approve and open / Cancel) used for website handoffs and key pages, plus 'Copy link' that opens nothing.",
+      "Spotify card takes an optional pasted open.spotify.com link; browser card keeps the free-form http(s) field.",
+      "Live 'Setup progress' list (Done / Next / To do) for API items when a backend is wired; static setup text otherwise.",
+      "Key field shows live key warnings while typing; key-page handoff while no key is stored.",
+      "Two-step Disconnect (remove key, then turn off) when a key is stored; failure refreshes the page to show what remains.",
+      "Failure shows the provider reason plus a 'Next step'; earlier-session history shown with honest wording.",
+      "IntegrationCard is now exported (test seam). No behavior change for existing exports."
+    ]
+  },
+  "checks": [
+    { "command": "node --test tests/backlog-connectors.test.mjs tests/autopilot-integrations.test.mjs", "result": "69/69 pass (26 new, 43 existing unchanged)" },
+    { "command": "npm test", "result": "746/746 pass" },
+    { "command": "npx tsc --noEmit", "result": "pass, no errors" },
+    { "command": "npx vite build && node scripts/build-main.mjs", "result": "pass" },
+    { "command": "mutation checks on temporary edits, restored afterwards", "result": "caught: dropping the Spotify host restriction, dropping the forget-on-key-removal, dropping Bearer redaction" }
+  ],
+  "interfaces": {
+    "service": "createIntegrationService deps unchanged. Results gain optional hint; views gain optional previousCheck. IPC methods and arity unchanged (INTEGRATION_METHODS / INTEGRATION_ARITY). PrefsStore stays the same two-method interface; the saved JSON gains an optional lastChecks map that older builds ignore.",
+    "ui": "IntegrationsPanel and Integrations props unchanged. src/ui/bridges.ts needs no change.",
+    "exports": "catalog: keyPageAction, inspectLink, keyWarnings, setupChecklist, SetupStep, RelatedIntegration; service: StoredCheck, validateOAuthConfig, createPkce, createOAuthState, buildAuthorizeUrl, stateMatches, redactOAuthText."
+  },
+  "captain_wiring": [
+    "None required for this work: no new IPC channel, no preload or contracts change, no netGuard or PROVIDER_CHECKS change, no new origin.",
+    "Existing wiring from continuation-result.integrations.json still applies (keys vault with the anthropic alias, trusted confirm, createJsonSidecar prefs, onKeyChange, route for <Integrations bridge=...>). Persisted check history works automatically through that same prefs sidecar.",
+    "Website handoffs and key pages call previewAction/executeAction, so the Computer action approval (trusted native confirmation) already covers them; nothing in the renderer opens a link by itself."
+  ],
+  "limitations": [
+    "Interactive flows (click through approval, Disconnect confirmation, Copy link) are not exercised by a DOM test: the repo has no jsdom or testing-library, so the renderer is verified with server-rendered markup for each state, and the service sequence the Disconnect button uses (remove key, then turn off) is tested directly.",
+    "No real provider, Spotify app, browser or OS handoff was contacted or opened. Whether Windows routes an open.spotify.com link into the Spotify app depends on the user's installation; the UI says Windows decides.",
+    "The Anthropic key page URL (console.anthropic.com/settings/keys) was not verified live (no network use); if the provider has moved it, the link redirects or needs updating in the catalog.",
+    "OAuth helpers are groundwork only. Spotify playback, calendar and any sign-in remain setup-required: they need an owner-registered client, provider terms review, token storage, a loopback listener and a netGuard allowance, none of which exist here.",
+    "OpenAI chat routing, GitHub issue posting and the weather widget remain unbuilt, as labelled in the catalog; connection checks verify reachability or key acceptance only.",
+    "The worktree has a node_modules junction to the original repo's node_modules so tests could resolve @phosphor-icons/react. It is git-ignored and not part of the change."
+  ]
+}

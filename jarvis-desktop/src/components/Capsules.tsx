@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react';
-import { AppWindow, ArrowDown, ArrowUp, CheckCircle, Cube, File as FileIcon, FloppyDisk, FolderOpen, Link as LinkIcon, MagnifyingGlass, Play, Plus, Trash, WarningCircle } from '@phosphor-icons/react';
+import { useEffect, useMemo, useState } from 'react';
+import { AppWindow, ArrowDown, ArrowUp, BookmarkSimple, CheckCircle, Copy, Cube, DownloadSimple, Export, Eye, File as FileIcon, FloppyDisk, FolderOpen, Link as LinkIcon, MagnifyingGlass, PencilSimple, Play, Plus, Trash, UploadSimple, WarningCircle } from '@phosphor-icons/react';
 import type { Capsule } from '../shared/contracts';
+import type { ReferenceKind } from '../../electron/services/store';
+import type { PackImport, PathMapping, RestorePreview } from '../../electron/services/capsules';
+import { buildResumeRecap, draftWorklog } from '../../electron/services/search';
 import { SceneBackdrop } from './SceneBackdrop';
 import { ConfirmDialog } from '../ui/Dialog';
 import { Badge, Button, Empty, Field, IconButton, Notice, PageHeader, Panel } from '../ui/primitives';
 import { useReady } from '../ui/store';
 import { SCENES, isKnownScene, sceneName } from '../ui/scenes';
-import { cx, parseHttpUrl, relTime, truncate } from '../ui/util';
+import { cx, fmtDateTime, parseHttpUrl, relTime, truncate } from '../ui/util';
 
 type Kind = Capsule['items'][number]['kind'];
 type Item = Capsule['items'][number];
@@ -33,11 +36,13 @@ function defaultLabel(kind: Kind, target: string): string {
   return parts[parts.length - 1] ?? target;
 }
 
-export function Capsules() {
+/** `initialItem` is the route's item parameter: the capsule to open first. An unknown id leaves the default. */
+export function Capsules({ initialItem }: { initialItem?: string } = {}) {
   const { state, api, mutate, run, toast, isPreview } = useReady();
+  const start = state.capsules.find((c) => c.id === initialItem) ?? state.capsules[0] ?? null;
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<string | 'new' | null>(state.capsules[0]?.id ?? null);
-  const [draft, setDraft] = useState<Draft | null>(() => (state.capsules[0] ? fromCapsule(state.capsules[0]) : null));
+  const [selected, setSelected] = useState<string | 'new' | null>(start?.id ?? null);
+  const [draft, setDraft] = useState<Draft | null>(() => (start ? fromCapsule(start) : null));
   const [saving, setSaving] = useState(false);
   const [pendingSelect, setPendingSelect] = useState<string | 'new' | null | undefined>(undefined);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -79,6 +84,11 @@ export function Capsules() {
     if (dirty) setPendingSelect(id);
     else open(id);
   };
+  // A later deep link to another capsule while this page is open (the hash changes without a remount).
+  useEffect(() => {
+    if (initialItem && state.capsules.some((c) => c.id === initialItem)) requestOpen(initialItem);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialItem]);
 
   const patch = (p: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...p } : d));
 
@@ -320,6 +330,8 @@ export function Capsules() {
                 {kind === 'app' && <p className="field-hint">Apps are launched by name or path when you restore. Launching may also be limited by your approved apps list.</p>}
               </Panel>
 
+              {draft.id && current && <ProjectMemory capsule={current} />}
+
               {draft.id && (
                 <Panel title="Restore" eyebrow="Reopen everything">
                   <p className="field-hint">
@@ -367,6 +379,7 @@ export function Capsules() {
                   )}
                 </Panel>
               )}
+              {draft.id && current && <RestoreTools capsule={current} dirty={dirty} />}
               {!draft.id && <Notice>Save the capsule to enable restore.</Notice>}
             </div>
           )}
@@ -405,5 +418,406 @@ export function Capsules() {
         </ul>
       </ConfirmDialog>
     </div>
+  );
+}
+
+// ---- Project memory: goals, references, checkpoints, resume recap -----------------------------------------------
+
+/** Adapter scopes that are not implemented. Shown so the limits are visible instead of implied. */
+export const CAPSULE_ADAPTER_STATUS = [
+  { id: 'browser', scope: 47, name: 'Browser profile and tab adapters', state: 'Partial', note: 'Saved web addresses open in your default browser. Open tabs and browser profiles are not read or restored.' },
+  { id: 'deep-state', scope: 49, name: 'Deep app-state restoration', state: 'Not available', note: 'Only items and window positions are restored. Documents, cursor position and in-app state are not captured; no adapter exists and this experiment has no written gate yet.' },
+  { id: 'spatial-map', scope: 50, name: 'Spatial project map with historical branches', state: 'Not available', note: 'Experimental and ungated; nothing is drawn or recorded for it.' },
+] as const;
+
+function Unavailable() {
+  return <Notice tone="warn" title="Local productivity storage is not connected">Goals, references, checkpoints and the recap need the sidecar store, which this build has not connected. Nothing is saved for them.</Notice>;
+}
+
+export function ProjectMemory({ capsule }: { capsule: Capsule }) {
+  const { state, api, productivity, productivityApi, applyProductivity, toast } = useReady();
+  const meta = productivity?.capsuleMeta[capsule.id];
+  const goals = meta?.goals ?? [];
+  const refs = meta?.references ?? [];
+  const checkpoints = useMemo(() => (productivity?.checkpoints ?? []).filter((c) => c.capsuleId === capsule.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [productivity, capsule.id]);
+  const recap = useMemo(() => buildResumeRecap(state, productivity ?? undefined, capsule.id), [state, productivity, capsule.id]);
+  const [goalText, setGoalText] = useState('');
+  const [refKind, setRefKind] = useState<ReferenceKind>('url');
+  const [refTarget, setRefTarget] = useState('');
+  const [refLabel, setRefLabel] = useState('');
+  const [cpTitle, setCpTitle] = useState('');
+  const [cpNote, setCpNote] = useState('');
+  const [editCp, setEditCp] = useState<{ id: string; title: string; note: string } | null>(null);
+
+  type GoalIn = { id?: string; text: string; done?: boolean };
+  type RefIn = { id?: string; kind: ReferenceKind; target: string; label?: string; note?: string };
+  const saveMeta = (g: GoalIn[], r: RefIn[], ok?: string) =>
+    applyProductivity({ op: 'capsule.setMeta', capsuleId: capsule.id, goals: g.map(({ id, text, done }) => ({ id, text, done })), references: r.map(({ id, kind, target, label, note }) => ({ id, kind, target, label, ...(note ? { note } : {}) })) }, ok);
+
+  const addGoal = async () => {
+    const t = goalText.trim();
+    if (!t) return;
+    if (await saveMeta([...goals, { text: t, done: false }], refs)) setGoalText('');
+  };
+  const addRef = async () => {
+    const t = refTarget.trim();
+    if (!t) return;
+    if (await saveMeta(goals, [...refs, { kind: refKind, target: t, label: refLabel.trim() }])) {
+      setRefTarget('');
+      setRefLabel('');
+    }
+  };
+  const browse = async () => {
+    try {
+      const p = await api.pickPath(refKind === 'folder' ? 'folder' : 'file');
+      if (p) setRefTarget(p);
+    } catch (e) {
+      toast('error', e instanceof Error ? e.message : 'The picker failed.');
+    }
+  };
+  const addCheckpoint = async () => {
+    const t = cpTitle.trim();
+    if (!t) return;
+    if (await applyProductivity({ op: 'checkpoint.add', title: t, note: cpNote.trim(), capsuleId: capsule.id, refs: [{ kind: 'capsule', id: capsule.id }] }, 'Checkpoint saved.')) {
+      setCpTitle('');
+      setCpNote('');
+    }
+  };
+  const copyDraft = async () => {
+    try {
+      await navigator.clipboard.writeText(draftWorklog(recap, { withSources: false }));
+      toast('ok', 'Worklog draft copied. Review it before sharing.');
+    } catch {
+      toast('error', 'Copying was blocked. Select the recap text and copy it manually.');
+    }
+  };
+  const refName = (r: (typeof refs)[number]) => {
+    if (r.kind === 'note') return state.notes.find((n) => n.id === r.target)?.title ?? '(deleted note)';
+    if (r.kind === 'task') return state.tasks.find((t) => t.id === r.target)?.title ?? '(deleted task)';
+    return r.label || r.target;
+  };
+
+  return (
+    <>
+      <Panel title="Resume recap" eyebrow="From saved records" actions={<Button size="sm" icon={Copy} onClick={() => void copyDraft()}>Copy worklog draft</Button>}>
+        {recap.empty ? (
+          <p className="field-hint">Nothing recorded for this capsule yet. Add goals, a checkpoint or references, or focus on a task, and they will be listed here with their sources.</p>
+        ) : (
+          <ul className="list compact" aria-label="Resume recap">
+            {recap.lines.map((l, i) => (
+              <li key={`${l.source.kind}:${l.source.id}:${i}`} className="list-row">
+                <span className="grow">{l.text}</span>
+                <Badge title={`Source: ${l.source.kind} ${l.source.id}`}>{l.source.kind}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="field-hint">Every line comes from something you saved here; no model writes it. The worklog copy is labelled as a draft.</p>
+      </Panel>
+
+      {!productivityApi || !productivity ? (
+        <Unavailable />
+      ) : (
+        <>
+          <Panel title="Goals" eyebrow={`${goals.filter((g) => !g.done).length} open`}>
+            {goals.length === 0 ? <p className="field-hint">No goals yet. Write what this project should achieve next.</p> : (
+              <ul className="list compact">
+                {goals.map((g) => (
+                  <li key={g.id} className="list-row">
+                    <input type="checkbox" id={`goal-${g.id}`} checked={g.done} onChange={() => void saveMeta(goals.map((x) => (x.id === g.id ? { ...x, done: !x.done } : x)), refs)} />
+                    <label htmlFor={`goal-${g.id}`} className={cx('grow', g.done && 'sub')}>{g.text}</label>
+                    <IconButton icon={Trash} label={`Remove goal ${truncate(g.text, 30)}`} onClick={() => void saveMeta(goals.filter((x) => x.id !== g.id), refs)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form className="add-item" onSubmit={(e) => { e.preventDefault(); void addGoal(); }}>
+              <Field label="New goal" className="grow">{(id) => <input id={id} className="input" value={goalText} maxLength={200} onChange={(e) => setGoalText(e.target.value)} />}</Field>
+              <div className="row align-end"><Button type="submit" icon={Plus} disabled={!goalText.trim()}>Add goal</Button></div>
+            </form>
+          </Panel>
+
+          <Panel title="References" eyebrow="Not opened by restore">
+            <p className="field-hint">References are pointers kept with the project: files, folders and links are never read or opened from here, and notes and tasks link to your saved ones.</p>
+            {refs.length > 0 && (
+              <ul className="list compact">
+                {refs.map((r) => (
+                  <li key={r.id} className="list-row">
+                    <Badge>{r.kind}</Badge>
+                    <span className="grow"><strong>{truncate(refName(r), 70)}</strong>{r.kind !== 'note' && r.kind !== 'task' && <code className="sub" title={r.target}> {truncate(r.target, 70)}</code>}</span>
+                    <IconButton icon={Trash} label={`Remove reference ${truncate(refName(r), 30)}`} onClick={() => void saveMeta(goals, refs.filter((x) => x.id !== r.id))} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form className="add-item" onSubmit={(e) => { e.preventDefault(); void addRef(); }}>
+              <Field label="Type">
+                {(id) => (
+                  <select id={id} className="input" value={refKind} onChange={(e) => { setRefKind(e.target.value as ReferenceKind); setRefTarget(''); }}>
+                    <option value="url">Link</option><option value="file">File</option><option value="folder">Folder</option><option value="note">Note</option><option value="task">Task</option>
+                  </select>
+                )}
+              </Field>
+              <Field label={refKind === 'note' ? 'Note' : refKind === 'task' ? 'Task' : refKind === 'url' ? 'Address' : 'Path'} className="grow">
+                {(id) =>
+                  refKind === 'note' || refKind === 'task' ? (
+                    <select id={id} className="input" value={refTarget} onChange={(e) => setRefTarget(e.target.value)}>
+                      <option value="">Choose…</option>
+                      {(refKind === 'note' ? state.notes.map((n) => ({ id: n.id, t: n.title })) : state.tasks.map((t) => ({ id: t.id, t: t.title }))).map((o) => <option key={o.id} value={o.id}>{truncate(o.t, 60)}</option>)}
+                    </select>
+                  ) : (
+                    <input id={id} className="input" value={refTarget} maxLength={520} spellCheck={false} onChange={(e) => setRefTarget(e.target.value)} />
+                  )
+                }
+              </Field>
+              <Field label="Label (optional)">{(id) => <input id={id} className="input" value={refLabel} maxLength={120} onChange={(e) => setRefLabel(e.target.value)} />}</Field>
+              <div className="row align-end">
+                {(refKind === 'file' || refKind === 'folder') && <Button icon={FolderOpen} onClick={() => void browse()}>Browse…</Button>}
+                <Button type="submit" icon={Plus} disabled={!refTarget.trim()}>Add reference</Button>
+              </div>
+            </form>
+          </Panel>
+
+          <Panel title="Checkpoints" eyebrow={`${checkpoints.length} saved`}>
+            <form className="add-item" onSubmit={(e) => { e.preventDefault(); void addCheckpoint(); }}>
+              <Field label="Checkpoint title" className="grow">{(id) => <input id={id} className="input" value={cpTitle} maxLength={120} placeholder="Where things stand" onChange={(e) => setCpTitle(e.target.value)} />}</Field>
+              <Field label="Note (optional)" className="grow">{(id) => <textarea id={id} className="input" rows={2} maxLength={4000} value={cpNote} onChange={(e) => setCpNote(e.target.value)} />}</Field>
+              <div className="row align-end"><Button type="submit" variant="primary" icon={BookmarkSimple} disabled={!cpTitle.trim()}>Save checkpoint</Button></div>
+            </form>
+            {checkpoints.length === 0 ? <p className="field-hint">A checkpoint is a note to your future self about this project, saved only when you press the button.</p> : (
+              <ul className="list compact">
+                {checkpoints.map((c) => (
+                  <li key={c.id} className="list-row">
+                    {editCp?.id === c.id ? (
+                      <div className="grow stack tight">
+                        <input className="input" aria-label="Checkpoint title" value={editCp.title} maxLength={120} onChange={(e) => setEditCp({ ...editCp, title: e.target.value })} />
+                        <textarea className="input" aria-label="Checkpoint note" rows={2} maxLength={4000} value={editCp.note} onChange={(e) => setEditCp({ ...editCp, note: e.target.value })} />
+                        <div className="row">
+                          <Button size="sm" variant="primary" onClick={async () => { if (editCp.title.trim() && (await applyProductivity({ op: 'checkpoint.update', id: c.id, title: editCp.title.trim(), note: editCp.note.trim() }, 'Checkpoint updated.'))) setEditCp(null); }}>Save</Button>
+                          <Button size="sm" onClick={() => setEditCp(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="grow"><strong>{c.title}</strong><span className="sub"> {fmtDateTime(c.createdAt)}</span>{c.note && <span className="sub block">{truncate(c.note, 200)}</span>}</span>
+                        <IconButton icon={PencilSimple} label={`Edit checkpoint ${truncate(c.title, 30)}`} onClick={() => setEditCp({ id: c.id, title: c.title, note: c.note })} />
+                        <IconButton icon={Trash} label={`Delete checkpoint ${truncate(c.title, 30)}`} onClick={() => void applyProductivity({ op: 'checkpoint.delete', id: c.id }, 'Checkpoint deleted.')} />
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        </>
+      )}
+    </>
+  );
+}
+
+// ---- Restore preview, window geometry, portable packs ---------------------------------------------------------
+
+type PackState = { raw: string; parsed: PackImport; mappings: PathMapping[] };
+
+export function RestoreTools({ capsule, dirty }: { capsule: Capsule; dirty: boolean }) {
+  const { api, productivityApi, applyProductivity, refreshProductivity, mutate, toast } = useReady();
+  const cap = productivityApi?.capsule;
+  const [preview, setPreview] = useState<RestorePreview | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [wins, setWins] = useState<{ hwnd: number; title: string; process: string }[] | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [rootPath, setRootPath] = useState('');
+  const [pack, setPack] = useState<PackState | null>(null);
+
+  const guard = async (name: string, fn: () => Promise<void>) => {
+    setBusy(name);
+    try { await fn(); } catch (e) { toast('error', e instanceof Error ? e.message : 'That did not work.'); } finally { setBusy(null); }
+  };
+  const pickFolder = async (): Promise<string | null> => {
+    try { return await api.pickPath('folder'); } catch (e) { toast('error', e instanceof Error ? e.message : 'The picker failed.'); return null; }
+  };
+
+  const doPreview = () => guard('preview', async () => { setPreview(await (cap as NonNullable<typeof cap>).previewRestore(capsule.id)); });
+  const listWins = () => guard('list', async () => { setWins(await (cap?.listWindows as NonNullable<typeof cap>['listWindows'] as () => Promise<{ hwnd: number; title: string; process: string }[]>)()); setPicked([]); });
+  const capture = () => guard('capture', async () => {
+    const r = await (cap?.captureGeometry as NonNullable<NonNullable<typeof cap>['captureGeometry']>)(capsule.id, picked);
+    toast(r.skipped.length ? 'info' : 'ok', `Saved ${r.saved} window position(s)${r.skipped.length ? `; skipped ${r.skipped.length}: ${truncate(r.skipped.map((s) => `${s.process || 'window'} (${s.reason})`).join('; '), 160)}` : ''}.`);
+    setWins(null);
+    await mutate(() => api.getState());
+    await refreshProductivity();
+  });
+  const doExport = () => guard('export', async () => {
+    const r = await (cap?.exportPack as NonNullable<NonNullable<typeof cap>['exportPack']>)(capsule.id, rootPath ? [{ name: 'project', path: rootPath }] : []);
+    toast(r.saved ? 'ok' : 'info', r.saved ? `Pack saved.${r.unmapped.length ? ` ${r.unmapped.length} path(s) outside the project folder keep their full path, which may include your user name.` : ''}` : 'Export cancelled.');
+  });
+  const readPack = () => guard('import', async () => {
+    const raw = await (cap?.readPack as NonNullable<NonNullable<typeof cap>['readPack']>)();
+    if (!raw) return;
+    setPack({ raw, mappings: [], parsed: await (cap?.parsePack as NonNullable<NonNullable<typeof cap>['parsePack']>)(raw, []) });
+  });
+  const remap = (mappings: PathMapping[]) => guard('import', async () => {
+    if (!pack) return;
+    setPack({ raw: pack.raw, mappings, parsed: await (cap?.parsePack as NonNullable<NonNullable<typeof cap>['parsePack']>)(pack.raw, mappings.filter((m) => m.from.trim() && m.to.trim())) });
+  });
+  const saveImported = () => guard('save', async () => {
+    if (!pack) return;
+    let saved = 0;
+    for (const c of pack.parsed.capsules) {
+      const before = new Set((await api.getState()).capsules.map((x) => x.id));
+      const next = await api.saveCapsule({ name: c.name, description: c.description, scene: c.scene, items: c.items, ...(c.windows ? { windows: c.windows } : {}) });
+      const created = next.capsules.find((x) => !before.has(x.id));
+      if (created && (c.goals.length || c.references.length)) {
+        await applyProductivity({ op: 'capsule.setMeta', capsuleId: created.id, goals: c.goals.map((text) => ({ text })), references: c.references });
+      }
+      saved++;
+    }
+    setPack(null);
+    await mutate(() => api.getState(), `Imported ${saved} capsule(s). Review each item before restoring.`);
+    await refreshProductivity();
+  });
+
+  return (
+    <>
+      <Panel title="Preview and window positions" eyebrow="Reads only">
+        {!cap ? (
+          <p className="field-hint">Restore preview and window capture are not connected in this build. Restore still shows every item for confirmation before anything opens.</p>
+        ) : (
+          <div className="stack tight">
+            <div className="row">
+              <Button icon={Eye} busy={busy === 'preview'} disabled={dirty} title={dirty ? 'Save your changes first' : undefined} onClick={() => void doPreview()}>Preview restore</Button>
+              {cap.listWindows && cap.captureGeometry && <Button icon={AppWindow} busy={busy === 'list'} onClick={() => void listWins()}>Choose windows to save…</Button>}
+            </div>
+            {preview && preview.capsule === capsule.name && (
+              <div aria-live="polite">
+                <ul className="list compact" aria-label="Items that restore would open">
+                  {preview.items.map((i) => (
+                    <li key={`${i.kind}:${i.target}`} className={cx('list-row', i.ok ? 'ok-row' : 'fail-row')}>
+                      {i.ok ? <CheckCircle size={15} aria-hidden /> : <WarningCircle size={15} aria-hidden />}
+                      <span className="grow"><span className="mono">{truncate(i.target, 80)}</span><span className="sub block">{truncate(i.detail, 200)}</span></span>
+                      <Badge tone={i.ok ? 'ok' : 'danger'}>{i.ok ? 'Allowed' : 'Blocked'}</Badge>
+                    </li>
+                  ))}
+                </ul>
+                {preview.windowsError && <Notice tone="warn">Windows could not be listed: {preview.windowsError}</Notice>}
+                {preview.windows.length > 0 && (
+                  <ul className="list compact" aria-label="Window positions that restore would apply">
+                    {preview.windows.map((w, i) => (
+                      <li key={i} className="list-row">
+                        <span className="grow">{w.saved.process} {w.saved.title && `“${truncate(w.saved.title, 40)}”`} → {w.saved.x},{w.saved.y} {w.saved.width}×{w.saved.height}{w.offscreen && ' (outside every known display)'}<span className="sub block">{w.reason ?? `Would move "${truncate(w.window?.title ?? '', 40)}"`}</span></span>
+                        <Badge tone={w.status === 'match' ? 'ok' : w.status === 'blocked' ? 'danger' : 'muted'}>{w.status === 'match' ? 'Match' : w.status === 'blocked' ? 'Blocked' : 'Not open'}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="field-hint">This is a dry run: nothing was opened or moved. Restoring still needs your confirmation.</p>
+              </div>
+            )}
+            {wins && (
+              <fieldset className="stack tight">
+                <legend>Windows open now</legend>
+                {wins.length === 0 && <p className="field-hint">No restorable windows were found.</p>}
+                {wins.slice(0, 60).map((w) => (
+                  <label key={w.hwnd} className="row">
+                    <input type="checkbox" checked={picked.includes(w.hwnd)} onChange={(e) => setPicked(e.target.checked ? [...picked, w.hwnd] : picked.filter((h) => h !== w.hwnd))} />
+                    <span>{w.process} — {truncate(w.title || '(untitled)', 60)}</span>
+                  </label>
+                ))}
+                <div className="row">
+                  <Button variant="primary" icon={FloppyDisk} busy={busy === 'capture'} disabled={picked.length === 0} onClick={() => void capture()}>Save positions of {picked.length} window(s)</Button>
+                  <Button onClick={() => setWins(null)}>Cancel</Button>
+                </div>
+                <p className="field-hint">Only the window titles, programs and rectangles of the windows you tick are saved. Minimized, maximized and protected windows are skipped.</p>
+              </fieldset>
+            )}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Share as a pack" eyebrow="Portable export">
+        {!cap?.exportPack || !cap.readPack || !cap.parsePack ? (
+          <p className="field-hint">Pack export and import are not connected in this build.</p>
+        ) : (
+          <div className="stack tight">
+            <Field label="Project folder to make portable (optional)" hint="Paths inside this folder are exported relative to it so they can be re-mapped on another PC. Paths outside it keep their full path.">
+              {(id) => (
+                <span className="row">
+                  <input id={id} className="input" value={rootPath} spellCheck={false} onChange={(e) => setRootPath(e.target.value)} />
+                  <Button icon={FolderOpen} onClick={async () => { const p = await pickFolder(); if (p) setRootPath(p); }}>Browse…</Button>
+                </span>
+              )}
+            </Field>
+            <div className="row">
+              <Button icon={Export} busy={busy === 'export'} disabled={dirty} onClick={() => void doExport()}>Export pack…</Button>
+              <Button icon={DownloadSimple} busy={busy === 'import'} onClick={() => void readPack()}>Import pack…</Button>
+            </div>
+            {pack && (
+              <div className="stack tight" aria-live="polite">
+                <h3>Import preview</h3>
+                <ul className="list compact">
+                  {pack.parsed.capsules.map((c, i) => <li key={i} className="list-row"><strong className="grow">{c.name}</strong><span className="sub">{c.items.length} item(s), {c.goals.length} goal(s), {c.windows?.length ?? 0} window(s)</span></li>)}
+                </ul>
+                {pack.parsed.roots.length > 0 && (
+                  <>
+                    <p className="field-hint">This pack uses project folders that must be chosen on this PC.</p>
+                    {pack.parsed.roots.map((name) => {
+                      const from = `{ROOT:${name}}`;
+                      const cur = pack.mappings.find((m) => m.from === from)?.to ?? '';
+                      return (
+                        <Field key={name} label={`Folder for “${name}”`}>
+                          {(id) => (
+                            <span className="row">
+                              <input id={id} className="input" value={cur} spellCheck={false} onChange={(e) => void remap([...pack.mappings.filter((m) => m.from !== from), { from, to: e.target.value }])} />
+                              <Button icon={FolderOpen} onClick={async () => { const p = await pickFolder(); if (p) void remap([...pack.mappings.filter((m) => m.from !== from), { from, to: p }]); }}>Browse…</Button>
+                            </span>
+                          )}
+                        </Field>
+                      );
+                    })}
+                  </>
+                )}
+                <Field label="Re-map an old folder (optional)" hint="Replace the start of full paths from the pack, for example C:\Users\old\Projects → D:\Work.">
+                  {(id) => (
+                    <span className="row">
+                      <input id={id} className="input" placeholder="Old folder" spellCheck={false} onBlur={(e) => { const v = e.target.value.trim(); if (v) void remap([...pack.mappings.filter((m) => m.from !== v), { from: v, to: pack.mappings.find((m) => m.from === v)?.to ?? '' }]); }} />
+                    </span>
+                  )}
+                </Field>
+                {pack.mappings.filter((m) => !m.from.startsWith('{ROOT:')).map((m) => (
+                  <Field key={m.from} label={`New folder for ${truncate(m.from, 40)}`}>
+                    {(id) => (
+                      <span className="row">
+                        <input id={id} className="input" value={m.to} spellCheck={false} onChange={(e) => void remap(pack.mappings.map((x) => (x.from === m.from ? { ...x, to: e.target.value } : x)))} />
+                        <Button icon={FolderOpen} onClick={async () => { const p = await pickFolder(); if (p) void remap(pack.mappings.map((x) => (x.from === m.from ? { ...x, to: p } : x))); }}>Browse…</Button>
+                      </span>
+                    )}
+                  </Field>
+                ))}
+                {pack.parsed.skipped.length > 0 && (
+                  <Notice tone="warn" title={`${pack.parsed.skipped.length} item(s) will not be imported`}>
+                    <ul className="list compact">{pack.parsed.skipped.slice(0, 8).map((s, i) => <li key={i} className="list-row"><span className="grow mono">{truncate(s.target, 60)}</span><span className="sub">{truncate(s.reason, 120)}</span></li>)}</ul>
+                  </Notice>
+                )}
+                {pack.parsed.notes.map((n) => <p key={n} className="field-hint">{n}</p>)}
+                <div className="row">
+                  <Button variant="primary" icon={UploadSimple} busy={busy === 'save'} disabled={pack.parsed.capsules.length === 0} onClick={() => void saveImported()}>Add {pack.parsed.capsules.length} capsule(s)</Button>
+                  <Button onClick={() => setPack(null)}>Discard</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Panel>
+
+      <Panel title="Adapters" eyebrow="What is and is not supported">
+        <ul className="list compact">
+          {CAPSULE_ADAPTER_STATUS.map((a) => (
+            <li key={a.id} className="list-row">
+              <span className="grow"><strong>{a.name}</strong> <span className="sub">(scope {a.scope})</span><span className="sub block">{a.note}</span></span>
+              <Badge tone={a.state === 'Partial' ? 'warn' : 'muted'}>{a.state}</Badge>
+            </li>
+          ))}
+        </ul>
+      </Panel>
+    </>
   );
 }

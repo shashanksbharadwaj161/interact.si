@@ -1,6 +1,6 @@
 // Pure input validation for everything that crosses the IPC boundary or is loaded from disk.
 import type {Activity, AppState, Capsule, ChatMessage, Note, Settings, Task} from '../../src/shared/contracts';
-import {hasControlChars, isDriveRoot, normalizeAbsolutePath} from './paths';
+import {hasControlChars, isBareExeName, isDriveRoot, normalizeAbsolutePath, visibleText} from './paths';
 
 export class ValidationError extends Error {}
 
@@ -94,7 +94,7 @@ export function validateLocalEndpoint(v: unknown): string {
 
 export function validateApprovedApp(v: unknown): string {
   const s = str(v, 'approved app', 520, {min: 1});
-  if (/^[A-Za-z0-9._ -]+\.exe$/i.test(s)) return s;
+  if (isBareExeName(s)) return s;
   const n = normalizeAbsolutePath(s);
   if ('error' in n) throw new ValidationError(`approved app "${s}": ${n.error}`);
   if (!/\.exe$/i.test(n.path)) throw new ValidationError('approved apps must be .exe files');
@@ -152,6 +152,23 @@ export function mergeSettings(current: Settings, patch: unknown): Settings {
     next[k] = settingsField(k, v);
   }
   return next as unknown as Settings;
+}
+
+/**
+ * Human-readable list of every security-relevant difference between two settings objects: added executables and
+ * folders, online mode, a changed local endpoint or cloud model. Empty when nothing that widens access changed.
+ * Feeds the trusted native confirmation for settings saves and imports (NSR-01, NSR-02); removals are not listed
+ * because they only narrow access.
+ */
+export function describePermissionChanges(before: Settings, after: Settings): string[] {
+  const has = (list: string[], v: string) => list.some((x) => x.toLowerCase() === v.toLowerCase());
+  return [
+    ...after.approvedApps.filter((v) => !has(before.approvedApps, v)).map((v) => `Approve executable: ${visibleText(v)}`),
+    ...after.allowedRoots.filter((v) => !has(before.allowedRoots, v)).map((v) => `Allow folder: ${visibleText(v)}`),
+    ...(before.mode !== 'online' && after.mode === 'online' ? ['Enable online mode (cloud requests may send conversation content)'] : []),
+    ...(before.localEndpoint !== after.localEndpoint ? [`Local model endpoint: ${before.localEndpoint} -> ${after.localEndpoint}`] : []),
+    ...(before.cloudModel !== after.cloudModel && after.mode === 'online' ? [`Cloud model: ${before.cloudModel} -> ${after.cloudModel}`] : []),
+  ];
 }
 
 export interface ParseOptions {

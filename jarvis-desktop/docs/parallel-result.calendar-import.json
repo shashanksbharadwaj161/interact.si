@@ -1,0 +1,51 @@
+{
+  "role": "calendar-import",
+  "session": "jarvis-desktop-105",
+  "done": true,
+  "at": "2026-10-15",
+  "changedFiles": [
+    "src/ui/calendar-import.ts",
+    "src/components/CalendarImport.tsx",
+    "tests/parallel-calendar-import.test.mjs",
+    "docs/parallel-result.calendar-import.json"
+  ],
+  "summary": "Original local .ics import review for Calendar. A pure, bounded parser (src/ui/calendar-import.ts) builds a preview with all-day, UTC, floating and zoned times (runtime IANA zones, file VTIMEZONE yearly rules or fixed offsets, a Windows-name table), RFC 5545 DST handling (gap times move forward, repeated times use the first occurrence, nominal DURATION days), and recurrence expanded only inside an explicit window with per-series, per-preview and step caps. Unsupported rules are skipped and counted. Reserved or prototype names, oversized, deeply nested, unbalanced and over-limit records are rejected per item. The typed component (CalendarImport.tsx) shows found/selected/conflict/already-stored/skipped counts, per-event zone and DST notes, conflicts with stored events and with other selected events, per-event checkboxes and bulk selection, and calls the host's onImport only after a ConfirmDialog. It reads no files, uses no network or storage, and changes no schedule or system setting.",
+  "checks": [
+    { "command": "npx tsc --noEmit -p tsconfig.json", "result": "pass (exit 0)" },
+    { "command": "node --test tests/parallel-calendar-import.test.mjs", "result": "16 tests, 16 pass, 0 fail (worst-case 2000 recurring zoned events: parse about 0.7 s, review about 10 ms on this machine)" },
+    { "command": "npm test", "result": "1094 tests, 1094 pass, 0 fail" },
+    { "command": "npm ci --ignore-scripts", "result": "repo-local install, no new dependencies" }
+  ],
+  "testCoverage": [
+    "UTC/floating/multi-day all-day normalization and display",
+    "IANA offsets on both sides of DST, vendor-prefixed TZID",
+    "DST gap (moves forward) and repeated hour (first occurrence)",
+    "Weekly recurrence keeps local time across DST; nominal P1D across spring-forward",
+    "VTIMEZONE yearly rules, fixed-offset VTIMEZONE, Windows zone name, unknown zone skipped",
+    "Open-ended rule fast-forwarded into the window; 400-occurrence cap flagged; COUNT series wholly in the past reported",
+    "MONTHLY -1FR, BYMONTHDAY=31 skipping short months, YEARLY Feb 29, UNTIL inclusive, EXDATE, RECURRENCE-ID move and cancel",
+    "HOURLY, BYSETPOS, COUNT+UNTIL, two RRULEs, RDATE PERIOD, RANGE=THISANDFUTURE skipped and counted; plain RDATE expanded",
+    "__proto__ property/parameter/component names, too many fields, overlong folded line, bad dates, year range, reversed and mixed ranges, cancelled, VTODO, stray END, deep nesting, >1 MB, not-calendar; Object.prototype unchanged; bidi/control characters stripped; javascript: URL dropped",
+    "2000-event cap and in-file duplicates",
+    "Conflicts with stored and selected events, half-open back-to-back, all-day and TRANSP:TRANSPARENT excluded, floating times in the display zone, duplicates excluded from default selection",
+    "Import request has only selected events, no RRULE/TZID, and round-trips through electron/services/calendar.ts parseIcs with zero skips and identical events",
+    "Server-rendered component: counts, conflict text, skip labels, DST note, checkbox state, button label, error notice, paste box toggle, onImport never called by rendering",
+    "Confirmation and outcome copy; duration parser accept/reject"
+  ],
+  "interfaceProposal": {
+    "module": "src/ui/calendar-import.ts exports parseIcsForImport(text, { now, lookbackDays?, horizonDays? }) -> ImportPreview; defaultSelection(preview, existing); reviewSelection(preview, selectedKeys, existing, timeZone?) -> SelectionReview; buildImportRequest(preview, selectedKeys, sourceName, stamp) -> { ok: true, request: CalendarImportRequest } | { ok: false, reason }; formatWhen(event, timeZone?); IMPORT_LIMITS; IMPORT_SKIP_LABELS; CANDIDATE_NOTE_LABELS.",
+    "component": "src/components/CalendarImport.tsx exports CalendarImport({ existing: CalendarEvent[], source?: { name, text } | null, onImport(request): Promise<{ added, dropped, total }>, onClose?, now?, timeZone?, allowPaste? }), plus outcomeMessage and confirmationLines.",
+    "request": "CalendarImportRequest = { sourceName, events: CalendarEvent[], ics }. ics contains only UTC, all-day or floating times and no recurrence, so the existing calendarImportText / CalendarClient.importIcs route can store it unchanged after the main process parses it again.",
+    "mountInCalendar": "Captain or the Calendar owner (src/components/Calendar.tsx is not owned here) can replace or sit beside PreviewPanel: after the file input's File.text() is read (size-checked as today), set a memoized source state { name: file.name, text } and render <CalendarImport existing={events ?? []} source={source} onImport={(r) => api.importIcs(r.ics)} onClose={() => setSource(null)} />, then reload the list on success. The source object must be memoized (useState), because a new object resets the preview. No new IPC channel or contract field is needed.",
+    "navigation": "No new nav entry required; it belongs inside the Calendar page. If a central host is preferred, mount the same element in a Calendar sub-panel or dialog with the same props."
+  },
+  "limitations": [
+    "Not mounted in Calendar.tsx or any route: that file and navigation are outside this ownership. Until the captain mounts it, users still get the existing store-parser preview (no zones or recurrence).",
+    "Recurrence subset only: DAILY/WEEKLY/MONTHLY/YEARLY with INTERVAL, COUNT or UNTIL, BYDAY (ordinals only for MONTHLY and YEARLY+BYMONTH), BYMONTHDAY, BYMONTH, WKST; RDATE (DATE/DATE-TIME) and EXDATE; RECURRENCE-ID without RANGE. Anything else is skipped and counted, not approximated.",
+    "Recurring events are expanded only between now-31 days and now+365 days by default (configurable up to 366/1098), at most 400 occurrences per series and 2000 events per preview; imported occurrences become individual events, so the store does not keep the rule and future occurrences beyond the window need a later import.",
+    "VTIMEZONE support covers fixed observances and yearly nth-weekday rules; RDATE-based or other observance rules fall back to the Windows table or are skipped. The runtime IANA database wins over file VTIMEZONE data when the TZID is a known region name.",
+    "Conflict checks use only timed busy events; all-day and TRANSP:TRANSPARENT events are listed but not checked. Floating and all-day times are interpreted in the display zone for conflicts; the existing store treats floating times as UTC for its own range queries.",
+    "The existing store key is UID+start, so importing a changed occurrence at a new time adds a new event rather than replacing the old one.",
+    "Rendering and pure flows are tested with react-dom/server; click-through interaction (checkbox toggle, dialog confirm) has no DOM test because no DOM test library is installed and none was added."
+  ]
+}
