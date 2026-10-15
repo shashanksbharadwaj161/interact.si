@@ -3,7 +3,7 @@
 // client: the main process parses and stores the file again, so the preview is never trusted for storage.
 // No calendar account is read. Recurring events are skipped and counted, never expanded.
 import { Suspense, useEffect, useId, useMemo, useState, type ComponentType } from 'react';
-import { CalendarBlank, CalendarX, FileArrowUp } from '@phosphor-icons/react';
+import { CalendarBlank, CalendarX, DownloadSimple, FileArrowUp } from '@phosphor-icons/react';
 import { MAX_EVENTS, MAX_ICS_BYTES, parseIcs, type CalendarEvent, type IcsParseResult, type SkipCode } from '../../electron/services/calendar';
 import { ConfirmDialog } from '../ui/Dialog';
 import { Badge, Button, Empty, Field, Notice, PageHeader, Panel } from '../ui/primitives';
@@ -24,6 +24,98 @@ export interface CalendarClient {
 }
 
 export type CalendarFileImport = CalendarImportResult & { imported: boolean; error?: 'too-large' | 'not-calendar' };
+
+/** The pure exporter (src/ui/calendar-export.ts). Loaded on first use so it stays out of the main chunk. */
+export type CalendarExportModule = typeof import('../ui/calendar-export');
+let exportModule: Promise<CalendarExportModule> | null = null;
+export const loadCalendarExport = (): Promise<CalendarExportModule> => (exportModule ??= import('../ui/calendar-export'));
+
+/** Saves text through the renderer's own download: a Blob object URL that is revoked right after use. Nothing is sent anywhere. */
+export function downloadIcs(text: string, fileName: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/calendar;charset=utf-8' }));
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+}
+
+/**
+ * Export group: summary, a read-only preview of the exact .ics text, its size, and the download. The text is built
+ * in the renderer from the events already shown; the optional app dialog save goes through the client instead.
+ */
+export function ExportPanel({ events, exporter, busy, onSaveViaApp, onDownloaded }: {
+  events: readonly CalendarEvent[] | null;
+  exporter: CalendarExportModule | null;
+  busy: boolean;
+  onSaveViaApp?: () => void;
+  onDownloaded?: (count: number) => void;
+}) {
+  const [showText, setShowText] = useState(false);
+  const textId = useId();
+  const prepared = useMemo(() => {
+    if (!exporter || !events) return null;
+    const result = exporter.eventsToIcs(events, { now: new Date() });
+    return { result, summary: exporter.summarizeExport(events, result) };
+  }, [exporter, events]);
+  return (
+    <Panel title="Export calendar" eyebrow="Preview before saving">
+      {!prepared || !exporter ? (
+        <p className="muted">{events === null ? 'Loading…' : 'Preparing the export…'}</p>
+      ) : (
+        <div className="stack">
+          <p>
+            {prepared.summary.count === 0
+              ? 'No events can be exported yet.'
+              : `${plural(prepared.summary.count, 'event')} from ${fmtDueKey(prepared.summary.firstDate ?? '')} to ${fmtDueKey(prepared.summary.lastDate ?? '')}.`}
+            {' '}Estimated size: {exporter.formatBytes(prepared.result.bytes)}.
+          </p>
+          {prepared.summary.truncated && <Notice tone="warn" title="Export limits reached">Some long text was shortened or some events were left out to stay within the export limits.</Notice>}
+          {prepared.summary.skipped.length > 0 && (
+            <div className="stack tight">
+              <strong>Not exported</strong>
+              <ul className="list" aria-label="Events left out of the export">
+                {prepared.summary.skipped.map((s) => (
+                  <li key={s.reason} className="list-row">
+                    <span className="grow">{s.label}</span>
+                    <Badge tone="warn">{s.count}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="row wrap">
+            <Button aria-expanded={showText} aria-controls={showText ? textId : undefined} disabled={prepared.summary.count === 0} onClick={() => setShowText((v) => !v)}>
+              {showText ? 'Hide .ics preview' : 'Preview .ics'}
+            </Button>
+            <Button
+              variant="primary"
+              icon={DownloadSimple}
+              disabled={busy || prepared.summary.count === 0}
+              onClick={() => { downloadIcs(prepared.result.text, exporter.exportFileName(localDateKey())); onDownloaded?.(prepared.result.count); }}
+            >
+              Download .ics
+            </Button>
+            {onSaveViaApp && <Button disabled={busy || prepared.summary.count === 0} onClick={onSaveViaApp}>Save via app dialog…</Button>}
+          </div>
+          {showText && prepared.summary.count > 0 && (
+            <div className="field">
+              <label htmlFor={textId}>Preview .ics (exact text that will be saved)</label>
+              <textarea id={textId} className="input" readOnly rows={12} spellCheck={false} value={prepared.result.text} />
+            </div>
+          )}
+          <p className="field-hint">Built on this device from the events listed below. Nothing is uploaded or sent anywhere.</p>
+        </div>
+      )}
+    </Panel>
+  );
+}
 
 /** Outcome text for a dialog import. null means the dialog was cancelled. */
 export function fileImportMessage(r: CalendarFileImport): { tone: 'info' | 'danger'; text: string } | null {
@@ -269,6 +361,12 @@ export function Calendar({ api, initialEvents, Review }: { api?: CalendarClient 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
+  const [exporter, setExporter] = useState<CalendarExportModule | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadCalendarExport().then((m) => { if (live) setExporter(m); }, () => { /* the export group keeps its preparing state */ });
+    return () => { live = false; };
+  }, []);
 
   const reload = async (client: CalendarClient) => setEvents(sortEvents(await client.list()));
 
@@ -350,7 +448,9 @@ export function Calendar({ api, initialEvents, Review }: { api?: CalendarClient 
     setMsg(null);
     try {
       const r = await api.exportIcs();
-      if (r.saved) setMsg({ tone: 'info', text: `Saved ${plural(r.events, 'event')} to the chosen .ics file.` });
+      setMsg(r.saved
+        ? { tone: 'info', text: `Saved ${plural(r.events, 'event')} to the chosen .ics file.` }
+        : { tone: 'info', text: 'Save cancelled. Nothing was written.' });
     } catch (e) {
       setMsg({ tone: 'danger', text: errMsg(e, 'The calendar could not be exported.') });
     } finally {
@@ -400,6 +500,7 @@ export function Calendar({ api, initialEvents, Review }: { api?: CalendarClient 
             <div className="row wrap">
               {api.importFile && <Button icon={FileArrowUp} disabled={busy || reading} onClick={() => void runFileImport()}>Import with file dialog</Button>}
               {api.exportIcs && <Button disabled={busy || reading || !events?.length} onClick={() => void runExport()}>Export all as .ics</Button>}
+
             </div>
           )}
           {(api.importFile || api.exportIcs) && <p className="field-hint">The system dialog runs in the app itself. Files reached through shortcut links, junctions or network locations are refused.</p>}
@@ -410,6 +511,13 @@ export function Calendar({ api, initialEvents, Review }: { api?: CalendarClient 
           </Suspense>
         )}
         {preview && <PreviewPanel preview={preview} busy={busy} onImport={() => void runImport()} onDiscard={() => setPreview(null)} />}
+        <ExportPanel
+          events={events}
+          exporter={exporter}
+          busy={busy || reading}
+          onSaveViaApp={api.exportIcs ? () => void runExport() : undefined}
+          onDownloaded={(n) => setMsg({ tone: 'info', text: `Prepared ${plural(n, 'event')} as an .ics download.` })}
+        />
         <EventList events={events} loadError={loadError} onClear={() => setClearOpen(true)} />
       </div>
       <ConfirmDialog

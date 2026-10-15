@@ -1014,6 +1014,152 @@
   outline-color: var(--accent);
 }
 
+/* File shelf (Home) */
+.file-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.file-shelf-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-shelf-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-shelf-row .grow {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.file-shelf-recent .chips,
+.file-shelf-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-shelf-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-shelf-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.file-shelf-item:last-child {
+  border-bottom: 0;
+}
+
+.file-shelf-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.file-shelf-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-shelf-target {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.file-shelf-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.file-shelf-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file-shelf-confirm {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--sunken);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  animation: view-in 0.16s var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-shelf-confirm {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .file-shelf-main {
+    flex-direction: column;
+  }
+}
+
+/* Interruptible animation slots (src/ui/anim-state.ts). Script drives --anim-progress 0..1 per frame from the
+   machine, so a change mid-fade continues from the current value; there are no CSS transitions to overlap. */
+.anim-slot {
+  opacity: var(--anim-progress, 1);
+  transform: translateY(calc((1 - var(--anim-progress, 1)) * 4px));
+}
+
+.stage-status {
+  display: inline-flex;
+  align-self: center;
+  margin: 6px auto 0;
+  padding: 2px 10px;
+  font: 600 11px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.scene[data-anim-phase="entering"],
+.scene[data-anim-phase="exiting"],
+.scene[data-anim-phase="interrupted"] {
+  opacity: calc(0.3 + 0.7 * var(--anim-progress, 1));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-slot {
+    opacity: 1;
+    transform: none;
+  }
+
+  .scene[data-anim-phase="entering"],
+  .scene[data-anim-phase="exiting"],
+  .scene[data-anim-phase="interrupted"] {
+    opacity: 1;
+  }
+}
+
+:root[data-motion="reduced"] .anim-slot {
+  opacity: 1;
+  transform: none;
+}
+
 @media (max-width: 1000px) {
   .home-widgets {
     grid-template-columns: minmax(0, 1fr);

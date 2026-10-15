@@ -13,7 +13,36 @@ import type {OcrResult,OcrStatus} from '../../electron/services/ocr';
 export type {OcrResult,OcrStatus};
 export type Mode='offline'|'online';
 export type Capability={id:string;name:string;available:boolean;reason?:string};
-export type Settings={onboarded:boolean;mode:Mode;theme:'graphite'|'nebula'|'paper';reduceMotion:boolean;startInTray:boolean;localModel:string;localEndpoint:string;cloudModel:string;voice:string;allowedRoots:string[];approvedApps:string[];retainDays:number};
+/** Optional cloud chat providers. Each is reached only in online mode, only with that provider's own stored key. */
+export type CloudProvider='anthropic'|'openai'|'openrouter';
+/** host is a display name for the single origin the network guard allows for that provider's chat endpoint. */
+export type CloudProviderInfo={id:CloudProvider;name:string;host:string;defaultModel:string;capability:string};
+export const CLOUD_PROVIDERS:readonly CloudProviderInfo[]=[
+ {id:'anthropic',name:'Anthropic',host:'api.anthropic.com',defaultModel:'claude-haiku-4-5',capability:'Claude models through the Messages API; streamed text replies.'},
+ {id:'openai',name:'OpenAI',host:'api.openai.com',defaultModel:'gpt-4o-mini',capability:'GPT models through the Chat Completions API; streamed text replies.'},
+ {id:'openrouter',name:'OpenRouter',host:'openrouter.ai',defaultModel:'openai/gpt-4o-mini',capability:'Many vendors behind one key (model ids look like vendor/model); streamed text replies.'},
+];
+export const DEFAULT_CLOUD_PROVIDER:CloudProvider='anthropic';
+export const isCloudProvider=(v:unknown):v is CloudProvider=>typeof v==='string'&&CLOUD_PROVIDERS.some((p)=>p.id===v);
+export const cloudProviderInfo=(p:unknown):CloudProviderInfo=>CLOUD_PROVIDERS.find((x)=>x.id===p)??CLOUD_PROVIDERS[0];
+/**
+ * The model id actually sent to a provider: the configured cloudModel unless it is empty or clearly belongs to another
+ * provider family (claude-* is Anthropic, vendor/model is OpenRouter, gpt-/o1/o3/o4/chatgpt- is OpenAI); then the provider default.
+ */
+export function effectiveCloudModel(provider:unknown,cloudModel:unknown):string{
+ const info=cloudProviderInfo(provider);
+ const m=typeof cloudModel==='string'?cloudModel.trim():'';
+ if(!m)return info.defaultModel;
+ const slash=m.includes('/'),claude=/^claude/i.test(m),gpt=/^(gpt-|chatgpt-|o[134](-|$))/i.test(m);
+ if(info.id==='anthropic')return slash||gpt?info.defaultModel:m;
+ if(info.id==='openai')return slash||claude?info.defaultModel:m;
+ return slash?m:info.defaultModel;
+}
+/** Per-provider key status for the renderer. Never carries a key. keyChannel says how keys are stored for this provider in this build. */
+export type CloudProviderStatus={provider:CloudProvider;name:string;hasKey:boolean|null;origin:string;defaultModel:string;keyChannel?:'per-provider'|'legacy'|'unavailable';reason?:string};
+/** Per-provider key methods are required in the full host; partial preview clients may omit them. */
+export type CloudProviderMethod='cloudProviderStatus'|'setProviderKey'|'clearProviderKey';
+export type Settings={onboarded:boolean;mode:Mode;theme:'graphite'|'nebula'|'paper';reduceMotion:boolean;startInTray:boolean;localModel:string;localEndpoint:string;cloudModel:string;/** Always present in state parsed by the backend (defaults to 'anthropic'); optional only so older literal Settings still type-check. */cloudProvider?:CloudProvider;voice:string;allowedRoots:string[];approvedApps:string[];retainDays:number};
 export type Capsule={id:string;name:string;description:string;scene:string;createdAt:string;updatedAt:string;items:{kind:'file'|'folder'|'url'|'app';target:string;label:string}[];windows?:{title:string;process:string;x:number;y:number;width:number;height:number}[]};
 export type Note={id:string;title:string;body:string;tags:string[];updatedAt:string};
 export type Task={id:string;title:string;done:boolean;due?:string;createdAt:string};
@@ -21,8 +50,19 @@ export type ChatMessage={id:string;role:'user'|'assistant';text:string;createdAt
 export type Activity={id:string;at:string;kind:string;summary:string;details?:string};
 export type AppState={settings:Settings;capsules:Capsule[];notes:Note[];tasks:Task[];chat:ChatMessage[];activity:Activity[]};
 export type SystemInfo={platform:string;arch:string;ramGB:number;cpu:string;capabilities:Capability[]};
+/** Where a battery/power reading came from. 'unmeasured' means nobody could read it; nothing is estimated. */
+export type BatterySource='host'|'navigator'|'unmeasured';
+/** Host power state (Electron powerMonitor). onBattery is null when unmeasured. The host never reports a percentage. */
+export type HostBatteryStatus={source:BatterySource;onBattery:boolean|null;measuredAt:string};
 export type ActionRequest={type:'launch'|'focus'|'move-window'|'type-text'|'click'|'open-url'|'list-windows';target?:string;text?:string;x?:number;y?:number;width?:number;height?:number};
 export type ActionPreview={id:string;summary:string;requiresApproval:boolean;allowed:boolean;reason?:string};
+/**
+ * open-path / reveal-folder (additive): target is the exact absolute local path. Same previewAction/executeAction
+ * preview-id + approval flow as ActionRequest. Kept as a separate member so existing Record<ActionRequest['type'],…> maps stay exhaustive.
+ */
+export type PathActionType='open-path'|'reveal-folder';
+export type PathActionRequest={type:PathActionType;target:string};
+export type AnyActionRequest=ActionRequest|PathActionRequest;
 // API v2 additions (backwards compatible: every new JarvisAPI method is optional, so older bridges still type-check).
 /** Offline intent plan. 'ready' is only a preview candidate: it never authorizes or runs anything. */
 export type IntentField='target'|'text'|'x'|'y'|'width'|'height'|'url'|'command';
@@ -61,11 +101,13 @@ export interface JarvisAPI {
  saveCapsule(capsule:Partial<Capsule>):Promise<AppState>;deleteCapsule(id:string):Promise<AppState>;restoreCapsule(id:string):Promise<{opened:string[];failed:{target:string;reason:string}[]}>;
  saveNote(note:Partial<Note>):Promise<AppState>;deleteNote(id:string):Promise<AppState>;saveTask(task:Partial<Task>):Promise<AppState>;deleteTask(id:string):Promise<AppState>;
  chat(text:string):Promise<ChatMessage>;clearChat():Promise<AppState>;setCloudKey(key:string):Promise<{configured:boolean}>;cloudKeyStatus():Promise<{configured:boolean}>;deleteCloudKey():Promise<void>;
- previewAction(action:ActionRequest):Promise<ActionPreview>;executeAction(previewId:string,approved:boolean):Promise<unknown>;
+ previewAction(action:AnyActionRequest):Promise<ActionPreview>;executeAction(previewId:string,approved:boolean):Promise<unknown>;
  speak(text:string):Promise<{ok:boolean;reason?:string}>;transcribe(audio:number[]):Promise<{text:string;reason?:string}>;
  exportData():Promise<{path:string|null}>;importData():Promise<AppState>;pickPath(kind:'file'|'folder'):Promise<string|null>;onActivity(handler:(activity:Activity)=>void):()=>void;
  /** v2, optional. Absent in the browser preview bridge; callers must check before use. */
  getApiInfo?():Promise<ApiInfo>;
+ /** Per-provider cloud keys (goal 102), optional. Provider ids are validated before any secret is touched; keys are never returned. */
+ cloudProviderStatus?():Promise<CloudProviderStatus[]>;setProviderKey?(provider:CloudProvider,key:string):Promise<{provider:CloudProvider;configured:boolean}>;clearProviderKey?(provider:CloudProvider):Promise<{provider:CloudProvider;configured:boolean}>;
  planIntent?(command:string,options?:IntentOptions):Promise<IntentPlan>;
  search?(query:string,options?:SearchOptions):Promise<SearchResult[]>;
  listLocalModels?():Promise<LocalModelList>;
@@ -111,4 +153,10 @@ export type UsagePerformanceRow={tokensPerSecond:number|null;eventId:string;at:s
 export type UsageSummary={report:UsageReport;performance:UsagePerformanceRow[]};
 /** The Electron preload implements every method. */
 export type FullJarvisAPI=Required<JarvisAPI>;
-declare global{interface Window{jarvis:JarvisAPI}}
+/**
+ * Read-only host power state (on battery or on AC) from Electron powerMonitor; no percentage. Exposed by the preload as
+ * window.jarvisHost, separate from the backend METHOD table: main pushes the state to the trusted page and the preload keeps
+ * the latest value. hostBattery() returns it (unmeasured until the first push); onHostBattery delivers changes and returns an unsubscribe.
+ */
+export interface HostBatteryAPI{hostBattery?():Promise<HostBatteryStatus>;onHostBattery?(handler:(status:HostBatteryStatus)=>void):()=>void}
+declare global{interface Window{jarvis:JarvisAPI;jarvisHost?:HostBatteryAPI}}

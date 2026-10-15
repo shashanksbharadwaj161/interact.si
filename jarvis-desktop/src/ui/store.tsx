@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AppState, JarvisAPI, Settings, SystemInfo } from '../shared/contracts';
 import { errMsg } from './util';
+import { applyAssociation, buildAssociationSessions, toAssociationOp, type AssociationChange } from './session-association';
 // Type-only imports: erased at build time, so no Node-side module reaches the renderer bundle.
 import type { ProductivityOp, ProductivityState } from '../../electron/services/store';
 import type { PackImport, PathMapping, PathRoot, RestorePreview } from '../../electron/services/capsules';
@@ -43,6 +44,8 @@ type Store = {
   /** Apply one validated sidecar operation, then refresh. Resolves true on success. */
   applyProductivity: (op: ProductivityOp, okMessage?: string) => Promise<boolean>;
   refreshProductivity: () => Promise<void>;
+  /** Goal 36: user correction of a session's task/project link, validated by applyAssociation and persisted through association.set / association.clear so it survives reload. */
+  setSessionAssociation: (sessionId: string, change: AssociationChange) => Promise<boolean>;
   isPreview: boolean;
   status: LoadStatus;
   loadError: string | null;
@@ -240,6 +243,27 @@ export function AppProvider({ api, isPreview, children }: { api: JarvisAPI; isPr
     [api, toast],
   );
 
+  const setSessionAssociation = useCallback(
+    async (sessionId: string, change: AssociationChange) => {
+      if (!productivity) {
+        toast('error', 'Local productivity data is not loaded yet.');
+        return false;
+      }
+      let op: ReturnType<typeof toAssociationOp>;
+      try {
+        const next = applyAssociation(buildAssociationSessions(productivity), sessionId, change, { tasks: state?.tasks ?? [], capsules: state?.capsules ?? [], now: new Date().toISOString() });
+        const session = next.find((s) => s.id === sessionId);
+        if (!session) throw new Error(`Unknown session id: ${sessionId}`);
+        op = toAssociationOp(session);
+      } catch (e) {
+        toast('error', errMsg(e));
+        return false;
+      }
+      return applyProductivity(op, op.op === 'association.set' ? 'Association saved; marked as corrected by you.' : 'Association cleared.');
+    },
+    [productivity, state, toast, applyProductivity],
+  );
+
   const value = useMemo<Store>(
     () => ({
       api,
@@ -248,6 +272,7 @@ export function AppProvider({ api, isPreview, children }: { api: JarvisAPI; isPr
       productivityError,
       applyProductivity,
       refreshProductivity,
+      setSessionAssociation,
       isPreview,
       status,
       loadError,
@@ -266,7 +291,7 @@ export function AppProvider({ api, isPreview, children }: { api: JarvisAPI; isPr
       mutate,
       run,
     }),
-    [api, productivityApi, productivity, productivityError, applyProductivity, refreshProductivity, isPreview, status, loadError, state, system, systemError, systemLoading, cloudConfigured, toasts, toast, dismissToast, reload, refreshSystem, refreshCloud, mutate, run],
+    [api, productivityApi, productivity, productivityError, applyProductivity, refreshProductivity, setSessionAssociation, isPreview, status, loadError, state, system, systemError, systemLoading, cloudConfigured, toasts, toast, dismissToast, reload, refreshSystem, refreshCloud, mutate, run],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

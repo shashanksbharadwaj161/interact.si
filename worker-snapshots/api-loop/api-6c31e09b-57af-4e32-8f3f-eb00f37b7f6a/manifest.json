@@ -1,0 +1,16 @@
+{
+  "task": "Loop 30: document-explain-ai",
+  "sessionId": "api-6c31e09b-57af-4e32-8f3f-eb00f37b7f6a",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/PromptTools.tsx",
+      "bytes": 48363,
+      "sha256": "c701d2b636a84cae89ff3c584fd796a3833fbba0896ea3f47bf570610bcd2b21"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

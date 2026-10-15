@@ -7,6 +7,11 @@ import {LIMITS, ValidationError, defaultState, parseState} from './validation';
 import {normalizeAbsolutePath} from './paths';
 import {validateOpenUrl} from './policy';
 import {PRODUCTIVITY_LIMITS} from './portable';
+import {AtRestError, isEncryptedBlob, unwrapEncrypted, wrapEncrypted, type AtRestCipher} from './atRest';
+
+export const AT_REST_MIGRATED_MESSAGE = 'Local data is now encrypted at rest with an operating-system protected key';
+export const AT_REST_LOCKED_WARNING = 'Local data is encrypted for another user profile or the protection key is unavailable; nothing was changed';
+const BACKUP_NAME_RE = /^(state|pre-import)-\d{8}-\d{6}\.json$/;
 
 // Settings that grant reach or change where data goes. An import must never change them (see importDocument).
 const SECURITY_SETTING_KEYS = ['mode', 'allowedRoots', 'approvedApps', 'localEndpoint', 'cloudModel'] as const;
@@ -53,6 +58,8 @@ export interface StoreOptions {
   fs?: StoreFs;
   now?: () => Date;
   newId?: () => string;
+  /** At-rest protector for state.json and backups. When absent or unavailable, plaintext files are read and written as before. */
+  cipher?: AtRestCipher;
 }
 
 export interface LoadResult { recovered: boolean; readOnly: boolean; warning?: string }
@@ -95,12 +102,50 @@ export class Store {
   private readOnly = false;
   private lastBackup = 0;
   private listeners = new Set<(a: Activity) => void>();
+  private cipher?: AtRestCipher;
+  /** True once data is encrypted on disk: from then on it is never written back as plaintext. */
+  private atRest = false;
+  /** Read-only because the file is encrypted and the protection key is unavailable. */
+  private keyLocked = false;
+  /** In-memory state is placeholder defaults (the real file could not be read); it must never be backed up. */
+  private placeholder = false;
 
   constructor(opts: StoreOptions) {
     this.dir = opts.dir;
     this.fs = opts.fs ?? nodeStoreFs;
     this.now = opts.now ?? (() => new Date());
     this.newId = opts.newId ?? (() => randomUUID());
+    this.cipher = opts.cipher;
+  }
+
+  private cipherReady(): boolean {
+    try { return !!this.cipher && this.cipher.available() === true; } catch { return false; }
+  }
+
+  /** Text written to state.json and backups: encrypted when the protector is available. Never downgrades to plaintext. */
+  private encode(json: string): string {
+    if (this.cipherReady()) {
+      try {
+        const blob = wrapEncrypted(json, this.cipher);
+        this.atRest = true;
+        return blob;
+      } catch (e) {
+        // A protector that reports ready but cannot encrypt is treated as unavailable, unless data is already encrypted.
+        if (this.atRest) throw e;
+        return json;
+      }
+    }
+    if (this.atRest) throw new AtRestError('unavailable', 'The operating-system protection key is unavailable');
+    return json;
+  }
+
+  /** Decrypts an encrypted state/backup file; plaintext (legacy) content is returned unchanged. */
+  private decode(raw: string): string {
+    return isEncryptedBlob(raw) ? unwrapEncrypted(raw, this.cipher) : raw;
+  }
+
+  private readOnlyMessage(): string {
+    return this.keyLocked ? 'Data is read-only because the protection key for local data is unavailable' : 'Data is read-only because it was written by a newer version';
   }
 
   get statePath() { return path.join(this.dir, 'state.json'); }
@@ -122,11 +167,38 @@ export class Store {
     let result: LoadResult = {recovered: false, readOnly: false};
     let raw: string | null = null;
     try { raw = await this.fs.readFile(this.statePath); } catch { raw = null; }
+    let migrate = false;
+    let text: string | null = raw;
+    if (raw !== null && isEncryptedBlob(raw)) {
+      text = null;
+      if (!this.cipherReady()) return this.lockReadOnly();
+      try {
+        text = unwrapEncrypted(raw, this.cipher);
+        this.atRest = true;
+      } catch (e) {
+        const why = e instanceof AtRestError ? e.message : 'Encrypted data could not be read';
+        if (e instanceof AtRestError && e.kind === 'version') {
+          // An encrypted format from a newer version: never overwrite or "recover" it.
+          this.readOnly = true;
+          this.placeholder = true;
+          this.state = defaultState();
+          return {recovered: false, readOnly: true, warning: 'Data was written by a newer version of Desktop Companion and cannot be read; nothing was changed.'};
+        }
+        // A well-formed blob that does not decrypt is either damaged or protected by another profile's key. If a
+        // backup decrypts, the key works and the main file is damaged: recover. Otherwise never touch anything.
+        if (e instanceof AtRestError && e.kind === 'key' && !(await this.newestBackup())) return this.lockReadOnly();
+        this.atRest = true;
+        result = await this.recover(raw, why);
+      }
+    } else if (raw !== null && this.cipherReady()) {
+      // Only announce the migration when the protector can really encrypt (a quick round-trip probe).
+      try { migrate = unwrapEncrypted(wrapEncrypted('probe', this.cipher), this.cipher) === 'probe'; } catch { migrate = false; }
+    }
     if (raw === null) {
       this.state = defaultState();
-    } else {
+    } else if (text !== null) {
       let env: ReturnType<typeof parseEnvelope> | null = null;
-      try { env = parseEnvelope(raw); } catch (e) { result = await this.recover(raw, (e as Error).message); }
+      try { env = parseEnvelope(text); } catch (e) { result = await this.recover(raw, (e as Error).message); }
       if (env) {
         const dropped: string[] = [];
         try {
@@ -150,24 +222,57 @@ export class Store {
       }
     }
     this.applyRetentionInMemory();
+    if (migrate && !this.readOnly) this.pushActivity('recovery', AT_REST_MIGRATED_MESSAGE);
     if (!this.readOnly) await this.persist();
+    if (migrate && !this.readOnly && this.atRest) await this.encryptLegacyBackups();
     return result;
+  }
+
+  /** Encrypted file, key unavailable: read-only defaults, nothing written, renamed or recovered. */
+  private lockReadOnly(): LoadResult {
+    this.readOnly = true;
+    this.keyLocked = true;
+    this.placeholder = true;
+    this.state = defaultState();
+    return {recovered: false, readOnly: true, warning: AT_REST_LOCKED_WARNING};
+  }
+
+  /** Best effort after migration: rewrites plaintext backups (rolling and pre-import) as encrypted, via tmp + rename. */
+  private async encryptLegacyBackups(): Promise<void> {
+    let names: string[] = [];
+    try { names = (await this.fs.readdir(this.backupDir)).filter((n) => BACKUP_NAME_RE.test(n)); } catch { return; }
+    for (const n of names) {
+      const file = path.join(this.backupDir, n);
+      const tmp = file + '.tmp';
+      try {
+        const raw = await this.fs.readFile(file);
+        if (isEncryptedBlob(raw)) continue;
+        await this.fs.writeFile(tmp, wrapEncrypted(raw, this.cipher));
+        await this.fs.rename(tmp, file);
+      } catch {
+        await this.fs.unlink(tmp).catch(() => undefined);
+      }
+    }
+  }
+
+  /** Newest readable rolling backup (each candidate is decrypted when encrypted), or null. */
+  private async newestBackup(): Promise<AppState | null> {
+    let names: string[] = [];
+    try { names = (await this.fs.readdir(this.backupDir)).filter((n) => /^state-\d{8}-\d{6}\.json$/.test(n)).sort().reverse(); } catch { names = []; }
+    for (const n of names) {
+      try {
+        const env = parseEnvelope(this.decode(await this.fs.readFile(path.join(this.backupDir, n))));
+        if (env.schemaVersion > SCHEMA_VERSION) continue;
+        return parseState(env.state, {lenient: true});
+      } catch { /* try older */ }
+    }
+    return null;
   }
 
   private async recover(badRaw: string, why: string): Promise<LoadResult> {
     const corrupt = path.join(this.dir, `state.corrupt-${stamp(this.now())}.json`);
     try { await this.fs.writeFile(corrupt, badRaw); } catch { /* best effort */ }
-    let recovered: AppState | null = null;
-    let names: string[] = [];
-    try { names = (await this.fs.readdir(this.backupDir)).filter((n) => /^state-\d{8}-\d{6}\.json$/.test(n)).sort().reverse(); } catch { names = []; }
-    for (const n of names) {
-      try {
-        const env = parseEnvelope(await this.fs.readFile(path.join(this.backupDir, n)));
-        if (env.schemaVersion > SCHEMA_VERSION) continue;
-        recovered = parseState(env.state, {lenient: true});
-        break;
-      } catch { /* try older */ }
-    }
+    const recovered = await this.newestBackup();
     this.state = recovered ?? defaultState();
     this.pushActivity('recovery', recovered ? 'State file was corrupt; restored from the newest valid backup' : 'State file was corrupt and no valid backup exists; started with defaults', why.slice(0, 200));
     return {recovered: true, readOnly: false, warning: recovered ? 'Saved data was damaged and restored from a backup.' : 'Saved data was damaged and could not be recovered; defaults were loaded.'};
@@ -181,7 +286,7 @@ export class Store {
   private async persist(): Promise<void> {
     const tmp = this.statePath + '.tmp';
     try {
-      await this.fs.writeFile(tmp, JSON.stringify(this.envelope()));
+      await this.fs.writeFile(tmp, this.encode(JSON.stringify(this.envelope())));
       // Windows can briefly lock the target (antivirus, indexer); retry the rename a few times.
       for (let attempt = 0; ; attempt++) {
         try { await this.fs.rename(tmp, this.statePath); break; } catch (e) {
@@ -204,7 +309,7 @@ export class Store {
 
   /** Must run inside the queue. fn mutates a clone; on throw nothing changes in memory or on disk. */
   private async applyMutation(fn: (draft: AppState) => void): Promise<AppState> {
-    if (this.readOnly) throw new ValidationError('Data is read-only because it was written by a newer version');
+    if (this.readOnly) throw new ValidationError(this.readOnlyMessage());
     const draft = structuredClone(this.state);
     fn(draft);
     draft.chat = draft.chat.slice(-LIMITS.chatMessages);
@@ -293,10 +398,12 @@ export class Store {
   }
 
   async backup(kind: 'auto' | 'pre-import' = 'auto'): Promise<string> {
+    // Defaults shown while the key is unavailable must never become a "newer" backup than the real data.
+    if (this.placeholder) throw new ValidationError(this.readOnlyMessage());
     await this.fs.mkdir(this.backupDir);
     const name = `${kind === 'auto' ? 'state' : 'pre-import'}-${stamp(this.now())}.json`;
     const file = path.join(this.backupDir, name);
-    await this.fs.writeFile(file, JSON.stringify(this.envelope()));
+    await this.fs.writeFile(file, this.encode(JSON.stringify(this.envelope())));
     this.lastBackup = this.now().getTime();
     await this.rotate().catch(() => undefined);
     return file;
@@ -337,7 +444,7 @@ export class Store {
     if (env.schemaVersion > SCHEMA_VERSION) throw new ValidationError('Export was created by a newer version of Desktop Companion');
     const dropped: string[] = [];
     const next = parseState(env.state, {lenient: true, dropped});
-    if (this.readOnly) throw new ValidationError('Data is read-only because it was written by a newer version');
+    if (this.readOnly) throw new ValidationError(this.readOnlyMessage());
     return this.enqueue(async () => {
       await this.backup('pre-import');
       return this.applyMutation((d) => {

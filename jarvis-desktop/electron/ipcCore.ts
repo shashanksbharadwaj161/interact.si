@@ -2,7 +2,7 @@
 // plus the small pure policies main.ts needs (file-request confinement, dev URL, trusted confirmation).
 import * as nodePath from 'node:path';
 import type {ChatMessage, ChatStreamBatch, ChatStreamEvent, ChatStreamOutcome, ChatStreamRoute, ChatStreamStart, JarvisAPI} from '../src/shared/contracts';
-import {ARITY, METHODS, type MethodName} from './channels';
+import {ARITY, METHODS, CLOUD_PROVIDER_IDS, type MethodName} from './channels';
 import {MAX_COMMAND_CHARS} from './services/intent';
 import {LIMITS} from './services/validation';
 
@@ -174,6 +174,9 @@ export const ARG_SPECS: Record<MethodName, readonly ArgSpec[]> = {
   saveNote: [OBJ], deleteNote: [ID], saveTask: [OBJ], deleteTask: [ID],
   chat: [{kind: 'string', max: LIMITS.chat}], clearChat: [],
   setCloudKey: [{kind: 'string', min: 1, max: 4096}], cloudKeyStatus: [], deleteCloudKey: [],
+  cloudProviderStatus: [],
+  setProviderKey: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}, {kind: 'string', min: 1, max: 4096}],
+  clearProviderKey: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}],
   // The renderer may only propose. `approved` must be a real boolean; the native confirmation still decides.
   previewAction: [OBJ], executeAction: [ID, {kind: 'boolean'}],
   speak: [{kind: 'string', max: LIMITS.speakChars}],

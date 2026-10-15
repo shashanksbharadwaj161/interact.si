@@ -1,0 +1,21 @@
+{
+  "task": "Loop 18: scene-spec-validate",
+  "sessionId": "api-dd95393b-0323-454a-bace-bad72e6f47b3",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/MotionStudio.tsx",
+      "bytes": 59677,
+      "sha256": "18d6e7cee74e0bf591890846c73fbc6ace5dd04768058ccc3de3420aeef05cb9"
+    },
+    {
+      "path": "src/styles/motion-studio.css",
+      "bytes": 6154,
+      "sha256": "49fed2d6735c919e3b338d0c9511f28c8c0ad6fdcba9d024a987fe9009e0477f"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

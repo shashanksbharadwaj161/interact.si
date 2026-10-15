@@ -1,0 +1,16 @@
+{
+  "task": "Loop 14: error-diagnosis-proposals",
+  "sessionId": "api-0951be91-e698-4c69-ab60-cc5acdf3832c",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Assistant.tsx",
+      "bytes": 66119,
+      "sha256": "0c4851bf7a36f3c6d8345ee0d6f60c1c26835248a5de33a5676f6d31bb4d6064"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

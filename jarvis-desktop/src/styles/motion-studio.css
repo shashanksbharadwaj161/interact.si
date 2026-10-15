@@ -267,6 +267,20 @@
   gap: 10px;
 }
 
+.motion-clip-json {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.motion-clip-summary {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .motion-key-list {
   display: grid;
   gap: 6px;
@@ -295,4 +309,44 @@
   .motion-layer-opacity {
     grid-column: 1 / 3;
   }
+}
+
+/* Describe a scene (feature 139) */
+.motion-spec-preview,
+.motion-spec-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+}
+
+.motion-spec-error {
+  color: var(--danger, #c0392b);
+}
+
+/* Generate with AI (goals 80/139) */
+.motion-ai-prompt {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.motion-ai-live pre {
+  max-height: 140px;
+  overflow: auto;
+}
+
+.motion-ai-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+}
+
+.motion-ai-summary .motion-swatch {
+  display: inline-block;
+  vertical-align: middle;
 }

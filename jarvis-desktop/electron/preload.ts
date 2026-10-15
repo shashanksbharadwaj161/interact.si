@@ -1,8 +1,9 @@
-// Sandboxed preload: exposes exactly the typed JarvisAPI surface and nothing else. No logic, no Node APIs.
+// Sandboxed preload: exposes exactly the typed JarvisAPI surface (window.jarvis) plus the read-only HostBatteryAPI
+// (window.jarvisHost) and nothing else. No Node APIs.
 import {contextBridge, ipcRenderer} from 'electron';
 import type {Activity, FullJarvisAPI} from '../src/shared/contracts';
-import {ACTIVITY_CHANNEL, channel} from './channels';
-import {productivityBridge, subscribeChatStream} from '../src/ui/bridges';
+import {ACTIVITY_CHANNEL, HOST_BATTERY_EVENT, channel} from './channels';
+import {createHostBatteryApi, productivityBridge, subscribeChatStream} from '../src/ui/bridges';
 
 const call = <T>(method: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(channel(method), ...args) as Promise<T>;
 
@@ -30,6 +31,10 @@ const flat: Omit<FullJarvisAPI, 'productivity'> = {
   importData: () => call('importData'),
   pickPath: (kind) => call('pickPath', kind),
   getApiInfo: () => call('getApiInfo'),
+  // Per-provider cloud keys: only a provider id and (for set) the key go in; only booleans and provider metadata come back.
+  cloudProviderStatus: () => call('cloudProviderStatus'),
+  setProviderKey: (provider, key) => call('setProviderKey', provider, key),
+  clearProviderKey: (provider) => call('clearProviderKey', provider),
   // Optional arguments are forwarded only when given, so the main-process arity/shape check sees exactly what the caller passed.
   planIntent: (command, options) => (options === undefined ? call('planIntent', command) : call('planIntent', command, options)),
   search: (query, options) => (options === undefined ? call('search', query) : call('search', query, options)),
@@ -75,3 +80,12 @@ if (!productivity) throw new Error('Productivity bridge is incomplete');
 const api: FullJarvisAPI = {...flat, productivity};
 
 contextBridge.exposeInMainWorld('jarvis', api);
+
+// Read-only host power state, kept apart from the backend method table. Main pushes it (trusted page only); nothing is
+// ever sent from here. The latest valid value is cached so the renderer can read it at any time.
+const jarvisHost = createHostBatteryApi((listener) => {
+  const l = (_e: unknown, s: unknown) => listener(s);
+  ipcRenderer.on(HOST_BATTERY_EVENT, l);
+  return () => { ipcRenderer.removeListener(HOST_BATTERY_EVENT, l); };
+});
+contextBridge.exposeInMainWorld('jarvisHost', jarvisHost);

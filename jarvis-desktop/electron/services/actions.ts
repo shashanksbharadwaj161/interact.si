@@ -1,10 +1,17 @@
 // previewAction / executeAction. Previews never execute. Execution needs a live, single-use, approved preview,
 // re-evaluates policy, and for window-scoped actions re-verifies the exact window and process that were approved.
 import * as nodePath from 'node:path';
-import type {ActionPreview, ActionRequest, Settings} from '../../src/shared/contracts';
+import type {ActionPreview, ActionRequest, AnyActionRequest, Settings} from '../../src/shared/contracts';
 import type {NativeAdapter, WindowInfo} from '../native/adapter';
-import {FsLike, isBareExeName, normalizeAbsolutePath, realFs, visibleText} from './paths';
+import {FsLike, isBareExeName, isInside, isOpenableFileExtension, normalizeAbsolutePath, realFs, resolveInsideRoots, visibleText} from './paths';
 import {Authorization, LaunchPlan, authorizeTarget, checkWindowPolicy, describeTypedText, selectWindow, validateActionRequest} from './policy';
+import {validatePathActionRequest} from './validation';
+
+/** File types open-path refuses outright: executables, scripts, installers and shortcuts must go through approvedApps. */
+export const EXECUTABLE_EXTENSIONS = ['.exe', '.bat', '.cmd', '.ps1', '.psm1', '.msi', '.msp', '.scr', '.lnk', '.com', '.pif', '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.hta', '.cpl', '.msc', '.reg', '.url', '.appref-ms', '.jar'];
+export const EXECUTABLE_REASON = 'Executable files, scripts, installers and shortcuts cannot be opened with open-path; add the app to the approved apps instead';
+export const LINK_ESCAPE_REASON = 'Target resolves through a link to a location outside the allowed folders';
+const isExecutablePath = (p: string) => EXECUTABLE_EXTENSIONS.includes(nodePath.win32.extname(p).toLowerCase());
 
 const w = nodePath.win32;
 
@@ -24,6 +31,8 @@ export interface ShellAdapter {
   /** Returns '' on success or an error message, like Electron's shell.openPath. */
   openPath(p: string): Promise<string>;
   spawnApp(exePath: string): Promise<void>;
+  /** Electron shell.showItemInFolder. When absent, reveal-folder opens the containing folder with openPath instead. */
+  showItemInFolder?(p: string): void;
 }
 
 export interface ActionDeps {
@@ -48,13 +57,15 @@ type Plan =
   | {kind: 'launch-path'; path: string; isDirectory: boolean; sig?: string}
   | {kind: 'launch-app'; entry: string; exe: string; sig?: string}
   | {kind: 'list-windows'}
+  | {kind: 'open-path'; path: string; isDirectory: boolean; sig?: string}
+  | {kind: 'reveal-folder'; path: string; isDirectory: boolean}
   | {kind: 'focus'; win: WindowTarget}
   | {kind: 'move-window'; win: WindowTarget; x: number; y: number; width: number; height: number}
   | {kind: 'type-text'; win: WindowTarget; text: string}
   | {kind: 'click'; win: WindowTarget; x: number; y: number};
 
 interface Evaluation { allowed: boolean; reason?: string; summary: string; requiresApproval: boolean; plan?: Plan }
-interface Entry { req: ActionRequest; ev: Evaluation; expiresAt: number; createdAt: number }
+interface Entry { req: AnyActionRequest; ev: Evaluation; expiresAt: number; createdAt: number }
 
 const clip = (s: string, n = 80) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 /** Window label for a trusted preview: hidden and direction-changing characters in the title are made visible. */
@@ -116,7 +127,7 @@ export class ActionService {
   }
 
   /** Builds the decision for a request using live settings and (for window actions) live window data. */
-  private async evaluate(req: ActionRequest): Promise<Evaluation> {
+  private async evaluate(req: AnyActionRequest): Promise<Evaluation> {
     const deny = (summary: string, reason: string, requiresApproval = true): Evaluation => ({allowed: false, reason, summary, requiresApproval});
     if (this.d.safeLaunch()) return deny(`Blocked ${req.type}`, 'Safe launch is active: actions are disabled until Desktop Companion is restarted normally');
     const s = this.d.settings();
@@ -137,9 +148,44 @@ export class ActionService {
         if (!plan) return deny('Start approved app', 'The approved app could not be found on this computer');
         return {allowed: true, summary: plan.kind === 'launch-app' ? `Start approved app ${plan.exe}` : this.launchSummary(a), requiresApproval: true, plan};
       }
+      case 'open-path': case 'reveal-folder': {
+        return this.evaluatePathAction(req.type, req.target ?? '', s);
+      }
       default:
         return this.evaluateWindowAction(req);
     }
+  }
+
+  /**
+   * open-path / reveal-folder: the exact path must be a local drive path that exists inside an allowed folder after
+   * resolving links. open-path refuses executables, scripts, installers and shortcuts. Nothing is opened here.
+   */
+  private async evaluatePathAction(type: 'open-path' | 'reveal-folder', target: string, s: Settings): Promise<Evaluation> {
+    const shown = clip(visibleText(target), 120);
+    const summary = type === 'open-path' ? `Open ${shown}` : `Show ${shown} in File Explorer`;
+    const deny = (reason: string): Evaluation => ({allowed: false, reason, summary, requiresApproval: true});
+    const n = normalizeAbsolutePath(target);
+    if ('error' in n) return deny(n.error);
+    if (type === 'open-path' && isExecutablePath(n.path)) return deny(EXECUTABLE_REASON);
+    const r = await resolveInsideRoots(n.path, s.allowedRoots, this.fs, {allowDangerousFiles: true});
+    if (!r.ok) {
+      const lexicallyInside = s.allowedRoots.some((root) => {
+        const nr = normalizeAbsolutePath(root);
+        return !('error' in nr) && isInside(nr.path, n.path);
+      });
+      return deny(lexicallyInside && r.reason === 'Target is outside the allowed folders' ? LINK_ESCAPE_REASON : r.reason);
+    }
+    const what = r.isDirectory ? 'folder' : 'file';
+    if (type === 'reveal-folder') {
+      return {allowed: true, summary: `Show ${what} ${clip(visibleText(r.path), 120)} in File Explorer`, requiresApproval: true, plan: {kind: 'reveal-folder', path: r.path, isDirectory: r.isDirectory}};
+    }
+    if (!r.isDirectory) {
+      if (isExecutablePath(r.path)) return deny(EXECUTABLE_REASON);
+      if (!isOpenableFileExtension(r.path)) return deny('This file type cannot be opened directly (only documents, images, audio, video and archives); add an app to the approved apps instead');
+    }
+    let sig: string | undefined;
+    if (!r.isDirectory) { try { sig = fileSig(await this.fs.stat(r.path)); } catch { /* no fingerprint available */ } }
+    return {allowed: true, summary: `Open ${what} ${clip(visibleText(r.path), 120)} with its default handler`, requiresApproval: true, plan: {kind: 'open-path', path: r.path, isDirectory: r.isDirectory, ...(sig ? {sig} : {})}};
   }
 
   private launchSummary(a: Extract<Authorization, {ok: true}>): string {
@@ -197,7 +243,7 @@ export class ActionService {
   }
 
   async preview(raw: unknown): Promise<ActionPreview> {
-    const req = validateActionRequest(raw);
+    const req: AnyActionRequest = validatePathActionRequest(raw) ?? validateActionRequest(raw);
     const t = this.now();
     this.previewed = this.previewed.filter((x) => t - x < 60_000);
     if (this.previewed.length >= MAX_PREVIEWS_PER_MINUTE) throw new Error(`Too many action previews (max ${MAX_PREVIEWS_PER_MINUTE} per minute)`);
@@ -284,7 +330,7 @@ export class ActionService {
     if (this.d.safeLaunch()) return {reason: 'Safe launch is active'};
     switch (plan.kind) {
       case 'list-windows': return {plan};
-      case 'open-url': case 'launch-app': case 'launch-path': {
+      case 'open-url': case 'launch-app': case 'launch-path': case 'open-path': case 'reveal-folder': {
         const again = await this.evaluate(entry.req);
         if (!again.allowed || !again.plan) return {reason: `Policy changed since the preview: ${again.reason ?? 'not allowed'}`};
         const a = again.plan, b = plan;
@@ -297,7 +343,8 @@ export class ActionService {
         const win = windows.find((x) => x.hwnd === plan.win.hwnd);
         if (!win) return {reason: 'The approved window no longer exists (stale preview)'};
         if (win.pid !== plan.win.pid || win.process.toLowerCase() !== plan.win.process.toLowerCase()) return {reason: 'The approved window now belongs to a different process (stale preview)'};
-        const req: ActionRequest = {...entry.req, target: `hwnd:${win.hwnd}`};
+        // Window plans only ever come from window-scoped ActionRequests (path actions are handled above).
+        const req: ActionRequest = {...(entry.req as ActionRequest), target: `hwnd:${win.hwnd}`};
         const again = this.finishWindowEvaluation(req, win);
         if (!again.allowed) return {reason: again.reason};
         return {plan: again.plan};
@@ -387,6 +434,23 @@ export class ActionService {
         return {windows: ws.map((x) => ({hwnd: x.hwnd, title: x.title, process: x.process, pid: x.pid, x: x.x, y: x.y, width: x.width, height: x.height, minimized: x.minimized, maximized: x.maximized, foreground: x.foreground, protected: x.elevated !== 0}))};
       }
       case 'open-url': await this.d.shell.openExternal(plan.url); return {};
+      case 'open-path': {
+        if (!plan.isDirectory && isExecutablePath(plan.path)) throw new Error(EXECUTABLE_REASON);
+        const err = await this.d.shell.openPath(plan.path);
+        if (err) throw new Error(err);
+        return {opened: plan.path};
+      }
+      case 'reveal-folder': {
+        if (this.d.shell.showItemInFolder) {
+          this.d.shell.showItemInFolder(plan.path);
+          return {revealed: plan.path};
+        }
+        // No reveal support injected: open the containing folder (which is inside the allowed folder) instead.
+        const folder = plan.isDirectory ? plan.path : w.dirname(plan.path);
+        const err = await this.d.shell.openPath(folder);
+        if (err) throw new Error(err);
+        return {revealed: folder};
+      }
       case 'launch-app': {
         await this.d.shell.spawnApp(plan.exe);
         return {};

@@ -3,7 +3,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {usageCost,PRICING_VERSION} from './usage-cost.mjs';
 // Explicit user-approved ceiling for this development session. Persisted lower limits remain lower.
-export const MAX_APPROVED_BUDGET=500;
+export const MAX_APPROVED_BUDGET=600;
 export function taskBudgetPolicy(task){
  const budgetMode=task.budgetMode===undefined?'task':task.budgetMode;
  if(!['task','shared'].includes(budgetMode))throw new Error('Invalid task budget mode');

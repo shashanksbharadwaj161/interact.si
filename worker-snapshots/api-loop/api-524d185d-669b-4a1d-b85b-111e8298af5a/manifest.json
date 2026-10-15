@@ -17,10 +17,20 @@
       "sha256": "0d02e900ae703d80ac32c555868484d445c2b921edf7e70682e883fa795687a2"
     },
     {
+      "path": "src/components/MotionStudio.tsx",
+      "bytes": 51786,
+      "sha256": "0bb79fd07af56c1497ed4694ca9d5e755806e8dacb83cfc91c2c4415da596bb8"
+    },
+    {
+      "path": "src/styles/motion-studio.css",
+      "bytes": 5640,
+      "sha256": "545a36360d618c92f4d08c0b027b64028de6717d5398bac30ae3708a154c324e"
+    },
+    {
       "path": "tests/round13-motion-clip.test.mjs",
       "bytes": 14481,
       "sha256": "4fb7426bb82646ad05b30dba0f03d983d61a9b5583227d88ed92012091f82ca4"
     }
   ],
-  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
 }

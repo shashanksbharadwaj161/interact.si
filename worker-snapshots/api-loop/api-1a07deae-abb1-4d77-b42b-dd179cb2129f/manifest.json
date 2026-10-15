@@ -1,0 +1,36 @@
+{
+  "task": "Loop 34: host-battery-resources",
+  "sessionId": "api-1a07deae-abb1-4d77-b42b-dd179cb2129f",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/shared/contracts.ts",
+      "bytes": 15378,
+      "sha256": "7f2aa0651c2f7b1929a1960728427fef38c030b14dedf62cc57d0ac03478aca0"
+    },
+    {
+      "path": "electron/channels.ts",
+      "bytes": 4560,
+      "sha256": "5c17372ac36020a674e6cd457ae99c5a74bffbe467ff1fe999eb2e295340a7e8"
+    },
+    {
+      "path": "electron/ipc.ts",
+      "bytes": 2219,
+      "sha256": "b6910e8da50b6788b2a576c4615bc0be0b6b471fad0623c27a801af4ef52cafc"
+    },
+    {
+      "path": "electron/preload.ts",
+      "bytes": 7540,
+      "sha256": "f64747193b58fcb63a32441e0cfc122b9d910010ee7ddbe8b7004c9b18ad78a8"
+    },
+    {
+      "path": "src/ui/bridges.ts",
+      "bytes": 17679,
+      "sha256": "ad886af7c11d348a2e7ecd1eafc8e7ddccb6026ab6a57861398bfd90db4ca5a9"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

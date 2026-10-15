@@ -1,0 +1,62 @@
+{
+  "clientDate": "2026-10-16",
+  "recordedAt": "2026-10-15T16:27:33.007Z",
+  "fullyComplete": false,
+  "implementationCoverage": {
+    "percent": 60.4,
+    "description": "Source-and-behavior-evidence review of all 140 named requirements; equal feature weights. This is an audited implementation-coverage estimate, not percentage of engineering hours or production-release acceptance.",
+    "counts": {
+      "working": 48,
+      "unverified": 22,
+      "partial": 34,
+      "preview": 12,
+      "missing": 24
+    },
+    "requirements": 140,
+    "throughRound": 40
+  },
+  "acceptedBatches": 17,
+  "verification": {
+    "testsPassed": 1686,
+    "testsFailed": 0,
+    "buildPassed": true,
+    "packagedSmoke": {
+      "routes": 23,
+      "rendererErrors": 0,
+      "externalRequests": 0,
+      "offline": true
+    }
+  },
+  "acceptedThisRecovery": [
+    "Primary state and backups protected with Windows safeStorage",
+    "Reminder sleep/resume scheduling repair",
+    "Anthropic/OpenAI/OpenRouter selected-provider generation and protected provider-key management"
+  ],
+  "installer": {
+    "path": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\jarvis-desktop\\release\\Desktop Companion Setup 0.1.0.exe",
+    "bytes": 111933232,
+    "sha256": "47AEA16DA4D27BB8A6E7FF319B7FEE4AB17D12EFE5AD8294E43C8EA77227D65E",
+    "signature": "NotSigned",
+    "architecture": "x64",
+    "cleanMachineLifecycleVerified": false
+  },
+  "loop": {
+    "round": 41,
+    "status": "running",
+    "phase": "planning"
+  },
+  "guard": {
+    "limit": 600,
+    "safety": 60,
+    "available": 10.245142340000712,
+    "description": "Guard reservation accounting, not authoritative provider billing"
+  },
+  "remainingCriticalWork": [
+    "Installed-product autonomous worker execution",
+    "Real OAuth account connections and provider registrations",
+    "Local vision, embeddings and verified model/runtime installation",
+    "Applied Windows customization",
+    "Remaining plaintext productivity/preferences storage",
+    "Clean-machine installer lifecycle, signing/update rollback and hardware acceptance"
+  ]
+}

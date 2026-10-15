@@ -49,11 +49,16 @@ import {
   type SceneParse,
 } from '../ui/motion-presets';
 import '../styles/motion-studio.css';
+import { MAX_SCENE_SPEC_CHARS, composeSceneFromText, sceneSpecToSettings, serializeSceneSpec, validateSceneSpec, type SceneSpec, type SceneSpecResult } from '../ui/scene-spec';
+import { CLIP_EXPORT_FPS, CLIP_EXPORT_LIMITS, clipByteSize, clipExportFrameCount, clipToBlobParts, formatBytes, sampleClip, type Clip } from '../ui/clip-export';
+import { MOTION_AI_LIMITS, buildMotionRequest, describeDestination, runMotionGeneration, validateGeneratedScene, type GeneratedSceneResult } from '../ui/motion-ai';
+import { useOptionalStore } from '../ui/store';
 import { DEFAULT_TIMELINE, TIMELINE_LIMITS, MAX_KEYS, formatTimecode, normalizeTimeline, playbackFrame, stepFrame, EASING_LIST, upsertKey, QUALITY_IDS, QUALITY_PROFILES, previewIntervalMs, TIMELINE_FPS, type TimelineFps, type Timeline, type EasingName, type QualityId } from '../ui/motion-timing';
 
 /**
  * Motion Studio: a self-contained, offline canvas playground. A scene stacks up to MAX_LAYERS
- * six original procedural kinds over a background hue. It never calls the backend.
+ * six original procedural kinds over a background hue. It calls the backend only for the optional
+ * "Generate with AI" group, and only after an explicit click (see src/ui/motion-ai.ts).
  * The only things it stores are the user's preset and scene lists (kinds, small numbers, short
  * names) under the non-sensitive UI preference prefix. Scene JSON from anywhere (a file, a paste,
  * a model reply) is validated by parseScene before it is drawn.
@@ -180,9 +185,32 @@ export function MotionStudio({ reducedMotion, className }: { reducedMotion: bool
   const [importText, setImportText] = useState('');
   const [importResult, setImportResult] = useState<{ source: string; result: SceneParse } | null>(null);
 
+  const [describeText, setDescribeText] = useState('');
+  const [specDraft, setSpecDraft] = useState<{ spec: SceneSpec; rationale: string[] } | { error: string } | null>(null);
+  const [specJson, setSpecJson] = useState('');
+  const [specResult, setSpecResult] = useState<SceneSpecResult | null>(null);
+  const [specMessage, setSpecMessage] = useState('');
+
+  /* Generate with AI (goals 80/139): the guarded chat service from the store; nothing is sent until an explicit click. */
+  const store = useOptionalStore();
+  const aiApi = store?.api ?? null;
+  const aiMode = store?.settings?.mode ?? null;
+  const [aiText, setAiText] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiLive, setAiLive] = useState('');
+  const [aiResult, setAiResult] = useState<GeneratedSceneResult | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiNote, setAiNote] = useState('');
+  const [aiKeyMissing, setAiKeyMissing] = useState(false);
+  const aiAbortRef = useRef<AbortController | null>(null);
+
   const [clipPlan, setClipPlan] = useState<ClipPlan>(() => normalizeClipPlan({}));
   const [recording, setRecording] = useState(false);
   const [clipMsg, setClipMsg] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null);
+  const [jsonClipFps, setJsonClipFps] = useState<number>(24);
+  const [jsonClipMs, setJsonClipMs] = useState<number>(3000);
+  const [jsonClip, setJsonClip] = useState<{ clip: Clip; bytes: number; key: unknown[] } | null>(null);
+  const [jsonClipError, setJsonClipError] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -459,6 +487,98 @@ export function MotionStudio({ reducedMotion, className }: { reducedMotion: bool
     else setImportText(text);
   };
 
+  /* ---------- describe a scene (feature 139): offline draft or pasted JSON, validated before applying ---------- */
+  const draftFromText = () => {
+    try {
+      setSpecDraft(composeSceneFromText(describeText));
+    } catch (err) {
+      setSpecDraft({ error: err instanceof Error ? err.message : 'Could not draft a scene.' });
+    }
+  };
+  const copyDraftToJson = () => {
+    if (!specDraft || 'error' in specDraft) return;
+    setSpecJson(serializeSceneSpec(specDraft.spec));
+    setSpecResult(null);
+    setSpecMessage('');
+  };
+  const validateSpec = () => {
+    setSpecResult(validateSceneSpec(specJson));
+    setSpecMessage('');
+  };
+  const applySpec = () => {
+    if (!specResult?.ok) return;
+    setSettings(sceneSpecToSettings(specResult.spec));
+    setSpecMessage(`Applied "${specResult.spec.name}" to layer ${activeLayer + 1}.`);
+  };
+
+  /* ---------- generate with AI: preview the exact text, send on an explicit click, validate with the scene-spec parser ---------- */
+  const aiRequest = useMemo(() => {
+    if (!aiText.trim()) return null;
+    try {
+      return buildMotionRequest({ description: aiText, reducedMotion });
+    } catch {
+      return null;
+    }
+  }, [aiText, reducedMotion]);
+  const aiDestination = aiMode ? describeDestination(aiMode) : null;
+  const aiCloudBlocked = aiMode === 'online' && (aiKeyMissing || store?.cloudConfigured === false);
+  /** Only a spec accepted by validateGeneratedScene (validateSceneSpec) can ever be previewed or applied. */
+  const aiValidatedSpec = aiResult?.ok ? aiResult.spec : null;
+  useEffect(() => () => aiAbortRef.current?.abort(), []);
+  const generateWithAi = async () => {
+    if (!aiApi || !aiMode || !aiRequest || aiAbortRef.current) return;
+    const request = aiRequest;
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
+    setAiBusy(true);
+    setAiResult(null);
+    setAiError(null);
+    setAiNote('');
+    setAiLive('');
+    setAiKeyMissing(false);
+    const done = () => {
+      if (aiAbortRef.current === controller) aiAbortRef.current = null;
+      if (mountedRef.current) setAiBusy(false);
+    };
+    if (describeDestination(aiMode).requiresConfirmation) {
+      let configured = false;
+      try {
+        configured = (await aiApi.cloudKeyStatus()).configured === true;
+      } catch {
+        configured = false;
+      }
+      if (!configured || controller.signal.aborted) {
+        done();
+        if (mountedRef.current) {
+          if (!configured) setAiKeyMissing(true);
+          else setAiError('Stopped. Nothing was sent or applied.');
+        }
+        return;
+      }
+    }
+    const out = await runMotionGeneration(aiApi, request, { signal: controller.signal, onDelta: (t) => { if (mountedRef.current) setAiLive(t); } });
+    done();
+    if (!mountedRef.current) return;
+    if (out.outcome === 'cancelled') return setAiError('Stopped. Nothing was applied.');
+    if (out.outcome === 'failed') return setAiError(out.error ?? 'No reply was generated. Nothing was applied.');
+    if (out.outcome === 'truncated') setAiNote('The reply reached the length limit and was cut off before validation.');
+    else if (out.outcome === 'incomplete') setAiNote(out.error ?? 'The reply ended early; only what arrived was validated.');
+    setAiResult(validateGeneratedScene(out.text));
+  };
+  const cancelAi = () => aiAbortRef.current?.abort();
+  const previewAiSpec = () => {
+    if (!aiValidatedSpec) return;
+    const json = serializeSceneSpec(aiValidatedSpec);
+    setSpecJson(json);
+    setSpecResult(validateSceneSpec(json));
+    setSpecMessage('The generated scene is in the JSON box above for review. It is not applied yet.');
+  };
+  const applyAiSpec = () => {
+    if (!aiValidatedSpec) return;
+    setSettings(sceneSpecToSettings(aiValidatedSpec));
+    setAiNote(`Applied "${aiValidatedSpec.name}" to layer ${activeLayer + 1}.`);
+  };
+
   /* ---------- clip export ---------- */
   const support = recorderSupport(canvasRef.current);
   const saveStill = () => {
@@ -547,6 +667,26 @@ export function MotionStudio({ reducedMotion, className }: { reducedMotion: bool
     recorderRef.current = { rec, timer, stream };
     setRecording(true);
     setClipMsg({ tone: 'info', text: `Recording ${plan.seconds} s…` });
+  };
+
+  /* ---------- clip JSON export (feature 140): sampled offline, previewed, then downloaded locally ---------- */
+  const jsonClipKey = [lab, jsonClipFps, jsonClipMs, reducedMotion];
+  const jsonClipReady = jsonClip && jsonClip.key.every((v, i) => v === jsonClipKey[i]) ? jsonClip : null;
+  const prepareJsonClip = () => {
+    try {
+      const clip = sampleClip(lab, { fps: jsonClipFps, durationMs: jsonClipMs, reducedMotion });
+      setJsonClip({ clip, bytes: clipByteSize(clip), key: jsonClipKey });
+      setJsonClipError(null);
+    } catch (err) {
+      setJsonClip(null);
+      setJsonClipError(err instanceof Error ? err.message : 'The clip could not be sampled.');
+    }
+  };
+  const downloadJsonClip = () => {
+    if (!jsonClipReady) return;
+    const [text, options] = clipToBlobParts(jsonClipReady.clip);
+    downloadBlob(`${safeFileName(scene.name)}.clip.json`, new Blob([text], options));
+    setClipMsg({ tone: 'info', text: 'Clip JSON export ready: choose where to save it.' });
   };
 
   /* ---------- timeline authoring ---------- */
@@ -866,6 +1006,105 @@ export function MotionStudio({ reducedMotion, className }: { reducedMotion: bool
               </Notice>
             )}
           </Panel>
+
+          <Panel title="Describe a scene" eyebrow="Offline draft and validation" className="motion-describe">
+            <Field label="Scene description" hint="Keywords set kind, speed, intensity and colour. Drafted on this device; no model is called.">
+              {(id, describedBy) => (
+                <div className="row">
+                  <input id={id} className="input" type="text" maxLength={200} value={describeText} placeholder="calm blue waves" aria-describedby={describedBy} onChange={(e) => setDescribeText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); draftFromText(); } }} />
+                  <Button size="sm" onClick={draftFromText}>Draft from text</Button>
+                </div>
+              )}
+            </Field>
+            {specDraft && ('error' in specDraft ? (
+              <p className="field-hint motion-spec-error" role="alert">{specDraft.error}</p>
+            ) : (
+              <div className="motion-spec-preview" aria-label="Draft preview (not applied)">
+                <p className="field-hint">Preview only, not applied yet: {describeSettings(sceneSpecToSettings(specDraft.spec))}.</p>
+                <ul className="motion-issues">{specDraft.rationale.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                <Button size="sm" onClick={copyDraftToJson}>Copy draft into JSON box</Button>
+              </div>
+            ))}
+            <Field label="Paste JSON from any model; it is validated here, nothing is sent anywhere" hint={`Format "desktop-companion-scene", version 1, up to ${MAX_SCENE_SPEC_CHARS} characters.`}>
+              {(id, describedBy) => (
+                <textarea id={id} className="input motion-import" rows={4} maxLength={MAX_SCENE_SPEC_CHARS + 1} spellCheck={false} value={specJson} aria-describedby={describedBy} onChange={(e) => { setSpecJson(e.target.value); setSpecResult(null); setSpecMessage(''); }} />
+              )}
+            </Field>
+            <div className="row wrap">
+              <Button size="sm" onClick={validateSpec} disabled={!specJson.trim()}>Validate</Button>
+              <Button size="sm" variant="primary" onClick={applySpec} disabled={!specResult?.ok}>Apply to studio</Button>
+            </div>
+            {specResult && (specResult.ok ? (
+              <div className="motion-spec-result" role="status">
+                <p className="field-hint">Valid: "{specResult.spec.name}", {describeSettings(sceneSpecToSettings(specResult.spec))}.</p>
+                {specResult.warnings.length > 0 && <ul className="motion-issues" aria-label="Warnings">{specResult.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
+              </div>
+            ) : (
+              <ul className="motion-issues motion-spec-error" role="alert" aria-label="Validation errors">{specResult.errors.map((e, i) => <li key={i}><code>{e.path || '(root)'}</code>: {e.message}</li>)}</ul>
+            ))}
+            {specMessage && <p className="field-hint" role="status">{specMessage}</p>}
+          </Panel>
+
+          <Panel title="Generate with AI" eyebrow="Assistant model, validated before use" className="motion-ai">
+            <Field label="Describe the scene for the model" hint={`Up to ${MOTION_AI_LIMITS.descriptionChars} characters. This description is the only thing from you that Motion Studio puts in the request: not your library, clipboard or screen.`}>
+              {(id, describedBy) => (
+                <textarea id={id} className="input motion-import" rows={3} maxLength={MOTION_AI_LIMITS.descriptionChars} value={aiText} aria-describedby={describedBy} disabled={aiBusy} placeholder="slow violet aurora with a few sparks" onChange={(e) => { setAiText(e.target.value); setAiKeyMissing(false); }} />
+              )}
+            </Field>
+            {!aiApi || !aiDestination ? (
+              <p className="field-hint">The assistant service is not connected in this view, so nothing can be generated here. The offline draft above still works.</p>
+            ) : (
+              <>
+                <details className="motion-ai-preview">
+                  <summary className="field-hint">What will be sent: {aiRequest ? `${aiRequest.sentChars} characters` : 'nothing yet'} to {aiDestination.label}</summary>
+                  {aiRequest ? <pre className="motion-schema motion-ai-prompt" aria-label="Exact text that will be sent">{aiRequest.preview}</pre> : <p className="field-hint">Write a description first.</p>}
+                </details>
+                {aiRequest && aiRequest.warnings.length > 0 && <ul className="motion-issues" aria-label="Request notes">{aiRequest.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
+                <p className="field-hint">Destination: {aiDestination.label}. The exchange is recorded in Assistant chat history like any other message, and the assistant may include recent Assistant conversation for context.</p>
+                {aiCloudBlocked && (
+                  <Notice tone="warn" title="Add your key in Settings">
+                    Online mode needs a cloud API key saved in Settings. Nothing was sent.
+                  </Notice>
+                )}
+                <div className="row wrap motion-ai-actions">
+                  {aiBusy ? (
+                    <Button size="sm" icon={Stop} onClick={cancelAi}>Cancel</Button>
+                  ) : aiDestination.requiresConfirmation ? (
+                    <Button size="sm" variant="primary" onClick={() => void generateWithAi()} disabled={!aiRequest || aiCloudBlocked}>Send to Anthropic cloud</Button>
+                  ) : (
+                    <Button size="sm" variant="primary" icon={Sparkle} onClick={() => void generateWithAi()} disabled={!aiRequest}>Generate locally</Button>
+                  )}
+                </div>
+                {aiBusy && (
+                  <div className="motion-ai-live" role="status" aria-live="polite">
+                    <p className="field-hint">Generating… nothing is applied until the reply passes validation.</p>
+                    {aiLive && <pre className="motion-schema">{aiLive.slice(-2000)}</pre>}
+                  </div>
+                )}
+                {aiError && <p className="field-error" role="alert">{aiError}</p>}
+                {aiResult && !aiResult.ok && (
+                  <div className="motion-ai-result" role="alert">
+                    <p className="field-hint">The reply was rejected by the scene validator. Nothing was applied.</p>
+                    <ul className="motion-issues motion-spec-error" aria-label="Validation errors">{aiResult.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                    <Button size="sm" onClick={() => void generateWithAi()} disabled={aiBusy || !aiRequest || aiCloudBlocked}>Try again</Button>
+                  </div>
+                )}
+                {aiValidatedSpec && (
+                  <div className="motion-ai-result motion-ai-summary" role="status">
+                    <p className="field-hint">
+                      <i className="motion-swatch" style={{ background: hueColor(aiValidatedSpec.hue, 85, 60) }} aria-hidden /> Valid: "{aiValidatedSpec.name}", {describeSettings(sceneSpecToSettings(aiValidatedSpec))}. Not applied yet.
+                    </p>
+                    {aiResult?.ok && aiResult.warnings.length > 0 && <ul className="motion-issues" aria-label="Warnings">{aiResult.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
+                    <div className="row wrap">
+                      <Button size="sm" onClick={previewAiSpec} disabled={!aiValidatedSpec}>Preview</Button>
+                      <Button size="sm" variant="primary" onClick={applyAiSpec} disabled={!aiValidatedSpec}>Apply</Button>
+                    </div>
+                  </div>
+                )}
+                {aiNote && <p className="field-hint" role="status">{aiNote}</p>}
+              </>
+            )}
+          </Panel>
         </div>
 
         <div className="stack motion-controls">
@@ -993,6 +1232,36 @@ export function MotionStudio({ reducedMotion, className }: { reducedMotion: bool
               <Button size="sm" icon={DownloadSimple} onClick={saveStill}>
                 Save PNG still
               </Button>
+            </div>
+            <div className="motion-clip-json" role="group" aria-label="Export clip">
+              <div className="motion-clip-grid">
+                <Field label="Clip fps">
+                  {(id) => (
+                    <select id={id} className="input" value={jsonClipFps} onChange={(e) => setJsonClipFps(Number(e.target.value))}>
+                      {CLIP_EXPORT_FPS.map((f) => <option key={f} value={f}>{f} fps</option>)}
+                    </select>
+                  )}
+                </Field>
+                <Field label="Clip duration (ms)" hint={`${CLIP_EXPORT_LIMITS.minDurationMs} to ${CLIP_EXPORT_LIMITS.maxDurationMs} ms; ${Number.isFinite(jsonClipMs) ? clipExportFrameCount(jsonClipFps, jsonClipMs) : 0} frames.`}>
+                  {(id, describedBy) => (
+                    <input id={id} className="input" type="number" min={CLIP_EXPORT_LIMITS.minDurationMs} max={CLIP_EXPORT_LIMITS.maxDurationMs} step={100} value={jsonClipMs} aria-describedby={describedBy} onChange={(e) => setJsonClipMs(Math.round(Number(e.target.value)))} />
+                  )}
+                </Field>
+              </div>
+              <div className="row wrap">
+                <Button size="sm" onClick={prepareJsonClip}>Export clip</Button>
+                {jsonClipReady && (
+                  <Button size="sm" variant="primary" icon={DownloadSimple} onClick={downloadJsonClip}>
+                    Download clip JSON
+                  </Button>
+                )}
+              </div>
+              {jsonClipReady && (
+                <p className="field-hint motion-clip-summary" role="status" aria-live="polite">
+                  {jsonClipReady.clip.frameCount} frames at {jsonClipReady.clip.fps} fps, about {formatBytes(jsonClipReady.bytes)}{jsonClipReady.clip.reducedMotion ? ' (still frames: reduced motion is on)' : ''}. Saved only on this computer.
+                </p>
+              )}
+              {jsonClipError && <p className="field-error" role="alert">{jsonClipError}</p>}
             </div>
             {clipMsg && (
               <p className={clipMsg.tone === 'danger' ? 'field-error' : 'field-hint'} role="status" aria-live="polite">

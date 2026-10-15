@@ -8,7 +8,7 @@
 //  - Loopback: only for purposes listed in LOOPBACK_PURPOSES, only listed routes and methods, and (when the caller
 //    supplies the configured endpoint) only that exact origin, so a changed port or service is never reached by accident.
 //  - Redirects are never followed; credential headers never go anywhere except where an entry above names them.
-import type {Mode} from '../../src/shared/contracts';
+import type {CloudProvider, Mode} from '../../src/shared/contracts';
 import {isLoopbackHost} from './validation';
 
 export type Purpose = 'ollama' | 'cloud-chat' | 'provider-check';
@@ -46,6 +46,31 @@ export const CLOUD_PATHS: readonly string[] = ['/v1/messages'];
 export const MAX_CLOUD_REQUESTS_PER_MINUTE = 30;
 
 export const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
+/** OpenAI-compatible chat providers (goal 102). Exactly one origin and one path each, 'cloud-chat' only, like ANTHROPIC_ORIGIN. */
+export const OPENAI_ORIGIN = 'https://api.openai.com';
+export const OPENROUTER_ORIGIN = 'https://openrouter.ai';
+export type CompatProvider = 'openai' | 'openrouter';
+export const COMPAT_CHAT_ROUTES: Readonly<Record<CompatProvider, {origin: string; path: string}>> = {
+  openai: {origin: OPENAI_ORIGIN, path: '/v1/chat/completions'},
+  openrouter: {origin: OPENROUTER_ORIGIN, path: '/api/v1/chat/completions'},
+};
+
+/** The single origin cloud chat for this provider may reach. Unknown ids throw (callers validate first). */
+export function originForProvider(provider: CloudProvider): string {
+  if (provider === 'anthropic') return ANTHROPIC_ORIGIN;
+  const route = COMPAT_CHAT_ROUTES[provider as CompatProvider];
+  if (!route || !Object.prototype.hasOwnProperty.call(COMPAT_CHAT_ROUTES, provider)) throw new NetworkDenied('Unknown cloud provider');
+  return route.origin;
+}
+
+/** Full chat endpoint URL for a provider (origin + its one allowed path). */
+export function chatUrlForProvider(provider: CloudProvider, origin = originForProvider(provider)): string {
+  return provider === 'anthropic' ? `${origin}${CLOUD_PATHS[0]}` : `${origin}${COMPAT_CHAT_ROUTES[provider as CompatProvider].path}`;
+}
+
+function compatProviderFor(origin: string): CompatProvider | null {
+  return origin === OPENAI_ORIGIN ? 'openai' : origin === OPENROUTER_ORIGIN ? 'openrouter' : null;
+}
 
 export interface ProviderCheck {
   id: string;
@@ -71,6 +96,11 @@ export const PROVIDER_CHECKS: readonly ProviderCheck[] = [
 export interface GuardContext {
   mode: () => Mode;
   hasCloudKey: () => boolean;
+  /**
+   * Whether a key is stored for an OpenAI-compatible provider. Absent means no such key exists, so those origins are
+   * refused (fail closed); the Anthropic key in hasCloudKey never unlocks another provider.
+   */
+  hasProviderKey?: (provider: CompatProvider) => boolean;
   /** Called for every allowed and denied attempt; origin and purpose only. */
   audit?: (decision: 'allowed' | 'denied', origin: string, purpose: string, reason?: string) => void;
   fetchImpl?: typeof fetch;
@@ -105,7 +135,7 @@ export function evaluateEgress(
   mode: Mode,
   hasCloudKey: boolean,
   cloudOrigin = ANTHROPIC_ORIGIN,
-  opts: {localEndpoint?: string; method?: string; headers?: HeadersInit} = {},
+  opts: {localEndpoint?: string; method?: string; headers?: HeadersInit; providerKeys?: Partial<Record<CompatProvider, boolean>>} = {},
 ): string | null {
   let u: URL;
   try { u = new URL(rawUrl); } catch { return 'Invalid URL'; }
@@ -120,6 +150,18 @@ export function evaluateEgress(
     if (mode !== 'online') return 'Offline mode: provider checks are blocked';
     if (method !== undefined && method !== 'GET') return 'Provider checks must use GET';
     if (sensitive.some((h) => h !== entry.credentialHeader)) return 'Credential header is not allowed for this provider check';
+    return null;
+  }
+
+  const compat = compatProviderFor(u.origin);
+  if (compat) {
+    // Same refusals, in the same spirit, as the Anthropic origin: offline first, then purpose, key, path, method, header.
+    if (mode !== 'online') return 'Offline mode: cloud requests are blocked';
+    if (purpose !== 'cloud-chat') return 'Cloud origin is only for cloud chat';
+    if (opts.providerKeys?.[compat] !== true) return 'No cloud API key is configured';
+    if (u.pathname !== COMPAT_CHAT_ROUTES[compat].path || u.search) return 'Cloud requests are limited to the chat endpoint';
+    if (method !== undefined && method !== 'POST') return 'Cloud chat requests must use POST';
+    if (sensitive.some((h) => h !== 'authorization')) return 'Only the API key header may be sent to the cloud provider';
     return null;
   }
 
@@ -155,6 +197,7 @@ export function createGuardedFetch(ctx: GuardContext) {
     // provider-check never depends on the Anthropic chat key: pass true so only chat is gated on it.
     const reason = evaluateEgress(url, purpose, ctx.mode(), purpose === 'provider-check' ? true : ctx.hasCloudKey(), ctx.cloudOriginOverride, {
       localEndpoint: ctx.localEndpoint?.(), method: init.method ?? 'GET', headers: init.headers,
+      providerKeys: purpose === 'cloud-chat' && ctx.hasProviderKey ? {openai: ctx.hasProviderKey('openai') === true, openrouter: ctx.hasProviderKey('openrouter') === true} : undefined,
     });
     if (reason) {
       ctx.audit?.('denied', origin, purpose, reason);

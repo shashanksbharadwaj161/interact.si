@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AvatarState } from '../components/Avatar';
+import { createAnimMachine, finish, isSettled, setReducedMotion, transition, viewAt, type AnimMachine, type AnimView } from './anim-state';
 
 /**
  * Where the live amplitude comes from. 'none' means no audio source is attached, so a host such as the
@@ -32,6 +33,59 @@ export function quantizeLevel(l: number): number {
  */
 export function hostVoiceLevel(c: Pick<Companion, 'level' | 'source'>): number | null {
   return c.source === 'none' ? null : quantizeLevel(c.level);
+}
+
+/** True when the root motion attribute (setting, Windows or battery rule) or the OS media query asks for reduced motion. */
+export function readReducedMotion(): boolean {
+  if (typeof document === 'undefined') return false;
+  if (document.documentElement.dataset.motion === 'reduced') return true;
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function nowMs(): number {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+}
+
+/**
+ * Drives one interruptible animation slot from a target (null = hidden). Each target change starts a new leg
+ * from the CURRENT progress; the previous requestAnimationFrame loop is cancelled first so two loops never run,
+ * and the loop is cancelled on unmount. With reduced motion every change is a single instantaneous step.
+ */
+export function useAnimMachine(target: string | null, opts?: { reducedMotion?: boolean }): AnimView {
+  const reduced = opts?.reducedMotion ?? readReducedMotion();
+  const machine = useRef<AnimMachine | null>(null);
+  if (machine.current === null) machine.current = createAnimMachine({ reducedMotion: reduced, now: nowMs(), initial: target });
+  const [view, setView] = useState<AnimView>(() => viewAt(machine.current as AnimMachine, nowMs()));
+  useEffect(() => {
+    let raf = 0;
+    const start = nowMs();
+    let m = setReducedMotion(machine.current as AnimMachine, reduced, start);
+    m = transition(m, target === null ? { type: 'hide' } : { type: 'show', target }, start);
+    machine.current = m;
+    setView(viewAt(m, start));
+    const canFrame = typeof requestAnimationFrame === 'function';
+    const step = () => {
+      raf = 0;
+      const t = nowMs();
+      m = transition(m, { type: 'tick' }, t);
+      machine.current = m;
+      setView(viewAt(m, t));
+      if (!isSettled(m)) raf = requestAnimationFrame(step);
+    };
+    if (!isSettled(m)) {
+      if (canFrame) raf = requestAnimationFrame(step);
+      else {
+        m = finish(m, start);
+        machine.current = m;
+        setView(viewAt(m, start));
+      }
+    }
+    return () => {
+      if (raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf);
+      raf = 0;
+    };
+  }, [target, reduced]);
+  return view;
 }
 
 const Ctx = createContext<Companion | null>(null);

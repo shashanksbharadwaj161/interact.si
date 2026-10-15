@@ -4,6 +4,7 @@ export const METHODS = [
   'saveCapsule', 'deleteCapsule', 'restoreCapsule',
   'saveNote', 'deleteNote', 'saveTask', 'deleteTask',
   'chat', 'clearChat', 'setCloudKey', 'cloudKeyStatus', 'deleteCloudKey',
+  'cloudProviderStatus', 'setProviderKey', 'clearProviderKey',
   'previewAction', 'executeAction', 'speak', 'transcribe',
   'exportData', 'importData', 'pickPath',
   // API v2
@@ -34,6 +35,7 @@ export const ARITY: Record<MethodName, number> = {
   saveCapsule: 1, deleteCapsule: 1, restoreCapsule: 1,
   saveNote: 1, deleteNote: 1, saveTask: 1, deleteTask: 1,
   chat: 1, clearChat: 0, setCloudKey: 1, cloudKeyStatus: 0, deleteCloudKey: 0,
+  cloudProviderStatus: 0, setProviderKey: 2, clearProviderKey: 1,
   previewAction: 1, executeAction: 2, speak: 1, transcribe: 1,
   exportData: 0, importData: 0, pickPath: 1,
   getApiInfo: 0, planIntent: 2, search: 2, listLocalModels: 0,
@@ -52,4 +54,30 @@ export const ARITY: Record<MethodName, number> = {
 };
 
 export const channel = (m: string) => `jarvis:${m}`;
+
+/**
+ * Subset of the authoritative METHODS table for provider key validation and clients.
+ * Registration and sender checks use the same dispatch path as every other method.
+ */
+export const PROVIDER_KEY_METHODS = ['cloudProviderStatus', 'setProviderKey', 'clearProviderKey'] as const;
+export type ProviderKeyMethod = (typeof PROVIDER_KEY_METHODS)[number];
+export const PROVIDER_KEY_ARITY: Record<ProviderKeyMethod, number> = {cloudProviderStatus: 0, setProviderKey: 2, clearProviderKey: 1};
+export const CLOUD_PROVIDER_IDS = ['anthropic', 'openai', 'openrouter'] as const;
+const MAX_KEY_ARG = 4096;
+
+/** Returns a user-safe problem for the arguments of a provider key call, or null when they are acceptable. Never echoes a key. */
+export function providerKeyArgsProblem(method: string, args: readonly unknown[]): string | null {
+  if (!(PROVIDER_KEY_METHODS as readonly string[]).includes(method)) return 'Unknown method';
+  const m = method as ProviderKeyMethod;
+  if (!Array.isArray(args) || args.length !== PROVIDER_KEY_ARITY[m]) return 'Wrong number of arguments';
+  if (m === 'cloudProviderStatus') return null;
+  if (typeof args[0] !== 'string' || !(CLOUD_PROVIDER_IDS as readonly string[]).includes(args[0])) return `Invalid argument 1 for ${m}: expected one of ${CLOUD_PROVIDER_IDS.join(', ')}`;
+  if (m === 'setProviderKey' && (typeof args[1] !== 'string' || args[1].length < 1 || args[1].length > MAX_KEY_ARG)) return `Invalid argument 2 for ${m}: expected a key of 1 to ${MAX_KEY_ARG} characters`;
+  return null;
+}
 export const ACTIVITY_CHANNEL = 'jarvis:activity';
+/**
+ * Main -> renderer push of host power state (Electron powerMonitor): sent after the trusted app page loads and on every
+ * 'on-battery'/'on-ac' change, only to pages that pass isTrustedUrl. Not a METHOD: the renderer never sends on it.
+ */
+export const HOST_BATTERY_EVENT = 'jarvis:hostBatteryChanged';

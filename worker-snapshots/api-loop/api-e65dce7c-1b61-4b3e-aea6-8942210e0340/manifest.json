@@ -1,0 +1,16 @@
+{
+  "task": "Loop 5: error-diagnosis",
+  "sessionId": "api-e65dce7c-1b61-4b3e-aea6-8942210e0340",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Computer.tsx",
+      "bytes": 28862,
+      "sha256": "93fd000615c9ff6911b0e888c9030e49885ae031c0a47c2d206962152f381a1e"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

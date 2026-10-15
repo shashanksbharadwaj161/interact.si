@@ -1,0 +1,16 @@
+{
+  "task": "Loop 25: browser-refs-import",
+  "sessionId": "api-c672131c-8ba9-44b5-a371-9b2bbd15572e",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Capsules.tsx",
+      "bytes": 55406,
+      "sha256": "7b77323e5245d008289ab27f897522ac4c3f8e3c95f444c8a49a2aca84968143"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

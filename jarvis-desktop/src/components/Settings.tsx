@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { ArrowCounterClockwise, DownloadSimple, Export, FloppyDisk, Key, MagnifyingGlass, Trash, UploadSimple, WifiHigh, WifiSlash, X } from '@phosphor-icons/react';
-import type { Mode, Settings as SettingsT } from '../shared/contracts';
+import type { CloudProvider, CloudProviderStatus, Mode, Settings as SettingsT } from '../shared/contracts';
+import { CLOUD_PROVIDERS, DEFAULT_CLOUD_PROVIDER, cloudProviderInfo, effectiveCloudModel, isCloudProvider } from '../shared/contracts';
+import '../styles/cloud-providers.css';
 import { PathListEditor } from './shared';
 import { ModelReadinessNotice, cloudModelError, localEndpointError, localModelError, modelReadiness, useModelCheck, type ModelReadiness } from './Onboarding';
 import { ConfirmDialog } from '../ui/Dialog';
 import { Badge, Button, Field, Notice, PageHeader, Panel, Segmented, Switch } from '../ui/primitives';
-import { readPref, writePref } from '../ui/prefs';
+import { readPref, usePref, writePref } from '../ui/prefs';
+import { LICENSE_OFFLINE_NOTE, LICENSE_PREF_KEY, LICENSE_TRUSTED_KEYS_PREF_KEY, describeLicense, evaluateLicense, normalizeTrustedKeys, parseLicense, verifyLicenseSignature, type LicenseEvaluation, type LicenseParseResult, type LicenseVerifyResult } from '../ui/license-file';
+import { cloudProvidersBridge, productivityBridge } from '../ui/bridges';
+import { BUNDLE_LIMITS, decryptBundle, encryptBundle, parseBundle, serializeBundle, summarizePlaintext, type BundleParseResult } from '../ui/encrypted-bundle';
+import { PROFILES_PREF_KEY, PROFILE_FIELD_LABELS, PROFILE_LIMITS, applyProfile, captureProfile, diffProfile, normalizeProfiles, removeProfile, renameProfile, setActiveProfile, upsertProfile, updateProfileSettings, type ProfilesState } from '../ui/profiles';
 import { useReady } from '../ui/store';
 import { cx, errMsg } from '../ui/util';
 
@@ -84,6 +90,7 @@ export type SettingsEntry = { id: string; tab: SettingsTab; title: string; keywo
 export const SETTINGS_INDEX: SettingsEntry[] = [
   { id: 'appearance', tab: 'general', title: 'Appearance', keywords: ['theme', 'dark', 'light', 'graphite', 'nebula', 'paper', 'colour', 'color', 'look'] },
   { id: 'profile', tab: 'general', title: 'Profile', keywords: ['name', 'display name', 'greeting', 'who', 'personal'] },
+  { id: 'personal-profiles', tab: 'general', title: 'Personal profiles', keywords: ['profile', 'profiles', 'switch profile', 'preset', 'named', 'personal', 'save current'] },
   { id: 'startup', tab: 'general', title: 'Startup', keywords: ['tray', 'system tray', 'minimised', 'minimized', 'boot', 'launch', 'start'] },
   { id: 'notifications', tab: 'general', title: 'Notifications', keywords: ['toast', 'message', 'popup', 'quiet', 'alerts', 'sound'] },
   { id: 'voice', tab: 'general', title: 'Voice', keywords: ['speech', 'speak', 'tts', 'voice name', 'narrator'] },
@@ -91,11 +98,13 @@ export const SETTINGS_INDEX: SettingsEntry[] = [
   { id: 'mode', tab: 'models', title: 'Mode', keywords: ['offline', 'online', 'cloud', 'privacy', 'internet'] },
   { id: 'readiness', tab: 'models', title: 'Model readiness', keywords: ['ready', 'check', 'ollama', 'running', 'status'] },
   { id: 'local-model', tab: 'models', title: 'Local model', keywords: ['ollama', 'endpoint', 'localhost', '127.0.0.1', 'port', 'llama', 'model name'] },
-  { id: 'cloud-model', tab: 'models', title: 'Cloud model', keywords: ['api key', 'key', 'token', 'provider', 'claude', 'anthropic', 'secret'] },
+  { id: 'cloud-model', tab: 'models', title: 'Cloud model', keywords: ['api key', 'key', 'token', 'provider', 'claude', 'anthropic', 'secret', 'openai', 'openrouter', 'gpt'] },
   { id: 'folders', tab: 'access', title: 'Allowed folders', keywords: ['files', 'directory', 'path', 'permission', 'scope', 'roots'] },
   { id: 'apps', tab: 'access', title: 'Approved apps', keywords: ['launch', 'program', 'exe', 'application', 'permission'] },
   { id: 'retention', tab: 'data', title: 'Retention', keywords: ['history', 'days', 'keep', 'delete', 'clear chat', 'conversation', 'privacy'] },
   { id: 'backup', tab: 'data', title: 'Backup', keywords: ['export', 'import', 'restore', 'file', 'copy', 'migrate'] },
+  { id: 'encrypted-bundle', tab: 'data', title: 'Encrypted transfer bundle', keywords: ['encrypt', 'encrypted', 'passphrase', 'transfer', 'bundle', 'sync', 'another computer', 'move', 'decrypt'] },
+  { id: 'license', tab: 'data', title: 'License (offline verification)', keywords: ['license', 'licence', 'activation', 'serial', 'pro', 'edition', 'signature', 'verify', 'trusted key', 'expiry', 'expires'] },
   { id: 'motion', tab: 'accessibility', title: 'Motion', keywords: ['reduce motion', 'animation', 'battery', 'reduced', 'vestibular', 'power'] },
   { id: 'text-size', tab: 'accessibility', title: 'Text size', keywords: ['font', 'larger', 'zoom', 'readability', 'scale', 'big'] },
   { id: 'keyboard', tab: 'accessibility', title: 'Keyboard', keywords: ['shortcut', 'alt', 'ctrl', 'f1', 'help', 'focus'] },
@@ -261,6 +270,555 @@ export function PreSaveSummary({ issues, confirmations, saveFailed, saving, onRe
   );
 }
 
+/* ---------- Encrypted transfer bundle (goal 109, manual, no sync service) ---------- */
+
+export const BUNDLE_NOTE = 'Bundles are encrypted locally with your passphrase and moved by you. This build has no sync account or server.';
+export const BUNDLE_RESTORE_NOTE = 'Restore into this app uses the existing import flow; this build does not merge automatically.';
+const BUNDLE_FILE_MAX_BYTES = 20_000_000;
+
+/** Returns a message when the passphrase pair cannot be used to create a bundle, or null when it can. */
+export function bundlePassphraseProblem(pass: string, repeat: string): string | null {
+  if (pass.length < BUNDLE_LIMITS.passphraseMin) return `Use at least ${BUNDLE_LIMITS.passphraseMin} characters.`;
+  if (pass !== repeat) return 'The two passphrases do not match.';
+  return null;
+}
+
+type BundleSource = { get(): Promise<unknown> } | null;
+
+/**
+ * Creates and opens passphrase-encrypted bundles in this window. The data comes from the local productivity store
+ * through the existing bridge; nothing here sends anything anywhere. Files are offered as a Blob download and read
+ * back with FileReader, so no file path is ever used.
+ */
+export function EncryptedBundlePanel({ source, notify }: { source: BundleSource; notify: (kind: 'ok' | 'error' | 'info', text: string) => void }) {
+  const [pass, setPass] = useState('');
+  const [passRepeat, setPassRepeat] = useState('');
+  const [label, setLabel] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [bundleJson, setBundleJson] = useState<string | null>(null);
+  const [bundleUrl, setBundleUrl] = useState<string | null>(null);
+  const [bundleName, setBundleName] = useState('desktop-companion-bundle.json');
+
+  const [importText, setImportText] = useState('');
+  const [importPass, setImportPass] = useState('');
+  const [opening, setOpening] = useState(false);
+  const [parsed, setParsed] = useState<BundleParseResult | null>(null);
+  const [decryptReason, setDecryptReason] = useState<string | null>(null);
+  const [decrypted, setDecrypted] = useState<string | null>(null);
+  const [fileNote, setFileNote] = useState<string | null>(null);
+
+  useEffect(() => () => { if (bundleUrl) URL.revokeObjectURL(bundleUrl); }, [bundleUrl]);
+
+  const passProblem = pass || passRepeat ? bundlePassphraseProblem(pass, passRepeat) : null;
+  const canCreate = !!source && !bundlePassphraseProblem(pass, passRepeat) && !creating;
+
+  const create = async () => {
+    if (!source) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const data = await source.get();
+      const plaintext = JSON.stringify(data, null, 2);
+      const envelope = await encryptBundle(plaintext ?? '', pass, { label: label.trim() || null });
+      const json = serializeBundle(envelope);
+      setBundleJson(json);
+      setBundleName(`desktop-companion-bundle-${envelope.createdAt.slice(0, 10)}.json`);
+      setBundleUrl(URL.createObjectURL(new Blob([json], { type: 'application/json' })));
+      setPass('');
+      setPassRepeat('');
+      notify('ok', 'Encrypted bundle created. Download it or copy the JSON.');
+    } catch (e) {
+      setCreateError(errMsg(e, 'The bundle could not be created.'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const copy = async (text: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      notify('ok', `${what} copied.`);
+    } catch {
+      notify('error', `${what} could not be copied.`);
+    }
+  };
+
+  const readFile = (file: File | undefined) => {
+    setFileNote(null);
+    if (!file) return;
+    if (file.size > BUNDLE_FILE_MAX_BYTES) {
+      setFileNote(`That file is ${file.size} bytes; the limit is ${BUNDLE_FILE_MAX_BYTES}.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImportText(typeof reader.result === 'string' ? reader.result : '');
+      setParsed(null);
+      setDecrypted(null);
+      setDecryptReason(null);
+      setFileNote(`Loaded ${file.name}.`);
+    };
+    reader.onerror = () => setFileNote('The file could not be read.');
+    reader.readAsText(file);
+  };
+
+  const open = async () => {
+    setOpening(true);
+    setDecrypted(null);
+    setDecryptReason(null);
+    const p = parseBundle(importText.trim());
+    setParsed(p);
+    try {
+      if (p.ok) {
+        const r = await decryptBundle(p.envelope, importPass);
+        if (r.ok) {
+          setDecrypted(r.plaintext);
+          setImportPass('');
+        } else setDecryptReason(r.reason);
+      }
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  const counts = decrypted ? summarizePlaintext(decrypted) : null;
+
+  return (
+    <div className="stack tight" data-testid="encrypted-bundle">
+      <Notice title="Encrypted transfer bundle (manual, no sync service)">{BUNDLE_NOTE}</Notice>
+
+      <h3>Create a bundle</h3>
+      {!source && <p className="field-hint">Local notes, tasks and capsules are not connected in this window, so there is nothing to encrypt here.</p>}
+      <div className="grid2">
+        <Field label="Passphrase" hint={`At least ${BUNDLE_LIMITS.passphraseMin} characters. It is never stored; without it the bundle cannot be opened.`}>
+          {(id, d) => <input id={id} aria-describedby={d} className="input" type="password" autoComplete="new-password" spellCheck={false} value={pass} maxLength={1024} onChange={(e) => setPass(e.target.value)} />}
+        </Field>
+        <Field label="Repeat passphrase" error={passProblem}>
+          {(id, d) => <input id={id} aria-describedby={d} className="input" type="password" autoComplete="new-password" spellCheck={false} value={passRepeat} maxLength={1024} onChange={(e) => setPassRepeat(e.target.value)} />}
+        </Field>
+      </div>
+      <Field label="Label (optional)" hint="Stored unencrypted next to the bundle, for example the computer it came from.">
+        {(id, d) => <input id={id} aria-describedby={d} className="input" value={label} maxLength={120} autoComplete="off" onChange={(e) => setLabel(e.target.value)} />}
+      </Field>
+      <div className="row wrap">
+        <Button icon={Key} busy={creating} disabled={!canCreate} onClick={() => void create()}>Create encrypted bundle</Button>
+        {bundleUrl && (
+          <a className="btn btn-ghost" href={bundleUrl} download={bundleName}>
+            <DownloadSimple size={16} aria-hidden /> <span>Download {bundleName}</span>
+          </a>
+        )}
+        {bundleJson && <Button onClick={() => void copy(bundleJson, 'Bundle JSON')}>Copy JSON</Button>}
+      </div>
+      {createError && <p className="field-error" role="alert">{createError}</p>}
+
+      <h3>Open a bundle</h3>
+      <Field label="Bundle file" hint="Read inside this window. No file path is used.">
+        {(id, d) => <input id={id} aria-describedby={d} type="file" accept="application/json,.json" onChange={(e) => readFile(e.target.files?.[0])} />}
+      </Field>
+      {fileNote && <p className="field-hint" role="status">{fileNote}</p>}
+      <Field label="Or paste bundle JSON">
+        {(id, d) => <textarea id={id} aria-describedby={d} className="input mono" rows={5} spellCheck={false} value={importText} onChange={(e) => { setImportText(e.target.value); setParsed(null); setDecrypted(null); setDecryptReason(null); }} />}
+      </Field>
+      <Field label="Bundle passphrase">
+        {(id, d) => <input id={id} aria-describedby={d} className="input" type="password" autoComplete="off" spellCheck={false} value={importPass} maxLength={1024} onChange={(e) => setImportPass(e.target.value)} />}
+      </Field>
+      <div className="row wrap">
+        <Button icon={UploadSimple} busy={opening} disabled={!importText.trim() || !importPass} onClick={() => void open()}>Decrypt and verify</Button>
+      </div>
+      {parsed && parsed.errors.length > 0 && (
+        <ul className="field-error" role="alert" aria-label="Bundle problems">
+          {parsed.errors.map((m) => <li key={m}>{m}</li>)}
+        </ul>
+      )}
+      {parsed && parsed.warnings.length > 0 && (
+        <ul className="field-hint" aria-label="Bundle warnings">
+          {parsed.warnings.map((m) => <li key={m}>{m}</li>)}
+        </ul>
+      )}
+      {parsed?.ok && (
+        <dl className="kv-list">
+          <div className="kv"><dt>Created</dt><dd>{parsed.envelope.createdAt}</dd></div>
+          <div className="kv"><dt>Label</dt><dd>{parsed.envelope.label ?? 'None'}</dd></div>
+        </dl>
+      )}
+      {decryptReason && <p className="field-error" role="alert">Decryption failed: {decryptReason}</p>}
+      {decrypted !== null && (
+        <div className="stack tight" role="status">
+          <p className="field-hint">Decrypted and verified: {decrypted.length} characters.</p>
+          {counts ? (
+            <ul className="chips" aria-label="Bundle contents">
+              {Object.entries(counts).map(([k, n]) => <li key={k} className="chip">{k}: {n}</li>)}
+              {Object.keys(counts).length === 0 && <li className="chip">No lists found</li>}
+            </ul>
+          ) : (
+            <p className="field-hint">The decrypted text is not a JSON object, so no counts are shown.</p>
+          )}
+          <div className="row wrap">
+            <Button onClick={() => void copy(decrypted, 'Decrypted JSON')}>Copy decrypted JSON</Button>
+          </div>
+        </div>
+      )}
+      <p className="field-hint">{BUNDLE_RESTORE_NOTE}</p>
+    </div>
+  );
+}
+
+/* ---------- License (goal 119, offline verification only) ---------- */
+
+type LicenseCheck = { parsed: LicenseParseResult; keyErrors: string[]; verify: LicenseVerifyResult | null; evaluation: LicenseEvaluation | null; error: string | null };
+
+/**
+ * Pasted license JSON and trusted public keys, verified in this window with crypto.subtle. No network call is made,
+ * nothing is activated, and no existing feature is gated on the result.
+ */
+export function LicensePanel() {
+  const [licenseText, setLicenseText] = usePref<string>(LICENSE_PREF_KEY, '');
+  const [keysText, setKeysText] = usePref<string>(LICENSE_TRUSTED_KEYS_PREF_KEY, '');
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<LicenseCheck | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const verify = async () => {
+    setChecking(true);
+    try {
+      const parsed = parseLicense(typeof licenseText === 'string' ? licenseText.trim() : '');
+      const { keys, errors: keyErrors } = normalizeTrustedKeys(typeof keysText === 'string' ? keysText.trim() : '');
+      if (!parsed.ok) {
+        setResult({ parsed, keyErrors, verify: null, evaluation: null, error: null });
+        return;
+      }
+      const subtle = (globalThis as { crypto?: { subtle?: unknown } }).crypto?.subtle;
+      const v = await verifyLicenseSignature(parsed.license, keys, subtle);
+      let evaluation: LicenseEvaluation | null = null;
+      let error: string | null = null;
+      try {
+        evaluation = evaluateLicense(parsed.license, v, new Date());
+      } catch (e) {
+        error = errMsg(e, 'The license could not be evaluated.');
+      }
+      setResult({ parsed, keyErrors, verify: v, evaluation, error });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const remove = () => {
+    setLicenseText('');
+    setResult(null);
+    setConfirmRemove(false);
+  };
+
+  const parsed = result?.parsed ?? null;
+  const ev = result?.evaluation ?? null;
+  const tone: 'ok' | 'warn' | 'danger' | 'muted' = ev ? (ev.status === 'valid' ? 'ok' : ev.status === 'expiring-soon' || ev.status === 'in-grace' ? 'warn' : 'danger') : 'muted';
+
+  return (
+    <div className="stack tight" data-testid="license-panel">
+      <Notice title="Offline verification only">{LICENSE_OFFLINE_NOTE}</Notice>
+      <Field label="License JSON" hint="Paste the license file contents. Kept in this window’s preferences. Nothing is sent anywhere.">
+        {(id, d) => <textarea id={id} aria-describedby={d} className="input mono" rows={6} spellCheck={false} value={licenseText} onChange={(e) => { setLicenseText(e.target.value); setResult(null); setConfirmRemove(false); }} />}
+      </Field>
+      <Field label="Trusted public keys (JSON)" hint='An array of {"keyId", "publicKeyJwk"} with EC P-256 public keys only. Private keys are rejected.'>
+        {(id, d) => <textarea id={id} aria-describedby={d} className="input mono" rows={4} spellCheck={false} value={keysText} onChange={(e) => { setKeysText(e.target.value); setResult(null); }} />}
+      </Field>
+      <div className="row wrap">
+        <Button icon={Key} busy={checking} disabled={!licenseText.trim()} onClick={() => void verify()}>Verify license</Button>
+        {!confirmRemove ? (
+          <Button variant="danger" icon={Trash} disabled={!licenseText} onClick={() => setConfirmRemove(true)}>Remove license</Button>
+        ) : (
+          <>
+            <Button variant="danger" icon={Trash} onClick={remove}>Confirm remove license</Button>
+            <Button onClick={() => setConfirmRemove(false)}>Cancel</Button>
+          </>
+        )}
+      </div>
+      {confirmRemove && <p className="field-hint" role="status">Removing clears the pasted license from this window’s preferences. Trusted keys are kept. Press Confirm to remove it.</p>}
+      {parsed && parsed.errors.length > 0 && (
+        <ul className="field-error" role="alert" aria-label="License problems">
+          {parsed.errors.map((m) => <li key={m}>{m}</li>)}
+        </ul>
+      )}
+      {parsed && parsed.warnings.length > 0 && (
+        <ul className="field-hint" aria-label="License warnings">
+          {parsed.warnings.map((m) => <li key={m}>{m}</li>)}
+        </ul>
+      )}
+      {result && result.keyErrors.length > 0 && (
+        <ul className="field-error" aria-label="Trusted key problems">
+          {result.keyErrors.map((m) => <li key={m}>{m}</li>)}
+        </ul>
+      )}
+      {result?.error && <p className="field-error" role="alert">{result.error}</p>}
+      {parsed?.ok && result?.verify && (
+        <div className="stack tight" role="status">
+          <p>
+            Signature: <Badge tone={result.verify.ok ? 'ok' : 'warn'}>{result.verify.reason}</Badge>
+            {ev && <> Status: <Badge tone={tone}>{ev.status}</Badge></>}
+          </p>
+          {ev && <p className="field-hint">{ev.explanation}</p>}
+          <dl className="kv-list">
+            {describeLicense(parsed.license).map((r) => (
+              <div className="kv" key={r.label}><dt>{r.label}</dt><dd>{r.value}</dd></div>
+            ))}
+            <div className="kv"><dt>Days remaining</dt><dd>{ev ? (ev.daysRemaining === null ? 'Not applicable' : String(ev.daysRemaining)) : 'Not applicable'}</dd></div>
+          </dl>
+          {parsed.license.features.length > 0 && (
+            <ul className="chips" aria-label="Licensed features">
+              {parsed.license.features.map((f) => <li key={f} className="chip">{f}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Personal profiles (goal 7, offline, this window's preferences) ---------- */
+
+export const PROFILES_NOTE = 'A profile stores theme, reduce motion, voice, local model, start in tray and history days. It never stores mode, folders, apps, the cloud model or any key, so switching cannot widen access or go online.';
+
+/**
+ * Named profiles kept with the existing prefs.ts helpers. Switching applies the captured fields through saveSettings
+ * (the same call every other Settings control uses); the active marker moves only after that save succeeds.
+ */
+export function PersonalProfilesPanel({ settings, applyPatch, notify }: { settings: SettingsT; applyPatch: (patch: Partial<SettingsT>) => Promise<string | null>; notify: (kind: 'ok' | 'error' | 'info', text: string) => void }) {
+  const [stored, setStored] = usePref<unknown>(PROFILES_PREF_KEY, null);
+  const state = useMemo(() => normalizeProfiles(stored), [stored]);
+  const [newName, setNewName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [removeId, setRemoveId] = useState<string | null>(null);
+
+  const commit = (fn: (s: ProfilesState) => ProfilesState, ok?: string): boolean => {
+    try {
+      setStored(fn(state));
+      setError(null);
+      if (ok) notify('ok', ok);
+      return true;
+    } catch (e) {
+      setError(errMsg(e, 'The profile change could not be made.'));
+      return false;
+    }
+  };
+
+  const saveCurrent = () => {
+    if (commit((s) => upsertProfile(s, captureProfile(newName, settings, new Date())), `Profile “${newName.replace(/\s+/g, ' ').trim()}” saved.`)) setNewName('');
+  };
+
+  const switchTo = async (id: string) => {
+    const p = state.profiles.find((x) => x.id === id);
+    if (!p) return;
+    setBusyId(id);
+    setError(null);
+    try {
+      const failure = await applyPatch({ ...applyProfile(p) });
+      if (failure) {
+        // The previous active profile stays marked; nothing about the profile list changes.
+        setError(`Could not switch to “${p.name}”: ${failure}`);
+        return;
+      }
+      commit((s) => setActiveProfile(s, id), `Switched to “${p.name}”.`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const doRename = () => {
+    if (renameId && commit((s) => renameProfile(s, renameId, renameDraft, new Date()), 'Profile renamed.')) setRenameId(null);
+  };
+
+  const removing = removeId ? state.profiles.find((p) => p.id === removeId) ?? null : null;
+  const full = state.profiles.length >= PROFILE_LIMITS.maxProfiles;
+
+  return (
+    <div className="stack tight" data-testid="personal-profiles">
+      <p className="field-hint">{PROFILES_NOTE} Profiles capture saved settings, not unsaved edits, and stay in this window’s preferences.</p>
+      <form className="row wrap align-end" onSubmit={(e) => { e.preventDefault(); saveCurrent(); }}>
+        <Field label="Profile name" hint={full ? `You have ${PROFILE_LIMITS.maxProfiles} profiles, the most allowed. Remove one first.` : `1 to ${PROFILE_LIMITS.nameMax} characters, unique.`} className="grow">
+          {(id, d) => <input id={id} aria-describedby={d} className="input" value={newName} maxLength={PROFILE_LIMITS.nameMax + 20} autoComplete="off" onChange={(e) => { setNewName(e.target.value); setError(null); }} />}
+        </Field>
+        <Button type="submit" icon={FloppyDisk} disabled={!newName.trim() || full}>Save current as profile</Button>
+      </form>
+      {error && <p className="field-error" role="alert">{error}</p>}
+      {state.profiles.length === 0 ? (
+        <p className="field-hint">No profiles yet. Name one above to save the current settings.</p>
+      ) : (
+        <ul className="stack tight" aria-label="Personal profiles">
+          {state.profiles.map((p) => {
+            const active = state.activeProfileId === p.id;
+            const diff = diffProfile(p, settings);
+            return (
+              <li key={p.id} className="stack tight" aria-current={active ? 'true' : undefined}>
+                <div className="row wrap">
+                  <strong>{p.name}</strong>
+                  {active && <Badge tone="ok">Active</Badge>}
+                  {diff.length > 0 ? (
+                    <span className="field-hint">Differs from current settings: {diff.map((k) => PROFILE_FIELD_LABELS[k]).join(', ')}{active ? ' (unsaved changes)' : ''}</span>
+                  ) : (
+                    <span className="field-hint">Matches current settings</span>
+                  )}
+                </div>
+                {renameId === p.id ? (
+                  <form className="row wrap align-end" onSubmit={(e) => { e.preventDefault(); doRename(); }}>
+                    <Field label={`New name for ${p.name}`} className="grow">
+                      {(id, d) => <input id={id} aria-describedby={d} className="input" value={renameDraft} maxLength={PROFILE_LIMITS.nameMax + 20} autoComplete="off" onChange={(e) => setRenameDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setRenameId(null); } }} />}
+                    </Field>
+                    <Button type="submit" size="sm" disabled={!renameDraft.trim()}>Save name</Button>
+                    <Button size="sm" onClick={() => setRenameId(null)}>Cancel</Button>
+                  </form>
+                ) : (
+                  <div className="row wrap">
+                    <Button size="sm" variant={active ? 'ghost' : 'primary'} busy={busyId === p.id} disabled={busyId !== null || (active && diff.length === 0)} aria-label={`Switch to ${p.name}`} onClick={() => void switchTo(p.id)}>Switch</Button>
+                    <Button size="sm" disabled={diff.length === 0} aria-label={`Update ${p.name} from current settings`} onClick={() => commit((s) => updateProfileSettings(s, p.id, settings, new Date()), `Profile “${p.name}” updated.`)}>Update from current</Button>
+                    <Button size="sm" aria-label={`Rename ${p.name}`} onClick={() => { setRenameId(p.id); setRenameDraft(p.name); setError(null); }}>Rename</Button>
+                    <Button size="sm" variant="danger" icon={Trash} aria-label={`Remove ${p.name}`} onClick={() => setRemoveId(p.id)}>Remove</Button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <ConfirmDialog open={!!removing} title={removing ? `Remove profile “${removing.name}”?` : 'Remove profile?'} confirmLabel="Remove profile" danger onCancel={() => setRemoveId(null)} onConfirm={() => { if (removing) commit((s) => removeProfile(s, removing.id), 'Profile removed.'); setRemoveId(null); }}>
+        <p>Only the saved profile is removed. Your current settings stay as they are.</p>
+      </ConfirmDialog>
+    </div>
+  );
+}
+
+/* ---------- Cloud providers (goal 102: optional providers, honest per-provider key status) ---------- */
+
+export const CLOUD_PROVIDER_NOTE = 'Requests go only to the chosen provider, and only in online mode. Offline mode never contacts any provider, and there is no automatic switch to another provider or to the local model.';
+export const PROVIDER_KEYS_NOTE = 'Each provider has its own key, stored with Windows protection on this computer. A stored key is never shown again; this screen only learns whether one is stored. No key is included with the app: use your own provider account.';
+
+/** Badge text for one provider's key slot. Unknown or unconnected states are said plainly, never shown as stored. */
+export function providerKeyLabel(s: CloudProviderStatus | undefined): { text: string; tone: 'ok' | 'warn' | 'muted' } {
+  if (!s || s.hasKey === null) return { text: 'Key status unknown', tone: 'muted' };
+  if (s.keyChannel === 'unavailable') return { text: 'No key (not connected in this build)', tone: 'muted' };
+  return s.hasKey ? { text: 'Key stored', tone: 'ok' } : { text: 'No key', tone: 'warn' };
+}
+
+export function CloudProvidersPanel({ api, provider, cloudModel, onSelect, notify, onKeysChanged, isPreview }: {
+  api: Parameters<typeof cloudProvidersBridge>[0];
+  provider: CloudProvider;
+  cloudModel: string;
+  onSelect: (p: CloudProvider) => void;
+  notify: (kind: 'ok' | 'error' | 'info', text: string) => void;
+  onKeysChanged?: () => void;
+  isPreview?: boolean;
+}) {
+  const client = useMemo(() => cloudProvidersBridge(api), [api]);
+  const [statuses, setStatuses] = useState<CloudProviderStatus[] | null>(null);
+  const [keys, setKeys] = useState<Partial<Record<CloudProvider, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<CloudProvider, string>>>({});
+  const [busy, setBusy] = useState<CloudProvider | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<CloudProvider | null>(null);
+  const refresh = useCallback(async () => {
+    try { setStatuses(await client.status()); } catch { setStatuses(null); }
+  }, [client]);
+  useEffect(() => { void refresh(); }, [refresh]);
+  // Pasted keys live only in this component's memory and are dropped when the window is hidden or the panel closes.
+  useEffect(() => {
+    const drop = () => { if (document.visibilityState === 'hidden') setKeys({}); };
+    document.addEventListener('visibilitychange', drop);
+    return () => { document.removeEventListener('visibilitychange', drop); setKeys({}); };
+  }, []);
+
+  const info = cloudProviderInfo(provider);
+  const model = effectiveCloudModel(provider, cloudModel);
+  const statusOf = (p: CloudProvider) => statuses?.find((s) => s.provider === p);
+
+  const save = async (p: CloudProvider) => {
+    const k = (keys[p] ?? '').trim();
+    const problem = apiKeyProblem(k);
+    if (problem) { setErrors((e) => ({ ...e, [p]: problem })); return; }
+    setBusy(p);
+    setErrors((e) => ({ ...e, [p]: undefined }));
+    try {
+      await client.setKey(p, k);
+      setKeys((m) => ({ ...m, [p]: '' }));
+      notify('ok', `${cloudProviderInfo(p).name} key stored. It will not be shown again.`);
+      onKeysChanged?.();
+    } catch (e) {
+      setErrors((m) => ({ ...m, [p]: errMsg(e, 'The key could not be stored.') }));
+    } finally {
+      setBusy(null);
+      await refresh();
+    }
+  };
+
+  const remove = async (p: CloudProvider) => {
+    setBusy(p);
+    try {
+      await client.clearKey(p);
+      notify('ok', `${cloudProviderInfo(p).name} key removed.`);
+      onKeysChanged?.();
+    } catch (e) {
+      setErrors((m) => ({ ...m, [p]: errMsg(e, 'The key could not be removed.') }));
+    } finally {
+      setBusy(null);
+      setConfirmRemove(null);
+      await refresh();
+    }
+  };
+
+  const active = providerKeyLabel(statusOf(provider));
+  return (
+    <div className="cloud-providers stack tight" data-testid="cloud-providers">
+      <div className="field">
+        <label htmlFor="cloud-provider-select">Cloud provider</label>
+        <select id="cloud-provider-select" className="input" value={provider} onChange={(e) => { if (isCloudProvider(e.target.value)) onSelect(e.target.value); }}>
+          {CLOUD_PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </div>
+      <p className="field-hint" data-testid="cloud-provider-routing">{CLOUD_PROVIDER_NOTE} The chosen provider is {info.name} ({info.host}).</p>
+      <dl className="kv-list">
+        <div className="kv"><dt>Model used</dt><dd><span className="mono">{model}</span>{model !== cloudModel.trim() && <span className="field-hint"> The saved model name does not fit {info.name}, so its default model is used.</span>}</dd></div>
+        <div className="kv"><dt>{info.name} key</dt><dd><Badge tone={active.tone}>{active.text}</Badge></dd></div>
+      </dl>
+      <p className="field-hint">{PROVIDER_KEYS_NOTE}</p>
+      <ul className="cloud-provider-list" aria-label="Provider keys">
+        {CLOUD_PROVIDERS.map((p) => {
+          const s = statusOf(p.id);
+          const label = providerKeyLabel(s);
+          const inputId = `provider-key-${p.id}`;
+          return (
+            <li key={p.id} className={cx('cloud-provider-row', p.id === provider && 'is-active')}>
+              <div className="cloud-provider-head">
+                <Key size={16} aria-hidden />
+                <strong>{p.name}</strong>
+                {p.id === provider && <Badge tone="accent">Selected</Badge>}
+                <Badge tone={label.tone}>{label.text}</Badge>
+                <span className="sub mono">{p.host}</span>
+              </div>
+              <p className="field-hint">{p.capability} Default model: <span className="mono">{p.defaultModel}</span>.{s?.reason ? ` ${s.reason}` : ''}</p>
+              <form className="row wrap align-end" onSubmit={(e) => { e.preventDefault(); void save(p.id); }}>
+                <div className="field grow">
+                  <label htmlFor={inputId}>New {p.name} key</label>
+                  <input id={inputId} className="input mono" type="password" autoComplete="off" spellCheck={false} maxLength={400} value={keys[p.id] ?? ''} placeholder={isPreview ? 'Unavailable in browser preview' : s?.hasKey ? 'A key is stored. Paste a new one to replace it' : 'Paste your key'} onChange={(e) => { const v = e.target.value; setKeys((m) => ({ ...m, [p.id]: v })); setErrors((m) => ({ ...m, [p.id]: undefined })); }} />
+                </div>
+                <Button type="submit" size="sm" icon={FloppyDisk} busy={busy === p.id} disabled={busy !== null || !(keys[p.id] ?? '').trim()}>Save</Button>
+                {confirmRemove === p.id ? (
+                  <>
+                    <Button size="sm" variant="danger" icon={Trash} busy={busy === p.id} onClick={() => void remove(p.id)}>Confirm remove</Button>
+                    <Button size="sm" onClick={() => setConfirmRemove(null)}>Cancel</Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="danger" icon={Trash} disabled={busy !== null || s?.hasKey !== true} onClick={() => setConfirmRemove(p.id)}>Remove</Button>
+                )}
+              </form>
+              {errors[p.id] && <p className="field-error" role="alert">{errors[p.id]}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 /* ---------- Draft handling ---------- */
 
 const DRAFT_KEYS = ['mode', 'localEndpoint', 'localModel', 'cloudModel', 'voice', 'allowedRoots', 'approvedApps', 'retainDays', 'startInTray'] as const;
@@ -282,6 +840,19 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [confirmKeyDelete, setConfirmKeyDelete] = useState(false);
+  const activeProvider: CloudProvider = isCloudProvider(settings.cloudProvider) ? settings.cloudProvider : DEFAULT_CLOUD_PROVIDER;
+  const [confirmProvider, setConfirmProvider] = useState<CloudProvider | null>(null);
+  const applyProvider = async (p: CloudProvider) => {
+    await mutate(() => api.saveSettings({ cloudProvider: p }), `Cloud provider set to ${cloudProviderInfo(p).name}.`);
+    setConfirmProvider(null);
+    void refreshSystem();
+  };
+  // Changing providers online asks for consent before the backend's independent native permission check.
+  const chooseProvider = (p: CloudProvider) => {
+    if (p === activeProvider) return;
+    if (settings.mode === 'online') setConfirmProvider(p);
+    else void applyProvider(p);
+  };
 
   const [exportNote, setExportNote] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -351,6 +922,19 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
     }
     return ok;
   };
+  /** Applies a profile patch with the shared saveSettings call. Resolves null on success, or the error text. */
+  const applyProfilePatch = async (patch: Partial<SettingsT>): Promise<string | null> => {
+    let failure: unknown = null;
+    const ok = await mutate(async () => {
+      try {
+        return await api.saveSettings(patch);
+      } catch (e) {
+        failure = e;
+        throw e;
+      }
+    });
+    return ok ? null : errMsg(failure, 'The settings could not be saved.');
+  };
   const requestSave = () => {
     if (invalid) {
       toast('error', `Fix ${issues.length === 1 ? 'the problem' : `the ${issues.length} problems`} listed above first.`);
@@ -415,6 +999,9 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
   };
 
   const online = draft.mode === 'online';
+  // The existing Backup export writes a file from the main process and never hands JSON to this window,
+  // so the bundle reads the local productivity store through the existing bridge instead.
+  const bundleSource = useMemo(() => productivityBridge(api), [api]);
 
   /* ---------- Search ---------- */
   const searching = query.trim().length > 0;
@@ -458,7 +1045,7 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
     };
   }, []);
 
-  const anyDialog = confirmOnline || confirmKeyDelete || confirmImport || confirmClear;
+  const anyDialog = confirmOnline || confirmKeyDelete || confirmImport || confirmClear || confirmProvider !== null;
   const onPageKeyDown = (e: ReactKeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 's' && !anyDialog) {
       e.preventDefault();
@@ -590,6 +1177,10 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
           </form>
         </SettingsSection>
 
+        <SettingsSection ctx={sectionCtx} id="personal-profiles" panelTab="general" title="Personal profiles" eyebrow="Switch applies immediately">
+          <PersonalProfilesPanel settings={settings} applyPatch={applyProfilePatch} notify={toast} />
+        </SettingsSection>
+
         <SettingsSection ctx={sectionCtx} id="startup" panelTab="general" title="Startup" eyebrow="Needs Save">
           <Switch label="Start in the system tray" description="Open minimised to the tray instead of showing the window." checked={draft.startInTray} onChange={(v) => set('startInTray', v)} />
         </SettingsSection>
@@ -655,6 +1246,7 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
         </SettingsSection>
 
         <SettingsSection ctx={sectionCtx} id="cloud-model" panelTab="models" title="Cloud model" eyebrow="Online route">
+          <CloudProvidersPanel api={api} provider={activeProvider} cloudModel={settings.cloudModel} onSelect={chooseProvider} notify={toast} isPreview={isPreview} onKeysChanged={() => { void refreshCloud(); void refreshSystem(); }} />
           <Field label="Model name" error={cloudError} hint="Used only in online mode.">
             {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.cloudModel} maxLength={120} spellCheck={false} onChange={(e) => set('cloudModel', e.target.value)} />}
           </Field>
@@ -714,6 +1306,14 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
           {isPreview && <p className="field-hint">Export and import are unavailable in browser preview.</p>}
         </SettingsSection>
 
+        <SettingsSection ctx={sectionCtx} id="encrypted-bundle" panelTab="data" title="Encrypted transfer bundle (manual, no sync service)" eyebrow="Move data between computers yourself">
+          <EncryptedBundlePanel source={bundleSource} notify={toast} />
+        </SettingsSection>
+
+        <SettingsSection ctx={sectionCtx} id="license" panelTab="data" title="License (offline verification)" eyebrow="No activation server">
+          <LicensePanel />
+        </SettingsSection>
+
         <SettingsSection ctx={sectionCtx} id="motion" panelTab="accessibility" title="Motion" eyebrow="Applies immediately">
           <Switch label="Reduce motion" description="Turns off avatar, scene, panel and Motion studio animation. Saved with your settings. The Windows reduced-motion setting is also respected." checked={settings.reduceMotion} onChange={(v) => void mutate(() => api.saveSettings({ reduceMotion: v }))} />
           <Switch
@@ -761,6 +1361,9 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
 
       <ConfirmDialog open={confirmOnline} title="Switch to online mode?" confirmLabel="Save and go online" busy={saving} onCancel={() => setConfirmOnline(false)} onConfirm={() => void doSave()}>
         <p>Your chat messages will be sent to the cloud model “{draft.cloudModel || 'not set'}” using your API key. Windows will ask you to confirm this too. Offline mode stays available and there is no automatic switching between the two.</p>
+      </ConfirmDialog>
+      <ConfirmDialog open={confirmProvider !== null} title={confirmProvider ? `Send online chat to ${cloudProviderInfo(confirmProvider).name}?` : 'Change cloud provider?'} confirmLabel="Change provider" onCancel={() => setConfirmProvider(null)} onConfirm={() => { if (confirmProvider) void applyProvider(confirmProvider); }}>
+        <p>{confirmProvider ? `From your next message, online chat goes only to ${cloudProviderInfo(confirmProvider).name} (${cloudProviderInfo(confirmProvider).host}) with that provider's own key. If no key is stored for it, chat shows an error and sends nothing. No other provider is tried.` : ''}</p>
       </ConfirmDialog>
       <ConfirmDialog open={confirmKeyDelete} title="Delete the saved key?" confirmLabel="Delete key" danger busy={keyBusy} onCancel={() => setConfirmKeyDelete(false)} onConfirm={() => void deleteKey()}>
         <p>Online chat stops working until you save a key again. Offline mode is not affected.</p>

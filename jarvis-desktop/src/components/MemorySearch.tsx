@@ -6,6 +6,10 @@ import type { ProductivityState } from '../../electron/services/store';
 import { CATEGORY_LABELS, SEARCH_LIMITS, groupResults, parseQuery, navResult, previewRetention, searchState, type ExternalDoc, type NavResult, type SearchCategory, type SearchResult } from '../../electron/services/search';
 import { Badge, Button, Empty, Field, Notice, Panel, Switch } from '../ui/primitives';
 import { useOptionalStore, useReady } from '../ui/store';
+import { RETRIEVAL_KINDS, buildIndex, docsFromState, findRelated, parseRetrievalKey, retrievalKey, type RetrievalHit, type RetrievalIndex, type RetrievalKind } from '../ui/local-retrieval';
+import { NOTES_QA_LIMITS, buildNotesQaRequest, describeDestination, parseAnswerReferences, runNotesQa, suggestNotes, type ParsedAnswer, type QaRunResult, type QaSource } from '../ui/notes-qa';
+
+const isRetrievalKind = (c: string): c is RetrievalKind => (RETRIEVAL_KINDS as readonly string[]).includes(c);
 
 const ICONS = { note: Note, task: CheckSquare, capsule: Cube, checkpoint: Cube, reference: Note, history: Info, external: MagnifyingGlass, chat: ChatCircleDots } satisfies Record<SearchCategory, unknown>;
 /**
@@ -100,6 +104,31 @@ export function MemorySearch({ state, onNavigate, initialQuery = '', limit, prod
     });
   }, [state, deferred, includeChat, includeHistory, limit, productivity, external, scope, tag, range]);
   const groups = useMemo(() => groupResults(results), [results]);
+  // Lexical related items (BM25 over saved words). Built from renderer state only; no model, no network.
+  const relatedIndex = useMemo<RetrievalIndex | null>(() => {
+    try {
+      return buildIndex(docsFromState(state, productivity));
+    } catch {
+      return null;
+    }
+  }, [state, productivity]);
+  const [relatedSource, setRelatedSource] = useState<{ key: string; title: string } | null>(null);
+  const relatedHits = useMemo<RetrievalHit[]>(() => {
+    if (!relatedIndex || !relatedSource) return [];
+    try {
+      return findRelated(relatedIndex, relatedSource.key, { limit: 8 });
+    } catch {
+      return [];
+    }
+  }, [relatedIndex, relatedSource]);
+  const showRelated = (r: SearchResult) => {
+    if (isRetrievalKind(r.category)) setRelatedSource({ key: retrievalKey(r.category, r.id), title: r.title });
+  };
+  const openRelated = (hit: RetrievalHit) => {
+    const parsed = parseRetrievalKey(hit.id);
+    if (!parsed) return null;
+    return navResult({ category: parsed.kind, id: parsed.id, title: hit.title, snippet: '', relevance: 0 }, productivity);
+  };
   const noteTags = useMemo(() => [...new Set(state.notes.flatMap((n) => n.tags))].sort().slice(0, 100), [state.notes]);
   const filtered = Boolean(scope || tag || range !== 'any');
   const clearFilters = () => {
@@ -241,11 +270,16 @@ export function MemorySearch({ state, onNavigate, initialQuery = '', limit, prod
                     return (
                       <li key={`${r.category}:${r.id}`}>
                         {target ? (
-                          <button type="button" data-result className="select-item" onClick={() => onNavigate(target)}>
+                          <button type="button" data-result className="select-item" onClick={() => onNavigate(target)} onFocus={() => showRelated(r)}>
                             {body}
                           </button>
                         ) : (
                           <div className="select-item" data-nolink>{body}</div>
+                        )}
+                        {isRetrievalKind(r.category) && (
+                          <Button size="sm" data-find-related aria-label={`Find related items for ${r.title}`} onClick={() => showRelated(r)}>
+                            Find related
+                          </Button>
                         )}
                       </li>
                     );
@@ -256,6 +290,227 @@ export function MemorySearch({ state, onNavigate, initialQuery = '', limit, prod
           })
         )}
       </div>
+
+      <RelatedItems headingId={`${statusId}-related`} source={relatedSource} hits={relatedHits} open={openRelated} onNavigate={onNavigate} />
+
+      <NotesQaPanel headingId={`${statusId}-ask`} state={state} productivity={productivity} onNavigate={onNavigate} />
+    </section>
+  );
+}
+
+type QaNoteRecord = AppState['notes'][number];
+type QaDone = { run: QaRunResult; parsed: ParsedAnswer; sources: readonly QaSource[] };
+const outcomeText: Record<QaRunResult['outcome'], string> = {
+  complete: 'Answer received.',
+  truncated: 'The answer reached the app length limit and was cut off.',
+  cancelled: 'Stopped.',
+  incomplete: 'The connection ended before the answer was finished.',
+  failed: 'No answer was generated.',
+};
+
+/**
+ * Ask your notes: the user ticks notes (suggested by on-device BM25 or found by title), reviews exactly what will be
+ * sent and where, then explicitly clicks to send. Only the ticked notes are ever included. Sending reuses the guarded
+ * chat service (main routes by settings.mode); the renderer never sees a cloud key.
+ */
+function NotesQaPanel({ headingId, state, productivity, onNavigate }: { headingId: string; state: AppState; productivity: ProductivityState | null; onNavigate: (result: NavResult) => void }) {
+  const ctx = useOptionalStore();
+  const api = ctx?.api ?? null;
+  const mode = ctx?.settings?.mode ?? state.settings.mode;
+  const destination = describeDestination(mode);
+  const online = destination.requiresConfirmation;
+  const [question, setQuestion] = useState('');
+  const deferredQuestion = useDeferredValue(question);
+  const [checked, setChecked] = useState<string[]>([]);
+  const [titleQuery, setTitleQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [partial, setPartial] = useState('');
+  const [done, setDone] = useState<QaDone | null>(null);
+  const [keyMissing, setKeyMissing] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const suggestions = useMemo(() => suggestNotes(state.notes, deferredQuestion, 6), [state.notes, deferredQuestion]);
+  const titleMatches = useMemo(() => {
+    const q = titleQuery.trim().toLowerCase();
+    return q ? state.notes.filter((n) => n.title.toLowerCase().includes(q)).slice(0, 8) : [];
+  }, [state.notes, titleQuery]);
+  const selectedNotes = useMemo(() => checked.map((id) => state.notes.find((n) => n.id === id)).filter((n): n is QaNoteRecord => Boolean(n)), [checked, state.notes]);
+  const request = useMemo(() => buildNotesQaRequest(question, selectedNotes), [question, selectedNotes]);
+  const full = checked.length >= NOTES_QA_LIMITS.maxNotes;
+  const toggle = (id: string) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : c.length >= NOTES_QA_LIMITS.maxNotes ? c : [...c, id]));
+  const keyKnownMissing = online && (keyMissing || ctx?.cloudConfigured === false);
+  const count = request.sources.length;
+
+  const send = async () => {
+    if (!api || !request.ready || busy) return;
+    if (online) {
+      let configured = false;
+      try {
+        configured = (await api.cloudKeyStatus()).configured === true;
+      } catch {
+        configured = false;
+      }
+      if (!configured) {
+        setKeyMissing(true);
+        return;
+      }
+      setKeyMissing(false);
+    }
+    const sent = request;
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setBusy(true);
+    setPartial('');
+    setDone(null);
+    const run = await runNotesQa(api, sent, { signal: ac.signal, onDelta: (t) => setPartial((p) => (p + t).slice(-8000)) });
+    if (abortRef.current === ac) abortRef.current = null;
+    setBusy(false);
+    setPartial('');
+    setDone({ run, parsed: parseAnswerReferences(run.text, sent.sources), sources: sent.sources });
+    void ctx?.reload().catch(() => undefined);
+  };
+
+  const noteChoice = (n: { id: string; title: string }, extra?: string) => (
+    <li key={n.id}>
+      <label className="row">
+        <input type="checkbox" checked={checked.includes(n.id)} disabled={busy || (!checked.includes(n.id) && full)} onChange={() => toggle(n.id)} />
+        <span>{n.title || '(untitled)'}</span>
+        {extra && <span className="sub">{extra}</span>}
+      </label>
+    </li>
+  );
+  const openNote = (ref: { id: string; title: string }) => navResult({ category: 'note', id: ref.id, title: ref.title, snippet: '', relevance: 0 }, productivity);
+
+  return (
+    <section aria-labelledby={headingId} className="stack tight" data-notes-qa>
+      <h4 id={headingId} className="eyebrow">Ask your notes</h4>
+      <p className="sub">Suggestions are ranked on this device. Nothing is sent until you click the send button below, and only the notes you tick are included: never all notes, the clipboard, the screen or chat history.</p>
+      <Field label="Question" hint={`Up to ${NOTES_QA_LIMITS.questionChars} characters.`}>
+        {(id, d) => <textarea id={id} className="input" aria-describedby={d} rows={2} maxLength={NOTES_QA_LIMITS.questionChars} value={question} disabled={busy} onChange={(e) => setQuestion(e.target.value)} />}
+      </Field>
+      {question.trim() && (
+        <div className="stack tight" data-qa-suggestions>
+          <p className="sub">Suggested notes (unticked until you choose; at most {NOTES_QA_LIMITS.maxNotes}):</p>
+          {suggestions.length ? <ul className="select-list">{suggestions.map((s) => noteChoice(s, s.sharedTerms.length ? `shares: ${s.sharedTerms.slice(0, 4).join(', ')}` : undefined))}</ul> : <p className="sub">No saved note shares words with the question. Add a note by title below.</p>}
+        </div>
+      )}
+      <Field label="Add a note by title">
+        {(id) => <input id={id} type="search" className="input" maxLength={200} autoComplete="off" value={titleQuery} disabled={busy} onChange={(e) => setTitleQuery(e.target.value)} />}
+      </Field>
+      {titleQuery.trim() && (titleMatches.length ? <ul className="select-list" data-qa-title-matches>{titleMatches.map((n) => noteChoice(n))}</ul> : <p className="sub">No note title contains that text.</p>)}
+
+      {selectedNotes.length > 0 && (
+        <div className="stack tight" data-consent-preview>
+          <p>
+            <strong>Will send to: {destination.label}</strong>
+          </p>
+          <ul aria-label="Notes that will be sent">
+            {request.sources.map((s) => (
+              <li key={s.id} className="row">
+                <span>[{s.n}] {s.title}</span>
+                <span className="sub">{s.chars} characters</span>
+                {s.truncated && <Badge tone="warn">shortened</Badge>}
+              </li>
+            ))}
+          </ul>
+          <p className="sub">
+            Total: {request.noteChars} characters of note text; {request.sentChars} characters sent including the question and instructions.
+          </p>
+          {request.warnings.map((w) => (
+            <p key={w} className="sub">{w}</p>
+          ))}
+          <details>
+            <summary>Show the exact text that will be sent</summary>
+            <pre className="sub" style={{ whiteSpace: 'pre-wrap', maxHeight: '16rem', overflow: 'auto' }}>{request.preview}</pre>
+          </details>
+        </div>
+      )}
+
+      {!api ? (
+        <Notice tone="info" title="Chat service not connected">Asking questions needs the app chat service, which is not available here.</Notice>
+      ) : (
+        <div className="row">
+          {online ? (
+            <Button variant="primary" data-confirm-send disabled={!request.ready || busy || keyKnownMissing} onClick={() => void send()}>
+              {`Send ${count} note${count === 1 ? '' : 's'} to Anthropic cloud`}
+            </Button>
+          ) : (
+            <Button variant="primary" data-confirm-send disabled={!request.ready || busy} onClick={() => void send()}>
+              Ask locally
+            </Button>
+          )}
+          {busy && (
+            <Button data-qa-cancel onClick={() => abortRef.current?.abort()}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      )}
+      {keyKnownMissing && (
+        <Notice tone="warn" title="Add your key in Settings">Online mode needs an Anthropic key stored in Settings. Nothing was sent.</Notice>
+      )}
+      {busy && (
+        <p className="sub" role="status" aria-live="polite">
+          Waiting for the answer…{partial ? ` ${partial}` : ''}
+        </p>
+      )}
+      {done && (
+        <div className="stack tight" data-qa-answer>
+          <p className="sub" role="status">{done.run.error && done.run.outcome !== 'complete' ? `${outcomeText[done.run.outcome]} ${done.run.error}` : outcomeText[done.run.outcome]}</p>
+          {done.parsed.answer && done.run.source !== 'system' && <p style={{ whiteSpace: 'pre-wrap' }}>{done.parsed.answer}</p>}
+          {done.parsed.references.length > 0 && (
+            <ul aria-label="Sources cited in the answer" className="select-list">
+              {done.parsed.references.map((r) => {
+                const target = openNote(r);
+                return (
+                  <li key={r.n}>
+                    {target ? (
+                      <button type="button" className="select-item" onClick={() => onNavigate(target)}>
+                        [{r.n}] {r.title}
+                      </button>
+                    ) : (
+                      <mark>[{r.n}] {r.title}</mark>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {done.parsed.unknownRefs.length > 0 && <p className="sub">The answer cites {done.parsed.unknownRefs.map((n) => `[${n}]`).join(', ')}, which do not match any note that was sent.</p>}
+          {done.parsed.answer && done.run.source !== 'system' && done.parsed.references.length === 0 && <p className="sub">The answer does not cite any of the sent notes.</p>}
+        </div>
+      )}
+      <p className="sub">The question, the included note text and the answer are recorded in Assistant chat history, like any other chat message.</p>
+    </section>
+  );
+}
+
+/** Additive lexical related-items list shown below the search results. */
+function RelatedItems({ headingId, source, hits, open, onNavigate }: { headingId: string; source: { key: string; title: string } | null; hits: RetrievalHit[]; open: (h: RetrievalHit) => NavResult | null; onNavigate: (result: NavResult) => void }) {
+  return (
+    <section aria-labelledby={headingId} className="stack tight" data-related>
+      <h4 id={headingId} className="eyebrow">Related items (lexical)</h4>
+      <p className="sub">Ranked by shared words on this device (BM25). No embedding model is installed in this build.</p>
+      {!source ? (
+        <p className="sub">Focus a result or choose Find related to list items that share its words.</p>
+      ) : hits.length === 0 ? (
+        <p className="sub" role="status">No saved items share distinctive words with {source.title}.</p>
+      ) : (
+        <ul className="select-list" aria-label={`Items related to ${source.title}`}>
+          {hits.map((h) => {
+            const target = open(h);
+            return (
+              <li key={h.id} className="row">
+                <strong>{h.title || '(untitled)'}</strong>
+                <Badge>{h.kind}</Badge>
+                <span className="sub">Shared words: {h.sharedTerms.join(', ')}</span>
+                {target && <Button size="sm" onClick={() => onNavigate(target)}>Open</Button>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

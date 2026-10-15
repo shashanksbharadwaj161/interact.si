@@ -1,0 +1,298 @@
+/* Motion Studio. Imported by src/components/MotionStudio.tsx; relies on tokens from tokens.css. */
+.motion-studio {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.motion-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.motion-stage-panel {
+  min-width: 0;
+}
+
+.motion-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 200px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(120% 90% at 50% 110%, hsla(var(--motion-hue, 210), 70%, 45%, 0.18), transparent 60%),
+    var(--sunken);
+}
+
+.motion-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.motion-status {
+  margin: 0;
+}
+
+.motion-controls {
+  min-width: 0;
+}
+
+.motion-field {
+  gap: 4px;
+}
+
+.motion-slider-row {
+  align-items: center;
+}
+
+.motion-value {
+  flex: 0 0 auto;
+  min-width: 44px;
+  text-align: right;
+  font: 600 12px var(--font-mono);
+  color: var(--text-2);
+}
+
+/* Range input, styled consistently with .input */
+.motion-slider {
+  --motion-thumb: var(--accent);
+  flex: 1 1 0;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.motion-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-strong);
+}
+
+.motion-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--motion-thumb);
+  border: 2px solid var(--panel-solid);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: transform 0.12s var(--ease);
+}
+
+.motion-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+.motion-slider:focus-visible {
+  outline: none;
+}
+
+.motion-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--focus);
+}
+
+/* Preset library */
+.motion-presets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.motion-presets li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.motion-preset {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  font: 500 13px var(--font-ui);
+  color: var(--text);
+  text-align: left;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.motion-preset:hover {
+  border-color: var(--line-strong);
+}
+
+.motion-preset:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.motion-preset.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.motion-preset-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.motion-preset-meta {
+  font: 500 11px var(--font-mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.motion-swatch {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+/* Reduced motion: no decorative transitions either */
+:root[data-motion="reduced"] .motion-slider::-webkit-slider-thumb,
+:root[data-motion="reduced"] .motion-preset {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-slider::-webkit-slider-thumb,
+  .motion-preset {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .motion-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Scene composition (layers, templates, import and clip export) */
+.motion-layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.motion-layer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.motion-layer .motion-preset {
+  min-height: 32px;
+}
+
+.motion-layer-opacity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.motion-layer-opacity .motion-slider {
+  height: 24px;
+}
+
+.motion-layer-opacity .motion-value {
+  min-width: 36px;
+}
+
+.motion-import {
+  width: 100%;
+  min-height: 92px;
+  font: 500 12px var(--font-mono);
+  resize: vertical;
+}
+
+.motion-issues {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.motion-issues li {
+  font: 400 13px var(--font-ui);
+}
+
+.motion-schema {
+  margin: 0;
+  padding: 8px 10px;
+  font: 500 11px var(--font-mono);
+  color: var(--text-2);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.motion-clip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.motion-key-list {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.motion-key-list .row {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+
+.motion-controls select,
+.motion-controls input[type="file"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 900px) {
+  .motion-layer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .motion-layer-opacity {
+    grid-column: 1 / 3;
+  }
+}

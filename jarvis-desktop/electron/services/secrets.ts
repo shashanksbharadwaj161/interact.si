@@ -11,7 +11,18 @@ import {promises as fsp} from 'node:fs';
 import * as path from 'node:path';
 import {randomBytes} from 'node:crypto';
 import type {NativeAdapter} from '../native/adapter';
-import {ValidationError} from './validation';
+import {ValidationError, validateCloudProvider} from './validation';
+import type {CloudProvider} from '../../src/shared/contracts';
+
+/**
+ * One protected key file per cloud chat provider. The Anthropic slot is the original single-key file (cloud-key.bin), so a
+ * key stored by an earlier build keeps working as the Anthropic key with no migration step; the other providers get their own files.
+ */
+export const PROVIDER_KEY_FILES: Readonly<Record<CloudProvider, string>> = {
+  anthropic: 'cloud-key.bin',
+  openai: 'openai-key.bin',
+  openrouter: 'openrouter-key.bin',
+};
 
 export interface SecretsFs {
   read(p: string): Promise<string | null>;
@@ -82,8 +93,10 @@ export function validateCloudKey(v: unknown): string {
 
 export class Secrets {
   private file: string;
+  private dir: string;
   constructor(private native: Pick<NativeAdapter, 'dpapi'>, dir: string, private fs: SecretsFs = nodeSecretsFs, private safeStorage?: SafeStorageLike) {
-    this.file = path.join(dir, 'secrets', 'cloud-key.bin');
+    this.dir = dir;
+    this.file = path.join(dir, 'secrets', PROVIDER_KEY_FILES.anthropic);
   }
 
   /** Never serializes anything: JSON.stringify(vault) is safe to put in a log or an export. */
@@ -147,6 +160,40 @@ export class Secrets {
     const blob = await this.fs.read(this.file);
     if (blob === null) return null;
     return this.unprotect(blob);
+  }
+
+  /** Validates the provider id (before any file is touched) and returns that provider's key file. */
+  private providerFile(provider: unknown): string {
+    const p = validateCloudProvider(provider);
+    return p === 'anthropic' ? this.file : path.join(this.dir, 'secrets', PROVIDER_KEY_FILES[p]);
+  }
+
+  /** True when a protected key blob is stored for this provider. Only a boolean ever leaves this module. */
+  async hasKey(provider: CloudProvider): Promise<boolean> {
+    const blob = await this.fs.read(this.providerFile(provider));
+    return blob !== null && blob.trim().length > 0;
+  }
+
+  /** Same protect-verify-replace sequence as set(), for one provider's slot. Other providers' keys are never touched. */
+  async setKey(provider: CloudProvider, key: unknown): Promise<{configured: boolean}> {
+    const file = this.providerFile(provider);
+    const k = validateCloudKey(key);
+    const blob = await this.protect(k);
+    if ((await this.unprotect(blob)) !== k) throw new Error('The protected key could not be verified; the previous key was kept');
+    await this.fs.write(file, blob);
+    return {configured: true};
+  }
+
+  /** Main-process only (chat routing). Never exposed through IPC. */
+  async revealKey(provider: CloudProvider): Promise<string | null> {
+    const blob = await this.fs.read(this.providerFile(provider));
+    if (blob === null) return null;
+    return this.unprotect(blob);
+  }
+
+  async clearKey(provider: CloudProvider): Promise<{configured: boolean}> {
+    await this.fs.remove(this.providerFile(provider));
+    return {configured: false};
   }
 
   async delete(): Promise<void> {

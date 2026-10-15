@@ -1,0 +1,16 @@
+{
+  "task": "Loop 25: update-manifest-verify",
+  "sessionId": "api-ae78dbb4-8ea2-4d05-98c1-38519ff89959",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Status.tsx",
+      "bytes": 13357,
+      "sha256": "8d5b9d0bd56f7189ca075a19cfe07c190a6a7d7d6019e86899d8685080040bf7"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

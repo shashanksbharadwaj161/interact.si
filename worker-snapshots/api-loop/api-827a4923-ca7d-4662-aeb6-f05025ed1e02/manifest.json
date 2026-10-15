@@ -15,7 +15,17 @@
       "path": "src/ui/workbench.ts",
       "bytes": 9780,
       "sha256": "cb6fbc03443d1b84b11cb54bc715dcf76e6c96127af2976c5ef30d7d8238e5a8"
+    },
+    {
+      "path": "src/components/PromptTools.tsx",
+      "bytes": 11867,
+      "sha256": "43d7d3f1eb4a07846b4ab7d58cb65c1ceddcbf07ea59126e11f8ef87d859a16d"
+    },
+    {
+      "path": "src/styles/views.css",
+      "bytes": 17738,
+      "sha256": "8967288bfafd8a64b633352660eb4ae10b3737196a9e4ce766bff0a9448c3598"
     }
   ],
-  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
 }

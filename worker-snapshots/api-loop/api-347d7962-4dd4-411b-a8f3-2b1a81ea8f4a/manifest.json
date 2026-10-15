@@ -1,0 +1,16 @@
+{
+  "task": "Loop 23: tone-translate",
+  "sessionId": "api-347d7962-4dd4-411b-a8f3-2b1a81ea8f4a",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/PromptTools.tsx",
+      "bytes": 22770,
+      "sha256": "cd47bd330937049740ae1fa91d086859866d726ed28e438243eec0cc2676502b"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

@@ -1,0 +1,46 @@
+{
+  "task": "Loop 16: explicit-context-controls",
+  "sessionId": "api-b93aa6d9-f385-47dc-9435-f7c943376107",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "electron/services/chat.ts",
+      "bytes": 22372,
+      "sha256": "c8ea93a47aa64a9fa7e6f27f8b44306126f40f223c6d9e79242ca4c07d232e4b"
+    },
+    {
+      "path": "electron/ipc.ts",
+      "bytes": 670,
+      "sha256": "78409fef39ca2b9a9dc05dfb786f5da881678acaf256f31f1fea27a35664ee0b"
+    },
+    {
+      "path": "electron/channels.ts",
+      "bytes": 4252,
+      "sha256": "0d9c7ac44e57634725bf03384d0f170ec60aaaffade852ae06b6001631c14011"
+    },
+    {
+      "path": "electron/preload.ts",
+      "bytes": 6931,
+      "sha256": "3902255605451186442899d70327a2eff5eabb21e589204f1a81ec461b614dba"
+    },
+    {
+      "path": "src/shared/contracts.ts",
+      "bytes": 13976,
+      "sha256": "4513bd5637a4ea06be7a1ae013212267ec7e727bdb2a34961e697e3474dbba00"
+    },
+    {
+      "path": "src/ui/bridges.ts",
+      "bytes": 14217,
+      "sha256": "01f2e8b785ad1f9c545663f024a7e89c0eaedb3e8dc922a537564abb161ffd9b"
+    },
+    {
+      "path": "src/components/Assistant.tsx",
+      "bytes": 66119,
+      "sha256": "0c4851bf7a36f3c6d8345ee0d6f60c1c26835248a5de33a5676f6d31bb4d6064"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

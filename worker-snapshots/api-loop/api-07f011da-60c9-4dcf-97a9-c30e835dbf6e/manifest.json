@@ -7,10 +7,30 @@
   "checkpointWritten": false,
   "files": [
     {
+      "path": "electron/channels.ts",
+      "bytes": 4252,
+      "sha256": "0d9c7ac44e57634725bf03384d0f170ec60aaaffade852ae06b6001631c14011"
+    },
+    {
+      "path": "electron/ipc.ts",
+      "bytes": 670,
+      "sha256": "78409fef39ca2b9a9dc05dfb786f5da881678acaf256f31f1fea27a35664ee0b"
+    },
+    {
+      "path": "electron/preload.ts",
+      "bytes": 6931,
+      "sha256": "3902255605451186442899d70327a2eff5eabb21e589204f1a81ec461b614dba"
+    },
+    {
       "path": "src/shared/contracts.ts",
       "bytes": 15506,
       "sha256": "8007ebd6a9eae0599201c5795f2663435fb49a9b3d93b8555e91baa5b26af0d6"
+    },
+    {
+      "path": "src/components/PromptTools.tsx",
+      "bytes": 11867,
+      "sha256": "43d7d3f1eb4a07846b4ab7d58cb65c1ceddcbf07ea59126e11f8ef87d859a16d"
     }
   ],
-  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
 }

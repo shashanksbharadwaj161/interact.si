@@ -1,0 +1,16 @@
+{
+  "task": "Loop 28: conversation-history-export",
+  "sessionId": "api-8ffdf96a-b039-4f47-8b8f-36543ca86b76",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Assistant.tsx",
+      "bytes": 78098,
+      "sha256": "45ef01d331b95cd412b9d729db5c01b34099e07e8d0127871adf5374f1f136d8"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

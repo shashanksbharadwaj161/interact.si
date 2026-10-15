@@ -1,0 +1,21 @@
+{
+  "task": "Loop 17: clip-export",
+  "sessionId": "api-47cb6e3a-7da5-4130-82ae-de03b3f1852b",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/MotionStudio.tsx",
+      "bytes": 55266,
+      "sha256": "9682a2af06c75ffdb55bfbd3ccade3548a0ae01c04e3e50daaeb4f1a3c91e805"
+    },
+    {
+      "path": "src/styles/motion-studio.css",
+      "bytes": 5873,
+      "sha256": "b50780c2e110af3cf35e5169e8062f8c2b476b0936aa3eebca9daa590671c51d"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

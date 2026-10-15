@@ -1,0 +1,16 @@
+{
+  "task": "Loop 28: calendar-ics-export",
+  "sessionId": "api-90462301-ae59-433e-8b2f-6ddd6a3472ec",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Calendar.tsx",
+      "bytes": 20316,
+      "sha256": "580365546edd9e64eb8b494ad0fe3122dd7ebe23458e0745422e4f25287872ad"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

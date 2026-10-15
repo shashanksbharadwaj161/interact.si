@@ -12,5 +12,5 @@
       "sha256": "9ac25e37966877fa5745ce1e6dd912943f39d1992cd2cfed1c51c7af5f622331"
     }
   ],
-  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
 }

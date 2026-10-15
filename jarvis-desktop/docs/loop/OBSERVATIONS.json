@@ -1,9 +1,448 @@
 {
   "version": 1,
-  "id": "879ae9ca-17b6-4a72-921a-b79f3836f41e",
-  "round": 16,
-  "at": "2026-10-15T05:06:07.722Z",
-  "priorVerifiedWork": [],
-  "reason": "Round failed; retry from observable error",
-  "error": "Worker worklog-standup-drafts stopped: failed"
+  "id": "d561021f-5b52-4077-a0f2-cc5582625160",
+  "round": 41,
+  "at": "2026-10-15T16:26:47.395Z",
+  "reason": "Explicit start",
+  "previousObservationId": "d93ddf24-5d77-41cd-b9db-9b4472c262f4",
+  "completionDirective": {
+    "version": 1,
+    "mode": "finish-audited-backlog",
+    "targetPercent": 100,
+    "scopeTotal": 140,
+    "auditThroughRound": 29,
+    "remainingGoalIds": [
+      "7",
+      "9",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "22",
+      "23",
+      "24",
+      "25",
+      "28",
+      "29",
+      "33",
+      "36",
+      "38",
+      "39",
+      "40",
+      "42",
+      "43",
+      "44",
+      "47",
+      "48",
+      "49",
+      "50",
+      "52",
+      "55",
+      "56",
+      "57",
+      "58",
+      "60",
+      "61",
+      "63",
+      "64",
+      "67",
+      "69",
+      "70",
+      "71",
+      "72",
+      "73",
+      "74",
+      "75",
+      "76",
+      "77",
+      "78",
+      "79",
+      "80",
+      "81",
+      "82",
+      "87",
+      "88",
+      "89",
+      "90",
+      "91",
+      "92",
+      "93",
+      "94",
+      "95",
+      "96",
+      "97",
+      "98",
+      "99",
+      "100",
+      "101",
+      "102",
+      "103",
+      "104",
+      "105",
+      "106",
+      "107",
+      "109",
+      "110",
+      "111",
+      "112",
+      "113",
+      "115",
+      "117",
+      "118",
+      "119",
+      "120",
+      "122",
+      "123",
+      "125",
+      "127",
+      "133",
+      "134",
+      "135",
+      "136",
+      "139",
+      "140"
+    ],
+    "prioritization": [
+      "Close audited runtime gaps first: wire host battery state into App motion reduction and keep SceneBackdrop mounted across scene changes; add behavioral tests. Then continue remaining end to end workflows.",
+      "Replace installed product manual agent records with actual bounded execution and results where technically feasible.",
+      "Implement missing screen and voice workflows with explicit permissions and deterministic fixture tests.",
+      "Build a unified Connected Accounts flow for Spotify, Gmail, Google Calendar, Microsoft and other supported services. Every user signs into their own account via provider authorization. Implement useful in-app actions with scoped consent, connection status, revocation and protected tokens. Use provider app registrations and PKCE where applicable; never shared owner credentials.",
+      "Complete actual reversible Windows customization subject to existing safety and compatible licensing.",
+      "Finish remaining avatar motion memory and workspace behavior rather than adding unrelated preview panels.",
+      "Resolve unverified installer hardware security and recovery requirements with actual evidence.",
+      "When the shared guard has less than 15 dollars available, choose one narrow Opus repair with at most three exact files including one new test. Reuse accepted adapters and avoid broad rewrites or repeated planning. Preserve all acceptance gates and the existing shared guard."
+    ],
+    "acceptanceCriteria": [
+      "Every remaining named requirement needs implemented behavior wired into the installed app and meaningful behavioral tests.",
+      "Keep all 140 requirements and all existing acceptance gates. Do not delete or rename gaps to inflate completion.",
+      "A prompt preview manual record reference link or unavailable label is not the operational feature.",
+      "Accepted slices do not automatically make their full feature complete. Review remaining named behavior.",
+      "Run focused worker checks then independent combined tests build and offline smoke before integration.",
+      "Use small exact edits and saved evidence. Preserve passed peers and repair incomplete work without repeating accepted changes.",
+      "Each supported integration must use the current user account, protected tokens, minimal scopes, disconnect and clear provider errors. Verify real authorized actions before marking complete. Provider registrations, signing and hardware evidence remain prerequisites; owning a Windows PC does not establish ARM64 or signing. Continue independent work when setup is unavailable.",
+      "Preserve the existing shared spending guard offline default protected credentials and product action confirmations. No purchases or automatic payments."
+    ]
+  },
+  "unresolvedWorkerFailures": [
+    {
+      "role": "worklog-draft",
+      "round": 17,
+      "files": [
+        "src/ui/worklog-draft.ts",
+        "src/components/MemoryWorkbench.tsx",
+        "tests/slice-worklog-draft.test.mjs"
+      ],
+      "reason": "Worker worklog-draft requires review or hardware/account input: Feature 35 slice. New pure module src/ui/worklog-draft.ts exports buildWorklogDraft(input, {since, until, capsuleId?, format, now?}). Input is {checkpoints, tasks, notes, focusSessions} using the existing field names (Checkpoint.createdAt/capsuleId/refs, Task.done/createdAt with optional completedAt/updatedAt, Note.updatedAt, FocusSession.endedAt/outcome/capsuleId/taskId). The window is half-open: since <= t < until. Records are grouped into Done (checkpoints, done tasks, completed focus), In progress (updated notes, focus stopped early) and Blocked/Open (open tasks). Each bullet carries {kind,id,title} evidence and a [kind:id] tag in the text. Sorting is deterministic. Markdown output differs by format (standup or worklog). With capsuleId, only that project's checkpoints and focus sessions are kept, plus the tasks and notes they reference. When nothing matches it returns {text:'',sections:[],evidence:[],empty:true}. It throws descriptive Errors for non-ISO or invalid dates, since >= until, since in the future, and a bad format. No network and no model. MemoryWorkbench.tsx: one import, the recap section now also renders a new StandupDraft panel (window select today/24h/7d, project select, Standup/Worklog Segmented toggle, a 'Draft standup' button, a read-only textarea, a 'Copy draft' button that uses navigator.clipboard when present, and an empty-state message). Existing sections, shortcuts and reduced-motion handling are unchanged. Added tests/slice-worklog-draft.test.mjs with 7 tests (esbuild data-URL import) covering window boundaries, grouping, evidence per bullet, capsule filter, determinism under reordering, empty result and invalid-window rejection."
+    },
+    {
+      "role": "error-diagnosis",
+      "round": 17,
+      "files": [
+        "src/ui/error-diagnosis.ts",
+        "src/components/PromptTools.tsx",
+        "tests/slice-error-diagnosis.test.mjs"
+      ],
+      "reason": "Worker error-diagnosis requires review or hardware/account input: Feature 28 slice: new pure module src/ui/error-diagnosis.ts exports diagnoseErrorText(text) (plus extractPaths, DIAGNOSIS_LIMITS, NO_PATTERN_TEXT). Offline rules only, no model call, no file access, no execution. Detects ENOENT, EACCES, EPERM, EADDRINUSE (with port), ECONNREFUSED (with address), Cannot find module, JavaScript heap out of memory, Windows HRESULT 0x8xxxxxxx (known codes high confidence, unknown low), 'Access is denied', Python Traceback and ModuleNotFoundError, and 'port N already in use'. Extracts Windows/POSIX paths (including paths with spaces inside stack-frame parentheses, quotes and Python File \"...\", line N) and line:col locations as plain strings; input capped at 20000 chars with truncated flag. Proposed actions (open-path, reveal-folder, copy-text, open-settings) are previews with requiresConfirmation:true and exact targets, never shell commands; unknown input yields matches:[], one copy-text action and the summary 'No known pattern recognized...'. PromptTools.tsx gets a 'Diagnose error' panel (textarea, Diagnose button, results with title/explanation/confidence, locations, 'Proposed actions (preview)'). copy-text uses the panel's existing clipboard copy helper on explicit click; open-path, reveal-folder and open-settings have no existing bridge (ActionRequest has no open-path/reveal type), so they render as disabled 'Not available in this build'. New tests/slice-error-diagnosis.test.mjs (esbuild data-URL bundling) covers every pattern family, Windows stack-trace path extraction, truncation, unknown input and action safety."
+    },
+    {
+      "role": "clip-export",
+      "round": 17,
+      "files": [
+        "src/ui/clip-export.ts",
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css",
+        "tests/slice-clip-export.test.mjs"
+      ],
+      "reason": "Worker clip-export requires review or hardware/account input: Feature 140 slice. New pure module src/ui/clip-export.ts exports sampleClip(sceneOrLab, {fps, durationMs, reducedMotion?}), parseClip(json), clipToBlobParts(clip), plus clipExportFrameCount, clipByteSize and formatBytes. It reuses labFromScene/resolveLayer/layerRate from motion-presets and framePhase/round from motion-timing, so per-frame, per-layer values (x, y, opacity, scale, phase, hue) are deterministic and computed without the DOM or requestAnimationFrame. fps must be an integer from 1 to 60 and durationMs must be 100..30000; values outside those ranges throw descriptive Errors. frameCount = max(1, round(fps*durationMs/1000)). Output uses the envelope {format:'desktop-companion-clip', version:1, sceneId, fps, durationMs, frameCount, reducedMotion, frames:[{t(ms), elements}], license:'original'}. With reduced motion, every frame holds the poster frame. parseClip checks size, JSON, format, version, license, sceneId, fps and duration bounds, that frameCount matches fps and duration, frame count, strictly increasing t, element ids, kinds and finite numbers, and opacity range. It drops unknown keys. MotionStudio.tsx adds an Export clip group to the Clip export panel with a 12/24/30/60 fps select and a bounded ms duration input. 'Export clip' samples the current lab, shows frameCount and estimated size, and then a 'Download clip JSON' button downloads it through the existing downloadBlob (URL.createObjectURL plus revoke). The prepared clip is invalidated when the lab, fps, duration or reduced-motion setting changes, and the component's reducedMotion prop is passed through. Small .motion-clip-json and .motion-clip-summary styles were added. The new tests/slice-clip-export.test.mjs uses the esbuild data-URL pattern and covers purity, the frameCount formula, monotonic times, determinism, reduced-motion stills, bounds rejection, a parseClip round-trip, and rejection of a tampered frameCount, wrong format, version, license, fps, non-increasing times and an unknown kind. It also checks the MotionStudio wiring."
+    }
+  ],
+  "softwareCheckedGoalIds": [
+    "35",
+    "28",
+    "140",
+    "139",
+    "29",
+    "91",
+    "97",
+    "107",
+    "73",
+    "96",
+    "74",
+    "118",
+    "16",
+    "26",
+    "93",
+    "38",
+    "27",
+    "94",
+    "47",
+    "117",
+    "95",
+    "50",
+    "100",
+    "109",
+    "56",
+    "8",
+    "119",
+    "6",
+    "20",
+    "54",
+    "30",
+    "21",
+    "32",
+    "80",
+    "23",
+    "12",
+    "59",
+    "114",
+    "81",
+    "7",
+    "55",
+    "57",
+    "60",
+    "64",
+    "36",
+    "33",
+    "63",
+    "67",
+    "113",
+    "52",
+    "102",
+    "101"
+  ],
+  "priorVerifiedWork": [
+    {
+      "round": 30,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "dictation-cleanup",
+          "goalIds": [
+            "23",
+            "12"
+          ],
+          "files": [
+            "src/ui/dictation-cleanup.ts",
+            "src/components/Assistant.tsx",
+            "tests/slice-dictation-cleanup.test.mjs"
+          ],
+          "summary": "Goal 23 (and its slice 12 parts): new pure DOM-free src/ui/dictation-cleanup.ts with DICTATION_LIMITS (12000/15000/20000/180s), cleanTranscriptOffline (spoken punctuation commands period/full stop, comma, question mark, exclamation mark/poi [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        },
+        {
+          "role": "document-explain-ai",
+          "goalIds": [
+            "27",
+            "21"
+          ],
+          "files": [
+            "src/ui/document-explain.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-document-explain-ai.test.mjs"
+          ],
+          "summary": "Goals 27/21: document-explain.ts keeps all existing exports unchanged (EXPLAIN_LIMITS stays {120000,12000,10,120} because the baseline test asserts it) and adds EXPLAIN_AI_LIMITS (12000 doc / 15000 prompt / 20000 reply / 180s), EXPLAIN_DEPT [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        },
+        {
+          "role": "calendar-ics-export",
+          "goalIds": [
+            "59",
+            "114"
+          ],
+          "files": [
+            "src/ui/calendar-export.ts",
+            "src/components/Calendar.tsx",
+            "tests/slice-calendar-export.test.mjs"
+          ],
+          "summary": "Goals 59/114: new pure DOM-free src/ui/calendar-export.ts (only a type import from electron/services/calendar). It has EXPORT_LIMITS (5000 events, 500-char summary, 5000-char description, 2 MiB total), eventsToIcs(events,{prodId?,now?}) ret [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        }
+      ]
+    },
+    {
+      "round": 32,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "reveal-path-action",
+          "goalIds": [
+            "28",
+            "81"
+          ],
+          "files": [
+            "src/shared/contracts.ts",
+            "electron/services/actions.ts",
+            "electron/services/validation.ts",
+            "electron/ipc.ts",
+            "src/ui/error-diagnosis.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-reveal-path-action.test.mjs"
+          ],
+          "summary": "Goals 28/81: Diagnose-error open-path and reveal-folder actions now go through the existing previewAction/executeAction preview-id and approval flow, and open-settings goes to Settings. contracts.ts: added PathActionType ('open-path'|'revea [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        },
+        {
+          "role": "personal-profiles",
+          "goalIds": [
+            "7"
+          ],
+          "files": [
+            "src/ui/profiles.ts",
+            "src/components/Settings.tsx",
+            "tests/slice-personal-profiles.test.mjs"
+          ],
+          "summary": "Goal 7: added pure DOM-free src/ui/profiles.ts (PROFILES_PREF_KEY='profiles.v1', PROFILE_LIMITS max 12 / name 1..40 trimmed, case-insensitive unique; PersonalProfile capturing only theme, reduceMotion, voice, localModel, startInTray, retain [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        },
+        {
+          "role": "file-shelf",
+          "goalIds": [
+            "55",
+            "57"
+          ],
+          "files": [
+            "src/ui/file-shelf.ts",
+            "src/components/Home.tsx",
+            "src/styles/views.css",
+            "tests/slice-file-shelf.test.mjs"
+          ],
+          "summary": "Goals 55/57: added the pure, DOM-free src/ui/file-shelf.ts. It has SHELF_PREF_KEY 'fileShelf.v1' and SHELF_LIMITS (200 items, label 80, note 500, 20 recent). It also exports normalizeShelf, addShelfItem (Windows paths dedupe case-insensitiv [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        }
+      ]
+    },
+    {
+      "round": 34,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "host-battery-resources",
+          "goalIds": [
+            "60",
+            "64"
+          ],
+          "files": [
+            "src/shared/contracts.ts",
+            "electron/services/system.ts",
+            "electron/channels.ts",
+            "electron/ipc.ts",
+            "electron/preload.ts",
+            "src/ui/bridges.ts",
+            "src/ui/resource-policy.ts",
+            "src/components/Status.tsx",
+            "tests/slice-host-battery.test.mjs"
+          ],
+          "summary": "Goals 60/64. electron/services/system.ts: new HostBatteryReader behind an injectable HostPowerAdapter plus powerMonitorAdapter (isOnBatteryPower and 'on-battery'/'on-ac' events). It reports {source:'host'|'unmeasured', onBattery, measuredAt [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        },
+        {
+          "role": "session-association-controls",
+          "goalIds": [
+            "36",
+            "33"
+          ],
+          "files": [
+            "src/ui/session-association.ts",
+            "src/ui/focus.tsx",
+            "src/ui/store.tsx",
+            "src/components/MemoryWorkbench.tsx",
+            "tests/slice-session-association.test.mjs"
+          ],
+          "summary": "Goal 36 (plus the goal 33 timeline association part): added pure, DOM-free src/ui/session-association.ts. It exports ASSOCIATION_LIMITS (frozen); suggestAssociations, which ranks deterministically by task completed/created near the session  [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        },
+        {
+          "role": "interruptible-anim-states",
+          "goalIds": [
+            "63",
+            "67"
+          ],
+          "files": [
+            "src/ui/anim-state.ts",
+            "src/ui/companion.tsx",
+            "src/components/Companion.tsx",
+            "src/components/SceneBackdrop.tsx",
+            "src/styles/views.css",
+            "tests/slice-interruptible-anim.test.mjs"
+          ],
+          "summary": "Goals 63/67. Added pure DOM-free src/ui/anim-state.ts: ANIM_LIMITS, ANIM_PHASES, createAnimMachine({reducedMotion, now?, initial?}), transition(machine, show|hide|tick|cancel, atMs) returning new frozen machines (explicit idle/entering/acti [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        }
+      ]
+    },
+    {
+      "round": 40,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "state-encryption-at-rest",
+          "goalIds": [
+            "113"
+          ],
+          "files": [
+            "electron/services/store.ts",
+            "electron/services/atRest.ts",
+            "electron/backend.ts",
+            "electron/main.ts",
+            "tests/slice-at-rest-encryption.test.mjs"
+          ],
+          "summary": "Goal 113 slice, main process only, no IPC, contract, preload, renderer or secrets.ts changes. NEW electron/services/atRest.ts: AtRestCipher interface; createSafeStorageCipher(safeStorageLike), which never throws from available(); memoryCiph [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        }
+      ]
+    },
+    {
+      "round": 40,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "reminder-sleep-resume",
+          "goalIds": [
+            "52"
+          ],
+          "files": [
+            "electron/services/reminders.ts",
+            "electron/services/lifecycle.ts",
+            "electron/services/system.ts",
+            "tests/slice-reminder-resume.test.mjs"
+          ],
+          "summary": "Hardened the existing real powerMonitor resume path: cancel the stalled timeout before resync, reject callbacks already queued from canceled timers, claim overdue task keys and schedule the next timer before asynchronous audit writes, and s [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        }
+      ]
+    },
+    {
+      "round": 40,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "cloud-provider-adapters",
+          "goalIds": [
+            "102",
+            "101"
+          ],
+          "files": [
+            "src/shared/contracts.ts",
+            "electron/services/validation.ts",
+            "electron/services/cloud.ts",
+            "electron/services/netGuard.ts",
+            "electron/services/chat.ts",
+            "electron/services/secrets.ts",
+            "electron/channels.ts",
+            "electron/ipc.ts",
+            "electron/preload.ts",
+            "src/ui/bridges.ts",
+            "src/components/Settings.tsx",
+            "src/components/Assistant.tsx",
+            "src/styles/cloud-providers.css",
+            "tests/slice-cloud-providers.test.mjs",
+            "electron/backend.ts",
+            "electron/ipcCore.ts"
+          ],
+          "summary": "Completed guarded Anthropic/OpenAI/OpenRouter adapters, selected-provider protected keys, actual backend routing and per-provider usage. Explicit extra ownership: electron/backend.ts and electron/ipcCore.ts (16 total source/test files). Rep [truncated; full evidence remains in PROGRESS or referenced raw log]"
+        }
+      ]
+    }
+  ]
 }

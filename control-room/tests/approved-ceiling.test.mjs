@@ -1,12 +1,12 @@
-import test from'node:test';import assert from'node:assert/strict';import{mkdtemp,rm,writeFile}from'node:fs/promises';import os from'node:os';import path from'node:path';import{Budget}from'../server/budget.mjs';
-for(const [limit,safety] of [[350,35],[500,50]])test(`approved ${limit} ceiling persists while prior uncertain holds remain protected and overspend fails closed`,async()=>{
+import test from'node:test';import assert from'node:assert/strict';import{mkdtemp,rm,writeFile}from'node:fs/promises';import os from'node:os';import path from'node:path';import{Budget,MAX_APPROVED_BUDGET}from'../server/budget.mjs';
+for(const [limit,safety] of [[350,35],[500,50],[550,55],[600,60]])test(`approved ${limit} ceiling persists while prior uncertain holds remain protected and overspend fails closed`,async()=>{
  const dir=await mkdtemp(path.join(os.tmpdir(),'room-approved-ceiling-'));
  try{
   const held=limit-safety-.2;
   const b=new Budget(dir);await b.init();await b.transaction(()=>{b.state.limit=limit;b.state.safety=safety;b.state.requests=[{id:'historical-hold',model:'claude-opus-5-5',taskId:'old',charge:held,reserved:held,settled:false}]});
   const restored=new Budget(dir);await restored.init();assert.equal(restored.snapshot().limit,limit);assert.equal(restored.snapshot().safety,safety);assert.equal(restored.snapshot().uncertain,1);assert.equal(restored.total(),held);
   await assert.rejects(restored.reserve({id:'new',budget:30},'claude-opus-5-5',25000,16384),/reservation denied/);assert.equal(restored.state.requests.length,1);
-  await writeFile(path.join(dir,'spending.json'),JSON.stringify({...restored.state,limit:501}));await assert.rejects(new Budget(dir).init(),/provider calls blocked/);
+  await writeFile(path.join(dir,'spending.json'),JSON.stringify({...restored.state,limit:MAX_APPROVED_BUDGET+1}));await assert.rejects(new Budget(dir).init(),/provider calls blocked/);
  }finally{await rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
 });
 test('new authorization does not automatically raise the default ledger or existing buffer',async()=>{

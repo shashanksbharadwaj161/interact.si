@@ -85,7 +85,34 @@ export class Room extends EventEmitter {
     const events=[[1000,'simulation','Inspecting the requested task and repository layout.'],[2500,'simulation','Tool event: simulated file inspection.'],[4500,'simulation','Draft result ready. No real files changed.']];
     const timers=events.map(([delay,kind,msg],i)=>setTimeout(async()=>{if(t.status!=='running')return;this.log(t,kind,msg);if(i===events.length-1){t.status='review';t.result='Simulation finished. This demonstrates task tracking and review; no AI calls were made.';t.authorized=false;}await this.save();},delay));this.demoTimers.set(t.id,timers);
   }
-  async cancel(id){const t=this.task(id);if(terminal.has(t.status))return this.publicTask(t);t.authorized=false;this.grants.delete(t.grant);for(const c of this.controllers.get(id)||[])c.abort();for(const timer of this.demoTimers.get(id)||[])clearTimeout(timer);if(t.sessionId){try{await this.adapter.cancel(t.sessionId);}catch(e){this.log(t,'error',`Cancel not confirmed: ${e.message}`);t.status='awaiting input';await this.save();throw new Error('Cloud access revoked, but worker termination could not be confirmed');}}t.status='cancelled';this.log(t,'service','Cancelled. Provider access revoked.');await this.save();this.kick();return this.publicTask(t);}
+  async cancel(id,{checkpoint=false}={}){const t=this.task(id);if(terminal.has(t.status))return this.publicTask(t);t.authorized=false;this.grants.delete(t.grant);for(const c of this.controllers.get(id)||[])c.abort();for(const timer of this.demoTimers.get(id)||[])clearTimeout(timer);if(t.sessionId){try{await this.adapter.cancel(t.sessionId);}catch(e){this.log(t,'error',`Cancel not confirmed: ${e.message}`);t.status='awaiting input';await this.save();throw new Error('Cloud access revoked, but worker termination could not be confirmed');}}t.status='cancelled';if(checkpoint){t.checkpointStoppedAt=new Date().toISOString();t.checkpointKind=checkpoint==='planner'?'planner':'worker';}this.log(t,'service',checkpoint?'Checkpoint worker stopped for independent verification. Provider access revoked.':'Cancelled. Provider access revoked.');await this.save();this.kick();return this.publicTask(t);}
+  // Internal trusted-verifier handoff only; never exposed as an API action.
+  async recordVerifiedCompletion(id,evidence){
+    const t=this.task(id);
+    if(!evidence||evidence.passed!==true||evidence.blocked||evidence.needs_review||!Number.isInteger(evidence.round)||evidence.round<1||typeof evidence.observationId!=='string'||!evidence.observationId||!Array.isArray(evidence.checks)||!evidence.checks.length||evidence.checks.some(c=>!c||c.exitCode!==0||typeof c.outputRef!=='string'||!c.outputRef.trim()))throw new Error('Independent passing verification evidence is required');
+    if(t.authorized||!t.checkpointStoppedAt||t.checkpointKind==='planner'||!['cancelled','complete'].includes(t.status))throw new Error('Only a checkpoint-stopped, unauthorized worker can receive verified completion');
+    if(t.status==='complete'){
+      if(t.verification?.observationId!==evidence.observationId||t.verification?.round!==evidence.round)throw new Error('Completion already recorded for different verification');
+      return this.publicTask(t);
+    }
+    t.verification=JSON.parse(redact(JSON.stringify({round:evidence.round,observationId:evidence.observationId,sourceFingerprint:evidence.sourceFingerprint??null,checks:evidence.checks.map(c=>({command:c.command??null,exitCode:c.exitCode,outputRef:c.outputRef})),at:new Date().toISOString(),softwareChecksPassed:true,featuresFullyAccepted:false}),[this.vault.cached,...this.grants.keys()]));
+    t.status='complete';t.reviewed=true;
+    this.log(t,'review','Worker slice independently verified and integrated. Full feature acceptance may still require hardware/account review.');
+    await this.save();return this.publicTask(t);
+  }
+  async recordPlannerCompletion(id,evidence){
+    const t=this.task(id);
+    if(!evidence||!Number.isInteger(evidence.round)||evidence.round<1||typeof evidence.observationId!=='string'||!evidence.observationId||!['dispatch','verify','blocked','complete'].includes(evidence.action)||!Number.isInteger(evidence.taskCount)||evidence.taskCount<0||evidence.taskCount>3)throw new Error('Validated planner decision evidence is required');
+    if(t.authorized||!t.checkpointStoppedAt||t.checkpointKind!=='planner'||!['cancelled','complete'].includes(t.status))throw new Error('Only a stopped, unauthorized planner checkpoint can complete');
+    if(t.status==='complete'){
+      if(t.plannerResult?.observationId!==evidence.observationId||t.plannerResult?.round!==evidence.round)throw new Error('Planner completion already recorded for different observation');
+      return this.publicTask(t);
+    }
+    t.plannerResult={kind:'plan-validated',round:evidence.round,observationId:evidence.observationId,action:evidence.action,taskCount:evidence.taskCount,at:new Date().toISOString(),softwareVerified:false,featuresIntegrated:false};
+    t.status='complete';
+    this.log(t,'service','Planner decision validated. Planning task complete; no software verification or feature integration claimed.');
+    await this.save();return this.publicTask(t);
+  }
   async followup(id,message){const t=this.task(id);if(typeof message!=='string'||!message.trim()||message.length>4096)throw new Error('Follow-up must be 1–4096 characters');if(t.mode==='real'){if(!this.online||!t.sessionId||!t.authorized)throw new Error('Resume the worker with online mode enabled first');if(this.active().filter(x=>x.id!==id).length>=this.maxWorkers)throw new Error('Worker concurrency limit reached');await this.adapter.followup(t.sessionId,message);}else if(terminal.has(t.status)||t.status==='review'){throw new Error('Resume the demo before sending a follow-up');}this.log(t,'user',message);await this.save();return this.publicTask(t);}
   async resume(id){const t=this.task(id);if(t.mode==='demo'){for(const timer of this.demoTimers.get(id)||[])clearTimeout(timer);t.authorized=true;this.runDemo(t);await this.save();return this.publicTask(t);}if(!this.online)throw new Error('Enable online development first');if(t.authorized&&['running','queued'].includes(t.status))throw new Error('Worker is already active');if(this.active().filter(x=>x.id!==id).length>=this.maxWorkers)throw new Error('Worker concurrency limit reached');if(taskBudgetPolicy(t)==='task'&&t.cost!==null&&t.cost>=t.budget)throw new Error('Task budget exhausted; start a new explicitly budgeted task');if(['budget','context'].includes(t.stopReport?.kind))throw new Error(t.stopReport.retry);await this.vault.get();
     // Grants do not survive restarts. Old sessions are not silently reauthorized with a stale gateway.

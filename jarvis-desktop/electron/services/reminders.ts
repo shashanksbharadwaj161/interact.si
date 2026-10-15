@@ -85,7 +85,9 @@ export class Reminders {
 
   /** Timer callback; also callable directly. Announces every due task once, then schedules the next one. */
   async fire(): Promise<number> {
-    this.timer = null;
+    // Resume can run before the original OS timeout is delivered. Cancel that
+    // timeout rather than losing its handle and leaving an orphan behind.
+    if (this.timer !== null) { this.clearTimer(this.timer); this.timer = null; }
     if (this.disposed) return 0;
     const due = this.due();
     this.checkpoint = this.d.now();
@@ -95,20 +97,23 @@ export class Reminders {
     const on = this.d.enabled ? this.d.enabled() !== false : true;
     const sorted = [...due].sort((a, b) => (dueAt(a) ?? 0) - (dueAt(b) ?? 0));
     for (const t of sorted) this.fired.add(keyOf(t));
+    // Claim every due key and arm the next timer before an asynchronous audit
+    // write yields. A second resume or task edit cannot create a second timer.
+    this.schedule();
     if (on) {
       const folded = sorted.length > MAX_BURST ? sorted.length - (MAX_BURST - 1) : 0;
       const single = folded ? sorted.slice(0, MAX_BURST - 1) : sorted;
       for (const t of single) {
+        if (this.disposed) break;
         try { this.d.notify(t.title, 'Due now', t); } catch { /* a failing notifier must not stop later reminders */ }
         try { await this.d.record?.(`Reminder: ${t.title}`); } catch { /* ignore */ }
       }
-      if (folded) {
+      if (folded && !this.disposed) {
         const rest = sorted.slice(MAX_BURST - 1);
         try { this.d.notify(`${rest.length} more tasks are due`, rest.slice(0, 3).map((t) => t.title).join(', ').slice(0, 200), rest[0]); } catch { /* ignore */ }
         try { await this.d.record?.(`Reminder: ${rest.length} more tasks due`); } catch { /* ignore */ }
       }
     }
-    this.schedule();
     return due.length;
   }
 
@@ -127,10 +132,15 @@ export class Reminders {
 
   private schedule(): void {
     if (this.timer !== null) { this.clearTimer(this.timer); this.timer = null; }
+    if (this.disposed) return;
     const next = this.nextAt();
     if (next === null) return;
     const delay = Math.min(MAX_TIMER_MS, Math.max(0, next - this.d.now()));
-    const h = this.setTimer(() => { void this.fire(); }, delay);
+    const h = this.setTimer(() => {
+      // A canceled timeout already queued by the host must not reschedule work.
+      if (this.timer !== h) return;
+      void this.fire();
+    }, delay);
     if (typeof h === 'object' && typeof h.unref === 'function') h.unref();
     this.timer = h;
   }

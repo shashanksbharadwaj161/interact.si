@@ -1,0 +1,57 @@
+/* Version pin section on each installed model row (src/components/Models.tsx). Uses existing design tokens only. */
+.model-pin {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.model-pin-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.model-pin-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.model-pin-digest {
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.92em;
+}
+
+.model-pin-actions {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.model-pin-mismatch,
+.model-pin-blocked,
+.model-pin-error {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--danger, #d9534f);
+  background: color-mix(in srgb, var(--danger, #d9534f) 10%, transparent);
+}
+
+.model-pin-mismatch p {
+  margin: 0 0 6px;
+}
+
+.model-pin-gate {
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-pin * {
+    transition: none !important;
+  }
+}

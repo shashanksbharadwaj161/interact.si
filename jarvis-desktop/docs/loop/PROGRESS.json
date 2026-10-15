@@ -1,0 +1,1053 @@
+{
+  "version": 1,
+  "work": [
+    {
+      "round": 17,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "worklog-draft",
+          "goalIds": [
+            "35"
+          ],
+          "files": [
+            "src/ui/worklog-draft.ts",
+            "src/components/MemoryWorkbench.tsx",
+            "tests/slice-worklog-draft.test.mjs"
+          ],
+          "summary": "Feature 35 slice. New pure module src/ui/worklog-draft.ts exports buildWorklogDraft(input, {since, until, capsuleId?, format, now?}). Input is {checkpoints, tasks, notes, focusSessions} using the existing field names (Checkpoint.createdAt/capsuleId/refs, Task.done/createdAt with optional completedAt/updatedAt, Note.updatedAt, FocusSession.endedAt/outcome/capsuleId/taskId). The window is half-open: since <= t < until. Records are grouped into Done (checkpoints, done tasks, completed focus), In progress (updated notes, focus stopped early) and Blocked/Open (open tasks). Each bullet carries {kind,id,title} evidence and a [kind:id] tag in the text. Sorting is deterministic. Markdown output differs by format (standup or worklog). With capsuleId, only that project's checkpoints and focus sessions are kept, plus the tasks and notes they reference. When nothing matches it returns {text:'',sections:[],evidence:[],empty:true}. It throws descriptive Errors for non-ISO or invalid dates, since >= until, since in the future, and a bad format. No network and no model. MemoryWorkbench.tsx: one import, the recap section now also renders a new StandupDraft panel (window select today/24h/7d, project "
+        },
+        {
+          "role": "error-diagnosis",
+          "goalIds": [
+            "28"
+          ],
+          "files": [
+            "src/ui/error-diagnosis.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-error-diagnosis.test.mjs"
+          ],
+          "summary": "Feature 28 slice: new pure module src/ui/error-diagnosis.ts exports diagnoseErrorText(text) (plus extractPaths, DIAGNOSIS_LIMITS, NO_PATTERN_TEXT). Offline rules only, no model call, no file access, no execution. Detects ENOENT, EACCES, EPERM, EADDRINUSE (with port), ECONNREFUSED (with address), Cannot find module, JavaScript heap out of memory, Windows HRESULT 0x8xxxxxxx (known codes high confidence, unknown low), 'Access is denied', Python Traceback and ModuleNotFoundError, and 'port N already in use'. Extracts Windows/POSIX paths (including paths with spaces inside stack-frame parentheses, quotes and Python File \"...\", line N) and line:col locations as plain strings; input capped at 20000 chars with truncated flag. Proposed actions (open-path, reveal-folder, copy-text, open-settings) are previews with requiresConfirmation:true and exact targets, never shell commands; unknown input yields matches:[], one copy-text action and the summary 'No known pattern recognized...'. PromptTools.tsx gets a 'Diagnose error' panel (textarea, Diagnose button, results with title/explanation/confidence, locations, 'Proposed actions (preview)'). copy-text uses the panel's existing clipboard copy hel"
+        },
+        {
+          "role": "clip-export",
+          "goalIds": [
+            "140"
+          ],
+          "files": [
+            "src/ui/clip-export.ts",
+            "src/components/MotionStudio.tsx",
+            "src/styles/motion-studio.css",
+            "tests/slice-clip-export.test.mjs"
+          ],
+          "summary": "Feature 140 slice. New pure module src/ui/clip-export.ts exports sampleClip(sceneOrLab, {fps, durationMs, reducedMotion?}), parseClip(json), clipToBlobParts(clip), plus clipExportFrameCount, clipByteSize and formatBytes. It reuses labFromScene/resolveLayer/layerRate from motion-presets and framePhase/round from motion-timing, so per-frame, per-layer values (x, y, opacity, scale, phase, hue) are deterministic and computed without the DOM or requestAnimationFrame. fps must be an integer from 1 to 60 and durationMs must be 100..30000; values outside those ranges throw descriptive Errors. frameCount = max(1, round(fps*durationMs/1000)). Output uses the envelope {format:'desktop-companion-clip', version:1, sceneId, fps, durationMs, frameCount, reducedMotion, frames:[{t(ms), elements}], license:'original'}. With reduced motion, every frame holds the poster frame. parseClip checks size, JSON, format, version, license, sceneId, fps and duration bounds, that frameCount matches fps and duration, frame count, strictly increasing t, element ids, kinds and finite numbers, and opacity range. It drops unknown keys. MotionStudio.tsx adds an Export clip group to the Clip export panel with a 12/24/3"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792047909792-0af54946-91e5-44b7-b3d5-b81406d68703.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792047968696-461f59f2-c8a2-46ce-9618-0187ab1c8e4c.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792047987855-023dd3d5-90c0-4f88-821d-3d2ab2866540.log"
+        }
+      ]
+    },
+    {
+      "round": 18,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "scene-spec-validate",
+          "goalIds": [
+            "139"
+          ],
+          "files": [
+            "src/ui/scene-spec.ts",
+            "src/components/MotionStudio.tsx",
+            "src/styles/motion-studio.css",
+            "tests/slice-scene-spec.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/scene-spec.ts (SCENE_SPEC_FORMAT/VERSION, validateSceneSpec with exact error paths for format/version/kind/intensity/speed/hue/name/root, 20000-char oversize rejection for strings and objects, unknown top-level keys dropped with warnings, non-integers rounded with warning; deterministic offline keyword composeSceneFromText whose output is re-validated; sceneSpecToPreset; serializeSceneSpec/sceneSpecToSettings helpers). Reuses motion-presets exports; no model or network calls. MotionStudio gains a 'Describe a scene' panel: text input + 'Draft from text' preview with rationale, 'Copy draft into JSON box', honestly labelled paste textarea, 'Validate' rendering errors/warnings, and 'Apply to studio' disabled until validation passes, applying via existing setSettings to the active layer. Two scoped CSS classes added. New tests/slice-scene-spec.test.mjs (7 tests) cover round-trip, each rejection path, oversize, unknown-key warnings, compose rules, compose always validates, empty text throws."
+        },
+        {
+          "role": "context-controls",
+          "goalIds": [
+            "29"
+          ],
+          "files": [
+            "src/ui/context-policy.ts",
+            "src/components/Assistant.tsx",
+            "tests/slice-context-policy.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/context-policy.ts (ContextPolicy, DEFAULT_CONTEXT_POLICY all off, CONTEXT_POLICY_PREF_KEY='assistant.contextPolicy', normalizeContextPolicy with legacy/bad-input coercion, case-insensitive trim/dedupe, 50-entry caps, deny-wins; decideContextShare with exact reasons in the order off -> denied -> allow-list miss -> ask -> on; buildContextPreview with 200-char excerpt and 8000-char total caps that never includes off/denied/ask sources; parseAppList). Added a ContextControls panel to Assistant.tsx (three Off/Ask/On selects, allowed/denied comma inputs committed on blur, persisted through usePref from src/ui/prefs.ts, read-only 'What would be shared' list of per-source decisions plus buildContextPreview output, and a note that this build attaches no capture). Added tests/slice-context-policy.test.mjs (7 tests: defaults, no network/capture code, normalization, dedupe/caps/deny-wins, all decision branches, preview include/exclude, truncation)."
+        },
+        {
+          "role": "task-board",
+          "goalIds": [
+            "91"
+          ],
+          "files": [
+            "src/ui/task-board.ts",
+            "src/components/Developer.tsx",
+            "tests/slice-task-board.test.mjs"
+          ],
+          "summary": "Feature 91 slice: new pure DOM-free src/ui/task-board.ts (TaskStatus, StopReason, BoardTask, TRANSITIONS, createTask with title/role validation, 120-char title bound and deterministic 't-<base36 now>-<index>' ids via counter, transitionTask with descriptive errors, required stop reasons ('completed' only for done), endedAt on terminal states, terminal immutability, deriveWorkerStatus idle/busy/paused + completed/failed counts from tasks only, summarizeBoard status/stopReason counts, parseBoard dropping malformed/duplicate entries capped at 200, TASK_BOARD_PREF_KEY). Developer.tsx gains a bounded 'Task board' panel: title input + role select + model select, Start/Pause/Resume/Mark done/Mark failed/Cancel buttons calling transitionTask with explicit stop reasons (reason selects for failed and cancelled, 'completed' for done), worker status list, summary counts, verbatim timestamps and stop reasons, persistence via usePref from src/ui/prefs.ts (unmodified). No spinners, estimates, percentages, network or model calls."
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792048623891-4c65c168-ecde-41ef-b5ca-89a3af351f1b.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792048671409-8c5edd6d-8145-49d1-9221-ce3382b27250.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792048689454-9955a125-526e-402e-9034-02cb5929337b.log"
+        }
+      ]
+    },
+    {
+      "round": 19,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "task-budget",
+          "goalIds": [
+            "97"
+          ],
+          "files": [
+            "src/ui/task-budget.ts",
+            "src/components/Developer.tsx",
+            "tests/slice-task-budget.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/task-budget.ts: TaskBudget type, DEFAULT_TASK_BUDGET (1 running, 20/day, 60 min, 0 USD), TASK_BUDGET_PREF_KEY='developer.taskBudget', normalizeTaskBudget (defaults for bad input, clamping, integer rounding, cents for USD), evaluateStart (concurrency -> daily-task -> spend, exact detail strings; optional ledger in opts), findOverdue (running tasks over the wall-clock limit, floor elapsed minutes), recordSpend/parseSpendLedger/sumSpendForDay (validation, 500-entry cap keeping newest, UTC-day or dayStartIso window), descriptive errors for invalid now/dayStartIso/spend timestamps. Developer.tsx: additive 'Task budget' group inside the Task board panel with four numeric inputs saved through normalizeTaskBudget via usePref(TASK_BUDGET_PREF_KEY, DEFAULT_TASK_BUDGET), plain-text start check, Start/Resume disabled with exact detail when blocked (move() also refuses), overdue list plus manual 'Stop overdue' button using transitionTask(...,'stopped',{stopReason:'timeout'}) only for listed tasks, manual 'Record spend' form persisted under 'developer.taskSpend'. No timers, network or model calls. New tests/slice-task-budget.test.mjs covers defaults/key, normalization,"
+        },
+        {
+          "role": "download-manifest",
+          "goalIds": [
+            "107"
+          ],
+          "files": [
+            "src/ui/download-manifest.ts",
+            "src/components/Models.tsx",
+            "tests/slice-download-manifest.test.mjs"
+          ],
+          "summary": "Feature 107 offline-verification slice. Added pure DOM-free src/ui/download-manifest.ts (format/version constants, parseDownloadManifest(json, allowedHosts=[]) with exact error paths for $, format, version, items (1..100), items[i] and each field, duplicate ids, non-https, credentials-in-url, host-not-allowed (default empty allow-list rejects every URL), 200000-char oversize; unknown root/item keys dropped with warnings; strict verifyDigest; planDownload returning blocked-offline/blocked-host/ready-to-request/invalid; local formatBytes; no network). Models.tsx gains ManifestVerifyPanel 'Verify download manifest (offline)' rendered in ModelsView: textarea, allowed-hosts comma input persisted via usePref('models.downloadHosts', []), Validate button showing errors/warnings/plan, online state taken from existing overview.downloads.allowed, and the note 'This build verifies manifests only; no download is started.' New tests/slice-download-manifest.test.mjs (9 tests) cover round-trip, rejection paths, duplicates, https/host enforcement, oversize, verifyDigest, planDownload statuses and no fetch/XMLHttpRequest source assertions. Full suite 1318/1318 passed."
+        },
+        {
+          "role": "taskbar-presets",
+          "goalIds": [
+            "73"
+          ],
+          "files": [
+            "src/ui/taskbar-presets.ts",
+            "src/components/Customization.tsx",
+            "tests/slice-taskbar-presets.test.mjs"
+          ],
+          "summary": "Feature 73 preview-and-reversibility slice. Added pure DOM-free src/ui/taskbar-presets.ts: 8 TASKBAR_SETTINGS (TaskbarAl, TaskbarDa, ShowTaskViewButton, TaskbarMn, TaskbarSd, Start_Layout, Start_TrackDocs, SearchboxTaskbarMode) with allowed values, value labels, documented Windows 11 defaults and explorerRestart flags; 3 reversible presets (default-windows-11, left-aligned-minimal, focus-clean); validatePresetValues with values.<key> error paths; captureSnapshot; diffPreset (ordered, changed keys only); buildPlan (undo = exact inverse in reverse order, requiresConfirmation:true, applied:false); serializePlan/parsePlan with 20000-char cap and full validation; descriptive errors for invalid timestamps and unknown preset ids. Customization.tsx gains a 'Taskbar and Start presets (preview only)' panel with preset select, manual current-value form persisted via usePref('customization.taskbarSnapshot'), Preview plan (apply + undo steps verbatim), Copy plan JSON via navigator.clipboard.writeText (no existing copy helper in file), and a G5 not-available note. No registry/system writes, IPC, network or native calls."
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792049198500-7e21dcc6-d2e6-4fee-aba9-df50101abf9a.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792049244845-fabd8866-ea4b-4703-ad8f-faece7f29c05.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792049262706-787a1795-9ce3-45c3-a2e8-0673edfdccee.log"
+        }
+      ]
+    },
+    {
+      "round": 20,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "agent-log",
+          "goalIds": [
+            "96"
+          ],
+          "files": [
+            "src/ui/agent-log.ts",
+            "src/components/Developer.tsx",
+            "tests/slice-agent-log.test.mjs"
+          ],
+          "summary": "Goal 96: added pure DOM-free src/ui/agent-log.ts (LogLevel, LogEntry, AGENT_LOG_PREF_KEY, AGENT_LOG_LIMITS, appendEntry with deterministic collision-safe 'l-<base36>-<index>' ids, validation errors, data truncation with '…[truncated]', per-task/total caps keeping newest; redactSecrets for sk-, Bearer, 32+ hex/base64 runs and api_key/token/secret/password key=value pairs returning {text,count}; filterLog newest-first with case-insensitive query; summarizeTask with lastResult or null; exportLog redacted envelope {format:'desktop-companion-agent-log',version:1,entries}; parseLog with exact $-path errors that drops malformed/duplicate entries; normalizeLog for prefs). Developer.tsx: additive AgentLogGroup rendered inside the Task board panel, persisted via usePref(AGENT_LOG_PREF_KEY), with task/level/message/data inputs, Add entry, task/level/text filters, newest-first list (verbatim timestamp/level/message, redacted data in a scroll-capped <pre>), per-task summary line, Export JSON to clipboard, and two-step confirm Clear task log. 8 new tests in tests/slice-agent-log.test.mjs."
+        },
+        {
+          "role": "explorer-presets",
+          "goalIds": [
+            "74"
+          ],
+          "files": [
+            "src/ui/explorer-presets.ts",
+            "src/components/Customization.tsx",
+            "tests/slice-explorer-presets.test.mjs"
+          ],
+          "summary": "Feature 74 preview-only slice. New pure DOM-free src/ui/explorer-presets.ts (independent of taskbar-presets) with 10 EXPLORER_SETTINGS (HideFileExt, Hidden, ShowSuperHidden, LaunchTo, NavPaneShowAllFolders, UseCompactMode, ToastEnabled, NOC_GLOBAL_SETTING_TOASTS_ENABLED, NOC_GLOBAL_SETTING_ALLOW_TOASTS_ABOVE_LOCK, FocusAssistMode) carrying scope, registry path label, allowed values, labels, default and explorerRestart; 3 reversible presets (default-windows-11, power-user-explorer, quiet-notifications); validatePresetValues with values.<key> paths, captureSnapshot with timestamp validation, diffPreset (ordered changed keys only), buildPlan {applySteps, undoSteps exact reversed inverse, explorerRestartNeeded, requiresConfirmation:true, applied:false}, serializePlan/parsePlan with 20000-char cap and exact error paths. Customization.tsx gains an additive 'Explorer and notification presets (preview only)' panel right after the taskbar panel: preset select, manual value selects grouped by scope persisted via usePref('customization.explorerSnapshot'), Preview plan with apply/undo steps and restart note, Copy plan JSON via navigator.clipboard.writeText, G5 not-available notice. New tests/s"
+        },
+        {
+          "role": "compat-tiers",
+          "goalIds": [
+            "118"
+          ],
+          "files": [
+            "src/ui/compat-tiers.ts",
+            "src/components/Status.tsx",
+            "tests/slice-compat-tiers.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/compat-tiers.ts (Arch, CompatTier, frozen SUPPORT_MATRIX where only win32 x64 build 19045+ is validated, win32 arm64 untested, ia32/darwin/linux unsupported; MINIMUM_HARDWARE/RECOMMENDED_HARDWARE plus HARDWARE_NOTE; never-throwing normalizeSystemInfo; classifyCompatibility with ordered reasons platform->arch->os build->RAM/disk/cores, meetsMinimum/meetsRecommended null when values are missing, missing list; tierLabel/tierExplanation; compareHardware; deterministic buildCompatReport). Status.tsx gets one additive 'Compatibility tier' panel that uses only platform/arch/ramGB from the existing SystemInfo payload; disk, CPU cores and OS build are not in that payload and show 'not reported' (null), with a Copy report button using navigator.clipboard.writeText(buildCompatReport(...)). Added 9 behavioral/source tests in tests/slice-compat-tiers.test.mjs."
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792049853779-9824a383-ca1c-469c-a603-ce1aca4e3446.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792049899168-5b95d129-5b92-44f1-a653-7b6c0aac6b59.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792049916316-749437a4-b372-46c6-90df-1b382032ed55.log"
+        }
+      ]
+    },
+    {
+      "round": 23,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "local-retrieval",
+          "goalIds": [
+            "16"
+          ],
+          "files": [
+            "src/ui/local-retrieval.ts",
+            "src/components/MemorySearch.tsx",
+            "tests/slice-local-retrieval.test.mjs"
+          ],
+          "summary": "Goal 16: added pure DOM-free src/ui/local-retrieval.ts (RETRIEVAL_LIMITS, tokenize with NFD accent folding, stop words and a 64-term cap, buildIndex returning a frozen BM25 index (k1 1.2, b 0.75, title tokens counted twice) with df, per-doc weights and a truncatedDocs count, findRelated and query with rounded scores, up to 8 sharedTerms, tie-break score desc > updatedAt desc > id asc, and descriptive validation errors). Also added docsFromState (notes, tasks, capsules with description and goals, checkpoints with title and note/summary) using kind-prefixed keys. MemorySearch.tsx gets a 'Find related' button on note/task/capsule/checkpoint rows, plus onFocus on result buttons, and an additive 'Related items (lexical)' section below the results. It shows up to 8 hits with a kind badge, shared words, an 'Open' button through navResult/onNavigate and the required BM25/no-embedding note. Existing props, describeSource, onNavigate clicks and arrow-key handling are unchanged. Added 9 behavioral tests in tests/slice-local-retrieval.test.mjs."
+        },
+        {
+          "role": "tone-translate",
+          "goalIds": [
+            "26"
+          ],
+          "files": [
+            "src/ui/tone-profiles.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-tone-profiles.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/tone-profiles.ts: 6 frozen TONE_PROFILES (email, team-chat, issue-tracker, code-comment, documentation, social-post) with rules/maxChars/keepLineBreaks, 14 TARGET_LANGUAGES incl. 'keep', TONE_PROFILE_PREF_KEY='writing.toneProfile', normalizeToneChoice, buildTonePrompt (verbatim text or selection, exact rules, protected-token list, descriptive throws for empty/over PROMPT_LIMITS/unknown profile/language; no 'translate' wording for 'keep'), extractProtectedTokens (URL, email, code span, {{placeholder}}, %s-style marker, number with unit/currency/percent), checkRewrite (missing tokens, empty, lengthRatio 2dp outside 0.3..3.0, over maxChars, lost line breaks). PromptTools.tsx gains one additive 'Tone and translation' panel: profile/language selects persisted via usePref, read-only rules, read-only prompt preview, Send through the existing createDraftSender path with the same route gating (mutually exclusive with the existing Send), reply shown, then checkRewrite problems and missing tokens as plain text, and an always-enabled insert button (replace selection if the prompt used the selection, else append) labeled 'Check found N problems · …' when the check fai"
+        },
+        {
+          "role": "worker-roles",
+          "goalIds": [
+            "93"
+          ],
+          "files": [
+            "src/ui/worker-roles.ts",
+            "src/components/Developer.tsx",
+            "tests/slice-worker-roles.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/worker-roles.ts: frozen WORKER_ROLES (planner, implementer, reviewer, tester, docs) with id/label/purpose/toolScopes/allowedModels/defaultModel, KNOWN_MODELS matching the Developer model select, TOOL_SCOPES, ROLE_PREF_KEY='developer.roleOverrides', getRole, recommendModel(roleId, available, overrides?) with reason, validateAssignment with exact problem messages, normalizeOverrides with warnings, describeRole, and descriptive Errors for non-string ids. Developer.tsx task form now uses these roles: picking a role sets the model to the recommendation (the user can still change it) and resets the scope checkboxes to the role's toolScopes. It shows purpose, tool scopes and allowed models as read-only text, lists the validateAssignment problems and disables 'Add queued task' while the assignment is invalid (add() re-checks too). Chosen scopes are saved in the task's existing note field, which parseBoard keeps, and also in an additive optional scopes field, which parseBoard drops on reload. TaskRow shows the note. Added a 'Role defaults' group of per-role default model selects saved through usePref(ROLE_PREF_KEY) via normalizeOverrides, showing any warnings, plu"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792050694235-5f2c581f-603b-4b77-9bd4-592bd3385e75.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792050737753-a7907367-4d9a-47dc-88ba-34d6cb377ac5.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792050755193-55efc796-88d3-4ab4-9fe8-9fb53f98bec5.log"
+        }
+      ]
+    },
+    {
+      "round": 24,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "coding-session-adapter",
+          "goalIds": [
+            "38"
+          ],
+          "files": [
+            "src/ui/coding-session-adapter.ts",
+            "src/components/MemoryWorkbench.tsx",
+            "tests/slice-coding-session-adapter.test.mjs"
+          ],
+          "summary": "Goal 38 slice. New pure src/ui/coding-session-adapter.ts: ADAPTER_LIMITS (inputChars 200000, commits 2000, sessions 200, gapMinutes 120), parseGitLog that auto-detects the default/--oneline/tab-separated %H%x09%an%x09%aI%x09%s layouts and handles default, iso and iso-strict dates with timezone offsets. It counts skipped lines, flags truncation at 2000 commits and throws descriptive errors for empty, oversize or unrecognizable input. groupSessions/groupSessionsDetailed sort dated commits ascending and split only when a gap is strictly greater than gapMinutes; undated commits go into one final session; ids are s-<index>; titles are capped at 120 chars and summaries at 2000. buildCheckpointDrafts returns {sessionId,title,note,createdAt?,capsuleId?,refs,gitRefs}, and toCheckpointOp maps a draft to the existing checkpoint.add op. MemoryWorkbench gets an additive 'Import coding sessions (git log, offline)' panel under the Checkpoints section with: a textarea, a gap input, Parse with honest stats, session checkboxes, a project select from state.capsules, and 'Create N checkpoints', which calls applyProductivity(checkpoint.add) once per selected draft. The panel shows the required offline "
+        },
+        {
+          "role": "document-explain",
+          "goalIds": [
+            "27"
+          ],
+          "files": [
+            "src/ui/document-explain.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-document-explain.test.mjs"
+          ],
+          "summary": "Goal 27 slice: new pure DOM-free src/ui/document-explain.ts (EXPLAIN_LIMITS, frozen EXPLAIN_MODES, fingerprintText FNV-1a 'fnv1a-<hex>-<len>', scanSensitive with counts + up to 10 masked samples for emails/URLs/sk-/Bearer/api_key-style secrets/16+ digit runs, chunkDocument paragraph-boundary chunks tiling the text with descriptive errors for empty/oversize/>10 parts, approveDocument, isApprovalCurrent, buildExplainPrompt with all throw paths; no imports, network, fs or model calls). PromptTools.tsx gains an additive 'Explain an approved document' panel between Tone and translation and Diagnose error: title, paste textarea, Scan and approve -> scan counts/masked samples -> explicit 'Approve this text', approval line (fingerprint/chars/parts/approvedAt), visible invalidation after edits, mode/question/part selects, exact prompt preview, 'Send part i' through the same createDraftSender route/route gating, Stop when streaming, verbatim reply. The required paste-only note is shown. New tests/slice-document-explain.test.mjs has 11 behavioral tests."
+        },
+        {
+          "role": "agent-session",
+          "goalIds": [
+            "94"
+          ],
+          "files": [
+            "src/ui/agent-session.ts",
+            "src/components/Developer.tsx",
+            "tests/slice-agent-session.test.mjs"
+          ],
+          "summary": "Goal 94: added pure DOM-free src/ui/agent-session.ts (AGENT_SESSION_FORMAT/VERSION, SESSION_LIMITS {jsonChars 400000, name 80}, buildSession with log redaction via exportLog/parseLog, serializeSession, parseSession with exact $-path errors and dropped counts, planResume pausing running tasks via transitionTask with the exact note plus future/30-day-stale warnings, diffSessions, normalizeSavedSessions/upsertSession for a cap-10 newest-first list). Developer.tsx gets one additive Sessions group inside the Task board panel: name + Save session (pref developer.agentSessions), list with verbatim savedAt/counts, Export JSON via navigator.clipboard, paste + Validate showing errors, dropped counts and diff, two-step Resume (shows diff on confirm) that replaces board/log/budget/spend through existing setters and lists actions and warnings verbatim. A note says sessions record manual board state and resuming never starts a worker. The agent-log pref was lifted to TaskBoardPanel and passed to AgentLogGroup via an optional logPref prop so both groups share state; AgentLogGroup behavior is otherwise unchanged."
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792051378958-2fff5b97-1fd2-4e92-b7fc-2d187500efc4.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792051422278-c0802e6c-aab1-4ee2-8997-89be2e842e1a.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792051440286-d33aa42f-2475-43d6-84c1-adb989fdb1b9.log"
+        }
+      ]
+    },
+    {
+      "round": 25,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "browser-refs-import",
+          "goalIds": [
+            "47"
+          ],
+          "files": [
+            "src/ui/browser-refs.ts",
+            "src/components/Capsules.tsx",
+            "tests/slice-browser-refs.test.mjs"
+          ],
+          "summary": "Goal 47: added pure DOM-free src/ui/browser-refs.ts (BROWSER_REFS_LIMITS, parseBrowserRefs auto-detecting netscape-html/json/markdown/lines with folder paths, entity decoding, http(s)-only with exact skip reasons for javascript:/data:/file:/chrome:/other schemes/credentials, label cap 160 with hostname+path fallback, normalized-URL dedupe, 500-item cap with truncated, descriptive throws; splitAgainstCapsule; toCapsuleItems; type-only imports). Added additive BrowserRefsImport panel 'Import browser bookmarks or tabs (paste, offline)' in Capsules.tsx for the selected capsule: textarea, Parse with detected/kept/skipped-reasons/truncated/already-present stats, folder filter, per-item checkboxes (fresh checked, present disabled), and 'Add N links to <name>' calling api.saveCapsule({id, items:[...capsule.items, ...toCapsuleItems(selected)]}) once via mutate, then syncing the editor draft. Shows the required note verbatim. Existing editing/restore/pack/window code unchanged. Added tests/slice-browser-refs.test.mjs with 11 behavioral tests."
+        },
+        {
+          "role": "update-manifest-verify",
+          "goalIds": [
+            "117"
+          ],
+          "files": [
+            "src/ui/update-manifest.ts",
+            "src/components/Status.tsx",
+            "tests/slice-update-manifest.test.mjs"
+          ],
+          "summary": "Goal 117 offline slice. Added pure DOM-free src/ui/update-manifest.ts (no imports, no fetch/fs/Electron): constants, parseUpdateManifest with exact $-path errors and unknown-key warnings, canonicalizePayload (key-sorted, excludes top-level signature), normalizeTrustedKeys (rejects private 'd'), verifyManifestSignature (crypto.subtle ECDSA P-256/SHA-256 over UTF-8 canonical payload; reasons ok/untrusted-key/bad-signature/bad-key/crypto-unavailable; strict base64 decoder never throws), compareVersions (strict semver with prerelease ordering, null on invalid), planUpdate (5 statuses, release, installer digest, NO_DOWNLOAD_NOTE), normalizeInstallLedger/recordInstall (validated, newest 20)/planRollback (steps requiresConfirmation:true, applied:false), verifyDigestHex. Status.tsx gets one additive 'Update manifest verification (offline)' panel after Compatibility tier using usePref for installedVersion/trustedKeys/installLedger, verify flow, verbatim notes in <pre>, ledger form and rollback plan, plus the required verbatim no-download notice. Existing panels unchanged. 10 new behavioral tests with a real generated P-256 key."
+        },
+        {
+          "role": "tool-scope-policy",
+          "goalIds": [
+            "95"
+          ],
+          "files": [
+            "src/ui/tool-scope-policy.ts",
+            "src/components/Computer.tsx",
+            "tests/slice-tool-scope-policy.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/tool-scope-policy.ts with ScopePolicy, a deny-all DEFAULT_SCOPE_POLICY, SCOPE_POLICY_PREF_KEY='computer.scopePolicy', normalizeScopePolicy (trim/dedupe/50 cap/known scopes only/maxTextChars clamped to 1..20000), policyFromRole, requiredScopeFor, evaluateActionScope (checks in this order: missing scope; launch against approvedApps/allowedRoots with '..' rejected and Windows paths compared case-insensitively; open-url limited to http/https with no credentials and a host allow-list that includes subdomains; type-text target, length and control characters; click/move-window target and integer coordinates), describePolicy, plus the normalizeScopePref/effectivePolicy helpers. It imports TOOL_SCOPES/WORKER_ROLES from worker-roles.ts, which has no computer-action ids, so it defines windows.read, windows.control, apps.launch, web.open and input.inject. Computer.tsx has one 'Action scope (renderer pre-check)' fieldset inside the action panel: an Off/Manual/WORKER_ROLES select, scope checkboxes, an allowed-hosts input and a max-chars input, all persisted through usePref(SCOPE_POLICY_PREF_KEY). It shows the exact reasons and the required verbatim notice; a denial dis"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792052212845-f268bdde-7c12-44f7-84d2-06c52e7d733d.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792052257176-08467d65-853c-4c70-92b4-0cba5937a60f.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792052274903-26e05e6c-6b7a-446c-89c7-093e0bfbeb08.log"
+        }
+      ]
+    },
+    {
+      "round": 26,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "project-map",
+          "goalIds": [
+            "50"
+          ],
+          "files": [
+            "src/ui/project-map.ts",
+            "src/components/Capsules.tsx",
+            "src/styles/project-map.css",
+            "tests/slice-project-map.test.mjs"
+          ],
+          "summary": "Goal 50 slice. NEW src/ui/project-map.ts (pure, no imports): MAP_LIMITS {capsules:100,nodesPerCapsule:200,labelChars:60}; buildProjectMap({capsules,checkpoints,tasks},{width,height,now?,selectedCapsuleId?}) returns a deep-frozen deterministic map with lanes (sorted by name then id), node ids prefixed 'capsule:'/'checkpoint:'/'task:', checkpoints placed on x by createdAt within timeRange (now-based fallback for a single date), invalid/missing dates and tasks with a matching capsuleId in a trailing undated column (at:null), timeline edges chaining dated checkpoints per lane, cross-lane reference edges from checkpoint refs naming another lane's capsule/node, labels truncated with an ellipsis, rounded coords, truncation counts (selected capsule kept), descriptive errors; mapKeyboardTarget for Arrow keys/Home/End. Capsules.tsx: additive ProjectMapPanel (exact insertions) rendered below the capsule split, using state.capsules, state.tasks and productivity.checkpoints; static <svg role=group aria-label='Project map'>, roving tabindex nodes, Enter/Space/click on a capsule calls existing requestOpen (respects unsaved-changes confirm), on a checkpoint shows title, verbatim createdAt and refs"
+        },
+        {
+          "role": "skill-suggestions",
+          "goalIds": [
+            "100"
+          ],
+          "files": [
+            "src/ui/skill-suggestions.ts",
+            "src/components/Developer.tsx",
+            "tests/slice-skill-suggestions.test.mjs"
+          ],
+          "summary": "Goal 100: added pure DOM-free src/ui/skill-suggestions.ts (SKILL_LIMITS, SKILLS_PREF_KEY, Skill type, normalizeTitleKey, parseNoteScopes, suggestSkills, normalizeSkills, upsertSkill, removeSkill, taskFromSkill). It imports only from task-board, agent-log and worker-roles. suggestSkills groups done/completed tasks by role plus a normalized title key, applies minOccurrences, orders by occurrences desc, then latest endedAt desc, then key asc, builds steps from unique info/result log messages (capped at 20 and truncated to 200 chars with an ellipsis), and takes scopes from the 'Scopes: ...' note intersected with TOOL_SCOPES. Developer.tsx: added a SkillSuggestionsGroup after the Sessions group inside the Task board panel. It shows suggestions (occurrences, verbatim lastCompletedAt, source task ids, scopes, steps), a 'Save as skill' button stored via usePref(SKILLS_PREF_KEY, []) through upsertSkill/normalizeSkills, saved skills with 'Queue task from skill' and a two-step Remove, the required verbatim note, and an empty-state sentence. The existing add path now takes an optional SkillTaskInput, so a queued skill task goes through the same validateAssignment/createTask/scopes-note logic a"
+        },
+        {
+          "role": "encrypted-bundle",
+          "goalIds": [
+            "109"
+          ],
+          "files": [
+            "src/ui/encrypted-bundle.ts",
+            "src/components/Settings.tsx",
+            "tests/slice-encrypted-bundle.test.mjs"
+          ],
+          "summary": "Goal 109 offline half. New pure src/ui/encrypted-bundle.ts (Web Crypto only): BUNDLE_FORMAT/VERSION/LIMITS, encryptBundle (PBKDF2-SHA-256 310000 iterations, 16-byte salt -> AES-GCM-256, 12-byte iv, header bound as additional data, kdf.check key-check value), parseBundle/validateBundle with exact $-path errors (format, version, createdAt, label, kdf name/hash/iterations min+max, salt/iv byte lengths, strict canonical base64, ciphertext too short/oversize, JSON oversize) and unknown-key warnings, decryptBundle returning ok/plaintext or bad-passphrase/corrupt/crypto-unavailable without throwing, serializeBundle, summarizePlaintext (top-level array counts or null), descriptive errors for short passphrase, empty/oversize plaintext, invalid now, long label. Settings.tsx: additive 'Encrypted transfer bundle (manual, no sync service)' section in the Data tab (plus a SETTINGS_INDEX entry) with passphrase+repeat (min 12, mismatch shown), optional label, Create encrypted bundle (data from productivityBridge(api).get(), because the existing Backup export writes a file in the main process and returns no JSON), Blob URL download named desktop-companion-bundle-<date>.json with revoke, Copy JSON, "
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792053200707-543e0404-d63c-467c-8bea-1d7c43314af2.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792053245159-06b0026a-b244-4fac-af2d-210b2465aaa6.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792053263175-0113f83e-0bcb-42cb-a947-5d684921eba5.log"
+        }
+      ]
+    },
+    {
+      "round": 27,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "clipboard-history-reuse",
+          "goalIds": [
+            "56",
+            "8"
+          ],
+          "files": [
+            "src/ui/clipboard-history.ts",
+            "src/components/Clipboard.tsx",
+            "tests/slice-clipboard-history.test.mjs"
+          ],
+          "summary": "Added pure DOM-free src/ui/clipboard-history.ts (HISTORY_LIMITS, foldText, compareEntries, filterEntries with case-insensitive accent-folded multi-word AND matching and newest-first/id-asc ordering, groupByDay with Today/Yesterday/ISO date (UTC)/Unknown time, historyKeyboardTarget for ArrowUp/ArrowDown/Home/End without wrap and null for unhandled keys, focusAfterRemoval, summarizeEntries, descriptive Errors). Clipboard.tsx: additive search input (aria-label 'Search clipboard history'), 'N of M entries match' status sentence, day-group headings, roving tabindex rows with arrow/Home/End navigation and Delete calling the existing remove(entry) and refocusing the nearest remaining row after reload; no-match empty state. Existing toggle/remove/purge/reload, ConfirmDialog, messages kept; doc comment updated. New tests/slice-clipboard-history.test.mjs with 11 behavioral tests incl. SSR render and no fetch/XMLHttpRequest source assertion."
+        },
+        {
+          "role": "offline-license-verify",
+          "goalIds": [
+            "119",
+            "6"
+          ],
+          "files": [
+            "src/ui/license-file.ts",
+            "src/components/Settings.tsx",
+            "tests/slice-license-file.test.mjs"
+          ],
+          "summary": "Goal 119 software half + goal 6 searchability. New pure, import-free src/ui/license-file.ts (mirrors update-manifest.ts): LICENSE_FORMAT/VERSION/LIMITS/PREF_KEY, LICENSE_TRUSTED_KEYS_PREF_KEY, LICENSE_OFFLINE_NOTE, parseLicense with exact $-path errors and unknown-key warnings (dropped), canonicalizePayload (key-sorted, signature excluded), normalizeTrustedKeys (EC P-256 public JWK only, rejects private 'd', accepts array or JSON string), verifyLicenseSignature(license, keys, subtle?) never throws with ok/untrusted-key/bad-signature/bad-key/crypto-unavailable, evaluateLicense(license, verify, now, graceDays=14) -> valid/expiring-soon(<=30 days)/in-grace/expired/invalid/not-yet-valid with integer or null daysRemaining and plain explanation, throws descriptive Errors for invalid now/graceDays; featureEnabled; describeLicense. Comments state no network call and no machine binding. Settings.tsx: SETTINGS_INDEX entry 'license' (Data tab) and a 'License (offline verification)' section with LicensePanel: license and trusted-keys textareas via usePref('license.file'/'license.trustedKeys'), Verify runs parse -> normalizeTrustedKeys -> verifyLicenseSignature(crypto.subtle) -> evaluateLicense"
+        },
+        {
+          "role": "finetune-dataset-builder",
+          "goalIds": [
+            "20"
+          ],
+          "files": [
+            "src/ui/finetune-dataset.ts",
+            "src/components/Models.tsx",
+            "tests/slice-finetune-dataset.test.mjs"
+          ],
+          "summary": "Added pure, import-free src/ui/finetune-dataset.ts: DATASET_LIMITS, DATASET_FORMAT, parseTranscript (User:/Assistant:/Me:/AI: case-insensitive, multi-line turns, blank-line conversations, consecutive same-role turns merged, skipped lines with 1-based line + reason, truncation at 2000 examples, descriptive errors for empty/oversize/no turns), buildExamples (trim, dedupe, truncate long turns, drop examples with turns under 2 chars, counts), scanExamples (emails, URLs, sk-/Bearer/api_key secrets, 16+ digit runs, max 10 masked samples), FNV-1a fnv1a, splitDataset (deterministic content+seed hash ranking, ratio validated 0..0.5), toJsonl/parseJsonl (line-numbered errors for JSON, roles, empty content, alternation starting with user, last turn assistant), datasetStats (per-example min/mean/max chars, ceil(chars/4) labelled estimate), buildManifest. Models.tsx: additive FinetuneDatasetPanel rendered after ManifestVerifyPanel with transcript textarea, Parse, honest stats/skipped reasons/truncation, masked scan samples, validation ratio (default 0.1) and seed inputs, split summary, Blob URL downloads of train.jsonl/validation.jsonl with immediate revoke, Copy manifest JSON via navigator.cli"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792053931655-6840fe1c-92d5-42f0-91cb-899a4124ad87.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792053969351-17d6c2ce-adac-4d44-bcd9-f8be308d62da.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792053986852-024b3bb2-4510-4311-8c07-3cac27ea876a.log"
+        }
+      ]
+    },
+    {
+      "round": 28,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "note-snippets-export",
+          "goalIds": [
+            "54"
+          ],
+          "files": [
+            "src/ui/note-snippets.ts",
+            "src/components/Notes.tsx",
+            "tests/slice-note-snippets.test.mjs"
+          ],
+          "summary": "Goal 54: added pure DOM-free src/ui/note-snippets.ts (SNIPPET_TAG, SNIPPET_LIMITS, listSnippets, filterSnippets with accent/case folding and title-before-body order, insertAtCursor with cap/truncated flag/surrogate-safe cut and descriptive errors, snippetKeyboardTarget without wrap, notesToMarkdown, notesToJson envelope, parseNotesExport with exact $-path envelope errors, 2,000,000-char cap, per-note drop list, no ids imported). Notes.tsx changes are additive: an Insert snippet button under Body opens an inline picker (search box labelled 'Search snippets', roving-tabindex rows, Enter/click inserts at the textarea selection through a body ref, Escape closes and refocuses the textarea, empty state explains #snippet); a Mark as snippet / Unmark snippet toggle that uses the existing addTag (respects MAX_TAGS); an Export menu in the PageHeader (Markdown of the filtered list, JSON of all notes, Blob URL revoked right after download, named desktop-companion-notes-<date>.md/.json); an Import JSON panel that can be collapsed and calls mutate(() => api.saveNote({title, body, tags})) once per note and reports 'Imported N notes, dropped M' (M counts parse drops plus failed saves). Added 12 be"
+        },
+        {
+          "role": "conversation-history-export",
+          "goalIds": [
+            "30"
+          ],
+          "files": [
+            "src/ui/conversation-export.ts",
+            "src/components/Assistant.tsx",
+            "tests/slice-conversation-export.test.mjs"
+          ],
+          "summary": "Goal 30: added pure DOM-free src/ui/conversation-export.ts (CONVERSATION_EXPORT_FORMAT, version 1, EXPORT_LIMITS, conversationToMarkdown, exportConversations, parseConversationExport with exact $-path errors/unknown-key warnings/duplicate and over-cap counts and no partial import on error, filterConversations with accent-folded query, half-open UTC date range, newest-first order and descriptive Errors, summarizeConversation, plus helpers normalizeHistory, mergeImported, chatToConversation, exportFileName, markdownFileName). It has no imports and no network/fs/model code. contracts.ts has no conversation type, so a minimal local type is defined. It maps ChatMessage text->content, createdAt->timestamp and source->provider, and never invents a model. Assistant.tsx: additive ConversationHistory 'History' panel rendered after the untouched ContextControls. It has Save current conversation, a search box (aria-label 'Search conversation history'), from/to date inputs, an 'N of M conversations match' status, and per-row Open (read-only view), Copy Markdown, Download .md (Blob URL revoked immediately) and Remove. It also has Export all (JSON) as desktop-companion-conversations-<date>.json a"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792054590390-0df50994-210c-4619-a975-03cdd47124fc.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792054664305-a177717b-b966-4e85-b52b-47b6af3a08a4.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792054687098-a82ee4ac-4620-4dbd-8f7d-cdb5a0ea3dcd.log"
+        }
+      ]
+    },
+    {
+      "round": 29,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "ai-writing-actions",
+          "goalIds": [
+            "26",
+            "21"
+          ],
+          "files": [
+            "src/ui/ai-writing.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-ai-writing.test.mjs"
+          ],
+          "summary": "Added src/ui/ai-writing.ts, a pure module that does not touch the DOM and imports only from tone-profiles.ts. It provides: WRITING_AI_LIMITS (selection 12000, prompt 15000 to stay under the 16 KiB chat limit, reply 20000, timeout 180s); WRITING_ACTIONS; buildWritingRequest, which returns a frozen object (prompt === preview, sentChars, warnings), applies the tone-profile rules and protected tokens, asks for the result text only, cuts oversized text with a warning, strips control characters, and requires a real language for translate; describeDestination (only online needs confirmation, labelled 'Anthropic cloud (stored key)'); cleanWritingReply, which strips fences, 'Here is…:' preambles and triple quotes and caps the length; and runWritingAction. runWritingAction uses the stream API when it is available. It passes deltas to onDelta, calls chatStreamCancel when the AbortSignal fires and returns 'cancelled', times out to 'incomplete', and maps lost/failed/system replies. Without the stream API it falls back to chat(). It does not throw for expected failures. PromptTools.tsx now has a 'Run with AI' section inside the existing Tone and translation panel. It offers an action select and "
+        },
+        {
+          "role": "notes-grounded-qa",
+          "goalIds": [
+            "32",
+            "16"
+          ],
+          "files": [
+            "src/ui/notes-qa.ts",
+            "src/components/MemorySearch.tsx",
+            "tests/slice-notes-qa.test.mjs"
+          ],
+          "summary": "Goals 32/16: added src/ui/notes-qa.ts (pure, imports only local-retrieval.ts): NOTES_QA_LIMITS, suggestNotes (BM25 via local-retrieval query), buildNotesQaRequest (frozen; notes numbered [1]..[n]; per-note/total/count caps with truncated flags and warnings; preview === prompt; ready flag), parseAnswerReferences (valid/unknown [n] and [n, m]), describeDestination (requiresConfirmation only online), runNotesQa (prefers chatStreamStart/onChatStream with cancel via chatStreamCancel, chat() fallback, maps failures without throwing, no retry/double send if stream start fails). MemorySearch.tsx gained an 'Ask your notes' panel: question input, unticked suggested notes plus add-by-title, consent preview (titles, chars, shortened flag, totals, exact text, destination from settings.mode), explicit 'Send N notes to Anthropic cloud' (re-checks api.cloudKeyStatus(); configured:false shows 'Add your key in Settings' and never sends) or 'Ask locally', busy state with Cancel, plain-text answer with cited sources opening notes via the existing navResult/onNavigate path, and a note that the exchange is recorded in Assistant chat history. New tests/slice-notes-qa.test.mjs covers ordering, numbering/c"
+        },
+        {
+          "role": "motion-ai-generate",
+          "goalIds": [
+            "80",
+            "139"
+          ],
+          "files": [
+            "src/ui/motion-ai.ts",
+            "src/components/MotionStudio.tsx",
+            "src/styles/motion-studio.css",
+            "tests/slice-motion-ai.test.mjs"
+          ],
+          "summary": "Added src/ui/motion-ai.ts (pure, imports only scene-spec.ts and motion-presets.ts): MOTION_AI_LIMITS (description 1000 chars, reply 60000 chars); buildMotionRequest returns a frozen {prompt, preview === prompt, sentChars, warnings}. The prompt's schema and limits come from scene-spec/motion-presets exports, its example comes from composeSceneFromText, it asks for JSON only, adds a reduced-motion speed cap and accepts an optional built-in base preset. Also added extractJsonCandidate (fence/prose stripping, string-aware balanced-brace scan that prefers parseable objects), validateGeneratedScene (runs the existing validateSceneSpec and returns its errors prefixed with the field path), describeDestination (requiresConfirmation only for online) and runMotionGeneration (uses the stream API first, cancels via chatStreamCancel, falls back to chat(), maps failed/lost/system-note/rejection results without throwing, and caps the reply). MotionStudio.tsx has a new 'Generate with AI' panel: description textarea; a 'What will be sent' preview showing the exact prompt, its character count and a destination label from settings.mode (via useOptionalStore, so standalone/SSR renders still work); 'Gen"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792057177908-32216938-1c8a-4fdf-b17e-6c74cb8a7c71.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792057229416-426b61ea-6192-42c6-bc88-4643dc3d654e.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792057247672-a43276b4-814b-49f0-904b-ffb5f59bf4e6.log"
+        }
+      ]
+    },
+    {
+      "round": 30,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "dictation-cleanup",
+          "goalIds": [
+            "23",
+            "12"
+          ],
+          "files": [
+            "src/ui/dictation-cleanup.ts",
+            "src/components/Assistant.tsx",
+            "tests/slice-dictation-cleanup.test.mjs"
+          ],
+          "summary": "Goal 23 (and its slice 12 parts): new pure DOM-free src/ui/dictation-cleanup.ts with DICTATION_LIMITS (12000/15000/20000/180s), cleanTranscriptOffline (spoken punctuation commands period/full stop, comma, question mark, exclamation mark/point, new line, new paragraph, open/close/end quote; standalone filler removal um/uh/er/erm/ah/hmm; same-line repeated-word collapse; whitespace normalization; sentence-start and pronoun-i capitalization; truncation flag; frozen {text, changes, truncated}; idempotent), describeChanges, buildDictationCleanupRequest (frozen, preview===prompt, transcript plus fixed instructions only, styles plain/notes/message), describeDestination (re-uses ai-writing; only 'online' needs confirmation), runDictationCleanup (wraps runWritingAction: stream with chatStreamCancel on abort -> 'cancelled', timeout/lost -> 'incomplete', chat() fallback, failed/system/empty -> {status:'failed', reason}, never throws, one send per call). Assistant.tsx: the existing transcribe handler still puts the transcript in the composer and now also opens a DictationCleanup step: original vs cleaned side by side (offline rules applied by default, no model call), change summary, Use cleane"
+        },
+        {
+          "role": "document-explain-ai",
+          "goalIds": [
+            "27",
+            "21"
+          ],
+          "files": [
+            "src/ui/document-explain.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-document-explain-ai.test.mjs"
+          ],
+          "summary": "Goals 27/21: document-explain.ts keeps all existing exports unchanged (EXPLAIN_LIMITS stays {120000,12000,10,120} because the baseline test asserts it) and adds EXPLAIN_AI_LIMITS (12000 doc / 15000 prompt / 20000 reply / 180s), EXPLAIN_DEPTHS, buildExplainRequest(text,{depth,question?,noteTitle?,selection?}) returning a frozen {prompt,preview===prompt,sentChars,warnings,truncated,source,depth} (selection preferred, otherwise the whole note; capped with a warning; control chars stripped; asks for plain text, short numbered sections that quote the source), describeDestination(mode) (only 'online' requires confirmation, labelled 'Anthropic cloud (stored key)'), cleanExplainReply (strips fence lines and 'Here is…' preambles, caps length), and runDocumentExplain(api, request, {signal,onDelta,timeoutMs}) (stream first with chatStreamCancel on abort -> 'cancelled', timeout -> 'incomplete', chat() fallback, failed/lost/system mapped to {status, reason}, no retry or double send; a stream-start failure does not fall back to chat). PromptTools.tsx adds an 'Explain with AI' section inside the existing explain panel: depth select, optional question, read-only 'What will be sent' preview with ch"
+        },
+        {
+          "role": "calendar-ics-export",
+          "goalIds": [
+            "59",
+            "114"
+          ],
+          "files": [
+            "src/ui/calendar-export.ts",
+            "src/components/Calendar.tsx",
+            "tests/slice-calendar-export.test.mjs"
+          ],
+          "summary": "Goals 59/114: new pure DOM-free src/ui/calendar-export.ts (only a type import from electron/services/calendar). It has EXPORT_LIMITS (5000 events, 500-char summary, 5000-char description, 2 MiB total), eventsToIcs(events,{prodId?,now?}) returning a frozen {text,count,skipped:[{id,index,reason}],truncated,bytes,firstDate,lastDate}, plus summarizeExport, formatBytes, exportFileName, foldLine, escapeIcsText and utcStamp. Output follows RFC 5545: VCALENDAR/VERSION/PRODID/CALSCALE, one VEVENT per event with UID taken from the event id, DTSTAMP from the supplied now (epoch if omitted), all-day events as VALUE=DATE, timed events as UTC Z (offsets converted), SUMMARY/DESCRIPTION/LOCATION, TEXT escaping, CRLF line endings and 75-octet folding that keeps multibyte characters whole. Invalid events are skipped with exact reason codes and nothing throws. Calendar.tsx adds an ExportPanel 'Export calendar' group showing the event count, date span, skipped reasons, a 'Preview .ics' toggle that opens a read-only textarea with the exact text, and the estimated size. 'Download .ics' uses Blob + URL.createObjectURL, then revokes the URL. 'Save via app dialog…' appears only when api.exportIcs exists an"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792058287237-0e99dc7a-5179-458f-b766-ff3139c982bb.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792058333550-a80e7145-3217-4c2d-b017-ba8695e52015.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792058351793-2941c8d4-0755-4c16-b3b1-3010a1038143.log"
+        }
+      ]
+    },
+    {
+      "round": 32,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "reveal-path-action",
+          "goalIds": [
+            "28",
+            "81"
+          ],
+          "files": [
+            "src/shared/contracts.ts",
+            "electron/services/actions.ts",
+            "electron/services/validation.ts",
+            "electron/ipc.ts",
+            "src/ui/error-diagnosis.ts",
+            "src/components/PromptTools.tsx",
+            "tests/slice-reveal-path-action.test.mjs"
+          ],
+          "summary": "Goals 28/81: Diagnose-error open-path and reveal-folder actions now go through the existing previewAction/executeAction preview-id and approval flow, and open-settings goes to Settings. contracts.ts: added PathActionType ('open-path'|'reveal-folder'), PathActionRequest {type,target} and AnyActionRequest; previewAction now takes AnyActionRequest. ActionRequest itself is unchanged (see limitations). validation.ts: validatePathActionRequest accepts only type+target, never trims the path, rejects unknown fields and missing or control-character targets, and returns null for other types so policy.validateActionRequest still rejects unknown types. actions.ts: evaluatePathAction resolves the path through resolveInsideRoots using the injected fs. Previews always require approval and are refused with exact reasons for UNC/device paths, paths outside allowedRoots, missing paths, links that resolve outside the roots, executables/scripts/installers/shortcuts (.exe .bat .cmd .ps1 .msi .scr .lnk and more) and non-openable file types. Execute reuses the existing flow: single use, approved===true, native confirm, policy re-check, rate limit and an 'Executed:'/'Failed:' Activity entry. It calls shel"
+        },
+        {
+          "role": "personal-profiles",
+          "goalIds": [
+            "7"
+          ],
+          "files": [
+            "src/ui/profiles.ts",
+            "src/components/Settings.tsx",
+            "tests/slice-personal-profiles.test.mjs"
+          ],
+          "summary": "Goal 7: added pure DOM-free src/ui/profiles.ts (PROFILES_PREF_KEY='profiles.v1', PROFILE_LIMITS max 12 / name 1..40 trimmed, case-insensitive unique; PersonalProfile capturing only theme, reduceMotion, voice, localModel, startInTray, retainDays; normalizeProfiles, captureProfile, upsertProfile, renameProfile, updateProfileSettings, removeProfile (clears active id), setActiveProfile, applyProfile (frozen exact patch), diffProfile; descriptive Errors). Settings.tsx: new searchable 'Personal profiles' index entry (keywords include 'profile') and section in General with PersonalProfilesPanel stored via usePref(PROFILES_PREF_KEY) from prefs.ts: save current as profile, Switch (applies patch through api.saveSettings via mutate; on failure shows error text and keeps previous active id), Update from current, inline Rename, Remove via existing ConfirmDialog, active badge and 'Differs from current settings' hint. No animations added. Encrypted-bundle and license sections untouched. New additive test file covers capture allowlist, name/duplicate/limit errors, frozen exact patch, remove clearing active id, normalize dropping malformed entries, diff, and Settings wiring."
+        },
+        {
+          "role": "file-shelf",
+          "goalIds": [
+            "55",
+            "57"
+          ],
+          "files": [
+            "src/ui/file-shelf.ts",
+            "src/components/Home.tsx",
+            "src/styles/views.css",
+            "tests/slice-file-shelf.test.mjs"
+          ],
+          "summary": "Goals 55/57: added the pure, DOM-free src/ui/file-shelf.ts. It has SHELF_PREF_KEY 'fileShelf.v1' and SHELF_LIMITS (200 items, label 80, note 500, 20 recent). It also exports normalizeShelf, addShelfItem (Windows paths dedupe case-insensitively with either slash; the default label is the basename; URLs must be http(s); javascript:/vbscript:/data:/file: are rejected with a reason), updateShelfItem, removeShelfItem, recordOpened, recentItems (lastOpenedAt newest first, then label), filterShelf (case and accent folding over label/target/note/tags), groupByKind and checkTarget. Invalid input throws a descriptive Error. Home.tsx now has a FileShelf panel below the existing widgets; existing content is unchanged. It offers Add file/Add folder through api.pickPath, a typed path/URL input, a search box, a list grouped by kind with inline label/note/tags editing (Enter saves, Escape cancels) and Remove. Open calls api.previewAction (launch for paths, open-url for links) and shows the summary and reason. api.executeAction(id, true) runs only after a per-click Confirm on an allowed preview. Disallowed previews show the reason with Dismiss, and failures show error text. recordOpened runs only w"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792064718396-9e62f29a-8c00-4d37-9446-86cf84edbfe9.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792064761449-7da0ec7b-dc8a-4976-bad5-1d1812b858cd.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792064779216-5864f84b-dfae-4c4a-b77a-4c4ba50822e9.log"
+        }
+      ]
+    },
+    {
+      "round": 34,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "host-battery-resources",
+          "goalIds": [
+            "60",
+            "64"
+          ],
+          "files": [
+            "src/shared/contracts.ts",
+            "electron/services/system.ts",
+            "electron/channels.ts",
+            "electron/ipc.ts",
+            "electron/preload.ts",
+            "src/ui/bridges.ts",
+            "src/ui/resource-policy.ts",
+            "src/components/Status.tsx",
+            "tests/slice-host-battery.test.mjs"
+          ],
+          "summary": "Goals 60/64. electron/services/system.ts: new HostBatteryReader behind an injectable HostPowerAdapter plus powerMonitorAdapter (isOnBatteryPower and 'on-battery'/'on-ac' events). It reports {source:'host'|'unmeasured', onBattery, measuredAt ISO}, never a percentage. A missing, throwing or malformed adapter gives unmeasured; read and subscribe never throw. The existing System.resources/BatteryReading shape and reasons are unchanged. src/shared/contracts.ts: added BatterySource, HostBatteryStatus, the HostBatteryAPI interface and an optional Window.jarvisHost. The baseline tests require exactly one ipcMain.handle per METHODS entry and no extra members on window.jarvis, and ipcCore/backend are not mine to edit. So the host state is push-only: electron/ipc.ts sends HOST_BATTERY_EVENT (channels.ts) to pages that pass isTrustedUrl, after did-finish-load and on every powerMonitor change, and removes its listeners in the returned disposer. No handler, METHOD, permission or network was added, and the renderer cannot send on this channel. electron/preload.ts exposes a separate read-only window.jarvisHost built by createHostBatteryApi (src/ui/bridges.ts). It caches the latest validated push ("
+        },
+        {
+          "role": "session-association-controls",
+          "goalIds": [
+            "36",
+            "33"
+          ],
+          "files": [
+            "src/ui/session-association.ts",
+            "src/ui/focus.tsx",
+            "src/ui/store.tsx",
+            "src/components/MemoryWorkbench.tsx",
+            "tests/slice-session-association.test.mjs"
+          ],
+          "summary": "Goal 36 (plus the goal 33 timeline association part): added pure, DOM-free src/ui/session-association.ts. It exports ASSOCIATION_LIMITS (frozen); suggestAssociations, which ranks deterministically by task completed/created near the session window or a created-to-completed span covering it, capsule checkpoints near the window and title word overlap, sorted by score, then id, then kind; applyAssociation, which is immutable, takes manual-reason changes only, keeps a field on undefined, removes it on null, sets correctedAt and correctedBy:'user', restores the recorded focus links when both are cleared, and throws descriptive Errors for an unknown session, task or capsule id; listCorrections, newest first with ties by id; buildAssociationSessions, which reads the sidecar timeline, focus and associations; and toAssociationOp. store.tsx gains an additive setSessionAssociation action. It validates through applyAssociation and saves through the existing productivity association.set and association.clear operations, so corrections survive reload. contracts.ts and electron/ were not edited. MemoryWorkbench Timeline now mounts an 'Associate session' details control on each timeline entry row a"
+        },
+        {
+          "role": "interruptible-anim-states",
+          "goalIds": [
+            "63",
+            "67"
+          ],
+          "files": [
+            "src/ui/anim-state.ts",
+            "src/ui/companion.tsx",
+            "src/components/Companion.tsx",
+            "src/components/SceneBackdrop.tsx",
+            "src/styles/views.css",
+            "tests/slice-interruptible-anim.test.mjs"
+          ],
+          "summary": "Goals 63/67. Added pure DOM-free src/ui/anim-state.ts: ANIM_LIMITS, ANIM_PHASES, createAnimMachine({reducedMotion, now?, initial?}), transition(machine, show|hide|tick|cancel, atMs) returning new frozen machines (explicit idle/entering/active/exiting/interrupted), progressAt clamped 0..1 and deterministic, cancel, finish, setReducedMotion, viewAt. A change mid-leg starts the new leg from the current progress (one leg at a time; a different target fades current content out from where it is, then fades the new one in; retargeting during a fade-out keeps the same leg). Reduced motion collapses every change to one instant step. src/ui/companion.tsx adds exported useAnimMachine(target, {reducedMotion}) and readReducedMotion(): rAF loop, cancelled on target change and on unmount. Companion.tsx adds a status badge (.stage-status) driven by the machine: it opens on listening/thinking/speaking/alert, crossfades between them and closes on idle, and it respects settings.reduceMotion and the root data-motion attribute. SceneBackdrop.tsx uses the same hook for the scene-to-scene fade (reduced when ambient is 'off'). It adds data-anim-phase/--anim-progress only while a fade runs, so settled mark"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792065932348-24ca126e-9613-4225-b3ef-1fd1985ea299.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792065987462-d4f0aeda-9085-43fb-a0e9-249d055ed685.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792066005727-80b53f78-8842-406c-a215-1966acf2baeb.log"
+        }
+      ]
+    },
+    {
+      "round": 40,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "completedWork": [
+        {
+          "role": "state-encryption-at-rest",
+          "goalIds": [
+            "113"
+          ],
+          "files": [
+            "electron/services/store.ts",
+            "electron/services/atRest.ts",
+            "electron/backend.ts",
+            "electron/main.ts",
+            "tests/slice-at-rest-encryption.test.mjs"
+          ],
+          "summary": "Goal 113 slice, main process only, no IPC, contract, preload, renderer or secrets.ts changes. NEW electron/services/atRest.ts: AtRestCipher interface; createSafeStorageCipher(safeStorageLike), which never throws from available(); memoryCipher() (TEST ONLY, XOR with a tagged prefix, a different key simulates another profile); versioned text envelope 'desktop-companion-encrypted-state v1\\n<base64>' with isEncryptedBlob/wrapEncrypted/parseEncryptedBlob/unwrapEncrypted. These throw AtRestError (kind format|version|size|unavailable|key) with descriptive messages and never pass raw library errors through. AT_REST_LIMITS are derived from LIMITS (notes+tasks x text / 4, capped at 2^27 chars). store.ts: optional StoreOptions.cipher. persist and all Store-written backups (auto and pre-import) go through the same tmp+fsync+rename / writeFile paths, wrapped when the cipher is available. Data is never downgraded to plaintext after it has been encrypted. A protector that claims to be ready but fails to encrypt before any data is encrypted keeps plaintext, as today. Load cases: (1) legacy plaintext file with a working cipher: parsed as today, migrated on the first persist, one 'recovery' activity"
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792080301681-cf26d3da-100c-488c-b3cf-8388dd113ca8.log"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792080358359-7a07c754-2e35-4026-9e41-5757a9477f0b.log"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792080379012-a0372c5f-14a3-4a56-83ef-d5d7d8ed87bd.log"
+        }
+      ]
+    },
+    {
+      "round": 40,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "coordinatorLocalRecovery": true,
+      "completedWork": [
+        {
+          "role": "reminder-sleep-resume",
+          "goalIds": [
+            "52"
+          ],
+          "files": [
+            "electron/services/reminders.ts",
+            "electron/services/lifecycle.ts",
+            "electron/services/system.ts",
+            "tests/slice-reminder-resume.test.mjs"
+          ],
+          "summary": "Hardened the existing real powerMonitor resume path: cancel the stalled timeout before resync, reject callbacks already queued from canceled timers, claim overdue task keys and schedule the next timer before asynchronous audit writes, and stop pending notification delivery after disposal. Added four deterministic behavioral tests covering resume, burst folding, notifications disabled, slow audit overlap, clock rollback, long sleep and timeout cap. All 29 focused tests passed. No network calls or permission changes."
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792080467710-fee73336-733e-41b6-bff9-19b42f2cdce4.log",
+          "fingerprint": "1bae7610f41d84ad8dc870a972f1447a6eed5e578a30065cc988600cf8dc6f4f"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792080523238-0bb43380-48c3-49ed-baa6-29fae17dd755.log",
+          "fingerprint": "e646165e8fda78be65817d39466144dc8658387927df1db3c83d1c27f7132b46"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792080542326-fb193ce6-4868-4256-a228-21c38d8a48f8.log",
+          "fingerprint": "9b3f329ecc49cb880707c90edbb36b1e5c901c56b00b28ac131315ce136f659f"
+        }
+      ]
+    },
+    {
+      "round": 40,
+      "softwareChecksPassed": true,
+      "featuresFullyAccepted": false,
+      "coordinatorLocalRecovery": true,
+      "completedWork": [
+        {
+          "role": "cloud-provider-adapters",
+          "goalIds": [
+            "102",
+            "101"
+          ],
+          "files": [
+            "src/shared/contracts.ts",
+            "electron/services/validation.ts",
+            "electron/services/cloud.ts",
+            "electron/services/netGuard.ts",
+            "electron/services/chat.ts",
+            "electron/services/secrets.ts",
+            "electron/channels.ts",
+            "electron/ipc.ts",
+            "electron/preload.ts",
+            "src/ui/bridges.ts",
+            "src/components/Settings.tsx",
+            "src/components/Assistant.tsx",
+            "src/styles/cloud-providers.css",
+            "tests/slice-cloud-providers.test.mjs",
+            "electron/backend.ts",
+            "electron/ipcCore.ts"
+          ],
+          "summary": "Completed guarded Anthropic/OpenAI/OpenRouter adapters, selected-provider protected keys, actual backend routing and per-provider usage. Explicit extra ownership: electron/backend.ts and electron/ipcCore.ts (16 total source/test files). Repaired protocol registration: all three provider key methods now use authoritative METHODS, ARITY and ARG_SPECS through ordinary trusted dispatch; removed extra raw IPC registration. FullJarvisAPI requires host methods. Added behavioral trust, subframe, arity, provider and key validation tests. Preserved accepted encryption Store cipher injection. Latest security/captain/provider suites passed 37/37 and full build passed. No paid API requests or canonical edits."
+        }
+      ],
+      "checks": [
+        {
+          "command": "npm test",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792080946729-f78e1a58-a238-4c53-950b-46bb093c8eeb.log",
+          "fingerprint": "f7131fab7ef79360262c46cc0518f2ee278b8f56ef5c5c08509bee1ababee24d"
+        },
+        {
+          "command": "npm run build",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792081039254-0b5aab2e-a9ad-4c8e-b3fc-f6c5d7aab4c6.log",
+          "fingerprint": "c32427864944d80ad5ea336fe968a1e67bc0503e02e8331a4a9da8c9ebd48b76"
+        },
+        {
+          "command": "npm run smoke",
+          "exitCode": 0,
+          "outputRef": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\control-room\\.controlroom\\loop\\evidence\\1792081061101-aa93403b-820e-4a6b-8bcd-466ff7cfbd96.log",
+          "fingerprint": "7e17b7448b0e2564f07e2b8c19de11b81d4cc8560cee506bc50776927a2e30b6"
+        }
+      ]
+    }
+  ],
+  "softwareCheckedGoalIds": [
+    "35",
+    "28",
+    "140",
+    "139",
+    "29",
+    "91",
+    "97",
+    "107",
+    "73",
+    "96",
+    "74",
+    "118",
+    "16",
+    "26",
+    "93",
+    "38",
+    "27",
+    "94",
+    "47",
+    "117",
+    "95",
+    "50",
+    "100",
+    "109",
+    "56",
+    "8",
+    "119",
+    "6",
+    "20",
+    "54",
+    "30",
+    "21",
+    "32",
+    "80",
+    "23",
+    "12",
+    "59",
+    "114",
+    "81",
+    "7",
+    "55",
+    "57",
+    "60",
+    "64",
+    "36",
+    "33",
+    "63",
+    "67",
+    "113",
+    "52",
+    "102",
+    "101"
+  ]
+}

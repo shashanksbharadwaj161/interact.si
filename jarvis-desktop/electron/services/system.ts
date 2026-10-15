@@ -2,7 +2,7 @@
 // Nothing here is estimated or invented: every number comes from the operating system or the running process, and
 // anything the platform cannot measure from the main process is reported as unavailable with a reason.
 import * as os from 'node:os';
-import type {Capability, Settings, SystemInfo} from '../../src/shared/contracts';
+import type {Capability, HostBatteryStatus, Settings, SystemInfo} from '../../src/shared/contracts';
 import type {NativeAdapter} from '../native/adapter';
 import type {GuardedFetch} from './netGuard';
 import type {Secrets} from './secrets';
@@ -214,4 +214,85 @@ export class System {
     if (!r || typeof r.charging !== 'boolean' || !Number.isFinite(r.level) || r.level < 0 || r.level > 1) return null;
     return {charging: r.charging, level: r.level};
   }
+}
+
+// ---------- Host power state (on battery / on AC) ----------
+
+/**
+ * Injectable host power adapter. In Electron it wraps powerMonitor (see powerMonitorAdapter); tests pass a fake.
+ * It can only say whether the machine runs on battery. It has no percentage, so none is ever reported.
+ */
+export interface HostPowerAdapter {
+  isOnBatteryPower(): boolean;
+  /** Calls listener(true) on 'on-battery' and listener(false) on 'on-ac'. Returns an unsubscribe. */
+  onChange?(listener: (onBattery: boolean) => void): () => void;
+}
+
+/** The subset of Electron's powerMonitor used here, typed loosely so a plain EventEmitter fake fits. */
+export interface PowerMonitorLike {
+  isOnBatteryPower?: () => boolean;
+  on(event: string, listener: () => void): unknown;
+  removeListener(event: string, listener: () => void): unknown;
+}
+
+/** Adapts Electron's powerMonitor (isOnBatteryPower plus the 'on-battery'/'on-ac' events) to HostPowerAdapter. */
+export function powerMonitorAdapter(pm: PowerMonitorLike): HostPowerAdapter {
+  return {
+    isOnBatteryPower: () => {
+      if (typeof pm.isOnBatteryPower !== 'function') throw new Error('isOnBatteryPower is not available');
+      return pm.isOnBatteryPower();
+    },
+    onChange: (listener) => {
+      const onBattery = () => listener(true);
+      const onAc = () => listener(false);
+      pm.on('on-battery', onBattery);
+      pm.on('on-ac', onAc);
+      return () => { pm.removeListener('on-battery', onBattery); pm.removeListener('on-ac', onAc); };
+    },
+  };
+}
+
+/**
+ * Reads host power state behind an injectable adapter. A missing adapter, a throw or a non-boolean answer is reported as
+ * {source: 'unmeasured', onBattery: null}; read() and subscribe() never throw.
+ */
+export class HostBatteryReader {
+  private unsubs = new Set<() => void>();
+  constructor(private adapter: HostPowerAdapter | null | undefined, private now: () => number = Date.now) {}
+
+  private stamp(): string { return new Date(this.now()).toISOString(); }
+
+  get connected(): boolean { return !!this.adapter && typeof this.adapter.isOnBatteryPower === 'function'; }
+
+  read(): HostBatteryStatus {
+    const measuredAt = this.stamp();
+    if (!this.connected) return {source: 'unmeasured', onBattery: null, measuredAt};
+    let v: unknown;
+    try { v = this.adapter!.isOnBatteryPower(); } catch { return {source: 'unmeasured', onBattery: null, measuredAt}; }
+    return typeof v === 'boolean' ? {source: 'host', onBattery: v, measuredAt} : {source: 'unmeasured', onBattery: null, measuredAt};
+  }
+
+  /** Delivers a fresh host status on every on-battery/on-ac change. A throwing handler is ignored. */
+  subscribe(handler: (status: HostBatteryStatus) => void): () => void {
+    if (typeof handler !== 'function' || !this.adapter || typeof this.adapter.onChange !== 'function') return () => undefined;
+    let off: () => void;
+    try {
+      off = this.adapter.onChange((onBattery) => {
+        if (typeof onBattery !== 'boolean') return;
+        try { handler({source: 'host', onBattery, measuredAt: this.stamp()}); } catch { /* a broken listener must not break the host */ }
+      });
+    } catch { return () => undefined; }
+    let active = true;
+    const unsub = () => {
+      if (!active) return;
+      active = false;
+      this.unsubs.delete(unsub);
+      try { off(); } catch { /* already detached */ }
+    };
+    this.unsubs.add(unsub);
+    return unsub;
+  }
+
+  /** Removes every listener this reader attached. */
+  dispose(): void { for (const u of [...this.unsubs]) u(); }
 }

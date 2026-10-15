@@ -9,13 +9,15 @@ const ROOTS = new Set(['src', 'electron', 'native', 'tests', 'docs', 'scripts'])
 const ROOT_FILES = /^(?:package\.json|(?:tsconfig(?:\.[\w-]+)?\.json)|(?:vite|vitest|eslint|postcss|tailwind)\.config\.(?:[cm]?[jt]s)|AGENTS\.md|CLAUDE\.md|README\.md|GOAL\.md|index\.html)$/i;
 const BLOCKED = /(?:^\. |^\.|^(?:node_modules|vendor|dist|build|coverage|private|logs?|keys?|secrets?|credentials?)$|(?:^|[._-])(?:env|secret|credential|token|password|key)(?:$|[._-])|\.(?:pem|pfx|p12|key|log)$)/i;
 const MAX_FILE = 128 * 1024;
+const MAX_EDIT = 24 * 1024;
 const MAX_RESULT = 24 * 1024;
 const MAX_CONTEXT = 700 * 1024;
 const TOOLS = [
   { name: 'list_files', description: 'List readable source files; optional source directory.', input_schema: { type: 'object', properties: { path: { type: 'string' } }, additionalProperties: false } },
   { name: 'read_file', description: 'Read a source file, at most 128 KiB. Optional offset and limit are character counts (limit defaults to 24000, maximum 24000). Use repeated offsets for large files.', input_schema: { type: 'object', properties: { path: { type: 'string' }, offset: { type: 'integer', minimum: 0 }, limit: { type: 'integer', minimum: 1, maximum: 24000 } }, required: ['path'], additionalProperties: false } },
   { name: 'write_file', description: 'Replace an exactly assigned file with UTF-8 content.', input_schema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'], additionalProperties: false } },
-  { name: 'run_check', description: 'Run one fixed verification: test, typecheck, or build. No commands or arguments accepted.', input_schema: { type: 'object', properties: { check: { enum: ['test', 'typecheck', 'build'] } }, required: ['check'], additionalProperties: false } },
+  { name: 'edit_file', description: 'Replace one exact, unique nonempty old_text in an existing assigned file. Each old_text and new_text is limited to 24 KiB; use small focused edits instead of rewriting large files.', input_schema: { type: 'object', properties: { path: { type: 'string' }, old_text: { type: 'string', minLength: 1 }, new_text: { type: 'string' } }, required: ['path', 'old_text', 'new_text'], additionalProperties: false } },
+  { name: 'run_check', description: 'Run one fixed check: test_owned executes only assigned tests/*.test.mjs files; test runs the full test set; typecheck or build. Focused checks do not establish full verification. No commands or arguments accepted.', input_schema: { type: 'object', properties: { check: { enum: ['test_owned', 'test', 'typecheck', 'build'] } }, required: ['check'], additionalProperties: false } },
 ];
 
 function inside(root, file) { const rel = path.relative(root, file); return rel === '' || (!rel.startsWith(`..${path.sep}`) && rel !== '..' && !path.isAbsolute(rel)); }
@@ -31,6 +33,31 @@ function relativeFile(value, directory = false) {
 export function safeCheckEnvironment(env = process.env) {
   const allowed = new Set(['systemroot', 'windir', 'comspec', 'path', 'pathext', 'temp', 'tmp', 'lang', 'lc_all', 'number_of_processors']);
   return Object.fromEntries(Object.entries(env).filter(([key]) => allowed.has(key.toLowerCase())).concat([['CI', '1'], ['NO_COLOR', '1']]));
+}
+
+/** Keep bounded failure diagnostics and the final TAP summary, not just noisy passing tests. */
+export function createCheckOutputCapture() {
+  const limit = 12000;
+  let total = 0, complete = '', head = '', tail = '', pending = '', failures = '', context = '', remaining = 0;
+  function line(value) {
+    if (/^\s*not ok\b/.test(value)) { failures = (failures + value + '\n').slice(-3000); remaining = 16; }
+    if (remaining > 0) { context = (context + value + '\n').slice(-4000); remaining--; }
+  }
+  return {
+    append(chunk) {
+      const value = String(chunk); total += value.length;
+      if (total <= limit) complete += value; else complete = '';
+      if (head.length < 1000) head += value.slice(0, 1000 - head.length);
+      tail = (tail + value).slice(-4500);
+      const lines = (pending + value).split('\n'); pending = lines.pop().slice(-4000);
+      for (const item of lines) line(item);
+    },
+    result() {
+      if (total <= limit) return { output: complete, outputTruncated: false };
+      if (pending) line(pending);
+      return { output: `${head}\n[output truncated; ${total} characters received]\n[failed tests]\n${failures}\n[failure diagnostics]\n${context}\n[final output / summary]\n${tail}`, outputTruncated: true };
+    },
+  };
 }
 
 export async function runApiWorker(config, { fetchProvider = globalThis.fetch, signal } = {}) {
@@ -55,8 +82,17 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
     return result.slice(0, max);
   }
   let state = { state: 'active', summary: 'Working on assigned files.', events: [], pid: process.pid };
+  let failureCode = 'worker_error', failureStage = 'initialization';
+  const failureSummaries = {
+    worker_error: 'Worker stopped after an unclassified runtime failure.',
+    provider_malformed_json: 'Provider returned malformed JSON; no tools from that response were executed.',
+    provider_protocol: 'Provider returned an invalid message structure; no tools from that response were executed.',
+    provider_transport_exhausted: 'Provider transport attempts were exhausted or the response could not be read.',
+    filesystem_persistence: 'Worker status could not be saved to the local filesystem.',
+  };
   async function persist(patch = {}) {
     state = { ...state, ...patch, events: state.events.slice(-100) };
+    try {
     await mkdir(path.dirname(stateFile), { recursive: true });
     const tmp = `${stateFile}.${process.pid}.tmp`;
     await writeFile(tmp, JSON.stringify(state), { mode: 0o600 });
@@ -64,6 +100,7 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
       try{await rename(tmp,stateFile);break;}
       catch(error){if(attempt>=5||!['EPERM','EACCES','EBUSY'].includes(error.code))throw error;await new Promise(resolve=>setTimeout(resolve,25*(attempt+1)));}
     }
+    } catch (error) { failureCode = 'filesystem_persistence'; failureStage = 'state_persistence'; throw error; }
   }
   async function retryDelay(milliseconds) {
     signal?.throwIfAborted();
@@ -122,14 +159,15 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
     signal?.throwIfAborted();
     return new Promise((resolve, reject) => {
       const child = spawn(process.execPath, args, { cwd: workspace, env: safeCheckEnvironment(), windowsHide: true, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
-      let output = '', timedOut = false;
-      const capture = chunk => { if (output.length < MAX_RESULT) output += chunk.toString().slice(0, MAX_RESULT - output.length); };
+      const output = createCheckOutputCapture();
+      let timedOut = false;
+      const capture = chunk => output.append(chunk.toString());
       child.stdout.on('data', capture); child.stderr.on('data', capture);
       const stop = () => child.kill();
       const timeout = setTimeout(() => { timedOut = true; stop(); }, 120000);
       signal?.addEventListener('abort', stop, { once: true });
       child.on('error', error => { clearTimeout(timeout); signal?.removeEventListener('abort', stop); reject(new Error('Verification process could not start')); });
-      child.on('close', code => { clearTimeout(timeout); signal?.removeEventListener('abort', stop); resolve({ exit: code ?? -1, timedOut, output: clean(output) }); });
+      child.on('close', code => { clearTimeout(timeout); signal?.removeEventListener('abort', stop); const captured = output.result(); resolve({ exit: code ?? -1, timedOut, ...captured, output: clean(captured.output) }); });
     });
   }
   async function trustedTool(tool) {
@@ -151,6 +189,27 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
       const handle = await open(file, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
       try { const info = await handle.stat(); if (!info.isFile() || info.size > MAX_FILE) throw new Error('Source file exceeds read limit'); const result = clean((await handle.readFile('utf8')).slice(offset, offset + limit)); inspections++; return result; } finally { await handle.close(); }
     }
+    if (tool.name === 'edit_file') {
+      if (Object.keys(input).some(key => !['path', 'old_text', 'new_text'].includes(key)) || typeof input.old_text !== 'string' || !input.old_text.length || typeof input.new_text !== 'string' || Buffer.byteLength(input.old_text) > MAX_EDIT || Buffer.byteLength(input.new_text) > MAX_EDIT) throw new Error('Exact edit requires nonempty old_text and old_text/new_text at most 24 KiB');
+      const file = await checkedPath(input.path, true);
+      const handle = await open(file, constants.O_RDWR | (constants.O_NOFOLLOW || 0));
+      try {
+        const info = await handle.stat();
+        if (!info.isFile() || info.nlink > 1 || info.size > MAX_FILE) throw new Error('Edit target must be a bounded regular unlinked source file');
+        const current = await handle.readFile('utf8');
+        const index = current.indexOf(input.old_text);
+        if (index < 0) throw new Error('Exact edit old_text was not found; read the current file first');
+        if (current.indexOf(input.old_text, index + 1) !== -1) throw new Error('Exact edit old_text is ambiguous; include unique surrounding context');
+        const next = current.slice(0, index) + input.new_text + current.slice(index + input.old_text.length);
+        if (Buffer.byteLength(next) > MAX_FILE) throw new Error('Edited content exceeds write limit');
+        // Write through the validated handle: no path reopening or truncation before validation.
+        const buffer = Buffer.from(next);
+        let written = 0;
+        while (written < buffer.length) { const result = await handle.write(buffer, written, buffer.length - written, written); if (!result.bytesWritten) throw new Error('Exact edit write made no progress'); written += result.bytesWritten; }
+        await handle.truncate(buffer.length);
+      } finally { await handle.close(); }
+      return 'Assigned file edited by one exact match.';
+    }
     if (tool.name === 'write_file') {
       if (typeof input.content !== 'string' || Buffer.byteLength(input.content) > MAX_FILE) throw new Error('Content exceeds write limit');
       const file = await checkedPath(input.path, true);
@@ -161,12 +220,21 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
       return 'Assigned file written.';
     }
     if (tool.name === 'run_check') {
-      if (Object.keys(input).some(k => k !== 'check') || !['test', 'typecheck', 'build'].includes(input.check)) throw new Error('Unknown fixed check');
+      if (Object.keys(input).some(k => k !== 'check') || !['test_owned', 'test', 'typecheck', 'build'].includes(input.check)) throw new Error('Unknown fixed check');
       let result;
-      if (input.check === 'test') {
+      if (input.check === 'test_owned') {
+        const tests = [...owned].filter(file => /^tests\/.+\.test\.mjs$/.test(file)).sort();
+        if (!tests.length || tests.length > 200) throw new Error('No bounded assigned test set found');
+        for (const file of tests) {
+          const absolute = await checkedPath(file);
+          if (!(await lstat(absolute)).isFile()) throw new Error('Assigned test must be a regular source file');
+        }
+        result = { ...await executeNode(['--test', '--test-concurrency=2', ...tests]), scope: 'assigned_tests_only', fullVerification: false };
+      } else if (input.check === 'test') {
         const tests = (await listFiles('tests')).filter(f => /\.(?:test|spec)\.[cm]?js$/.test(f));
         if (!tests.length || tests.length > 200) throw new Error('No bounded test set found');
-        result = await executeNode(['--test', ...tests]);
+        // Several workers can verify concurrently; do not multiply CPU-sized test pools.
+        result = await executeNode(['--test', '--test-concurrency=2', ...tests]);
       } else {
         result = await executeNode([await trustedTool('typescript/bin/tsc'), '--noEmit']);
         if (input.check === 'build' && result.exit === 0) result = await executeNode([await trustedTool('vite/bin/vite.js'), 'build']);
@@ -186,18 +254,20 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
     }
     throw new Error('Unknown worker tool');
   }
-  await persist();
   const messages = [{ role: 'user', content: config.prompt }];
   try {
+    await persist();
     for (let turn = 0; turn < maxTurns; turn++) {
+      failureStage = 'request_preparation';
       signal?.throwIfAborted();
       if (JSON.stringify(messages).length > MAX_CONTEXT) { await persist({ state: 'blocked', reason: 'context_limit', summary: 'Context limit reached; review the completed file changes.' }); return state; }
       const request = {
         method: 'POST', redirect: 'error',
         headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: config.model, max_tokens: 16384, stream: false, cache_control: { type: 'ephemeral' }, system: `You are a coding worker. Complete the assignment using the tools. Edit only these exact files: ${[...owned].join(', ')}. Read only allowed project sources. Never request secrets, private runtime data, external services, payment changes, or shell commands. ${planner ? 'You are the planner: inspect sources at most six times, then dispatch three substantial tasks with disjoint file ownership in docs/loop/decision.json (version 1). Use the supplied goal and observations; do not perform a full repository audit. You cannot run checks. Write the decision promptly; the runtime stops after a valid checkpoint.' : 'Use fixed checks to verify changes. The runtime stops after an owned docs/loop/result.<role>.json completion checkpoint with done:true and a checks array.'} Give a concise factual completion summary.`, tools: planner ? TOOLS.filter(t => ['write_file', 'read_file', 'list_files'].includes(t.name)) : TOOLS, messages }),
+        body: JSON.stringify({ model: config.model, max_tokens: 16384, stream: false, cache_control: { type: 'ephemeral' }, system: `You are a coding worker. Complete the assignment using the tools. Edit only these exact files: ${[...owned].join(', ')}. Read only allowed project sources. Never request secrets, private runtime data, external services, payment changes, or shell commands. ${planner ? 'You are the planner: inspect sources at most six times, then dispatch up to three small independently complete tasks with disjoint file ownership; honor a single-worker instruction in the audited completion directive when the remaining allowance is low in docs/loop/decision.json (version 1). Use the supplied goal and observations; do not perform a full repository audit. You cannot run checks. Write the decision promptly; the runtime stops after a valid checkpoint.' : 'Prefer edit_file with small unique exact-match sections for existing source files; reserve write_file for new or short files. Prefer test_owned and typecheck before your completion checkpoint; test_owned runs only your assigned tests and is not full verification. The independent verifier runs the full suite, build and smoke checks after integration. Report focused check scope accurately. The runtime stops after an owned docs/loop/result.<role>.json completion checkpoint with done:true and a checks array.'} Give a concise factual completion summary.`, tools: planner ? TOOLS.filter(t => ['write_file', 'read_file', 'list_files'].includes(t.name)) : TOOLS, messages }),
       };
       let response;
+      failureStage = 'provider_transport';
       for (let attempt = 0; attempt < 3; attempt++) {
         signal?.throwIfAborted();
         try {
@@ -214,19 +284,38 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
         // independent; an uncertain earlier charge remains held by the gateway.
         await retryDelay(250 * (attempt + 1));
       }
-      if (!response) throw new Error('Provider transport retries exhausted');
+      if (!response) { failureCode = 'provider_transport_exhausted'; throw new Error('Provider transport retries exhausted'); }
       if (!response.ok) { await persist({ state: 'failed', reason: `provider_http_${Number(response.status) || 0}`, summary: 'Provider rejected the request; worker stopped.' }); return state; }
-      const raw = await response.text();
-      if (raw.length > 2 * MAX_CONTEXT) throw new Error('Provider response exceeds limit');
-      const body = JSON.parse(raw);
-      if (!Array.isArray(body.content) || body.content.length > 64) throw new Error('Invalid provider response');
+      let raw;
+      try { raw = await response.text(); } catch { failureCode = 'provider_transport_exhausted'; throw new Error('Provider response read failed'); }
+      failureStage = 'provider_decode';
+      if (typeof raw !== 'string' || raw.length > 2 * MAX_CONTEXT) { failureCode = 'provider_protocol'; throw new Error('Provider response exceeds limit'); }
+      let body;
+      try { body = JSON.parse(raw); } catch { failureCode = 'provider_malformed_json'; throw new Error('Malformed provider JSON'); }
+      failureStage = 'provider_validation';
+      if (!body || typeof body !== 'object' || !Array.isArray(body.content) || body.content.length > 64 || typeof body.stop_reason !== 'string') { failureCode = 'provider_protocol'; throw new Error('Invalid provider response'); }
+      // A truncated tool block may contain incomplete input. Never execute any
+      // tool in that response or pay for an unbounded continuation/retry.
+      if (body.stop_reason === 'max_tokens') { await persist({ state: 'blocked', reason: 'output_limit', summary: 'Provider output limit reached; no tools from the truncated response were executed. Use smaller exact edits.' }); return state; }
+      const ids = new Set();
+      for (const block of body.content) {
+        const valid = block && typeof block === 'object' && !Array.isArray(block) && (
+          block.type === 'text' && typeof block.text === 'string' ||
+          block.type === 'thinking' && typeof block.thinking === 'string' && typeof block.signature === 'string' ||
+          block.type === 'redacted_thinking' && typeof block.data === 'string' ||
+          block.type === 'tool_use' && typeof block.id === 'string' && block.id.length > 0 && !ids.has(block.id) && typeof block.name === 'string' && block.name.length > 0 && block.input && typeof block.input === 'object' && !Array.isArray(block.input)
+        );
+        if (!valid) { failureCode = 'provider_protocol'; throw new Error('Invalid provider content block'); }
+        if (block.type === 'tool_use') ids.add(block.id);
+      }
+      const calls = body.content.filter(b => b.type === 'tool_use');
+      if ((calls.length > 0) !== (body.stop_reason === 'tool_use')) { failureCode = 'provider_protocol'; throw new Error('Inconsistent provider tool response'); }
+      failureStage = 'tool_execution';
       // Thinking/signature blocks are carried back verbatim only in memory.
       messages.push({ role: 'assistant', content: body.content });
       const text = body.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
       if (text) await persist({ summary: clean(text, 1600) });
-      const calls = body.content.filter(b => b.type === 'tool_use');
       if (calls.length) {
-        if (body.stop_reason !== 'tool_use') throw new Error('Inconsistent provider tool response');
         const results = [];
         const checkpointWrites = new Set();
         for (const call of calls) {
@@ -234,9 +323,20 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
           let value, is_error = false;
           try { value = await perform(call); } catch (error) { value = 'Tool rejected: ' + clean(error.code ? `filesystem ${error.code}` : error.message, 300); is_error = true; }
           if (!is_error && call.name === 'write_file' && owned.has(call.input.path) && (call.input.path === 'docs/loop/decision.json' || /^docs\/loop\/result\.[a-z0-9_-]+\.json$/i.test(call.input.path))) checkpointWrites.add(call.input.path);
-          const event = { tool: TOOLS.some(t => t.name === call.name) ? call.name : 'unknown', ...(typeof call.input?.path === 'string' && (() => { try { relativeFile(call.input.path, true); return true; } catch { return false; } })() ? { path: call.input.path } : {}), ...(call.name === 'run_check' && ['test', 'typecheck', 'build'].includes(call.input?.check) ? { check: call.input.check, ...(typeof value?.exit === 'number' ? { exit: value.exit } : {}) } : {}) };
+          const event = { tool: TOOLS.some(t => t.name === call.name) ? call.name : 'unknown', ...(typeof call.input?.path === 'string' && (() => { try { relativeFile(call.input.path, true); return true; } catch { return false; } })() ? { path: call.input.path } : {}), ...(call.name === 'run_check' && ['test_owned', 'test', 'typecheck', 'build'].includes(call.input?.check) ? { check: call.input.check, ...(typeof value?.exit === 'number' ? { exit: value.exit } : {}) } : {}) };
           state.events.push(event); await persist();
-          results.push({ type: 'tool_result', tool_use_id: call.id, content: clean(typeof value === 'string' ? value : JSON.stringify(value)), ...(is_error ? { is_error: true } : {}) });
+          let content;
+          if (typeof value === 'object' && value && typeof value.output === 'string') {
+            // Preserve valid JSON even when escaping control characters expands output.
+            const safe = { ...value, output: clean(value.output) };
+            while (JSON.stringify(safe).length > MAX_RESULT && safe.output.length > 100) {
+              const keep = Math.floor(safe.output.length / 3);
+              safe.output = safe.output.slice(0, keep) + '\n[serialization truncated]\n' + safe.output.slice(-keep);
+              safe.outputTruncated = true;
+            }
+            content = JSON.stringify(safe);
+          } else content = clean(typeof value === 'string' ? value : JSON.stringify(value));
+          results.push({ type: 'tool_result', tool_use_id: call.id, content, ...(is_error ? { is_error: true } : {}) });
         }
         messages.push({ role: 'user', content: results });
         // Finish the entire settled tool batch before acknowledging a checkpoint.
@@ -254,7 +354,10 @@ export async function runApiWorker(config, { fetchProvider = globalThis.fetch, s
     }
     await persist({ state: 'blocked', reason: 'turn_limit', summary: `Worker reached the ${maxTurns}-turn safety limit.` });
   } catch {
-    await persist({ state: 'failed', reason: signal?.aborted ? 'cancelled' : 'worker_error', summary: signal?.aborted ? 'Worker cancelled.' : 'Worker stopped after a provider or runtime failure.' });
+    const patch = { state: 'failed', reason: signal?.aborted ? 'cancelled' : failureCode, failureStage, summary: signal?.aborted ? 'Worker cancelled.' : failureSummaries[failureCode] };
+    // Only fixed codes and summaries leave this catch; provider bodies, exception
+    // messages and thinking blocks are deliberately excluded from diagnostics.
+    try { await persist(patch); } catch { state = { ...state, state: 'failed', reason: 'filesystem_persistence', failureStage: 'state_persistence', summary: failureSummaries.filesystem_persistence }; }
   }
   return state;
 }

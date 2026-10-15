@@ -1,0 +1,41 @@
+{
+  "task": "Loop 41: app-battery-motion",
+  "sessionId": "api-1614b0d4-9501-4b9b-816e-4bf2b7f0f60d",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/App.tsx",
+      "bytes": 38759,
+      "sha256": "85855406c8503d124dbfd35c1a7289f0a4c28dc631ecfabac53956895887b4d7"
+    },
+    {
+      "path": "src/components/SceneBackdrop.tsx",
+      "bytes": 5190,
+      "sha256": "c277f7b9207d7fb93cc34058ab632d3235b0ccd207e1fa7ca2ff29eed35d5c00"
+    },
+    {
+      "path": "src/ui/resource-policy.ts",
+      "bytes": 15894,
+      "sha256": "4098d9ff80b7a350aa51d29046b580a3028cea7e78938c6491bcd946f3f09712"
+    },
+    {
+      "path": "src/ui/scenes.ts",
+      "bytes": 2263,
+      "sha256": "825072a22b966c0793b83c16d5a89ca77a5f2042a27a01fbdf0a5f308d8cad6b"
+    },
+    {
+      "path": "src/styles/app-motion.css",
+      "bytes": 548,
+      "sha256": "f956f46e74aaceb8fe56020544c27652c9b032593456e728fb93a5c07361736d"
+    },
+    {
+      "path": "tests/slice-app-battery-motion.test.mjs",
+      "bytes": 9388,
+      "sha256": "586ebeb566d428f0ef39882f462bc3b3553a60571543d0cd9d4105d4bb6ce9d6"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

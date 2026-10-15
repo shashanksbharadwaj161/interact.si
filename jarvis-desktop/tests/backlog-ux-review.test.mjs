@@ -287,6 +287,9 @@ test('avatar and motion modules import only local source and the React and icon 
       metafile: true,
       format: 'esm',
       platform: 'browser',
+      // Shared approved dependencies are junctions in worker worktrees. Keep
+      // metafile paths local so the unchanged package allowlist audits them.
+      preserveSymlinks: true,
       absWorkingDir: root,
       loader: { '.css': 'empty' },
       jsx: 'automatic',

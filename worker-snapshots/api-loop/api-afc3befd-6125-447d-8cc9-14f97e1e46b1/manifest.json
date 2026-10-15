@@ -1,0 +1,61 @@
+{
+  "task": "Loop 39: model-digest-pinning",
+  "sessionId": "api-afc3befd-6125-447d-8cc9-14f97e1e46b1",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/model-pins.ts",
+      "bytes": 6875,
+      "sha256": "2e1e1cff31d2673e5f76702a0ab598f2593f369f3a8c5edfac94c1b73bf2c048"
+    },
+    {
+      "path": "electron/services/models.ts",
+      "bytes": 55129,
+      "sha256": "666a28ead5fe1d654937fddb14f7df25244e5be983df03ecfee86ba81056b98b"
+    },
+    {
+      "path": "src/shared/contracts.ts",
+      "bytes": 16672,
+      "sha256": "eba07d5214af87b4a41e1ef5ed532b28a4416043a97ee824ec865ef86de89224"
+    },
+    {
+      "path": "electron/channels.ts",
+      "bytes": 5383,
+      "sha256": "77ba453153014d676e89e68e64c446d6cc69f0176e58a9483e17df7082a703aa"
+    },
+    {
+      "path": "electron/ipc.ts",
+      "bytes": 6388,
+      "sha256": "1c9c52c8b0f27aa9aa1adb3145bd9ebdbcf255341e12c1f7c60fb32ff03bacf8"
+    },
+    {
+      "path": "electron/preload.ts",
+      "bytes": 7901,
+      "sha256": "aa8c0a0777b392055628ed5645d6f0984eaff623b80329dc742867956782dffd"
+    },
+    {
+      "path": "src/ui/bridges.ts",
+      "bytes": 19976,
+      "sha256": "e137b75e19d6ef2b13469b8273491e656f7595d4878bbd816d95d4a9732e0ccb"
+    },
+    {
+      "path": "src/components/Models.tsx",
+      "bytes": 34107,
+      "sha256": "7e3bccba40bd9f0a35a925962cdb72748383e08c427d520dd11917d82dd0e46d"
+    },
+    {
+      "path": "src/styles/model-pins.css",
+      "bytes": 1054,
+      "sha256": "4433c223980defd92d0a02d739f9477f9d089ad2f0ea4e2f60ba61ba91b6de80"
+    },
+    {
+      "path": "tests/slice-model-pins.test.mjs",
+      "bytes": 20989,
+      "sha256": "671739f1e6a9074dc016dae06ba121bffb46f023eee780fd09dfb6ba253bf723"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

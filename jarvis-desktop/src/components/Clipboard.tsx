@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ClipboardText, Trash } from '@phosphor-icons/react';
 import type { ClipboardEntryView, ClipboardStatus } from '../../electron/services/clipboard';
 import type { ClipboardClient } from '../ui/bridges';
+import { filterEntries, focusAfterRemoval, groupByDay, historyKeyboardTarget } from '../ui/clipboard-history';
 import { ConfirmDialog } from '../ui/Dialog';
 import { Badge, Button, Empty, IconButton, KV, LoadingBlock, Notice, Panel, Switch } from '../ui/primitives';
 import { errMsg, fmtDateTime } from '../ui/util';
@@ -57,7 +58,10 @@ type Message = { tone: 'info' | 'warn' | 'danger'; text: string };
 /**
  * Opt-in clipboard history. Off by default: turning it on asks the native main process for confirmation, and turning it
  * off clears every stored entry. Entries are shown as previews only; the panel has no control that writes to the system
- * clipboard. Every change re-reads status and entries from the backend, so the panel never shows state it did not get back.
+ * clipboard (the listed ClipboardEntryView carries only a truncated `preview`, not the full stored text, so there is no
+ * "copy again" control). Stored previews can be searched, are grouped by day, and the rows support roving-tabindex
+ * keyboard navigation (ArrowUp/ArrowDown/Home/End) with Delete removing the focused row. Every change re-reads status
+ * and entries from the backend, so the panel never shows state it did not get back.
  */
 export function Clipboard({ client, onStatus, initial }: ClipboardProps) {
   const [status, setStatus] = useState<ClipboardStatus | null>(initial?.status ?? null);
@@ -66,6 +70,29 @@ export function Clipboard({ client, onStatus, initial }: ClipboardProps) {
   const [busy, setBusy] = useState<'toggle' | 'remove' | 'clear' | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [query, setQuery] = useState('');
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const pendingFocus = useRef<number | null>(null);
+
+  const visible = filterEntries(entries, query);
+  const groups = groupByDay(visible);
+  const ordered = groups.flatMap((g) => g.entries);
+  const activeId = ordered.some((e) => e.id === focusedId) ? focusedId : (ordered[0]?.id ?? null);
+  const orderedKey = ordered.map((e) => e.id).join('\n');
+
+  const focusRow = (id: string) => {
+    setFocusedId(id);
+    rowRefs.current.get(id)?.focus();
+  };
+
+  // After a keyboard Delete, move focus to the nearest remaining row once the reloaded list renders.
+  useEffect(() => {
+    if (pendingFocus.current === null || busy !== null) return;
+    const target = focusAfterRemoval(pendingFocus.current, ordered.length);
+    pendingFocus.current = null;
+    if (target !== null) focusRow(ordered[target].id);
+  }, [orderedKey, busy]);
 
   const reload = async (c: ClipboardClient) => {
     const r = await clipboardActions(c).load();
@@ -118,6 +145,21 @@ export function Clipboard({ client, onStatus, initial }: ClipboardProps) {
     else setMessage({ tone: 'info', text: 'All clipboard history entries were cleared.' });
     await reload(client);
     setBusy(null);
+  };
+
+  const onRowKeyDown = (ev: KeyboardEvent<HTMLLIElement>, entry: ClipboardEntryView, index: number) => {
+    if (ev.target !== ev.currentTarget) return;
+    if (ev.key === 'Delete') {
+      ev.preventDefault();
+      if (busy) return;
+      pendingFocus.current = index;
+      void remove(entry);
+      return;
+    }
+    const next = historyKeyboardTarget(ev.key, index, ordered.length);
+    if (next === null) return;
+    ev.preventDefault();
+    focusRow(ordered[next].id);
   };
 
   if (!client) {
@@ -184,18 +226,64 @@ export function Clipboard({ client, onStatus, initial }: ClipboardProps) {
               {enabled ? 'Text you copy appears here. Text that looks like a secret is never stored.' : 'Nothing is recorded while history is off.'}
             </Empty>
           ) : (
-            <ul className="stack tight" aria-label="Clipboard history entries">
-              {entries.map((e) => (
-                <li key={e.id} className="list-row">
-                  <ClipboardText size={16} aria-hidden />
-                  <div className="grow">
-                    <p>{e.preview}</p>
-                    <p className="field-hint">{`Copied ${capturedLabel(e.capturedAt)} · ${e.copies} ${e.copies === 1 ? 'time' : 'times'}`}</p>
-                  </div>
-                  <IconButton icon={Trash} label={`Remove entry copied ${capturedLabel(e.capturedAt)}`} disabled={controlsBusy} onClick={() => void remove(e)} />
-                </li>
-              ))}
-            </ul>
+            <div className="stack">
+              <input
+                type="search"
+                className="input"
+                aria-label="Search clipboard history"
+                placeholder="Search clipboard history"
+                value={query}
+                maxLength={200}
+                onChange={(ev) => setQuery(ev.target.value)}
+              />
+              <p className="field-hint" role="status" aria-live="polite">
+                {`${visible.length} of ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'} match`}
+              </p>
+              <p className="field-hint">Use the arrow keys, Home and End to move between entries. Press Delete to remove the focused entry.</p>
+              {ordered.length === 0 ? (
+                <Empty icon={ClipboardText} title="No matching entries">
+                  No stored preview contains every word you searched for.
+                </Empty>
+              ) : (
+                <ul className="stack tight" aria-label="Clipboard history entries">
+                  {groups.map((g) => (
+                    <li key={g.key} className="stack tight">
+                      <h3 id={`clipboard-day-${g.key}`} className="eyebrow">
+                        {g.label}
+                      </h3>
+                      <ul className="stack tight" aria-labelledby={`clipboard-day-${g.key}`}>
+                        {g.entries.map((e) => {
+                          const index = ordered.indexOf(e);
+                          return (
+                            <li
+                              key={e.id}
+                              ref={(el) => {
+                                if (el) rowRefs.current.set(e.id, el);
+                                else rowRefs.current.delete(e.id);
+                              }}
+                              className="list-row"
+                              tabIndex={e.id === activeId ? 0 : -1}
+                              aria-label={`Clipboard entry: ${e.preview}`}
+                              onFocus={(ev) => {
+                                if (ev.target === ev.currentTarget) setFocusedId(e.id);
+                              }}
+                              onKeyDown={(ev) => onRowKeyDown(ev, e, index)}
+                            >
+                              <ClipboardText size={16} aria-hidden />
+                              <div className="grow">
+                                <p>{e.preview}</p>
+                                <p className="field-hint">{`Copied ${capturedLabel(e.capturedAt)} · ${e.copies} ${e.copies === 1 ? 'time' : 'times'}`}</p>
+                              </div>
+                              <IconButton icon={Trash} label={`Remove entry copied ${capturedLabel(e.capturedAt)}`} disabled={controlsBusy} onClick={() => void remove(e)} />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </Panel>
       )}

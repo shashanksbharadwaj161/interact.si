@@ -9,6 +9,9 @@ import { useStore } from '../ui/store';
 import { ProjectMemory } from './Capsules';
 import { MemoryControls } from './MemorySearch';
 import { listSourceCandidates } from '../ui/prompt-tools';
+import { buildWorklogDraft, type WorklogDraft, type WorklogFormat } from '../ui/worklog-draft';
+import { ASSOCIATION_LIMITS, buildAssociationSessions, listCorrections, suggestAssociations, type AssocSession, type AssociationChange } from '../ui/session-association';
+import { ADAPTER_LIMITS, buildCheckpointDrafts, groupSessionsDetailed, parseGitLog, toCheckpointOp, type GroupedSessions, type ParsedGitLog } from '../ui/coding-session-adapter';
 import {
   EMPTY_CHECKPOINT_FILTER, MEMORY_SHORTCUTS, UNAVAILABLE_SOURCES, checkpointEvidence, filterCheckpoints, fmtDuration, fmtWhen, groupTimeline, isFiltered, localDayKey, matchShortcut, useReducedMotion, workbenchStatus,
   type CheckpointFilter,
@@ -70,10 +73,10 @@ export function MemoryWorkbench({ initialSection = 'overview' }: { initialSectio
           <Segmented<Section> label="Memory section" value={section} onChange={setSection} options={SECTIONS} />
           {section === 'overview' && <Overview go={setSection} />}
           {section === 'projects' && <Projects />}
-          {section === 'checkpoints' && <Checkpoints />}
+          {section === 'checkpoints' && <><Checkpoints /><CodingSessionImport /></>}
           {section === 'shelf' && <Shelf />}
           {section === 'timeline' && <Timeline />}
-          {section === 'recap' && <RecapSection />}
+          {section === 'recap' && <><RecapSection /><StandupDraft /></>}
           {section === 'privacy' && <MemoryControls />}
           {section === 'portability' && <Portability />}
         </>
@@ -269,6 +272,81 @@ function Checkpoints() {
   );
 }
 
+/**
+ * Goal 38: offline coding-session adapter. Parses pasted git log text into sessions and writes the selected ones through
+ * the existing `checkpoint.add` operation, one call per draft. Nothing here runs git or reads a repository.
+ */
+function CodingSessionImport() {
+  const { state, productivity, applyProductivity, toast } = useStore();
+  const [text, setText] = useState('');
+  const [gap, setGap] = useState(String(ADAPTER_LIMITS.gapMinutes));
+  const [capsuleId, setCapsuleId] = useState('');
+  const [parsed, setParsed] = useState<ParsedGitLog | null>(null);
+  const [grouped, setGrouped] = useState<GroupedSessions | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  if (!state || !productivity) return null;
+  const parse = () => {
+    try {
+      const p = parseGitLog(text);
+      const g = groupSessionsDetailed(p.commits, { gapMinutes: Number(gap) });
+      setParsed(p); setGrouped(g); setSelected(new Set(g.sessions.map((s) => s.id))); setError(null);
+    } catch (e) {
+      setParsed(null); setGrouped(null); setSelected(new Set()); setError(e instanceof Error ? e.message : 'The text could not be parsed.');
+    }
+  };
+  const toggle = (id: string) => { const next = new Set(selected); if (next.has(id)) next.delete(id); else next.add(id); setSelected(next); };
+  const create = async () => {
+    if (!grouped || saving) return;
+    const chosen = grouped.sessions.filter((s) => selected.has(s.id));
+    if (!chosen.length) return;
+    setSaving(true);
+    try {
+      const drafts = buildCheckpointDrafts(chosen, { capsuleId: capsuleId || undefined, now: new Date().toISOString() });
+      let ok = 0;
+      for (const d of drafts) if (await applyProductivity(toCheckpointOp(d))) ok++;
+      toast(ok === drafts.length ? 'ok' : 'error', `Created ${ok} of ${drafts.length} checkpoint(s) from pasted git history.`);
+      if (ok === drafts.length) setSelected(new Set());
+    } catch (e) {
+      toast('error', e instanceof Error ? e.message : 'Checkpoints could not be created.');
+    } finally { setSaving(false); }
+  };
+  const count = grouped ? grouped.sessions.filter((s) => selected.has(s.id)).length : 0;
+  return (
+    <Panel title="Import coding sessions (git log, offline)" eyebrow="Checkpoints from pasted history">
+      <p className="sub">Parsed from pasted text only; this build does not run git or read repositories.</p>
+      <Field label="Pasted git log" hint={`Default git log, --oneline, or --format=%H%x09%an%x09%aI%x09%s. Up to ${ADAPTER_LIMITS.inputChars} characters.`}>
+        {(id, d) => <textarea id={id} aria-describedby={d} className="input mono" rows={6} value={text} maxLength={ADAPTER_LIMITS.inputChars} onChange={(e) => setText(e.target.value)} />}
+      </Field>
+      <div className="row align-end">
+        <Field label="Gap between sessions (minutes)">{(id) => <input id={id} type="number" className="input narrow" min={1} max={ADAPTER_LIMITS.maxGapMinutes} value={gap} onChange={(e) => setGap(e.target.value)} />}</Field>
+        <Field label="Project">{(id) => <select id={id} className="input" value={capsuleId} onChange={(e) => setCapsuleId(e.target.value)}><option value="">No project</option>{state.capsules.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
+        <Button onClick={parse} disabled={!text.trim()}>Parse</Button>
+      </div>
+      {error && <Notice tone="warn" title="Nothing parsed">{error}</Notice>}
+      {parsed && grouped && (
+        <div className="stack">
+          <p className="sub" role="status" aria-live="polite">
+            Layout: {parsed.layout} · {parsed.commits.length} commit(s) · {parsed.skippedLines} skipped line(s){parsed.truncated ? ` · truncated at ${ADAPTER_LIMITS.commits} commits` : ''} · {grouped.totalSessions} session(s){grouped.truncated ? ` (showing the first ${grouped.sessions.length})` : ''}
+          </p>
+          <ul className="list" aria-label="Coding sessions">
+            {grouped.sessions.map((s) => (
+              <li key={s.id} className="list-row">
+                <label className="grow">
+                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} /> <strong>{s.title}</strong>
+                  <span className="sub"> · {s.commitCount} commit(s) · {s.undated ? 'undated' : `${fmtWhen(s.startedAt as string)} – ${fmtWhen(s.endedAt as string)}`}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <Button variant="primary" icon={Flag} onClick={() => void create()} disabled={!count} busy={saving}>{`Create ${count} checkpoint${count === 1 ? '' : 's'}`}</Button>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function Shelf() {
   const { state, api, productivity, applyProductivity, toast } = useStore();
   const [kind, setKind] = useState<'file' | 'folder' | 'url'>('file');
@@ -321,6 +399,8 @@ function Timeline() {
   if (!productivity) return null;
   const policy = productivity.policy;
   const days = groupTimeline(productivity.timeline);
+  const sessions = buildAssociationSessions(productivity);
+  const sessionById = new Map(sessions.map((s) => [s.id, s] as const));
   return (
     <div className="stack">
       <Notice tone="info" title={policy.timelineEnabled ? 'Application timeline is on' : 'Application timeline is off'}>
@@ -328,19 +408,131 @@ function Timeline() {
           ? `Entries arrive only from modules that report an application session while this is on; this screen records nothing by itself. Window titles are ${policy.timelineTitles ? 'kept' : 'not kept'}. Entries older than ${policy.retainDays.timeline || '∞'} days are removed.`
           : 'Nothing is recorded. Turn it on under Privacy if you want a local record of which applications you used and when.'}
       </Notice>
+      <SessionCorrections sessions={sessions} />
+      <FocusSessionAssociations sessions={sessions} />
       {days.length === 0 ? <Empty title="No timeline entries">{policy.timelineEnabled ? 'No module has reported an application session yet.' : 'The timeline is off.'}</Empty> : days.map((d) => (
         <Panel key={d.day} title={d.day} eyebrow={fmtDuration(d.totalSec)}>
           <ul className="list compact">
             {d.entries.map((e) => (
-              <li key={e.id} className="list-row">
+              <li key={e.id} className="list-row" style={{ flexWrap: 'wrap' }}>
                 <span className="grow"><strong>{e.app}</strong>{e.title ? <span className="sub"> · {e.title}</span> : null}<span className="sub"> · {fmtWhen(e.at)}{e.endedAt ? ` → ${fmtDuration(Math.max(0, (Date.parse(e.endedAt) - Date.parse(e.at)) / 1000))}` : ' (open)'}</span></span>
                 <Button size="sm" icon={Trash} onClick={() => void applyProductivity({ op: 'timeline.delete', id: e.id }, 'Entry deleted.')} aria-label={`Delete timeline entry ${e.app}`}>Delete</Button>
+                {sessionById.get(e.id) && <SessionAssociation session={sessionById.get(e.id) as AssocSession} />}
               </li>
             ))}
           </ul>
         </Panel>
       ))}
     </div>
+  );
+}
+
+/**
+ * Goal 36: "Associate session" control mounted on each timeline/focus session row. Native details/summary, selects and
+ * buttons keep it keyboard reachable (Tab, Enter/Space); it has no animation, so reduced motion needs nothing extra.
+ * Saves go through store.setSessionAssociation (association.set / association.clear), so corrections survive reload.
+ */
+function SessionAssociation({ session }: { session: AssocSession }) {
+  const { state, productivity, setSessionAssociation } = useStore();
+  const [taskId, setTaskId] = useState(session.taskId ?? '');
+  const [capsuleId, setCapsuleId] = useState(session.capsuleId ?? '');
+  const [busy, setBusy] = useState(false);
+  const taskSelect = useId();
+  const projectSelect = useId();
+  useEffect(() => { setTaskId(session.taskId ?? ''); setCapsuleId(session.capsuleId ?? ''); }, [session.taskId, session.capsuleId, session.correctedAt]);
+  const suggestions = useMemo(
+    () => (state && productivity ? suggestAssociations(session, { tasks: state.tasks, capsules: state.capsules, checkpoints: productivity.checkpoints }) : []),
+    [session, state, productivity],
+  );
+  if (!state || !productivity) return null;
+  const corrected = session.correctedBy === 'user';
+  const save = async (change: AssociationChange) => {
+    if (busy) return;
+    setBusy(true);
+    try { await setSessionAssociation(session.id, change); } finally { setBusy(false); }
+  };
+  const taskName = session.taskId ? state.tasks.find((t) => t.id === session.taskId)?.title ?? 'deleted task' : null;
+  const projectName = session.capsuleId ? state.capsules.find((c) => c.id === session.capsuleId)?.name ?? 'deleted project' : null;
+  const dirty = taskId !== (session.taskId ?? '') || capsuleId !== (session.capsuleId ?? '');
+  return (
+    <details className="session-assoc" data-session-assoc={session.id} style={{ flexBasis: '100%' }}>
+      <summary>
+        Associate session{taskName || projectName ? <span className="sub"> · {[taskName, projectName].filter(Boolean).join(' · ')}</span> : null}
+        {corrected && <> <Badge tone="info" title={session.correctedAt ? `Corrected ${fmtWhen(session.correctedAt)}` : undefined}>corrected by you</Badge></>}
+      </summary>
+      <div className="stack tight" role="group" aria-label={`Associate session ${session.title}`}>
+        <div className="row align-end">
+          <span className="field">
+            <label className="field-label" htmlFor={taskSelect}>Task</label>
+            <select id={taskSelect} className="input" value={taskId} onChange={(e) => setTaskId(e.target.value)} disabled={busy}>
+              <option value="">No task</option>
+              {taskId && !state.tasks.some((t) => t.id === taskId) && <option value={taskId}>Deleted task</option>}
+              {state.tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+            </select>
+          </span>
+          <span className="field">
+            <label className="field-label" htmlFor={projectSelect}>Project</label>
+            <select id={projectSelect} className="input" value={capsuleId} onChange={(e) => setCapsuleId(e.target.value)} disabled={busy}>
+              <option value="">No project</option>
+              {capsuleId && !state.capsules.some((c) => c.id === capsuleId) && <option value={capsuleId}>Deleted project</option>}
+              {state.capsules.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </span>
+          <Button size="sm" variant="primary" busy={busy} disabled={!dirty} onClick={() => void save({ taskId: taskId || null, capsuleId: capsuleId || null, reason: 'manual' })}>Save</Button>
+          <Button size="sm" disabled={!corrected || busy} onClick={() => void save({ taskId: null, capsuleId: null, reason: 'manual' })} aria-label={`Clear association for ${session.title}`}>Clear</Button>
+        </div>
+        {suggestions.length > 0 ? (
+          <ul className="chips" aria-label="Suggested associations">
+            {suggestions.map((s) => (
+              <li key={`${s.kind}:${s.id}`}>
+                <button type="button" className="chip" disabled={busy} title={s.reasons.join('; ')} aria-label={`Apply suggested ${s.kind === 'task' ? 'task' : 'project'} ${s.label}`}
+                  onClick={() => void save(s.kind === 'task' ? { taskId: s.id, reason: 'manual' } : { capsuleId: s.id, reason: 'manual' })}>
+                  {s.kind === 'task' ? 'Task' : 'Project'}: {s.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="sub">No suggestions from task times, nearby checkpoints or title words.</p>}
+      </div>
+    </details>
+  );
+}
+
+function FocusSessionAssociations({ sessions }: { sessions: AssocSession[] }) {
+  const focus = sessions.filter((s) => s.kind === 'focus').slice(0, Math.min(20, ASSOCIATION_LIMITS.maxSessions));
+  if (!focus.length) return null;
+  return (
+    <Panel title="Focus sessions" eyebrow="Associate with a task or project">
+      <ul className="list compact" aria-label="Focus sessions">
+        {focus.map((s) => (
+          <li key={s.id} className="list-row" style={{ flexWrap: 'wrap' }}>
+            <span className="grow"><strong>{s.title}</strong><span className="sub"> · {fmtWhen(s.startedAt)}{s.endedAt ? ` → ${fmtDuration(Math.max(0, (Date.parse(s.endedAt) - Date.parse(s.startedAt)) / 1000))}` : ''}</span></span>
+            <SessionAssociation session={s} />
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function SessionCorrections({ sessions }: { sessions: AssocSession[] }) {
+  const { state } = useStore();
+  const list = listCorrections(sessions);
+  if (!state || !list.length) return null;
+  return (
+    <Panel title="Corrected associations" eyebrow={`${list.length} by you`}>
+      <ul className="list compact" aria-label="Corrected associations">
+        {list.slice(0, 20).map((c) => {
+          const names = [c.taskId ? state.tasks.find((t) => t.id === c.taskId)?.title ?? 'deleted task' : null, c.capsuleId ? state.capsules.find((x) => x.id === c.capsuleId)?.name ?? 'deleted project' : null].filter(Boolean).join(' · ');
+          return (
+            <li key={c.sessionId} className="list-row">
+              <span className="grow"><strong>{c.title}</strong><span className="sub"> · {c.kind === 'focus' ? 'focus session' : 'timeline'} → {names} · <time dateTime={c.correctedAt}>{fmtWhen(c.correctedAt)}</time></span></span>
+              <Badge tone="info">corrected by you</Badge>
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
   );
 }
 
@@ -382,6 +574,51 @@ function RecapSection() {
         <p className="field-hint">Assembled from local records; no model is involved. The draft is not stored anywhere until you paste it.</p>
       </Panel>
     </div>
+  );
+}
+
+type DraftWindow = 'today' | '24h' | '7d';
+const DRAFT_WINDOWS: { value: DraftWindow; label: string }[] = [{ value: 'today', label: 'Today' }, { value: '24h', label: 'Last 24h' }, { value: '7d', label: 'Last 7 days' }];
+const DRAFT_FORMATS: { value: WorklogFormat; label: string }[] = [{ value: 'standup', label: 'Standup' }, { value: 'worklog', label: 'Worklog' }];
+
+function StandupDraft() {
+  const { state, productivity, toast } = useStore();
+  const [win, setWin] = useState<DraftWindow>('today');
+  const [format, setFormat] = useState<WorklogFormat>('standup');
+  const [capsuleId, setCapsuleId] = useState('');
+  const [draft, setDraft] = useState<WorklogDraft | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!state || !productivity) return null;
+  const generate = () => {
+    const now = new Date();
+    const since = win === 'today' ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) : new Date(now.getTime() - (win === '24h' ? 1 : 7) * 86_400_000);
+    try {
+      setDraft(buildWorklogDraft({ checkpoints: productivity.checkpoints, tasks: state.tasks, notes: state.notes, focusSessions: productivity.focus }, { since: since.toISOString(), until: new Date(now.getTime() + 1).toISOString(), now: now.toISOString(), format, ...(capsuleId ? { capsuleId } : {}) }));
+      setError(null);
+    } catch (e) { setDraft(null); setError(e instanceof Error ? e.message : 'The draft could not be built.'); }
+  };
+  const copy = async () => {
+    if (!draft || draft.empty) return;
+    if (!navigator.clipboard?.writeText) { toast('error', 'Copying is not available here. Select the text and copy it manually.'); return; }
+    try { await navigator.clipboard.writeText(draft.text); toast('ok', 'Draft copied. Review it before sharing.'); } catch { toast('error', 'Copying was blocked. Select the text and copy it manually.'); }
+  };
+  return (
+    <Panel title="Draft standup" eyebrow="From local records only">
+      <div className="row align-end">
+        <Field label="Window">{(id) => <select id={id} className="input narrow" value={win} onChange={(e) => { setWin(e.target.value as DraftWindow); setDraft(null); }}>{DRAFT_WINDOWS.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}</select>}</Field>
+        <Field label="Project">{(id) => <select id={id} className="input" value={capsuleId} onChange={(e) => { setCapsuleId(e.target.value); setDraft(null); }}><option value="">All</option>{state.capsules.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
+        <Segmented<WorklogFormat> label="Draft format" value={format} onChange={(f) => { setFormat(f); setDraft(null); }} options={DRAFT_FORMATS} />
+        <Button variant="primary" onClick={generate}>Draft standup</Button>
+      </div>
+      {error && <Notice tone="danger" title="Cannot draft">{error}</Notice>}
+      {draft?.empty && <p className="sub" role="status">Nothing recorded in this window. Checkpoints, tasks, saved notes and focus sessions show up here; nothing is invented.</p>}
+      {draft && !draft.empty && (
+        <>
+          <textarea className="input mono" rows={12} readOnly aria-label="Standup draft" value={draft.text} />
+          <div className="row"><Button size="sm" icon={Copy} onClick={() => void copy()}>Copy draft</Button><span className="sub">{draft.evidence.length} line(s), each citing a record</span></div>
+        </>
+      )}
+    </Panel>
   );
 }
 

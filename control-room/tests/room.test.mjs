@@ -65,3 +65,39 @@ test('Windows DPAPI round trip stores no plaintext and deletes key', {skip:proce
 });
 
 
+
+test('trusted completion records evidence only after checkpoint stop, remains idempotent, never restores authority or spend',async t=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'verified-task-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const room=new Room(dir,new FakeAdapter(),new FakeVault());room.kick=()=>{};
+ const task={id:'slice',status:'review',mode:'real',authorized:true,grant:'private-grant',events:[],cost:3.5,usage:{requests:2}};
+ room.tasks=[task];room.grants.set(task.grant,task.id);
+ const evidence={passed:true,round:2,observationId:'observation-2',sourceFingerprint:'source-sha',checks:[{command:'npm test',exitCode:0,outputRef:'test.log'}]};
+ await assert.rejects(room.recordVerifiedCompletion(task.id,evidence),/checkpoint-stopped/);
+ await room.cancel(task.id,{checkpoint:true});assert.equal(task.status,'cancelled');assert.equal(task.authorized,false);
+ await room.recordVerifiedCompletion(task.id,evidence);assert.equal(task.status,'complete');assert.equal(task.verification.featuresFullyAccepted,false);assert.equal(task.verification.softwareChecksPassed,true);
+ assert.equal(room.grants.size,0);assert.equal(task.authorized,false);assert.equal(task.cost,3.5);assert.equal(task.usage.requests,2);
+ const events=task.events.length;await room.recordVerifiedCompletion(task.id,evidence);assert.equal(task.events.length,events);
+ await assert.rejects(room.recordVerifiedCompletion(task.id,{...evidence,round:3}),/different verification/);
+ const saved=JSON.parse(await readFile(room.file));assert.equal(saved.tasks[0].status,'complete');assert.equal(saved.tasks[0].verification.checks[0].outputRef,'test.log');
+});
+test('ordinary historical cancellations and failed or blocked checks cannot become verified completions',async t=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'unverified-task-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const room=new Room(dir,new FakeAdapter(),new FakeVault());room.kick=()=>{};
+ const task={id:'cancelled',status:'review',authorized:true,events:[]};room.tasks=[task];await room.cancel(task.id);
+ const evidence={passed:true,round:1,observationId:'obs',checks:[{exitCode:0,outputRef:'pass.log'}]};
+ await assert.rejects(room.recordVerifiedCompletion(task.id,evidence),/checkpoint-stopped/);assert.equal(task.status,'cancelled');
+ task.checkpointStoppedAt='test checkpoint';
+ for(const bad of [{...evidence,passed:false},{...evidence,blocked:true},{...evidence,needs_review:true},{...evidence,checks:[]},{...evidence,checks:[{exitCode:1,outputRef:'failed.log'}]},{...evidence,checks:[{exitCode:0,outputRef:''}]}])await assert.rejects(room.recordVerifiedCompletion(task.id,bad),/passing verification/);
+ assert.equal(task.status,'cancelled');task.authorized=true;await assert.rejects(room.recordVerifiedCompletion(task.id,evidence),/unauthorized/);
+});
+
+test('validated planner completion is distinct from software verification and ordinary cancellation',async t=>{
+ const dir=await mkdtemp(path.join(os.tmpdir(),'planner-task-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const room=new Room(dir,new FakeAdapter(),new FakeVault());room.kick=()=>{};const planner={id:'planner',status:'review',authorized:true,events:[]};room.tasks=[planner];
+ const evidence={round:1,observationId:'obs',action:'dispatch',taskCount:2};
+ await room.cancel(planner.id);await assert.rejects(room.recordPlannerCompletion(planner.id,evidence),/planner checkpoint/);
+ planner.status='review';await room.cancel(planner.id,{checkpoint:'planner'});await room.recordPlannerCompletion(planner.id,evidence);
+ assert.equal(planner.status,'complete');assert.equal(planner.plannerResult.kind,'plan-validated');assert.equal(planner.plannerResult.softwareVerified,false);assert.equal(planner.plannerResult.featuresIntegrated,false);assert.equal(planner.verification,undefined);assert.equal(planner.authorized,false);assert.equal(room.grants.size,0);
+ const n=planner.events.length;await room.recordPlannerCompletion(planner.id,evidence);assert.equal(planner.events.length,n);
+ await assert.rejects(room.recordVerifiedCompletion(planner.id,{passed:true,round:1,observationId:'obs',checks:[{exitCode:0,outputRef:'test.log'}]}),/checkpoint-stopped/);
+});

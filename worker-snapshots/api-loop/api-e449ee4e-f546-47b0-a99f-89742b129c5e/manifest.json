@@ -1,0 +1,16 @@
+{
+  "task": "Loop 40: state-encryption-at-rest",
+  "sessionId": "api-e449ee4e-f546-47b0-a99f-89742b129c5e",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "electron/backend.ts",
+      "bytes": 69754,
+      "sha256": "eef5f166ad29c3c6c5f0c4697cbb19760adb887bb3fbc93958e7f709a088afe2"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

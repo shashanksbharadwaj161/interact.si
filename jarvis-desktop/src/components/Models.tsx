@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowClockwise, Cube, DownloadSimple, Eject, FolderOpen, ShieldCheck, Stop } from '@phosphor-icons/react';
 // Types only: the service module pulls in main-process code and must never be bundled into the window.
 import type { HealthState, ModelJob, ModelsClient, ModelsOverview, PackValidation, ResourceProfileId } from '../../electron/services/models';
 import { Badge, Button, Empty, Field, LoadingBlock, Notice, PageHeader, Panel, Segmented, type Tone } from '../ui/primitives';
+import { usePref } from '../ui/prefs';
+import { DOWNLOAD_MANIFEST_MAX_CHARS, normalizeAllowedHosts, parseDownloadManifest, parseHostsInput, planDownload, type ParseResult, type PlanEntry } from '../ui/download-manifest';
+import { DATASET_LIMITS, buildExamples, buildManifest, datasetStats, parseTranscript, scanExamples, splitDataset, toJsonl, type BuildResult, type ScanResult, type SplitResult, type TranscriptParseResult } from '../ui/finetune-dataset';
 
 export function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '0 B';
@@ -60,6 +63,166 @@ function JobRow({ job, onCancel }: { job: ModelJob; onCancel: (id: string) => vo
       </div>
       {job.state === 'running' && <Button size="sm" icon={Stop} onClick={() => onCancel(job.id)}>Cancel</Button>}
     </li>
+  );
+}
+
+const PLAN_TONE: Record<PlanEntry['status'], Tone> = { 'ready-to-request': 'ok', 'blocked-offline': 'muted', 'blocked-host': 'warn', invalid: 'danger' };
+
+/**
+ * Offline manifest verifier (feature 107). Parses pasted JSON and shows the plan; it never fetches anything.
+ * `onlineEnabled` comes from the app's existing online/offline download state.
+ */
+export function ManifestVerifyPanel({ onlineEnabled }: { onlineEnabled: boolean }) {
+  const [text, setText] = useState('');
+  const [storedHosts, setStoredHosts] = usePref<unknown>('models.downloadHosts', []);
+  const hosts = normalizeAllowedHosts(storedHosts);
+  const [hostsText, setHostsText] = useState(() => hosts.join(', '));
+  const [result, setResult] = useState<{ parsed: ParseResult; plan: PlanEntry[] } | null>(null);
+  const validate = () => {
+    const allowed = parseHostsInput(hostsText);
+    setStoredHosts(allowed);
+    const parsed = parseDownloadManifest(text, allowed);
+    setResult({ parsed, plan: parsed.ok ? planDownload(parsed.manifest, { onlineEnabled, allowedHosts: allowed }) : [] });
+  };
+  return (
+    <Panel title="Verify download manifest (offline)" eyebrow="Optional model and update downloads">
+      <p className="field-hint">This build verifies manifests only; no download is started.</p>
+      <p className="field-hint">Online downloads: {onlineEnabled ? 'enabled by online mode (still not acted on by this verifier)' : 'off (offline mode)'}.</p>
+      <Field label="Manifest JSON" hint={`Paste a manifest, at most ${DOWNLOAD_MANIFEST_MAX_CHARS} characters.`}>
+        {(id, d) => <textarea id={id} aria-describedby={d} className="input mono" rows={6} spellCheck={false} maxLength={DOWNLOAD_MANIFEST_MAX_CHARS + 1} value={text} onChange={(e) => { setText(e.target.value); setResult(null); }} />}
+      </Field>
+      <Field label="Allowed hosts" hint="Comma-separated exact host names, for example models.example.org. Empty rejects every URL.">
+        {(id, d) => <input id={id} aria-describedby={d} className="input mono" spellCheck={false} maxLength={2000} value={hostsText} onChange={(e) => { setHostsText(e.target.value); setResult(null); }} />}
+      </Field>
+      <Button icon={ShieldCheck} disabled={!text.trim()} onClick={validate}>Validate</Button>
+      {result && (result.parsed.ok ? (
+        <>
+          <Notice tone="info" title="Manifest is valid">{result.parsed.manifest.items.length} item(s). Nothing was downloaded.</Notice>
+          {result.parsed.warnings.length > 0 && <Notice tone="warn" title="Warnings"><ul>{result.parsed.warnings.slice(0, 20).map((w, i) => <li key={i}>{w}</li>)}</ul></Notice>}
+          <ul className="cap-list">
+            {result.plan.map((e, i) => (
+              <li key={`${e.id}-${i}`} className="cap-row">
+                <Badge tone={PLAN_TONE[e.status]}>{e.status}</Badge>
+                <div><strong>{e.id}</strong><p className="field-hint">{e.reason}</p></div>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <Notice tone="danger" title="Manifest rejected"><ul>{result.parsed.errors.slice(0, 20).map((e, i) => <li key={i}><code>{e.path}</code>: {e.message}</li>)}</ul></Notice>
+      ))}
+    </Panel>
+  );
+}
+
+export const FINETUNE_DATASET_NOTE = 'This build builds and checks a dataset file only; no training or upload is started.';
+
+/** Save text as a local file through a temporary Blob URL that is revoked right after the click. */
+function downloadTextFile(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/x-ndjson' }));
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+interface FinetuneParsed { parsed: TranscriptParseResult; built: BuildResult; scan: ScanResult }
+
+/** Offline fine-tuning dataset builder (goal 20, export only). Nothing here trains, uploads or calls a model. */
+export function FinetuneDatasetPanel() {
+  const [text, setText] = useState('');
+  const [ratioText, setRatioText] = useState('0.1');
+  const [seed, setSeed] = useState('1');
+  const [data, setData] = useState<FinetuneParsed | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const parse = () => {
+    setStatus(null);
+    try {
+      const parsed = parseTranscript(text);
+      const built = buildExamples(parsed.examples, { dedupe: true, maxTurnChars: DATASET_LIMITS.turnChars });
+      setData({ parsed, built, scan: scanExamples(built.examples) });
+      setError(null);
+    } catch (e) {
+      setData(null);
+      setError(e instanceof Error ? e.message : 'Could not parse the transcript.');
+    }
+  };
+  const split = useMemo<{ ok: true; value: SplitResult } | { ok: false; message: string } | null>(() => {
+    if (!data) return null;
+    const ratio = Number(ratioText.trim());
+    try {
+      if (!ratioText.trim()) throw new RangeError('Validation ratio must be a number from 0 to 0.5.');
+      return { ok: true, value: splitDataset(data.built.examples, ratio, seed) };
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'Invalid validation ratio.' };
+    }
+  }, [data, ratioText, seed]);
+  const stats = data ? datasetStats(data.built.examples) : null;
+  const copyManifest = async () => {
+    if (!split || !split.ok) return;
+    const json = JSON.stringify(buildManifest(split.value, new Date().toISOString()), null, 2);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard is not available here.');
+      await navigator.clipboard.writeText(json);
+      setStatus('Manifest JSON copied.');
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : 'Could not copy the manifest.');
+    }
+  };
+  const reasonCounts = data ? Object.entries(data.parsed.skipped.reduce<Record<string, number>>((acc, s) => { acc[s.reason] = (acc[s.reason] ?? 0) + 1; return acc; }, {})) : [];
+  return (
+    <Panel title="Fine-tuning dataset (offline, export only)" eyebrow="Personal fine-tuning experiments">
+      <p className="field-hint">{FINETUNE_DATASET_NOTE}</p>
+      <Field label="Transcript" hint={`Lines start with User:/Me: or Assistant:/AI:. A blank line separates conversations. At most ${DATASET_LIMITS.inputChars} characters.`}>
+        {(id, d) => <textarea id={id} aria-describedby={d} className="input mono" rows={8} spellCheck={false} maxLength={DATASET_LIMITS.inputChars + 1} value={text} onChange={(e) => { setText(e.target.value); setData(null); setError(null); setStatus(null); }} />}
+      </Field>
+      <Button icon={ShieldCheck} disabled={!text.trim()} onClick={parse}>Parse</Button>
+      {error && <Notice tone="danger" title="Transcript rejected">{error}</Notice>}
+      {data && stats && (
+        <>
+          <Notice tone="info" title="Parsed locally">
+            {stats.examples} example(s), {stats.turns} turn(s) kept from {data.built.counts.input} parsed. {data.parsed.skipped.length} line(s) skipped.
+            {data.parsed.truncated ? ` Truncated: only the first ${DATASET_LIMITS.examples} examples were kept.` : ' Not truncated.'}
+            {` Duplicates removed: ${data.built.counts.duplicates}. Long turns cut to ${DATASET_LIMITS.turnChars} characters: ${data.built.counts.truncatedTurns}. Dropped for turns under ${DATASET_LIMITS.minTurnChars} characters: ${data.built.counts.droppedShort}.`}
+          </Notice>
+          <p className="field-hint">Characters per example: min {stats.minChars}, mean {stats.meanChars}, max {stats.maxChars}. About {stats.approxTokens} {stats.approxTokensLabel}.</p>
+          {reasonCounts.length > 0 && <ul className="field-hint">{reasonCounts.map(([r, n]) => <li key={r}>{r}: {n}</li>)}</ul>}
+          {data.scan.total > 0 ? (
+            <Notice tone="warn" title="Possible personal data or secrets">
+              Emails: {data.scan.emails}, URLs: {data.scan.urls}, secrets: {data.scan.secrets}, 16+ digit numbers: {data.scan.longDigits}. Review before exporting.
+              <ul>{data.scan.samples.map((s, i) => <li key={i}><code>{s.exampleId}</code> {s.kind}: <code>{s.masked}</code></li>)}</ul>
+            </Notice>
+          ) : <p className="field-hint">Scan found no emails, URLs, secrets or long digit runs.</p>}
+          <div className="row">
+            <Field label="Validation ratio" hint="0 to 0.5. The split is deterministic for the same content and seed.">
+              {(id, d) => <input id={id} aria-describedby={d} className="input mono" inputMode="decimal" maxLength={10} value={ratioText} onChange={(e) => setRatioText(e.target.value)} />}
+            </Field>
+            <Field label="Seed">
+              {(id, d) => <input id={id} aria-describedby={d} className="input mono" maxLength={40} value={seed} onChange={(e) => setSeed(e.target.value)} />}
+            </Field>
+          </div>
+          {split && (split.ok ? (
+            <>
+              <p className="field-hint">Split: {split.value.train.length} train, {split.value.validation.length} validation (ratio {split.value.ratio}, seed "{split.value.seed}").</p>
+              <div className="row">
+                <Button icon={DownloadSimple} disabled={split.value.train.length === 0} onClick={() => downloadTextFile('train.jsonl', toJsonl(split.value.train))}>Download train.jsonl</Button>
+                <Button icon={DownloadSimple} disabled={split.value.validation.length === 0} onClick={() => downloadTextFile('validation.jsonl', toJsonl(split.value.validation))}>Download validation.jsonl</Button>
+                <Button onClick={() => void copyManifest()}>Copy manifest JSON</Button>
+              </div>
+            </>
+          ) : <Notice tone="danger" title="Invalid validation ratio">{split.message}</Notice>)}
+          {status && <p className="field-hint" role="status">{status}</p>}
+        </>
+      )}
+    </Panel>
   );
 }
 
@@ -203,6 +366,8 @@ export function ModelsView(p: ModelsViewProps) {
           </div>
         </div>
       )}
+      <ManifestVerifyPanel onlineEnabled={o?.downloads.allowed === true} />
+      <FinetuneDatasetPanel />
     </div>
   );
 }

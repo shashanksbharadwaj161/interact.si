@@ -1,0 +1,13 @@
+/* App-level motion policy (goals 64/60/67/44). The shared backdrop is mounted once; scene changes fade inside it
+   through the anim-state machine. These rules only make the resolved policy visible and stop leftover drift. */
+
+/* Any battery or user reason that reduced motion freezes ambient drift on the shared backdrop at once. */
+.scene-layer:not([data-motion-reason="none"]) .scene *,
+.scene-layer:not([data-motion-reason="none"]) .scene {
+  animation-play-state: paused;
+  transition-duration: 0s;
+}
+
+.dock-motion[title] {
+  cursor: help;
+}

@@ -1,7 +1,9 @@
 // Captain integration glue: adapts the flat, validated IPC methods on window.jarvis to the object-shaped
 // client interfaces the module views expect. Every builder returns null when the backend (or the browser
 // preview bridge) does not expose the methods, so views can say "not connected" instead of pretending.
-import type { ApprovedDocumentPreview, ApprovedDocumentSaveOptions, CalendarImportSummary, ChatMessage, ChatStreamBatch, ChatStreamEvent, ChatStreamOutcome, ChatStreamStart, JarvisAPI, ProductivityNamespace, UsageSummary } from '../shared/contracts';
+import type { ApprovedDocumentPreview, ApprovedDocumentSaveOptions, CalendarImportSummary, HostBatteryAPI, HostBatteryStatus, ChatMessage, ChatStreamBatch, ChatStreamEvent, ChatStreamOutcome, ChatStreamStart, JarvisAPI, ProductivityNamespace, UsageSummary } from '../shared/contracts';
+import type { CloudProvider, CloudProviderStatus } from '../shared/contracts';
+import { CLOUD_PROVIDERS, cloudProviderInfo, isCloudProvider } from '../shared/contracts';
 import type { RoutinesApi } from '../../electron/services/routines';
 import type { ModelsClient } from '../../electron/services/models';
 import type { IntegrationsBridge } from './integration-catalog';
@@ -125,6 +127,70 @@ export function resourcesBridge(api: Api): (() => Promise<ResourceSnapshot>) | n
   return typeof api.systemResources === 'function' ? () => api.systemResources!() : null;
 }
 
+/** Read-only host power state (Electron powerMonitor). subscribe is present only when the backend pushes on-battery/on-ac changes. */
+export interface HostBatteryBridge {
+  read(): Promise<HostBatteryStatus>;
+  subscribe?(handler: (status: HostBatteryStatus) => void): () => void;
+}
+
+/** Adapts window.jarvisHost. Null when it is absent (browser preview, older preload), so the UI can fall back to unmeasured. */
+export function hostBatteryBridge(api: Partial<HostBatteryAPI> | null | undefined): HostBatteryBridge | null {
+  if (!api || typeof api.hostBattery !== 'function') return null;
+  const bridge: HostBatteryBridge = { read: () => api.hostBattery!() };
+  if (typeof api.onHostBattery === 'function') bridge.subscribe = (handler) => api.onHostBattery!(handler);
+  return bridge;
+}
+
+/** Validates one pushed host status. Anything malformed is dropped rather than shown. */
+export function parseHostBatteryStatus(v: unknown): HostBatteryStatus | null {
+  if (!isRecord(v) || typeof v.measuredAt !== 'string' || v.measuredAt.length > 40 || !Number.isFinite(Date.parse(v.measuredAt))) return null;
+  if (v.source === 'host' && typeof v.onBattery === 'boolean') return { source: 'host', onBattery: v.onBattery, measuredAt: v.measuredAt };
+  if (v.source === 'unmeasured' && v.onBattery === null) return { source: 'unmeasured', onBattery: null, measuredAt: v.measuredAt };
+  return null;
+}
+
+/**
+ * Builds window.jarvisHost in the preload from a raw subscription to the main-process push channel. Keeps the latest valid
+ * status (unmeasured until the first push), forwards valid changes to subscribers, and never sends anything to main.
+ */
+export function createHostBatteryApi(listen: (listener: (raw: unknown) => void) => () => void, now: () => number = Date.now): Required<HostBatteryAPI> {
+  let latest: HostBatteryStatus | null = null;
+  const handlers = new Set<(s: HostBatteryStatus) => void>();
+  listen((raw) => {
+    const s = parseHostBatteryStatus(raw);
+    if (!s) return;
+    latest = s;
+    for (const h of [...handlers]) { try { h({ ...s }); } catch { /* a broken view must not stop the others */ } }
+  });
+  return {
+    hostBattery: async () => (latest ? { ...latest } : { source: 'unmeasured', onBattery: null, measuredAt: new Date(now()).toISOString() }),
+    onHostBattery: (handler) => {
+      if (typeof handler !== 'function') throw new TypeError('handler must be a function');
+      handlers.add(handler);
+      return () => { handlers.delete(handler); };
+    },
+  };
+}
+
+/** The Battery Status API object shape (BatteryManager) that the renderer may read. */
+export interface BrowserBatteryManagerLike {
+  charging: unknown;
+  level: unknown;
+}
+
+/**
+ * Wraps navigator.getBattery (passed in, never looked up here) as a labelled reader for resolveBatteryStatus in
+ * src/ui/resource-policy.ts. Returns null when the API is absent, which is common in Electron builds.
+ */
+export function navigatorBatteryReader(getBattery: unknown, thisArg?: unknown): (() => Promise<{ source: 'navigator'; charging: unknown; level: unknown }>) | null {
+  if (typeof getBattery !== 'function') return null;
+  return async () => {
+    const b = (await (getBattery as () => Promise<BrowserBatteryManagerLike>).call(thisArg)) as BrowserBatteryManagerLike | null;
+    if (!b || typeof b !== 'object') throw new Error('No battery manager');
+    return { source: 'navigator', charging: b.charging, level: b.level };
+  };
+}
+
 /** window.jarvis.productivity, built from the flat validated IPC methods. The preload uses this, so the shapes cannot drift. */
 export function productivityBridge(api: Api): ProductivityNamespace | null {
   if (!has(api, PRODUCTIVITY_METHODS)) return null;
@@ -171,6 +237,67 @@ export function documentsBridge(api: Api): DocumentsBridge | null {
     choose: () => api.documentsChoose!(),
     saveAsNote: (token, options) => (options === undefined ? api.documentsSave!(token) : api.documentsSave!(token, options)),
     discard: (token) => api.documentsDiscard!(token),
+  };
+}
+
+/** Optional cloud chat providers: key status per provider and per-provider key storage. Keys go in, never come out. */
+export const CLOUD_PROVIDER_METHODS = ['cloudProviderStatus', 'setProviderKey', 'clearProviderKey'] as const;
+export const PROVIDER_KEYS_NOT_CONNECTED = 'Per-provider keys are not connected in this build, so a key for this provider cannot be stored yet.';
+export type CloudProvidersClient = {
+  /** One entry per provider, in CLOUD_PROVIDERS order. hasKey null means the status could not be read. */
+  status(): Promise<CloudProviderStatus[]>;
+  setKey(provider: CloudProvider, key: string): Promise<{ provider: CloudProvider; configured: boolean }>;
+  clearKey(provider: CloudProvider): Promise<{ provider: CloudProvider; configured: boolean }>;
+};
+
+const baseStatus = (provider: CloudProvider, hasKey: boolean | null, keyChannel: CloudProviderStatus['keyChannel'], reason?: string): CloudProviderStatus => {
+  const info = cloudProviderInfo(provider);
+  return { provider: info.id, name: info.name, hasKey, origin: info.host, defaultModel: info.defaultModel, keyChannel, ...(reason ? { reason } : {}) };
+};
+
+/** Keeps only well-formed entries from main and never anything that looks like a key. */
+export function parseProviderStatus(raw: unknown): CloudProviderStatus[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: CloudProviderStatus[] = [];
+  for (const p of CLOUD_PROVIDERS) {
+    const e = raw.find((x) => isRecord(x) && x.provider === p.id) as Record<string, unknown> | undefined;
+    if (!e) return null;
+    out.push(baseStatus(p.id, typeof e.hasKey === 'boolean' ? e.hasKey : null, 'per-provider'));
+  }
+  return out;
+}
+
+/**
+ * Adapts window.jarvis to a per-provider key client. When the per-provider channels are absent or not connected, the
+ * Anthropic slot falls back to the original single-key methods and the other providers honestly report no key and
+ * refuse to store one, rather than silently storing it as the Anthropic key.
+ */
+export function cloudProvidersBridge(api: Api): CloudProvidersClient {
+  const perProvider = has(api, CLOUD_PROVIDER_METHODS);
+  const legacy = async (): Promise<CloudProviderStatus[]> => {
+    let anthropic: boolean | null = null;
+    try { anthropic = typeof api.cloudKeyStatus === 'function' ? (await api.cloudKeyStatus()).configured === true : null; } catch { anthropic = null; }
+    return CLOUD_PROVIDERS.map((p) => (p.id === 'anthropic' ? baseStatus(p.id, anthropic, 'legacy') : baseStatus(p.id, false, 'unavailable', PROVIDER_KEYS_NOT_CONNECTED)));
+  };
+  return {
+    status: async () => {
+      if (perProvider) {
+        try { const parsed = parseProviderStatus(await api.cloudProviderStatus!()); if (parsed) return parsed; } catch { /* fall back below */ }
+      }
+      return legacy();
+    },
+    setKey: async (provider, key) => {
+      if (!isCloudProvider(provider)) throw new Error('Unknown cloud provider');
+      if (perProvider) return api.setProviderKey!(provider, key);
+      if (provider === 'anthropic' && typeof api.setCloudKey === 'function') { const r = await api.setCloudKey(key); return { provider, configured: r.configured }; }
+      throw new Error(PROVIDER_KEYS_NOT_CONNECTED);
+    },
+    clearKey: async (provider) => {
+      if (!isCloudProvider(provider)) throw new Error('Unknown cloud provider');
+      if (perProvider) return api.clearProviderKey!(provider);
+      if (provider === 'anthropic' && typeof api.deleteCloudKey === 'function') { await api.deleteCloudKey(); return { provider, configured: false }; }
+      throw new Error(PROVIDER_KEYS_NOT_CONNECTED);
+    },
   };
 }
 

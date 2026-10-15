@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { starShadow } from '../ui/scenes';
+import { useAnimMachine } from '../ui/companion';
 
 /**
  * Ambient motion policy for the backdrop. Pure so it can be tested without a DOM.
@@ -47,11 +48,19 @@ function useAmbient(): 'off' | 'paused' | 'on' {
   return ambientMode(reduced, hidden);
 }
 
-export function SceneBackdrop({ scene, className = '' }: { scene: string; className?: string }) {
+export function SceneBackdrop({ scene: requested, className = '' }: { scene: string; className?: string }) {
   const stars = useMemo(() => ({ a: starShadow(46, 11), b: starShadow(22, 29) }), []);
   const ambient = useAmbient();
+  // Project-to-project scene crossfade on the shared interruptible machine: the current scene fades out from
+  // wherever it is, then the requested one fades in. Switching twice quickly retargets without restarting or
+  // overlapping two fades; reduced motion (ambient 'off') swaps in one step.
+  const fade = useAnimMachine(requested, { reducedMotion: ambient === 'off' });
+  const scene = fade.shown ?? requested;
+  // Only a running fade adds attributes, so a settled backdrop renders exactly the markup it always did.
+  const fading = fade.phase === 'entering' || fade.phase === 'exiting' || fade.phase === 'interrupted';
+  const fadeStyle = fading ? ({ '--anim-progress': fade.progress } as CSSProperties) : undefined;
   return (
-    <div className={`scene ${className}`} data-scene={scene} data-ambient={ambient} aria-hidden="true">
+    <div className={`scene ${className}`} data-scene={scene} data-ambient={ambient} data-anim-phase={fading ? fade.phase : undefined} style={fadeStyle} aria-hidden="true">
       <div className="scene-wash" />
       <div className="scene-drift" />
       {(scene === 'deep-space' || scene === 'orbit') && (

@@ -1,7 +1,7 @@
 // Workspace module tests: portable memory (store), evidence resolution and recap filtering (search), workbench helpers,
 // bounded prompt tools and the three screens. Bundles the real TypeScript in memory with an in-memory file system and a
 // fake bridge; no real files, desktop, network, model or Electron. Nothing here sends anything anywhere.
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile, readdir } from 'node:fs/promises';
@@ -69,6 +69,9 @@ const { store, search, portable, wb, pt, MemoryWorkbench, WritingWorkbench, Docu
 // ---- fixtures ----------------------------------------------------------------------------------------------------
 const NOW = new Date('2026-10-15T10:00:00.000Z');
 const T0 = NOW.getTime();
+// Renderer date defaults must use the same clock as the fixed fixture records.
+mock.timers.enable({ apis: ['Date'], now: NOW });
+test.after(() => mock.timers.reset());
 const iso = (ms) => new Date(ms).toISOString();
 
 function memFs() {

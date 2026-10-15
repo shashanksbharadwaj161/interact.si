@@ -1,0 +1,36 @@
+{
+  "task": "Loop 41: project-branches",
+  "sessionId": "api-af031971-1659-451c-8144-92f8f401f5f8",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/project-map.ts",
+      "bytes": 15064,
+      "sha256": "7c3d3454028951fea2540014dbbd5edbdb0b1db14ab5ec5dbd089112748af694"
+    },
+    {
+      "path": "src/ui/project-branches.ts",
+      "bytes": 15110,
+      "sha256": "fac9400cce6dd103772d9b0b7a09a93e4a53e7a4c3069ae4f71cdcea443c2a0a"
+    },
+    {
+      "path": "src/ui/store.tsx",
+      "bytes": 15918,
+      "sha256": "ab09208df0d3360d2fb282774b15dfe9f5f02e0bce161abca0b7bcb511ea2d61"
+    },
+    {
+      "path": "src/components/Capsules.tsx",
+      "bytes": 67054,
+      "sha256": "f6b67d48070fba8a548565f99e4fcc4199356100ee11365dd187655de11c9fa7"
+    },
+    {
+      "path": "src/styles/project-branches.css",
+      "bytes": 712,
+      "sha256": "75fa71518a54d855022135ffccf3264ac7b66da991e131232a9d9d87d8930203"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

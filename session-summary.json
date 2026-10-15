@@ -1,33 +1,19 @@
 {
-  "savedAt": "2026-10-15T06:31:35.109Z",
-  "productName": "Desktop Companion (temporary)",
-  "complete": false,
-  "overallCompletionPercent": null,
-  "registry": {
-    "total": 140,
-    "verified": 5,
-    "partial": 81,
-    "planned": 54
+  "savedAt": "2026-10-15T16:38:52.703Z",
+  "clientDate": "2026-10-16",
+  "productAccepted": false,
+  "userReported": "Installed app difficult to use, poor UI/UX, features did not work for user; exact failing flows not yet reproduced.",
+  "workersStopped": true,
+  "paidAuthorizationStopped": true,
+  "source": "jarvis-desktop",
+  "handoff": "CLAUDE_HANDOFF.md",
+  "installerIncluded": false,
+  "credentialsIncluded": false,
+  "latestSoftwareChecks": {
+    "tests": 1686,
+    "buildPassed": true,
+    "offlineRoutes": 23,
+    "packagedSmokePassed": true
   },
-  "validation": {
-    "appTests": 1266,
-    "controlRoomTests": 140,
-    "appBuild": "passed",
-    "controlRoomBuild": "passed",
-    "offlineSmokeRoutes": 23,
-    "rendererErrors": 0,
-    "externalRequests": 0
-  },
-  "loop": {
-    "lastRound": 16,
-    "status": "blocked",
-    "acceptedBatches": 0,
-    "activePaidWorkers": 0,
-    "online": false
-  },
-  "recovery": {
-    "unverifiedWorkerDrafts": 19,
-    "changedDraftFiles": 30
-  },
-  "privateRuntimeIncluded": false
+  "fullApplicationComplete": false
 }

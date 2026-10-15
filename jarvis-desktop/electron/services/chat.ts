@@ -7,6 +7,10 @@ import {NetworkDenied} from './netGuard';
 import type {Store} from './store';
 import type {Secrets} from './secrets';
 import {validateChatText} from './validation';
+import type {CloudProvider} from '../../src/shared/contracts';
+import {DEFAULT_CLOUD_PROVIDER, cloudProviderInfo, effectiveCloudModel, isCloudProvider} from '../../src/shared/contracts';
+import {CloudProviderError, streamProviderChat} from './cloud';
+import {StreamAborted, StreamIncomplete, StreamProtocolError} from './ollama';
 
 const HISTORY_CHARS = 8000;
 const REPLY_CAP = 60_000;
@@ -262,7 +266,9 @@ export async function cloudChat(guardedFetch: GuardedFetch, settings: Settings, 
 
 export interface ChatDeps {
   store: Store;
-  secrets: Pick<Secrets, 'configured' | 'reveal'>;
+  secrets: Pick<Secrets, 'configured' | 'reveal'> & Partial<Pick<Secrets, 'hasKey' | 'revealKey'>>;
+  /** Called when an OpenAI-compatible provider reported both token counts. Failures here never lose the reply. */
+  recordUsage?: (u: {provider: CloudProvider; model: string; inputTokens: number; outputTokens: number}) => unknown;
   fetch: GuardedFetch;
   cloudOrigin?: string;
   /** Optional resource profile for local chats (see models.ts). Absent means the long-standing defaults. */
@@ -299,6 +305,44 @@ export function resolveChatRoute(settings: Pick<Settings, 'mode'>, keyConfigured
   return {route: 'local', denied: null};
 }
 
+/** The provider online chat uses. Missing or unknown values mean the default (Anthropic), never a guess at another one. */
+export function selectedCloudProvider(settings: Partial<Pick<Settings, 'cloudProvider'>>): CloudProvider {
+  return isCloudProvider(settings.cloudProvider) ? settings.cloudProvider : DEFAULT_CLOUD_PROVIDER;
+}
+
+export function noProviderKeyMessage(provider: CloudProvider): string {
+  return `No API key stored for ${cloudProviderInfo(provider).name}. Add it in Settings or switch to offline mode`;
+}
+
+/** Whether the selected non-Anthropic provider has its own key. Only that provider's slot is read. */
+async function compatKeyStored(deps: ChatDeps, provider: CloudProvider): Promise<boolean> {
+  if (typeof deps.secrets.hasKey !== 'function') return false;
+  try { return (await deps.secrets.hasKey(provider)) === true; } catch { return false; }
+}
+
+/**
+ * One reply from an OpenAI-compatible provider through the shared stream adapter. Cancellation aborts the in-flight guarded
+ * fetch through opts.signal; stream outcomes are mapped onto the chat error types used by the rest of this module.
+ */
+async function compatChat(deps: ChatDeps, provider: CloudProvider, key: string, model: string, history: Turn[], opts: ChatCallOptions): Promise<string> {
+  const signal = opts.signal ?? new AbortController().signal;
+  try {
+    const r = await streamProviderChat(provider, deps.fetch, {key, model, messages: history, signal, onDelta: opts.onDelta ?? (() => undefined)});
+    if (r.usage && deps.recordUsage) {
+      try { await deps.recordUsage({provider, model, inputTokens: r.usage.inputTokens, outputTokens: r.usage.outputTokens}); } catch { /* usage is best effort */ }
+    }
+    return r.text;
+  } catch (e) {
+    if (e instanceof StreamAborted || signal.aborted) throw new ChatCancelled(e instanceof StreamAborted ? e.partial : '');
+    if (e instanceof StreamIncomplete) {
+      if (e.idle) throw Object.assign(new Error('No data from the server'), {name: 'TimeoutError'});
+      throw new ChatIncomplete(e.partial);
+    }
+    if (e instanceof CloudProviderError || e instanceof StreamProtocolError) throw new CloudChatError(e.message);
+    throw e;
+  }
+}
+
 export interface RunOptions {
   signal?: AbortSignal;
   onDelta?: (text: string) => void;
@@ -320,14 +364,23 @@ async function runChat(deps: ChatDeps, rawText: unknown, opts: RunOptions): Prom
   let cloudRequestStarted = false;
   try {
     let out: string;
-    const decision = resolveChatRoute(settings, routeSource === 'local' || (await deps.secrets.configured()));
-    if (decision.denied) throw new CloudChatError(decision.denied);
-    if (decision.route === 'cloud') {
+    const provider = selectedCloudProvider(settings);
+    // Only the selected provider's key slot is checked; another provider's key never stands in for it.
+    const keyStored = routeSource === 'local' || (provider === 'anthropic' ? await deps.secrets.configured() : await compatKeyStored(deps, provider));
+    const decision = resolveChatRoute(settings, keyStored);
+    if (decision.denied) throw new CloudChatError(provider === 'anthropic' ? decision.denied : noProviderKeyMessage(provider));
+    if (decision.route === 'cloud' && provider !== 'anthropic') {
+      const key = typeof deps.secrets.revealKey === 'function' ? await deps.secrets.revealKey(provider) : null;
+      if (!key) throw new CloudChatError(`The stored API key for ${cloudProviderInfo(provider).name} could not be decrypted; set it again in Settings`);
+      if (opts.signal?.aborted) throw new ChatCancelled();
+      cloudRequestStarted = true;
+      out = await compatChat(deps, provider, key, effectiveCloudModel(provider, settings.cloudModel), history, callOpts);
+    } else if (decision.route === 'cloud') {
       const key = await deps.secrets.reveal();
       if (!key) throw new CloudChatError('The stored API key could not be decrypted; set it again in Settings');
       if (opts.signal?.aborted) throw new ChatCancelled();
       cloudRequestStarted = true;
-      out = await cloudChat(deps.fetch, settings, key, history, deps.cloudOrigin, callOpts);
+      out = await cloudChat(deps.fetch, {...settings, cloudModel: effectiveCloudModel('anthropic', settings.cloudModel)}, key, history, deps.cloudOrigin, callOpts);
     } else {
       out = await ollamaChat(deps.fetch, settings, history, callOpts);
     }

@@ -1,0 +1,56 @@
+{
+  "task": "Loop 41: model-pinning-budget",
+  "sessionId": "api-3242a614-0c54-44b3-bee9-13c678526743",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/shared/contracts.ts",
+      "bytes": 19366,
+      "sha256": "0fd04ef427eb051362a821170fb74d4e660c5cd781dbf5766c35e1ef30a1876b"
+    },
+    {
+      "path": "electron/services/models.ts",
+      "bytes": 41683,
+      "sha256": "dca51668edcf3c108d85a61b1256fc9d4e3ac181b7237025e8384eb6b3cdcc2c"
+    },
+    {
+      "path": "electron/services/validation.ts",
+      "bytes": 23580,
+      "sha256": "1ba5cef82f225ad00e0ef003e50a037d15cb937fd25716b7ba8cae20f09aa510"
+    },
+    {
+      "path": "electron/channels.ts",
+      "bytes": 7625,
+      "sha256": "57ba389f9e2c2008d5339d83a456978cef78ab0fa34de6013a184e5b3ac76ae6"
+    },
+    {
+      "path": "electron/ipc.ts",
+      "bytes": 4292,
+      "sha256": "6d8eb1c34325cb7644d93e108c4e9d7172d312ac473b63043c2c282e86c4708d"
+    },
+    {
+      "path": "electron/preload.ts",
+      "bytes": 8382,
+      "sha256": "9d67fa65571b0512e7bb551acf1a3eff1ff6ebb1ff3bd6fde65f4de0e1f4c262"
+    },
+    {
+      "path": "src/ui/bridges.ts",
+      "bytes": 24051,
+      "sha256": "8d2ce3d8b5fee6b2d4cae8fbdf31d4b5b11d3aa83380224faf8cbd6dda1a8950"
+    },
+    {
+      "path": "src/ui/model-pinning.ts",
+      "bytes": 8402,
+      "sha256": "e774023f5cec58fc1e4f9a35e99234e2d2cdf4bf9771a12423e6df0903b6cd14"
+    },
+    {
+      "path": "src/components/Models.tsx",
+      "bytes": 26253,
+      "sha256": "91e1381ddd8f429c5dfaae209fd8c9cf7445559ccf9cc1524298bb08a07e4023"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

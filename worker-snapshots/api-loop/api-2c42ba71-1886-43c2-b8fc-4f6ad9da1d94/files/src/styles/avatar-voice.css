@@ -1,0 +1,104 @@
+/* ---------- Voice link: mouth shapes and head pose driven by speech playback ---------- */
+
+/* A linked avatar takes its mouth from the voice link, not from the decorative talk loop. */
+.avatar[data-voice-link="on"] .av-mouth {
+  animation: none;
+  transition: width 0.08s linear, height 0.08s linear, border-radius 0.08s linear, opacity 0.08s linear;
+}
+
+.avatar .av-mouth.av-mouth-narrow {
+  width: 9%;
+  height: calc(var(--s) * 0.03);
+  border-radius: 50%;
+  opacity: 0.95;
+}
+
+.avatar .av-mouth.av-mouth-open {
+  width: 15%;
+  height: calc(var(--s) * 0.05);
+  border-radius: 40%;
+  opacity: 1;
+}
+
+.avatar .av-mouth.av-mouth-wide {
+  width: 26%;
+  height: calc(var(--s) * 0.032);
+  border-radius: 30%;
+  opacity: 1;
+}
+
+.avatar[data-voice-link="on"] .av-head {
+  transition: transform 0.24s ease-out;
+  transform-origin: 50% 90%;
+}
+
+.avatar[data-voice-link="on"] .av-head.av-pose-speaking {
+  transform: rotate(-2deg) translateY(-1%);
+}
+
+.avatar[data-voice-link="on"] .av-head.av-pose-listening {
+  transform: rotate(4deg);
+}
+
+.avatar[data-voice-link="on"] .av-head.av-pose-thinking {
+  transform: rotate(-5deg) translateX(-2%);
+}
+
+/* Reduced motion: keep the static mouth shape, drop the head tilt and any easing. */
+:root[data-motion="reduced"] .avatar[data-voice-link="on"] .av-head {
+  transform: none;
+  transition: none;
+}
+
+:root[data-motion="reduced"] .avatar[data-voice-link="on"] .av-mouth {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar[data-voice-link="on"] .av-head {
+    transform: none;
+    transition: none;
+  }
+
+  .avatar[data-voice-link="on"] .av-mouth {
+    transition: none;
+  }
+}
+
+/* ---------- Studio panel ---------- */
+.avv-panel-body {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.avv-preview {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent, #5eaaff) 6%, transparent);
+}
+
+.avv-readout {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.avv-readout dt {
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.avv-readout dd {
+  margin: 0 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.avv-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

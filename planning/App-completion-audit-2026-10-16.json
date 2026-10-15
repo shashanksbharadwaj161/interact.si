@@ -1,0 +1,2140 @@
+{
+  "schemaVersion": 1,
+  "auditedAt": "2026-10-15T16:18:02.355Z",
+  "acceptedThroughRound": 40,
+  "latestVerifiedTests": 1686,
+  "total": 140,
+  "counts": {
+    "working": 48,
+    "unverified": 22,
+    "partial": 34,
+    "preview": 12,
+    "missing": 24
+  },
+  "weightedPoints": 84.5,
+  "coveragePercent": 60.4,
+  "method": {
+    "description": "Source-and-behavior-evidence review of all 140 named requirements; equal feature weights. This is an audited implementation-coverage estimate, not percentage of engineering hours or production-release acceptance.",
+    "weights": {
+      "working": 1,
+      "unverified": 0.75,
+      "partial": 0.5,
+      "preview": 0.25,
+      "missing": 0
+    },
+    "working": "Named feature implemented and wired, with behavior evidence; not a blanket clean-machine/hardware certification.",
+    "unverified": "Implementation appears present, but essential runtime, hardware, account or acceptance evidence is missing.",
+    "partial": "Real working subset exists; a material part of the named requirement is absent.",
+    "preview": "Planning, manual simulation or preview only; the requested operational capability does not run.",
+    "missing": "No functioning implementation of the named requirement."
+  },
+  "scopeNotes": [
+    "All 140 original requirements retained. Baseline all-feature audit through29, with source/behavior review of accepted changes through34 and recovered40 slices.",
+    "Feature implementation coverage is a rubric estimate, not production-release acceptance or percentage of hours.",
+    "No paid provider requests performed for local recovery; live BYOK/OAuth/hardware acceptance remains explicit."
+  ],
+  "remainingCriticalWork": [
+    "Installed-product autonomous worker execution",
+    "Real OAuth account connections and provider registrations",
+    "Local vision, embeddings and verified model/runtime installation",
+    "Applied Windows customization",
+    "Remaining plaintext productivity/preferences storage",
+    "Clean-machine installer lifecycle, signing/update rollback and hardware acceptance"
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "name": "First-run setup wizard",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Onboarding.tsx: four-step Mode, Permissions, Hardware, Review wizard",
+        "tests/onboarding.test.mjs: invalid model blocks Next/Finish"
+      ],
+      "missing": [],
+      "note": "Wizard implemented; no clean-machine acceptance claimed."
+    },
+    {
+      "id": 2,
+      "name": "Hardware and dependency checks",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/system.ts: systemInfo capability checks",
+        "src/components/Onboarding.tsx: modelReadiness",
+        "tests/onboarding.test.mjs: live Ollama readiness and unknown states"
+      ],
+      "missing": [],
+      "note": "Checks are implemented; dependency installation is a different feature."
+    },
+    {
+      "id": 3,
+      "name": "Offline/online mode selection",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/netGuard.ts: external request guard",
+        "src/components/Settings.tsx: route/mode controls",
+        "tests/backend-core.test.mjs: offline rejects external endpoints",
+        "tests/substantial-streaming.test.mjs: switching offline aborts cloud stream"
+      ],
+      "missing": [],
+      "note": "Online requires explicit user mode/key/start."
+    },
+    {
+      "id": 4,
+      "name": "Permission setup and review",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Settings.tsx: permission-change confirmation preview",
+        "electron/services/policy.ts: backend enforcement",
+        "tests/parallel-settings.test.mjs: preview mirrors main-process confirmation rule"
+      ],
+      "missing": [],
+      "note": "Software permission flow tested; OS-specific approval acceptance is separate."
+    },
+    {
+      "id": 5,
+      "name": "Main application dashboard",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Home.tsx: live dashboard/widgets",
+        "src/components/App.tsx: Home route",
+        "tests/autopilot-shell-runtime.test.mjs: every navigable view renders",
+        "tests/milestone-home-widgets.test.mjs"
+      ],
+      "missing": [],
+      "note": "Functional dashboard, not a final visual-design acceptance."
+    },
+    {
+      "id": 6,
+      "name": "Searchable settings",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Settings.tsx: searchable ranked sections",
+        "tests/parallel-settings.test.mjs: search title rank and flat live-region results"
+      ],
+      "missing": [],
+      "note": "Search indexes section metadata, not arbitrary field contents."
+    },
+    {
+      "id": 7,
+      "name": "Personal profiles and preferences",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Settings.tsx: displayName and appearance/notification preferences",
+        "src/ui/prefs.ts: persisted preferences",
+        "src/ui/profiles.ts: six-setting allowlist, named capture/rename/remove/switch patches",
+        "src/components/Settings.tsx: PersonalProfilesPanel persists profiles via usePref and applies through api.saveSettings; failed save preserves previous active profile",
+        "tests/slice-personal-profiles.test.mjs: profile isolation, bounds, apply, normalization, diff and mounted wiring"
+      ],
+      "missing": [],
+      "note": "Named/switchable personal profiles close the previous named gap. Profiles are preference presets, not separate authentication identities."
+    },
+    {
+      "id": 8,
+      "name": "Keyboard and accessibility controls",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/App.tsx: shortcutAction, reduced-motion and text-size controls",
+        "tests/autopilot-shell-runtime.test.mjs: every displayed shortcut opens correct view and fields/buttons named",
+        "tests/milestone-a11y.test.mjs"
+      ],
+      "missing": [],
+      "note": "Controls implemented; no claim of full screen-reader certification."
+    },
+    {
+      "id": 9,
+      "name": "Tray, startup, notification preferences",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/main.ts: tray, global hotkey, startHidden, due notifications",
+        "src/components/Settings.tsx: startup and quiet-toast settings"
+      ],
+      "missing": [
+        "Complete login-startup/notification preference integration and Windows acceptance not established"
+      ],
+      "note": "Settings copy says Windows notifications unused despite main due-notification code; requires alignment."
+    },
+    {
+      "id": 10,
+      "name": "Help, tutorials, diagnostic status",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/GuidedSetup.tsx: guided topics/tour",
+        "src/components/App.tsx: Help and guided setup route",
+        "tests/full-guidance.test.mjs: callbacks, tour bounds, actual capability statuses",
+        "src/components/Status.tsx"
+      ],
+      "missing": [],
+      "note": "Help/tour/status now exist, unlike stale registry limitation."
+    },
+    {
+      "id": 11,
+      "name": "Local text reasoning",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/chat.ts: local Ollama chat",
+        "src/components/Assistant.tsx: selected local route",
+        "docs/current-verification.md: real qwen3.5:2b arithmetic response"
+      ],
+      "missing": [
+        "G2 reference-laptop latency/throughput and 8/16GB sizing acceptance"
+      ],
+      "note": "Historical real local response exists; reported cold run about26.9s does not establish target latency."
+    },
+    {
+      "id": 12,
+      "name": "Local speech recognition",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/services/speech.ts: Windows recognizer and optional local engines",
+        "tests/backlog-voice.test.mjs: Whisper adapter exact argv, executable hash, timeout and unavailable states",
+        "src/ui/dictation-cleanup.ts: transcript postprocessing, not an ASR engine",
+        "tests/slice-dictation-cleanup.test.mjs: deterministic cleanup and guarded model transport"
+      ],
+      "missing": [
+        "No newly installed/bundled verified neural ASR engine pack or G3 WER/license acceptance."
+      ],
+      "note": "Unchanged: postprocessing does not close recognition-engine availability/accuracy gap."
+    },
+    {
+      "id": 13,
+      "name": "Local speech playback",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/speech.ts: local TTS playback/cancel",
+        "src/components/Assistant.tsx: speak controls",
+        "tests/backend-native.test.mjs: honest missing voice capability",
+        "docs/current-verification.md: actual Windows TTS detected"
+      ],
+      "missing": [
+        "Audible playback acceptance on target Windows hardware"
+      ],
+      "note": "Detected voices and mocked service behavior are not audible verification."
+    },
+    {
+      "id": 14,
+      "name": "Local model-pack setup and offline import",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Models.tsx: validate/import model pack",
+        "electron/services/models.ts: pack verification/import",
+        "tests/model-pack-path-security.test.mjs"
+      ],
+      "missing": [
+        "Real GGUF pack import/runtime acceptance and hardware sizing"
+      ],
+      "note": "UI/backend wired; no real offline pack acceptance evidenced."
+    },
+    {
+      "id": 15,
+      "name": "Local vision model support",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "electron/services/models.ts: local-vision capability explicitly unavailable without image adapter"
+      ],
+      "missing": [
+        "No local image-input pipeline or registered vision adapter; G2 open"
+      ],
+      "note": "Type contracts alone are not implementation."
+    },
+    {
+      "id": 16,
+      "name": "Local embeddings and retrieval",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/ui/local-retrieval.ts: BM25 lexical index/search",
+        "src/components/MemorySearch.tsx: related retrieval",
+        "tests/slice-local-retrieval.test.mjs",
+        "electron/services/models.ts: embeddings unsupported",
+        "canonical outputs/jarvis-desktop/src/ui/notes-qa.ts: suggestNotes remains BM25; tests/slice-notes-qa.test.mjs: local BM25 ranking"
+      ],
+      "missing": [
+        "Local embedding generation/vector retrieval absent; G2 open"
+      ],
+      "note": "Keyword BM25 is functional retrieval, not embeddings. round29delta: notes-grounded Q&A added, but embedding generation/vector index still absent; classification remains partial."
+    },
+    {
+      "id": 17,
+      "name": "Model switching and version pinning",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/services/models.ts: select model",
+        "src/components/Models.tsx: onSelect",
+        "tests/autopilot-models.test.mjs"
+      ],
+      "missing": [
+        "No version/digest pinning workflow; G2 sizing unrecorded"
+      ],
+      "note": "Selecting a mutable model name is not version pinning."
+    },
+    {
+      "id": 18,
+      "name": "CPU/GPU and memory budgets",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/services/models.ts: RESOURCE_PROFILES, selectProfile/chatOptions",
+        "src/components/Models.tsx: selectable profile",
+        "tests/autopilot-models.test.mjs"
+      ],
+      "missing": [
+        "Measured/enforced OS CPU/GPU/RAM limits and reference-laptop G2 validation"
+      ],
+      "note": "Model context/thread/keepalive profiles are real but not hard resource isolation."
+    },
+    {
+      "id": 19,
+      "name": "Model download verification and removal",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/models.ts: pull jobs, checksums/size and removal",
+        "src/components/Models.tsx: job status/cancel/removal",
+        "tests/autopilot-models.test.mjs",
+        "tests/model-pack-path-security.test.mjs"
+      ],
+      "missing": [
+        "Actual model download/removal and G2 reference-hardware acceptance"
+      ],
+      "note": "Implemented paths tested with fixtures; live pull not evidenced."
+    },
+    {
+      "id": 20,
+      "name": "Personal model fine-tuning experiments",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Models.tsx: FinetuneDatasetPanel",
+        "src/ui/finetune-dataset.ts: split/export/sensitive scan",
+        "tests/slice-finetune-dataset.test.mjs"
+      ],
+      "missing": [
+        "Training execution, adapter loading and resulting-model evaluation absent"
+      ],
+      "note": "Useful dataset preparation/export only; UI explicitly says no training/upload."
+    },
+    {
+      "id": 21,
+      "name": "Text chat with streaming",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Assistant.tsx: LiveReply, applyStreamEvent, Stop and live composer",
+        "electron/services/chat.ts: stream hub",
+        "tests/substantial-streaming.test.mjs: local streaming end-to-end, cancel, cloud gating and reported usage",
+        "canonical outputs/jarvis-desktop/tests/slice-ai-writing.test.mjs: stream send/cancel/fallback; tests/slice-notes-qa.test.mjs: stream deltas/cancellation",
+        "src/ui/document-explain.ts: runDocumentExplain uses streaming chat bridge and cancellation",
+        "tests/slice-document-explain-ai.test.mjs: deltas, cancel, timeout/lost response, fallback and no double send"
+      ],
+      "missing": [],
+      "note": "Unchanged working streaming chat; new callers do not constitute an additional complete feature."
+    },
+    {
+      "id": 22,
+      "name": "Push-to-talk conversation",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Assistant.tsx: hold-to-record and transcription",
+        "src/ui/audio.ts: ClipRecorder",
+        "tests/backlog-voice.test.mjs: consent, WAV16kHz, stop, silence, device-loss"
+      ],
+      "missing": [
+        "Physical microphone and recognition conversation acceptance"
+      ],
+      "note": "Full push-to-talk software pipeline present; hardware not exercised by mocks."
+    },
+    {
+      "id": 23,
+      "name": "Clean dictation with insertion preview",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Assistant.tsx: transcript enters composer before Send",
+        "electron/services/speech.ts: bounded transcription",
+        "tests/backlog-voice.test.mjs",
+        "src/components/Assistant.tsx: DictationCleanup, original/cleaned preview, Use cleaned/Use original, explicit optional local/cloud cleanup and applyDictation composer insertion",
+        "src/ui/dictation-cleanup.ts: offline punctuation/filler/spacing rules; bounded model cleanup with cancellation",
+        "tests/slice-dictation-cleanup.test.mjs: stream/cancel/failure cases and explicit insertion wiring"
+      ],
+      "missing": [
+        "Cross-application insertion workflow is not implemented/verified by this slice.",
+        "Neural speech accuracy/G3 acceptance remains unrecorded; deterministic rules can alter legitimate spoken words, disclosed in source."
+      ],
+      "note": "Unchanged classification, substantial gap reduction: clean-up and insertion into the app composer now work. This is not full native cross-app dictation."
+    },
+    {
+      "id": 24,
+      "name": "Selected screen-region questions",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Computer.tsx: no region capture/question pipeline",
+        "src/ui/context-policy.ts: policy only"
+      ],
+      "missing": [
+        "Screen-region selection/capture and visual question routing; G6 open"
+      ],
+      "note": "No functional selected-screen-region questions."
+    },
+    {
+      "id": 25,
+      "name": "OCR and otherwise unselectable text extraction",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/ocr.ts: choose local image, language check, recognize/cancel",
+        "src/components/Computer.tsx: OCR review",
+        "tests/backlog-ocr.test.mjs",
+        "tests/expansion-ocr-ui.test.mjs"
+      ],
+      "missing": [
+        "Real Windows image OCR and G6 acceptance; screen capture absent"
+      ],
+      "note": "User-chosen image extraction implemented; screenshots not automatically captured."
+    },
+    {
+      "id": 26,
+      "name": "Translation and app-specific writing tone",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/PromptTools.tsx: toneSend and translation controls",
+        "src/ui/tone-profiles.ts: app-specific style and checks",
+        "tests/slice-tone-profiles.test.mjs",
+        "tests/full-workspace.test.mjs: createDraftSender sends only on explicit Send",
+        "canonical outputs/jarvis-desktop/src/ui/ai-writing.ts: buildWritingRequest/runWritingAction; src/components/PromptTools.tsx: data-ai-writing, explicit confirmation/insert; tests/slice-ai-writing.test.mjs: stream path, cancellation and fallback"
+      ],
+      "missing": [],
+      "note": "Manual destination profile choice; real configured model route used, cloud accepted response not verified. round29delta: rewrite/summarize/translate now have focused guarded AI request runner, preview and result insertion; provider tests use fixtures."
+    },
+    {
+      "id": 27,
+      "name": "Approved document explanations",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/PromptTools.tsx: docSend approval/fingerprint/chunk routing",
+        "src/ui/document-explain.ts: approval and explanation prompts",
+        "electron/services/approvedDocuments.ts: approved txt/md import",
+        "tests/slice-document-explain.test.mjs",
+        "tests/approved-documents.test.mjs",
+        "src/ui/document-explain.ts: exact request preview, depth and selection-aware bounded explanation generation",
+        "src/components/PromptTools.tsx: Explain with AI, route/key confirmation, cancel, preview and Insert into editor",
+        "tests/slice-document-explain-ai.test.mjs: guarded transport and renderer wiring"
+      ],
+      "missing": [],
+      "note": "Unchanged working approved text/Markdown explanations; stronger direct generation workflow. PDF/Word support not claimed."
+    },
+    {
+      "id": 28,
+      "name": "Error diagnosis with proposed actions",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/ui/error-diagnosis.ts: errno/HRESULT/traceback rules and proposed actions",
+        "src/components/PromptTools.tsx: diagnosis and copy controls",
+        "tests/slice-error-diagnosis.test.mjs",
+        "electron/services/actions.ts: open-path/reveal-folder preview, native-confirmation execution and root/link/executable policy",
+        "src/components/PromptTools.tsx and src/ui/error-diagnosis.ts: proposed path actions use real preview/execute; settings action navigates",
+        "tests/slice-reveal-path-action.test.mjs: injected shell executes approved safe targets, refuses others"
+      ],
+      "missing": [
+        "Diagnosis remains a bounded rule-based checker; no general model-backed diagnostic reasoning.",
+        "Real native Windows fixture-matrix execution remains unverified."
+      ],
+      "note": "Unchanged, but disabled proposed-action UI gap is closed. Do not count injected-shell tests as native OS acceptance."
+    },
+    {
+      "id": 29,
+      "name": "Explicit screen/app context controls",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/context-policy.ts: decideContextShare/buildContextPreview",
+        "src/components/Assistant.tsx: context-policy controls",
+        "tests/slice-context-policy.test.mjs"
+      ],
+      "missing": [
+        "No actual screen/app context capture/source bridge; G6 open"
+      ],
+      "note": "Policy preview is not functioning captured screen/app context."
+    },
+    {
+      "id": 30,
+      "name": "Conversation history and export",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Assistant.tsx: History panel, archive/import/filter/export",
+        "src/ui/conversation-export.ts: JSON/Markdown exports",
+        "tests/slice-conversation-export.test.mjs"
+      ],
+      "missing": [],
+      "note": "Now separate history/export UI; stale whole-state-only limitation superseded."
+    },
+    {
+      "id": 31,
+      "name": "Explicit project checkpoints",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MemoryWorkbench.tsx: Checkpoints add/edit/delete",
+        "electron/services/store.ts: checkpoint ops",
+        "tests/full-workspace.test.mjs: evidence update and original timestamp preservation"
+      ],
+      "missing": [],
+      "note": "Explicitly saved project checkpoints, no automatic capture claimed."
+    },
+    {
+      "id": 32,
+      "name": "Searchable project notes and references",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MemorySearch.tsx: project filter and note references",
+        "src/components/Capsules.tsx: ProjectMemory references",
+        "tests/backend-search.test.mjs: ranked typed snippets",
+        "tests/full-workspace.test.mjs",
+        "canonical outputs/jarvis-desktop/src/ui/notes-qa.ts: selected-note request, citation mapping/runNotesQa; src/components/MemorySearch.tsx: NotesQa consent/confirm panel; tests/slice-notes-qa.test.mjs: unchecked notes excluded, citations and cancellation"
+      ],
+      "missing": [],
+      "note": "Local stored project notes/references searchable. round29delta: notes-grounded AI Q&A added alongside functional project search; note selection and destination preview explicit; cloud-provider response not independently accepted."
+    },
+    {
+      "id": 33,
+      "name": "Opt-in application session timeline",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/MemoryWorkbench.tsx: Timeline view",
+        "src/components/MemorySearch.tsx: opt-in policy",
+        "electron/services/store.ts: timeline operations",
+        "tests/full-workspace.test.mjs: grouped timeline",
+        "src/ui/session-association.ts and src/components/MemoryWorkbench.tsx: corrections over persisted timeline/focus records",
+        "tests/slice-session-association.test.mjs"
+      ],
+      "missing": [
+        "Still no live OS application-session reporting/capture source."
+      ],
+      "note": "Unchanged: better correction/view does not populate actual application-use timeline automatically."
+    },
+    {
+      "id": 34,
+      "name": "Evidence-backed daily recaps",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MemoryWorkbench.tsx: RecapSection day/source filters",
+        "electron/services/search.ts: buildDailyRecap/resolveEvidence",
+        "tests/full-workspace.test.mjs: stale evidence, source filtering and recap rendering"
+      ],
+      "missing": [],
+      "note": "Evidence-only local daily recap now reachable."
+    },
+    {
+      "id": 35,
+      "name": "Draft worklog and standup updates",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MemoryWorkbench.tsx: StandupDraft generate/edit/copy/window/project",
+        "src/ui/worklog-draft.ts: buildWorklogDraft",
+        "tests/slice-worklog-draft.test.mjs"
+      ],
+      "missing": [],
+      "note": "Deterministic draft from real records, no invented automatic observations."
+    },
+    {
+      "id": 36,
+      "name": "Correctable task/session association",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/store.ts: session associations and suggestions",
+        "electron/services/search.ts: association logic",
+        "src/ui/session-association.ts: deterministic suggestions, immutable apply/clear, correction history and stored association reconstruction",
+        "src/ui/store.tsx: setSessionAssociation validates and persists existing association.set/association.clear operations",
+        "src/components/MemoryWorkbench.tsx: mounted task/project selects, Save/Clear, suggestions and corrected-by-you history on timeline/focus sessions",
+        "tests/slice-session-association.test.mjs: apply/clear, stored reload reconstruction, unknown-ID refusal and renderer/store wiring"
+      ],
+      "missing": [],
+      "note": "Mounted correction workflow closes gap for existing recorded timeline/focus sessions. Automatic OS session capture remains feature33 gap, not required to correct an existing session record."
+    },
+    {
+      "id": 37,
+      "name": "Memory edit, forget, retention controls",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MemorySearch.tsx: MemoryControls retention preview/two-step forgetting",
+        "src/components/MemoryWorkbench.tsx: checkpoint editing/deletion",
+        "tests/expansion-memory.test.mjs: retention and explicit forget",
+        "tests/full-workspace.test.mjs"
+      ],
+      "missing": [],
+      "note": "Record editing/deletion plus scope forgetting and retention implemented."
+    },
+    {
+      "id": 38,
+      "name": "Coding-session adapters",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/MemoryWorkbench.tsx: CodingSessionImport",
+        "src/ui/coding-session-adapter.ts: parseGitLog/groupSessionsDetailed/checkpoint ops",
+        "tests/slice-coding-session-adapter.test.mjs"
+      ],
+      "missing": [
+        "Live IDE/coding-tool session adapters absent"
+      ],
+      "note": "Pasted git-log session import only; does not run git/read IDE state."
+    },
+    {
+      "id": 39,
+      "name": "Continuous screen history",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/ui/context-policy.ts: screen policy only",
+        "no continuous capture implementation in inspected source"
+      ],
+      "missing": [
+        "Continuous screen recording/history pipeline and G6 consent/retention acceptance"
+      ],
+      "note": "Policy placeholder not screen history."
+    },
+    {
+      "id": 40,
+      "name": "Meeting/system-audio capture and summaries",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/ui/audio.ts: microphone clip recorder only",
+        "electron/services/speech.ts: dictation"
+      ],
+      "missing": [
+        "Meeting/system-audio loopback capture and summary session workflow; G3/G6 acceptance"
+      ],
+      "note": "Short mic dictation not meeting/system-audio capture."
+    },
+    {
+      "id": 41,
+      "name": "Project capsules with goals and references",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Capsules.tsx: ProjectMemory goals/references/checkpoints",
+        "electron/services/store.ts: capsule.setMeta",
+        "tests/full-workspace.test.mjs: portable goals/references and store acceptance"
+      ],
+      "missing": [],
+      "note": "Named goals/references now present; stale registry contradicted."
+    },
+    {
+      "id": 42,
+      "name": "Launch apps, files, and URLs together",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Capsules.tsx: restore preview/confirmation",
+        "electron/services/capsules.ts: restoreCapsule launch sequence",
+        "tests/backend-native.test.mjs",
+        "tests/autopilot-productivity.test.mjs"
+      ],
+      "missing": [
+        "Real multi-item launch acceptance across Windows apps/files/URLs"
+      ],
+      "note": "Backend and approval wiring present; fixture success not broad Windows execution evidence."
+    },
+    {
+      "id": 43,
+      "name": "Save and restore supported window geometry",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Capsules.tsx: RestoreTools.listWins/capture and saved windows",
+        "electron/services/capsules.ts: captureGeometry/restoreCapsule",
+        "native Win32 helper",
+        "tests/backend-native.test.mjs"
+      ],
+      "missing": [
+        "Real geometry save/restore/DPI/multi-monitor matrix acceptance"
+      ],
+      "note": "Capture UI now exists; only supported windows eligible."
+    },
+    {
+      "id": 44,
+      "name": "Project-specific visual scene",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Capsules.tsx: saved capsule scene",
+        "src/ui/scenes.ts: scene catalogue",
+        "electron/services/capsules.ts: export/import preserves scene"
+      ],
+      "missing": [
+        "No established project-resume scene application pipeline"
+      ],
+      "note": "Persisted choice is less than project-specific active visual behavior."
+    },
+    {
+      "id": 45,
+      "name": "Resume recap with source references",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Capsules.tsx: ProjectMemory resume recap/source badges/copy draft",
+        "electron/services/search.ts: buildResumeRecap",
+        "tests/autopilot-productivity.test.mjs",
+        "tests/full-workspace.test.mjs"
+      ],
+      "missing": [],
+      "note": "Evidence recap derived from saved project data; no automatic external context."
+    },
+    {
+      "id": 46,
+      "name": "Cross-project search",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MemorySearch.tsx: cross-project search and project filter",
+        "electron/services/search.ts: searchState",
+        "tests/backend-search.test.mjs: typed results, capsule items and chat explicit opt-in"
+      ],
+      "missing": [],
+      "note": "App-owned records only; not unrestricted disk indexing."
+    },
+    {
+      "id": 47,
+      "name": "Browser-profile and tab adapters",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Capsules.tsx: BrowserRefsImport",
+        "src/ui/browser-refs.ts: paste parser/import",
+        "tests/slice-browser-refs.test.mjs"
+      ],
+      "missing": [
+        "Live browser-profile/tab-reading/restoration adapter absent"
+      ],
+      "note": "Paste-only bookmark/tab text to saved URL items; default browser open is not profile integration."
+    },
+    {
+      "id": 48,
+      "name": "Portable capsule export with path mapping",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Capsules.tsx: RestoreTools export/read/parse/import/path remapping",
+        "electron/services/capsules.ts: exportCapsulePack/parseCapsulePack",
+        "tests/autopilot-productivity.test.mjs"
+      ],
+      "missing": [
+        "Packaged file-picker/export/import round trip on target Windows"
+      ],
+      "note": "Functional portable path-mapping implementation; native acceptance outstanding."
+    },
+    {
+      "id": 49,
+      "name": "Deep app-state restoration adapters",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Capsules.tsx: adapter status explicitly limits restoration to launch/geometry",
+        "electron/services/capsules.ts: supported restore only"
+      ],
+      "missing": [
+        "Deep app-specific document/cursor/editor/tab state restoration adapters"
+      ],
+      "note": "No deep-state restoration demonstrated."
+    },
+    {
+      "id": 50,
+      "name": "Spatial project map with historical branches",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Capsules.tsx: ProjectMapPanel keyboard SVG timeline",
+        "src/ui/project-map.ts: buildProjectMap",
+        "tests/slice-project-map.test.mjs"
+      ],
+      "missing": [
+        "Historical branching graph/branch creation or restoration absent"
+      ],
+      "note": "Functional spatial lanes of capsules/checkpoints/tasks, not full historical branches."
+    },
+    {
+      "id": 51,
+      "name": "Tasks and checklists",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Tasks.tsx: taskMatches, filterCounts, groupTasks and save/toggle/delete controls",
+        "electron/backend.ts: persisted task CRUD; tests/parallel-tasks.test.mjs and tests/backend-core.test.mjs"
+      ],
+      "missing": [],
+      "note": "Functional flat checklist; nested subtasks are not part of this feature name."
+    },
+    {
+      "id": 52,
+      "name": "Reminders and timers",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/reminders.ts: reminder scheduling and notification delivery",
+        "src/components/Tasks.tsx: reminderStatus/snoozeUntil and focus timer controls; src/ui/focus.tsx: absolute deadline, pause/resume",
+        "tests/autopilot-productivity.test.mjs and tests/backlog-routines.test.mjs"
+      ],
+      "missing": [
+        "Real Windows notification/timer delivery across sleep/restart not established by current source audit"
+      ],
+      "note": "Real reminder and timer implementation, not just UI; native delivery remains acceptance-dependent."
+    },
+    {
+      "id": 53,
+      "name": "Focus sessions with history",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/ui/focus.tsx: FocusProvider persisted deadline with start/pause/resume/reset",
+        "src/components/Tasks.tsx: observeFocus records sessions and focusSummary shows today/week/recent sessions",
+        "electron/services/search.ts: observeFocus, focusSummary; productivity backend persistence"
+      ],
+      "missing": [],
+      "note": "Provider comment says it does not record history itself; mounted Tasks observer does record it."
+    },
+    {
+      "id": 54,
+      "name": "Quick notes and snippets",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Notes.tsx: persisted note editor, tags, drafts, export/import and snippet insertion",
+        "src/ui/note-snippets.ts: listSnippets, insertAtCursor and parseNotesExport",
+        "tests/parallel-notes.test.mjs: draft restoration and conflict cases; tests/slice-note-snippets.test.mjs"
+      ],
+      "missing": [],
+      "note": "Actual saved notes/snippets and insertion workflow."
+    },
+    {
+      "id": 55,
+      "name": "File shelf with references",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/search.ts: searches productivity.shelf references",
+        "src/components/Capsules.tsx: project reference editor with file/folder picker and saved references",
+        "src/ui/file-shelf.ts: normalize/add/edit/remove/search/group/reference data and successful-open recents",
+        "src/components/Home.tsx: mounted FileShelf with picker/typed references, label/note/tags edit, removal and preview-confirm open",
+        "tests/slice-file-shelf.test.mjs: data behavior, URL safety, dedupe, persistence key and renderer wiring"
+      ],
+      "missing": [],
+      "note": "Dedicated shelf add/edit/list closes old gap. Native opening is separately gated under feature81."
+    },
+    {
+      "id": 56,
+      "name": "Optional clipboard history",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/clipboard.ts: opt-in collection, retention and purge",
+        "src/components/Clipboard.tsx: clipboardActions load/toggle/remove/purge, searchable grouped previews",
+        "tests/slice-clipboard-history.test.mjs: search, grouping, focus and mounted panel; tests/autopilot-clipboard.test.mjs"
+      ],
+      "missing": [
+        "Real desktop clipboard sampling/privacy lifecycle not independently exercised in this audit"
+      ],
+      "note": "History previews are functional; intentionally no copy-again control because API only returns truncated previews."
+    },
+    {
+      "id": 57,
+      "name": "Application launcher and recent items",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Computer.tsx: approved Launch app action form",
+        "electron/services/actions.ts: launch-app and launch-path execution; src/components/Capsules.tsx: restore approved apps/files",
+        "src/components/Home.tsx: file/folder/URL shelf with Recently opened after confirmed executed outcomes",
+        "src/ui/file-shelf.ts: recentItems and recordOpened",
+        "tests/slice-file-shelf.test.mjs"
+      ],
+      "missing": [
+        "No dedicated application launcher/catalog with recent launched applications; shelf kinds are file/folder/url and explicit app kind is rejected."
+      ],
+      "note": "Unchanged: reference recents do not complete the named application launcher experience."
+    },
+    {
+      "id": 58,
+      "name": "Media and per-app volume controls",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "electron/services/integrations.ts and src/components/Integrations.tsx: Spotify website handoff/setup-required, no playback/session-volume adapter",
+        "tests/backlog-connectors.test.mjs: Spotify playback stays setup-required"
+      ],
+      "missing": [
+        "Media transport integration",
+        "Windows per-app audio session enumeration and volume modification"
+      ],
+      "note": "Opening Spotify links is not media control."
+    },
+    {
+      "id": 59,
+      "name": "Calendar view and local calendar import",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Calendar.tsx and CalendarImport.tsx: calendar view and explicit local ICS review/import",
+        "electron/services/calendar.ts: parsed event import and persistent calendar",
+        "src/ui/calendar-import.ts and tests/parallel-calendar-import.test.mjs: timezone, recurrence and duplicates",
+        "src/ui/calendar-export.ts: RFC5545 escaping, UTF8-aware folding, all-day and UTC event output",
+        "src/components/Calendar.tsx: exact ICS preview, Blob download and export summary",
+        "tests/slice-calendar-export.test.mjs"
+      ],
+      "missing": [],
+      "note": "Unchanged working local calendar import/view; export adds useful real behavior, not online calendar OAuth."
+    },
+    {
+      "id": 60,
+      "name": "System, battery, and device widgets",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/services/system.ts: System.resources measured CPU/memory/process telemetry and optional battery injection",
+        "src/components/Status.tsx: system/resource display; src/components/Home.tsx: capabilities widget",
+        "electron/services/system.ts: HostBatteryReader using powerMonitorAdapter, honest AC/battery measurement without invented percentage",
+        "electron/ipc.ts and electron/preload.ts: trusted push-only host battery bridge wired to Electron powerMonitor",
+        "src/components/Status.tsx: BatteryPanel browser→host→unmeasured fallback",
+        "tests/slice-host-battery.test.mjs: adapter behavior, fallback, push caching and source labels"
+      ],
+      "missing": [
+        "Broader device widgets beyond existing capability summaries remain absent.",
+        "No native battery percentage measurement or real-device fixture acceptance added."
+      ],
+      "note": "Unchanged, but previously absent host on-battery/AC reader is now genuinely wired."
+    },
+    {
+      "id": 61,
+      "name": "Movable expanding desktop island",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "electron/main.ts: createWindow creates ordinary 1180x780 BrowserWindow, no overlay/island window",
+        "src/components/App.tsx: regular app shell"
+      ],
+      "missing": [
+        "Transparent frameless always-on-top island",
+        "Drag/expand/collapse, monitor/DPI and fullscreen-app behavior"
+      ],
+      "note": "A working main app window does not implement a desktop island."
+    },
+    {
+      "id": 62,
+      "name": "Original color, typography, material themes",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/App.tsx: document dataset theme/textSize effects",
+        "src/components/Settings.tsx: theme and appearance preferences",
+        "src/styles/tokens.css, shell.css and components.css: implemented palette/material/typography tokens; tests/autopilot-visual.test.mjs"
+      ],
+      "missing": [],
+      "note": "Original application themes are implemented; taste quality is not measured as completion."
+    },
+    {
+      "id": 63,
+      "name": "Interruptible status and panel animations",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/App.tsx: live motion policy and panel shell",
+        "src/styles/components.css and src/styles/avatar.css: state and panel transitions",
+        "src/ui/companion.tsx: state changes replace timers and animate current activity",
+        "src/ui/anim-state.ts: explicit frozen idle/entering/active/exiting/interrupted state machine with current-progress retargeting and reduced motion",
+        "src/ui/companion.tsx: requestAnimationFrame lifecycle/cancel hook",
+        "src/components/Companion.tsx: status badge wired through machine",
+        "tests/slice-interruptible-anim.test.mjs: interruption, cancel, monotonic/clamped progress and reduced-motion behavior"
+      ],
+      "missing": [
+        "Panel transitions themselves are not wired to this machine.",
+        "Desktop-island status/panel animation acceptance remains absent."
+      ],
+      "note": "Unchanged: explicit interruptible state-machine gap closed for in-app status badge, but full named panel/desktop behavior remains."
+    },
+    {
+      "id": 64,
+      "name": "Reduced motion, battery, fullscreen controls",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/App.tsx: useReducedMotion, batteryWantsReducedMotion and fullscreen toggle",
+        "src/components/Settings.tsx: reduce-motion and low-battery motion switches",
+        "tests/autopilot-visual.test.mjs and tests/backlog-resources.test.mjs",
+        "src/ui/resource-policy.ts: batterySaverMotionActive and browser→host fallback",
+        "src/components/Status.tsx: measured battery source and preference-aware status",
+        "src/components/App.tsx: actual root motion policy still reads navigator.getBattery only",
+        "tests/slice-host-battery.test.mjs"
+      ],
+      "missing": [
+        "External fullscreen-app detection/suppression still absent.",
+        "Host fallback is shown on Status, but root motion policy in App.tsx is not wired to host battery; Electron without navigator.getBattery still misses actual host-driven motion suppression."
+      ],
+      "note": "Unchanged. A pure helper reporting active saver mode is insufficient proof root animations are suppressed by host battery events."
+    },
+    {
+      "id": 65,
+      "name": "Companion with assistant-state animations",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/ui/companion.tsx: CompanionProvider live state and quantized microphone amplitude",
+        "src/components/Assistant.tsx: sets listening/thinking/speaking/error activity",
+        "src/components/Companion.tsx and Avatar.tsx: live animated avatar rendering; tests/parallel-avatar.test.mjs"
+      ],
+      "missing": [],
+      "note": "In-app companion is connected to actual assistant states, separate from missing desktop island."
+    },
+    {
+      "id": 66,
+      "name": "Audio-reactive waveforms and effects",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/ui/audio.ts: ClipRecorder WebAudio analyser reads microphone amplitude",
+        "src/components/Assistant.tsx: real analyser drives local meter and shared companion level during consented recording",
+        "src/ui/companion.tsx: quantizeLevel, hostVoiceLevel; src/components/AvatarStudio.tsx: live level host"
+      ],
+      "missing": [],
+      "note": "Actual microphone-driven meter/effects; manual simulated poses are labelled separately."
+    },
+    {
+      "id": 67,
+      "name": "Animated project/scene transitions",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/SceneBackdrop.tsx and src/styles/scene3d.css: animated in-app scenes",
+        "src/components/App.tsx and src/styles/components.css: page/panel transitions; saved scene preference",
+        "src/components/SceneBackdrop.tsx: useAnimMachine requested-scene transition with current-progress retargeting",
+        "src/components/Capsules.tsx: mounted scene editor preview benefits from stable backdrop instance",
+        "tests/slice-interruptible-anim.test.mjs: machine behavior and source wiring"
+      ],
+      "missing": [
+        "App.tsx scene-layer is keyed by scene (line730), remounting SceneBackdrop on global scene change and discarding previous machine state.",
+        "No distinct project-to-project scene transition workflow is wired; capsules store scene, app-wide scene is independent preference."
+      ],
+      "note": "Unchanged: actual scene-preview transitions improve, but keyed global remount and absent project-switch wiring prevent full named feature acceptance."
+    },
+    {
+      "id": 68,
+      "name": "Widget layout editor and live preview",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Home.tsx: normalizeLayout, moveWidget, setWidgetHidden and mounted WidgetPicker",
+        "src/components/WidgetPicker.tsx and src/ui/widgets.ts: editable saved widths/order/visibility",
+        "tests/milestone-home-widgets.test.mjs: saved layout placement, mounted picker and allowed widths"
+      ],
+      "missing": [],
+      "note": "Functional saved layout changes reflected immediately in Home."
+    },
+    {
+      "id": 69,
+      "name": "Live wallpaper/shader scenes",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/MotionStudio.tsx and Scene3D.tsx: animated visual scenes inside application",
+        "src/components/SceneBackdrop.tsx: CSS scene backgrounds"
+      ],
+      "missing": [
+        "Windows desktop wallpaper attachment/lifecycle",
+        "Desktop shader wallpaper runtime/performance acceptance"
+      ],
+      "note": "In-app visual scene subset exists; it is not a Windows live wallpaper."
+    },
+    {
+      "id": 70,
+      "name": "Physics-driven desktop and window effects",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "electron/main.ts: ordinary window without physics/desktop overlay",
+        "src/ui/mod-catalog.ts: unsupported effect declarations; no desktop physics adapter"
+      ],
+      "missing": [
+        "Desktop/window physics simulation and native effect application"
+      ],
+      "note": "CSS motion inside app is not physics-driven Windows behavior."
+    },
+    {
+      "id": 71,
+      "name": "Curated optional mod catalog",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/mod-catalog.ts: CATALOG has four generic profiles; every homepage/version/license/build verification is absent",
+        "src/components/Customization.tsx: renders descriptions and manual reversal guidance",
+        "tests/autopilot-mods.test.mjs: project links blocked until verified permissive license"
+      ],
+      "missing": [
+        "Actual curated identified mods with verified links/licenses/releases"
+      ],
+      "note": "Catalog scaffold exists; generic descriptions are not a usable mod catalog."
+    },
+    {
+      "id": 72,
+      "name": "Mod version and compatibility checks",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/mod-catalog.ts: checkCompatibility compares supplied metadata, verifiedVersion fields null",
+        "src/components/Customization.tsx: displays compatibility result"
+      ],
+      "missing": [
+        "Installed/version detection",
+        "Real release/build compatibility metadata and tested entries"
+      ],
+      "note": "Pure comparison/check UI cannot check actual mods while every catalog metadata field is unknown."
+    },
+    {
+      "id": 73,
+      "name": "Taskbar and Start menu presets",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/components/Customization.tsx: TaskbarPresetsPanel explicitly preview-only with manually entered values",
+        "src/ui/taskbar-presets.ts: buildPlan/captureSnapshot/serializePlan; tests/slice-taskbar-presets.test.mjs"
+      ],
+      "missing": [
+        "Reading actual Windows settings",
+        "Applying and reverting taskbar/Start presets"
+      ],
+      "note": "JSON plan preview changes no Windows setting."
+    },
+    {
+      "id": 74,
+      "name": "Explorer and notification presets",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/components/Customization.tsx: ExplorerPresetsPanel manually entered values and Applying is not available notice",
+        "src/ui/explorer-presets.ts: buildPlan/serializePlan; tests/slice-explorer-presets.test.mjs"
+      ],
+      "missing": [
+        "Reading actual Windows settings",
+        "Applying and reverting Explorer/notification presets"
+      ],
+      "note": "Tested planning logic is not applied Windows customization."
+    },
+    {
+      "id": 75,
+      "name": "Save and restore customization settings",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/mod-catalog.ts: normalizePrefs/exportPrefs and preset/effect preference state",
+        "src/components/Customization.tsx: preference export and stored preview selection"
+      ],
+      "missing": [
+        "Snapshot of actual Windows customization",
+        "Restore/apply adapter"
+      ],
+      "note": "Saves intended preference descriptions only; no OS customization exists to restore."
+    },
+    {
+      "id": 76,
+      "name": "Advanced window borders, corners, transparency",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Customization.tsx: experimental scope unavailable text",
+        "electron/main.ts: no native border/corner/transparency adapter"
+      ],
+      "missing": [
+        "Native window styling implementation and reversal"
+      ],
+      "note": "Feature label/roadmap only."
+    },
+    {
+      "id": 77,
+      "name": "Dock/genie/wobble animation packs",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Customization.tsx: experimental scopes not built",
+        "src/ui/mod-catalog.ts: no supported dock or window animation effect"
+      ],
+      "missing": [
+        "Dock engine",
+        "Genie/wobble native animation packs"
+      ],
+      "note": "No functional desktop dock/effect implementation."
+    },
+    {
+      "id": 78,
+      "name": "Resource and icon redirection packs",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/ui/mod-catalog.ts: no resource/icon redirection adapter",
+        "src/components/Customization.tsx: experimental feature unavailable"
+      ],
+      "missing": [
+        "Resource/icon redirection implementation and reversible pack installer"
+      ],
+      "note": "Roadmap only."
+    },
+    {
+      "id": 79,
+      "name": "Virtual-desktop behavior modifications",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "electron/native/adapter.ts: window input/focus primitives, no virtual-desktop modification adapter",
+        "src/components/Customization.tsx: experimental scope unavailable"
+      ],
+      "missing": [
+        "Windows virtual-desktop APIs and behavior modification/reversal"
+      ],
+      "note": "No functional virtual-desktop implementation."
+    },
+    {
+      "id": 80,
+      "name": "AI-composed validated scene specifications",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "ROUND29 DELTA outputs/jarvis-desktop/src/ui/motion-ai.ts: buildMotionRequest, runMotionGeneration, validateGeneratedScene route guarded chat/stream replies through existing scene validator",
+        "ROUND29 DELTA outputs/jarvis-desktop/src/components/MotionStudio.tsx: exact prompt preview, explicit local/cloud send, cancellation, validated result review before apply",
+        "ROUND29 DELTA tests/slice-motion-ai.test.mjs: schema-derived prompt, invalid replies, guarded stream and cancellation; root confirms integrated 1572 tests/build/smoke"
+      ],
+      "missing": [
+        "Live-model generated scene response and real provider failure/recovery acceptance not established by mocked tests"
+      ],
+      "note": "Round29 source checked after frozen snapshot: actual AI composition now implemented for in-app scenes. Does not imply Windows-wide customization."
+    },
+    {
+      "id": 81,
+      "name": "Approved app-launch action tools",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Computer.tsx: preview/approval/execute launcher controls",
+        "electron/services/actions.ts: resolveExecutable, preview TTL, single-use execution and native trusted confirmation",
+        "tests/backend-approval.test.mjs and tests/backend-native.test.mjs",
+        "electron/services/actions.ts: guarded path-action additions retain preview TTL/single use/native confirmation",
+        "tests/slice-reveal-path-action.test.mjs: approved execution and refusal with injected shell"
+      ],
+      "missing": [
+        "Native action behavior on real Windows app fixture matrix not independently verified."
+      ],
+      "note": "Unchanged: added operational code and fixture tests do not supply missing Windows acceptance evidence."
+    },
+    {
+      "id": 82,
+      "name": "Durable scheduled routines",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/routines.ts: persisted routine/run/schedule engine",
+        "src/components/Routines.tsx: schedule editor and manual/start/pause controls; App.tsx routinesBridge wiring",
+        "tests/autopilot-routines.test.mjs: exactly-once slots across restarts, missed/grace cases and persistence"
+      ],
+      "missing": [
+        "Packaged Windows long-running scheduling/native confirmation acceptance"
+      ],
+      "note": "Schedules require app running; no claim of machine-off execution."
+    },
+    {
+      "id": 83,
+      "name": "Visual editable workflow steps",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/Routines.tsx: blankStep, routineToDraft, draftIssues/draftToPayload and editable reordered action/wait steps",
+        "tests/autopilot-routines.test.mjs: editor round-trip, candidates and mounted routine screen"
+      ],
+      "missing": [],
+      "note": "Real visual list editor persisted to routine backend; not a node-graph requirement."
+    },
+    {
+      "id": 84,
+      "name": "Conditions, bounded retries, duplicate prevention",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/routines.ts: conditional execution, bounded retries and per-routine/global run locks",
+        "src/components/Routines.tsx: condition/retry controls",
+        "tests/autopilot-routines.test.mjs: fresh confirmation on retry, policy declines no retry, duplicate prevention"
+      ],
+      "missing": [],
+      "note": "Named engine behavior implemented and exercised with injected action adapters."
+    },
+    {
+      "id": 85,
+      "name": "Execution results and partial-failure history",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/routines.ts: persisted RunRecord and per-step results",
+        "src/components/Routines.tsx: filterRuns, durationText, history and partial-failure inspection",
+        "tests/autopilot-routines.test.mjs: partial results, continue-on-failure, restart interruption"
+      ],
+      "missing": [],
+      "note": "Actual routine execution records; separate manual agent logs are not credited here."
+    },
+    {
+      "id": 86,
+      "name": "Cancellation and pause-all controls",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/routines.ts: cancel and pause-all hold between steps",
+        "src/components/Routines.tsx: Cancel/Stop/Pause controls",
+        "tests/autopilot-routines.test.mjs: cancellation keeps partial results, pause skips due slots"
+      ],
+      "missing": [],
+      "note": "Cancellation is cooperative between steps, not interruption of an already-issued OS input primitive."
+    },
+    {
+      "id": 87,
+      "name": "Undo for explicitly reversible steps",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Routines.tsx: undoable flag limited to move-window and history undo button",
+        "electron/services/routines.ts: one-time reverse move with trusted confirmation",
+        "tests/autopilot-routines.test.mjs: undo only explicitly reversible moves through confirmation once"
+      ],
+      "missing": [
+        "Real window movement/restore acceptance on Windows"
+      ],
+      "note": "Deliberately only reversible geometry actions; arbitrary text/clicks are not undoable."
+    },
+    {
+      "id": 88,
+      "name": "Selected file/browser action adapters",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/services/actions.ts: authorized launch-path/open-url; src/components/Capsules.tsx file/folder references",
+        "src/components/Computer.tsx: open-url scope explicitly says page is not read or controlled",
+        "tests/backend-approval.test.mjs and tests/slice-browser-refs.test.mjs"
+      ],
+      "missing": [
+        "Browser content/tab automation adapter",
+        "Rich selected file operations beyond approved opening/references"
+      ],
+      "note": "Useful approved file/URL handoffs, not autonomous browser interaction."
+    },
+    {
+      "id": 89,
+      "name": "Watch-once routine recording",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "electron/services/routines.ts and tests/autopilot-routines.test.mjs: recording explicitly gated/unimplemented",
+        "src/components/Routines.tsx: manual editor only"
+      ],
+      "missing": [
+        "Consent-based action recorder",
+        "Recorded action interpretation and editable replay"
+      ],
+      "note": "No watch-once recorder."
+    },
+    {
+      "id": 90,
+      "name": "Cross-app semantic drag-to-action workflows",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Routines.tsx: no semantic cross-app drag handlers",
+        "tests/autopilot-routines.test.mjs: semantic drag remains gated"
+      ],
+      "missing": [
+        "Cross-app drag semantic interpretation",
+        "Approved executable workflow adapter"
+      ],
+      "note": "Manual action forms and task drag layouts do not implement this feature."
+    },
+    {
+      "id": 91,
+      "name": "Task board and worker status",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Developer.tsx: TaskBoardPanel with createTask/transitionTask/deriveWorkerStatus",
+        "src/ui/task-board.ts: persisted manual status transitions; tests/slice-task-board.test.mjs"
+      ],
+      "missing": [
+        "Live execution-linked worker status in installed app"
+      ],
+      "note": "Functional task board, but statuses are user-recorded, not actual running workers."
+    },
+    {
+      "id": 92,
+      "name": "Isolated project workspaces",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Developer.tsx: external Control Room link only; no app workspace/worktree creation API",
+        "electron/backend.ts: no isolated worker workspace service"
+      ],
+      "missing": [
+        "Product project/worktree isolation and execution workspace lifecycle"
+      ],
+      "note": "External development control-room worktrees do not fulfill installer product feature."
+    },
+    {
+      "id": 93,
+      "name": "Model/worker role selection",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/ui/worker-roles.ts: WORKER_ROLES, recommendModel, validateAssignment and override normalization",
+        "src/components/Developer.tsx: role/model assignment for manual board tasks; tests/slice-worker-roles.test.mjs"
+      ],
+      "missing": [
+        "Role/model selection connected to actual spawned app workers"
+      ],
+      "note": "Real role validation/preference subset; selection currently does not dispatch a worker."
+    },
+    {
+      "id": 94,
+      "name": "Persistent resumable agent sessions",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/agent-session.ts: buildSession/serializeSession/planResume/diffSessions",
+        "src/components/Developer.tsx: SessionsGroup explicitly saves manual board/log/budget snapshots and never starts worker",
+        "tests/slice-agent-session.test.mjs"
+      ],
+      "missing": [
+        "Actual agent execution transcript/state continuation",
+        "Resume connection to worker runtime"
+      ],
+      "note": "Manual board restore is implemented, not resumable agent execution."
+    },
+    {
+      "id": 95,
+      "name": "Scoped tools and context policies",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/ui/tool-scope-policy.ts: effectivePolicy/evaluateActionScope used by Computer.tsx",
+        "src/ui/context-policy.ts: deny-wins policy normalization and buildContextPreview used in Assistant.tsx",
+        "electron/services/policy.ts: native action root/app/window restrictions; tests/slice-tool-scope-policy.test.mjs and slice-context-policy.test.mjs"
+      ],
+      "missing": [
+        "Actual agent-worker tool scope enforcement in product",
+        "Full collected-context capture/share pipeline"
+      ],
+      "note": "Useful manual-action and context-policy subset; not a complete agent permissions runtime."
+    },
+    {
+      "id": 96,
+      "name": "Agent logs and result inspection",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/agent-log.ts: appendEntry/filterLog/exportLog/redactSecrets",
+        "src/components/Developer.tsx: AgentLogGroup user-recorded log entries and manual task summaries",
+        "tests/slice-agent-log.test.mjs"
+      ],
+      "missing": [
+        "Real worker event ingestion and execution results linked to agents"
+      ],
+      "note": "Manual logging scaffold; backend ordinary activity log is real but is not agent execution telemetry."
+    },
+    {
+      "id": 97,
+      "name": "Budgets and bounded task execution",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/task-budget.ts: evaluateStart/findOverdue and manual spend ledger",
+        "src/components/Developer.tsx: budgets only gate manual board Start/Resume; comment says evaluated on render, nothing runs on timer",
+        "tests/slice-task-budget.test.mjs"
+      ],
+      "missing": [
+        "Actual worker token/cost accounting",
+        "Enforced runtime cancellation/spend limits for product agent execution"
+      ],
+      "note": "Manual board start constraints and manually entered spend are not bounded agent execution."
+    },
+    {
+      "id": 98,
+      "name": "Local specialist multi-agent execution",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Developer.tsx: separate Control Room external link, no launch/embed/data exchange",
+        "electron/backend.ts: no local multi-agent worker executor"
+      ],
+      "missing": [
+        "Installed product specialist worker runtime and coordination",
+        "Local model-backed concurrent execution"
+      ],
+      "note": "Development Claude agents do not implement local product agents."
+    },
+    {
+      "id": 99,
+      "name": "Animated worker/crew visualization",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/Developer.tsx: static manual worker/task lists",
+        "src/components/Avatar.tsx and Companion.tsx: single assistant animation, not worker crew"
+      ],
+      "missing": [
+        "Worker-linked animated crew scene/visualization"
+      ],
+      "note": "One animated companion and a static task list do not fulfill animated worker crew."
+    },
+    {
+      "id": 100,
+      "name": "Suggested reusable skills from past runs",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/ui/skill-suggestions.ts: suggestSkills groups repeated completed manual tasks and taskFromSkill creates reusable templates",
+        "src/components/Developer.tsx: SkillSuggestionsGroup lists/saves/queues suggestions; tests/slice-skill-suggestions.test.mjs"
+      ],
+      "missing": [
+        "Suggestions derived from real executed agent runs",
+        "Reusable skill execution connected to worker engine"
+      ],
+      "note": "Deterministic suggestions over manually recorded tasks are functional, but actual past-run agent integration absent."
+    },
+    {
+      "id": 101,
+      "name": "Anthropic BYOK provider",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/cloud.ts: streamCloudChat streams Anthropic Messages through guarded fetch",
+        "electron/backend.ts: cloudKeyStatus/setCloudKey and chat route; src/components/Settings.tsx: secure key entry/cloud-model controls",
+        "tests/autopilot-integrations.test.mjs: approved Anthropic check sends one request without exposing key"
+      ],
+      "missing": [
+        "Installed application live BYOK generation acceptance not recorded; development-worker API success is separate"
+      ],
+      "note": "Actual provider implementation, not merely a website link."
+    },
+    {
+      "id": 102,
+      "name": "Additional optional AI providers",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/Integrations.tsx: explicit OpenAI connection-check-only disclosure",
+        "electron/services/integrations.ts: createIntegrationService approved connection checks",
+        "tests/autopilot-integrations.test.mjs: OpenAI bearer header and rejected-key mapping",
+        "Scope: docs/product-roadmap.md and docs/loop/GOAL.md name feature102 only as Additional optional AI providers; src/shared/feature-registry.json requires only online mode. No original named Gemini requirement was found. Prior audit gap examples are not additional acceptance obligations.",
+        "Accepted canonical electron/services/cloud.ts: OpenAiStreamValidator and streamOpenAiCompatibleChat implement bounded SSE generation, usage extraction, cancellation, incomplete/error handling and dispatch for both OpenAI and OpenRouter.",
+        "Accepted canonical electron/services/netGuard.ts: exact OpenAI /v1/chat/completions and OpenRouter /api/v1/chat/completions origins/routes; offline and own-key gating; redirect denial.",
+        "Accepted canonical electron/services/chat.ts: selectedCloudProvider, effectiveCloudModel and compatChat route actual sends through selected provider key and guarded stream without trying another provider.",
+        "Accepted canonical electron/backend.ts and electron/services/secrets.ts: provider-specific protected key slots, provider status/save/remove handlers and state selection.",
+        "Accepted canonical src/components/Settings.tsx: Anthropic/OpenAI/OpenRouter selection, selected host/model display, separate masked save/remove key controls and explicit provider-change confirmation.",
+        "Accepted canonical tests/slice-cloud-providers.test.mjs: fixture-driven stream deltas/usage, protocol errors, cancellation, incomplete replies, status-only HTTP errors, offline/route/own-key guard refusal, per-provider key isolation, real createBackend selection and usage wiring. Test existence and content inspected; this auditor has not certified the current mutable worker test pass.",
+        "Independent combined gate: 1686 tests, build and offline smoke passed after authoritative IPC repair."
+      ],
+      "missing": [
+        "Explicitly approved real OpenAI/OpenRouter key, generation, cancellation and usage acceptance has not been recorded; tests use fake transport and fake key protection.",
+        "Real Electron/Windows protected-key and restart acceptance for additional providers remains unrecorded."
+      ],
+      "note": "Additional OpenAI and OpenRouter generation is implemented and wired through the authoritative IPC allowlist, selected protected keys and guarded routes. Live provider and Windows restart acceptance remains unverified; OAuth account integration is a separate requirement."
+    },
+    {
+      "id": 103,
+      "name": "Web research with cited sources",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/ui/integration-catalog.ts: web-research availability not-built; provider not chosen"
+      ],
+      "missing": [
+        "Search provider",
+        "Research retrieval and source citation flow"
+      ],
+      "note": "Local note retrieval is not web research."
+    },
+    {
+      "id": 104,
+      "name": "Calendar account connectors",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/ui/integration-catalog.ts: calendar connector setup-required",
+        "electron/services/integrations.ts: pure OAuth/PKCE helpers explicitly implement no sign-in"
+      ],
+      "missing": [
+        "Registered OAuth client",
+        "Authorization callback/token exchange",
+        "Calendar-account synchronization"
+      ],
+      "note": "Local calendar and ICS import are different features."
+    },
+    {
+      "id": 105,
+      "name": "Issue-tracker draft export and approved posting",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Integrations.tsx: IssueDraft form formats and copies local issue draft",
+        "src/ui/integration-catalog.ts: formatIssueDraft",
+        "tests/autopilot-integrations.test.mjs: formatIssueDraft formats locally and requires title"
+      ],
+      "missing": [
+        "Authenticated tracker posting adapter",
+        "Posting approval and posted-result confirmation"
+      ],
+      "note": "Functional draft export; no approved API posting."
+    },
+    {
+      "id": 106,
+      "name": "Weather/news feed widgets",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/integration-catalog.ts: weather connection check only; news availability not-built",
+        "electron/services/integrations.ts: approved exact-origin connection check"
+      ],
+      "missing": [
+        "Weather display widget",
+        "News retrieval source and widget"
+      ],
+      "note": "Connection diagnostic exists; requested widgets do not."
+    },
+    {
+      "id": 107,
+      "name": "Optional model/update downloads",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/download-manifest.ts: parseDownloadManifest/verifyDigest/planDownload",
+        "src/components/Models.tsx: ManifestVerifyPanel explicitly states no download started",
+        "tests/slice-download-manifest.test.mjs: host/HTTPS/digest/plan checks"
+      ],
+      "missing": [
+        "Download execution",
+        "Verified installation and signed update distribution"
+      ],
+      "note": "Offline manifest verification and download plans only."
+    },
+    {
+      "id": 108,
+      "name": "Per-provider data previews and usage history",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/backend.ts: integrationsPreview and integrationsUsage wired",
+        "src/components/Integrations.tsx: preview/check controls and UsageHistory",
+        "tests/autopilot-integrations.test.mjs: preview describes what leaves without sending; approved checks recorded"
+      ],
+      "missing": [],
+      "note": "Scope is local previews and history, not authoritative provider billing."
+    },
+    {
+      "id": 109,
+      "name": "Encrypted cross-device sync",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/ui/encrypted-bundle.ts: PBKDF2/AES-GCM authenticated encrypted transfer bundle",
+        "src/components/Settings.tsx: EncryptedBundlePanel with manual file download/import",
+        "tests/slice-encrypted-bundle.test.mjs: Unicode roundtrip, wrong passphrase and tampering"
+      ],
+      "missing": [
+        "Automatic device synchronization transport",
+        "Conflict resolution and remote device state"
+      ],
+      "note": "Real encrypted manual transfer exists; no sync service."
+    },
+    {
+      "id": 110,
+      "name": "Community scene/widget marketplace",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/ui/integration-catalog.ts: marketplace gated/unavailable"
+      ],
+      "missing": [
+        "Community catalog",
+        "Package trust/review",
+        "Publish/install flows"
+      ],
+      "note": "Local preset library is not community marketplace."
+    },
+    {
+      "id": 111,
+      "name": "Windows installer and uninstaller",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "package.json: electron-builder NSIS x64 target, assisted install and install-directory controls",
+        "docs/current-verification.md: built unsigned NSIS development installer"
+      ],
+      "missing": [
+        "Clean-machine install/uninstall lifecycle validation"
+      ],
+      "note": "Installer built; lifecycle not accepted. Signing belongs to release readiness too."
+    },
+    {
+      "id": 112,
+      "name": "Bundled runtime and offline installation option",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "package.json: Electron packaged with compiled app and native helpers",
+        "docs/current-verification.md: local runtime/weights not bundled"
+      ],
+      "missing": [
+        "Offline AI runtime/model-weight installation bundle"
+      ],
+      "note": "Electron shell is bundled; local model runtime and weights are separate prerequisites."
+    },
+    {
+      "id": 113,
+      "name": "Local encrypted sensitive-data storage",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/services/secrets.ts: Secrets uses safeStorage/DPAPI encrypted atomic key vault",
+        "electron/services/integrations.ts: createDpapiKeyVault provider slots",
+        "electron/services/store.ts: ordinary state JSON persistence",
+        "electron/services/atRest.ts: versioned encrypted envelope and safeStorage adapter; memoryCipher explicitly test-only",
+        "electron/main.ts: stateCipher created from real Electron safeStorage and passed into backend Store",
+        "electron/services/store.ts: state.json and rolling/preimport backup encode/decode, legacy backup migration, read-only on unavailable encrypted key",
+        "tests/slice-at-rest-encryption.test.mjs: 8/8 focused tests; migration/reload, corruption recovery, unavailable-key non-overwrite, encrypted backups and deliberate plaintext exports"
+      ],
+      "missing": [
+        "ProductivityStore still writes productivity.json as plaintext JSON at store.ts:801, including timeline/focus/reference data.",
+        "Renderer preferences remain localStorage plaintext and now include file shelf paths/notes/tags; not all sensitive content is protected.",
+        "First-write unavailable protector still falls back to plaintext, so encryption is not mandatory/fail-closed before initial migration.",
+        "Real Windows DPAPI/user-profile migration acceptance is not supplied by injected-cipher tests."
+      ],
+      "note": "Unchanged partial but substantial security progress: primary state and its backups encrypted when protector works; original all-sensitive-content requirement is broader than this accepted slice."
+    },
+    {
+      "id": 114,
+      "name": "Export/import and backup recovery",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/backend.ts: exportData/importData native dialog paths",
+        "electron/services/store.ts: exportDocument/importDocument, atomic backup and valid-backup corruption recovery",
+        "tests/backend-core.test.mjs: valid import preserves permissions and failed save rolls back; malformed import makes no change",
+        "src/components/Settings.tsx: Data export/import controls",
+        "src/ui/calendar-export.ts and src/components/Calendar.tsx: additional local ICS export",
+        "tests/slice-calendar-export.test.mjs",
+        "Existing workspace backup/import/recovery evidence retained from baseline"
+      ],
+      "missing": [],
+      "note": "Unchanged working local export/import/recovery; calendar export is not a new independent completion point."
+    },
+    {
+      "id": 115,
+      "name": "Crash recovery and safe launch",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/main.ts: launch guard safeLaunch wiring, unresponsive/exception activity recording",
+        "electron/services/lifecycle.ts: launch marker guard",
+        "tests/autopilot-native.test.mjs: two unclean starts enter safe launch and clean exit clears markers"
+      ],
+      "missing": [
+        "Real packaged crash/restart acceptance exercise"
+      ],
+      "note": "Complete code path and simulated lifecycle tests; essential real crash path unverified."
+    },
+    {
+      "id": 116,
+      "name": "Network-denial/offline verification",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/netGuard.ts: guarded outbound request policy",
+        "electron/main.ts: renderer session security/egress hooks",
+        "docs/local-integration-2026-10-15.md: actual Electron offline smoke, 23 routes, zero external requests",
+        "docs/loop/PROGRESS.json: integrated batches passed npm run smoke"
+      ],
+      "missing": [],
+      "note": "Behavioral offline verification exists; not a universal external packet-capture certification."
+    },
+    {
+      "id": 117,
+      "name": "Signed updates with rollback",
+      "classification": "preview",
+      "score": 0.25,
+      "evidence": [
+        "src/ui/update-manifest.ts: signature verification, planUpdate and descriptive rollback ledger; never downloads/installs/rolls back",
+        "src/components/Status.tsx: offline update-manifest panel",
+        "tests/slice-update-manifest.test.mjs: genuine signature and tamper verification"
+      ],
+      "missing": [
+        "Signed update delivery/install execution",
+        "Actual rollback execution and lifecycle acceptance"
+      ],
+      "note": "Real cryptographic validation but requested update/rollback actions remain plans."
+    },
+    {
+      "id": 118,
+      "name": "Validated x64/ARM64 compatibility tiers",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "package.json: actual x64 packaging target",
+        "src/ui/compat-tiers.ts: ARM64 explicitly untested",
+        "src/components/Status.tsx: compatibility view",
+        "tests/slice-compat-tiers.test.mjs: tier classifier validation"
+      ],
+      "missing": [
+        "ARM64 build and runtime acceptance",
+        "Broader Windows hardware compatibility acceptance"
+      ],
+      "note": "x64 runtime smoke exists; matrix labels alone do not validate ARM64."
+    },
+    {
+      "id": 119,
+      "name": "Commercial licensing without mandatory cloud check-in",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/ui/license-file.ts: offline ECDSA P-256 license verification/evaluation; explicitly gates no functionality",
+        "src/components/Settings.tsx: LicensePanel verifies pasted license",
+        "tests/slice-license-file.test.mjs: genuine signature, tamper, expiry/grace and featureEnabled"
+      ],
+      "missing": [
+        "Publisher-owned issuance/trusted-key distribution",
+        "Integrated entitlement enforcement and commercial purchase/license lifecycle"
+      ],
+      "note": "Substantial offline verifier, not complete commercial licensing."
+    },
+    {
+      "id": 120,
+      "name": "Enterprise policy and managed deployment",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/shared/feature-registry.json: no enterprise implementation reference; package.json only personal NSIS installer"
+      ],
+      "missing": [
+        "Managed policy source/enforcement",
+        "Enterprise deployment tooling"
+      ],
+      "note": "Developer tool-scope controls do not constitute enterprise management."
+    },
+    {
+      "id": 121,
+      "name": "Unified usage dashboard",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/App.tsx: UsageView wired to usageBridge",
+        "src/components/UsagePanel.tsx: totals/models/billing/budget/attribution/performance panels",
+        "electron/backend.ts: usageReport returns ledger report and performance",
+        "tests/autopilot-usage.test.mjs: rendered unknown and empty states, budget meter"
+      ],
+      "missing": [],
+      "note": "Functional local dashboard; provider balances correctly show unknown without adapter."
+    },
+    {
+      "id": 122,
+      "name": "Supported provider quota/balance adapters",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "electron/services/usage.ts: declared adapter snapshots and unsupported/unknown placeholders only",
+        "src/components/UsagePanel.tsx: No billing adapter/unknown statuses"
+      ],
+      "missing": [
+        "Actual provider quota/balance fetch adapters and refresh path"
+      ],
+      "note": "Snapshot data model is not provider adapter."
+    },
+    {
+      "id": 123,
+      "name": "Reset countdown and stale-data indicators",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/UsagePanel.tsx: billingBadge, reset countdown and reset-passed states",
+        "electron/services/usage.ts: report computes ageMs/resetInMs/resetDue",
+        "tests/autopilot-usage.test.mjs: observed/unknown/unsupported/stale distinct"
+      ],
+      "missing": [
+        "Real provider observation ingestion making countdown live"
+      ],
+      "note": "Display logic works with snapshots; provider source absent."
+    },
+    {
+      "id": 124,
+      "name": "Local token and estimated cost ledger",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/usage.ts: recordEvent/reserve/settle/setPrices/snapshot/loadState",
+        "electron/backend.ts: chat request result usage recorded and persisted",
+        "src/components/UsagePanel.tsx: token and estimated cost display",
+        "tests/autopilot-usage.test.mjs: priced/unpriced events, reservations and state roundtrip"
+      ],
+      "missing": [],
+      "note": "Estimates explicitly labelled; no invoice claim."
+    },
+    {
+      "id": 125,
+      "name": "Project/worker cost attribution",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "electron/services/usage.ts: report attribution grouping by project/worker",
+        "src/components/UsagePanel.tsx: attribution table",
+        "tests/autopilot-usage.test.mjs: attribution groups spend and propagates unpriced unknown",
+        "electron/backend.ts: chat recordEvent currently omits project and worker"
+      ],
+      "missing": [
+        "Actual request context project/worker tagging",
+        "Installed-app worker execution cost collection"
+      ],
+      "note": "Functional grouping but ordinary real app events lack attribution context."
+    },
+    {
+      "id": 126,
+      "name": "Budget pace and threshold alerts",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/usage.ts: setBudget and report budget conservativeTotal/pace/alerts",
+        "electron/backend.ts: usageSetBudget wiring",
+        "src/components/UsagePanel.tsx: budget pace meter and threshold alert rendering",
+        "tests/autopilot-usage.test.mjs: monthly conservative spend, reached alerts and over-pace"
+      ],
+      "missing": [],
+      "note": "Local ledger-based alerts; accuracy depends on entered price table and known usage."
+    },
+    {
+      "id": 127,
+      "name": "Local inference performance history",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "electron/services/usage.ts: parseOllamaMetrics and performance tokensPerSecond history",
+        "electron/backend.ts: chat usage records generation timings; usageReport returns performance",
+        "src/components/UsagePanel.tsx: Local performance list",
+        "tests/autopilot-usage.test.mjs: final Ollama chunk metrics produce tokens-per-second history"
+      ],
+      "missing": [
+        "Real installed local-model timing acceptance run"
+      ],
+      "note": "Implemented end-to-end path, external local runtime not exercised."
+    },
+    {
+      "id": 128,
+      "name": "Usage report export",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "electron/services/usage.ts: bounded exportCsv/exportJson with truncation flags",
+        "electron/backend.ts: usageExport native save dialog",
+        "src/components/App.tsx: UsageView export controls",
+        "tests/autopilot-usage.test.mjs: CSV formula neutralization, row/byte caps and JSON time range"
+      ],
+      "missing": [],
+      "note": "Real local report export implementation."
+    },
+    {
+      "id": 129,
+      "name": "2D avatar geometry editor",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/AvatarStudio.tsx: geometry sliders, switches, persisted pack and live stage",
+        "src/ui/avatar-editor.ts: bounded geometry and rendering",
+        "tests/autopilot-visual.test.mjs: finite shapes and canvas-only painter",
+        "tests/parallel-avatar.test.mjs: undo/redo actual pack edits"
+      ],
+      "missing": [],
+      "note": "Narrow 2D feature fulfilled; 3D/portrait work belongs to different IDs."
+    },
+    {
+      "id": 130,
+      "name": "Expression authoring library",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/AvatarStudio.tsx: built-in and user expressions; save/update/delete pose controls",
+        "src/ui/avatar-editor.ts: upsertExpression and expression normalization",
+        "tests/backlog-avatar.test.mjs: valid bounded built-in poses; new poses render finite geometry"
+      ],
+      "missing": [],
+      "note": "Actual editable saved library, not static expression thumbnails only."
+    },
+    {
+      "id": 131,
+      "name": "Avatar animation timeline editor",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/AvatarStudio.tsx: editable keyframes/time/expression/easing, looping, playback and save timeline",
+        "src/ui/avatar-editor.ts: deterministic timeline sampling/review",
+        "tests/backlog-avatar.test.mjs: keyframe easing, bounded poses, loop seam/gap/flicker review"
+      ],
+      "missing": [],
+      "note": "Functional 2D expression timelines with contact sheets."
+    },
+    {
+      "id": 132,
+      "name": "Portable avatar pack import/export",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/AvatarStudio.tsx: JSON download/copy/file import with review, replace/merge and undo",
+        "src/ui/avatar-editor.ts: bounded pack parsing and merge",
+        "tests/backlog-avatar.test.mjs: BOM/CRLF import, id clash rewrite, repeat-import dedupe",
+        "tests/parallel-avatar.test.mjs: import/export preview and edit history"
+      ],
+      "missing": [],
+      "note": "Portable JSON packs; no claim of 3D/avatar model asset compatibility."
+    },
+    {
+      "id": 133,
+      "name": "3D avatar/model customization",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/AvatarStudio.tsx: 2D geometry pack and explicit rejection of 3D model imports",
+        "src/components/Scene3D.tsx: procedural scene rendering separate from avatar model pipeline"
+      ],
+      "missing": [
+        "3D avatar asset import",
+        "Rig/material/model customization and export"
+      ],
+      "note": "Procedural 3D background is not 3D avatar customization."
+    },
+    {
+      "id": 134,
+      "name": "Voice-driven avatar mouth/pose states",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/Assistant.tsx: explicit recording amplitude forwarded to inline avatar",
+        "src/ui/avatar-editor.ts: voice smoothing/bands and bounded expression state",
+        "tests/backlog-avatar.test.mjs: smoothing attack/release and bounded bands"
+      ],
+      "missing": [
+        "TTS audio-driven mouth/pose path",
+        "Real microphone/avatar acceptance"
+      ],
+      "note": "Real amplitude wiring subset; simulated studio level also clearly labelled."
+    },
+    {
+      "id": 135,
+      "name": "Realistic portrait animation adapter",
+      "classification": "missing",
+      "score": 0,
+      "evidence": [
+        "src/components/AvatarStudio.tsx: geometric 2D editor; image/portrait/3D import refused",
+        "src/shared/feature-registry.json: no portrait adapter evidence"
+      ],
+      "missing": [
+        "Portrait model/assets",
+        "Animation inference adapter and rendering pipeline"
+      ],
+      "note": "Geometric avatar animation does not satisfy realistic portrait animation."
+    },
+    {
+      "id": 136,
+      "name": "Avatar quality/hardware profile manager",
+      "classification": "partial",
+      "score": 0.5,
+      "evidence": [
+        "src/components/AvatarStudio.tsx: selectable quality profiles",
+        "src/ui/avatar-editor.ts: frame-rate and pixel-ratio limits",
+        "tests/autopilot-visual.test.mjs: quality profiles bound FPS/DPR and unknown ids fall back"
+      ],
+      "missing": [
+        "Hardware-aware recommendation/detection",
+        "Measured hardware/profile acceptance"
+      ],
+      "note": "Manual quality presets functional."
+    },
+    {
+      "id": 137,
+      "name": "Procedural motion scene editor",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MotionStudio.tsx: actual canvas scene settings, layered timeline/keyframes/playback, persistence/import/export",
+        "src/ui/motion-presets.ts: procedural layers and scene sampling",
+        "tests/parallel-motion.test.mjs: accessible timeline controls and frame stepping",
+        "tests/backlog-motion.test.mjs: deterministic tracks and bounded exports"
+      ],
+      "missing": [],
+      "note": "Registry claim no timeline is stale: current editor contains timeline and keyframes."
+    },
+    {
+      "id": 138,
+      "name": "Original scene/template library",
+      "classification": "working",
+      "score": 1,
+      "evidence": [
+        "src/components/MotionStudio.tsx: built-in preset library and user save/replace/delete presets",
+        "src/ui/motion-presets.ts: original built-in presets",
+        "tests/motion-presets.test.mjs: valid distinct presets cover every kind; reserved built-in prefix"
+      ],
+      "missing": [],
+      "note": "Original local template library exists; community sharing is separate feature110."
+    },
+    {
+      "id": 139,
+      "name": "AI-to-validated-scene generation",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "ROUND29 DELTA canonical src/ui/motion-ai.ts: buildMotionRequest, runMotionGeneration guarded chat streaming/cancellation and validateGeneratedScene using existing schema",
+        "ROUND29 DELTA canonical src/components/MotionStudio.tsx: exact prompt preview, explicit Anthropic cloud confirmation or Generate locally, validated preview/apply controls",
+        "ROUND29 DELTA canonical tests/slice-motion-ai.test.mjs: mocked streaming, errors/cancellation, destination consent, malformed generated JSON, guarded preview/apply wiring",
+        "Parent confirmed round29 accepted with 1572 tests/build/smoke passing"
+      ],
+      "missing": [
+        "Real installed-app AI provider or local-model scene generation acceptance"
+      ],
+      "note": "Accepted round29 adds actual guarded AI generation; previous rule-based draft is no longer the only path. Delta inspected directly in canonical source after frozen audit snapshot."
+    },
+    {
+      "id": 140,
+      "name": "Local animation/clip export",
+      "classification": "unverified",
+      "score": 0.75,
+      "evidence": [
+        "src/components/MotionStudio.tsx: clipSupport, canvas.captureStream, MediaRecorder WebM chunks and downloadBlob",
+        "src/components/MotionStudio.tsx: separate sampled .clip.json export",
+        "tests/parallel-motion.test.mjs: recording stops with playback, recorder error/unmount cleanup and truthful exports",
+        "tests/slice-clip-export.test.mjs: deterministic bounded sampled JSON frames"
+      ],
+      "missing": [
+        "Actual encoded WebM file save/playback acceptance in packaged Windows runtime"
+      ],
+      "note": "Actual WebM encoder path exists; not JSON-only. GIF/MP4/APNG intentionally unavailable."
+    }
+  ]
+}

@@ -1,11 +1,12 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowCounterClockwise, Copy, FloppyDisk, MagnifyingGlass, Note as NoteIcon, Plus, Tag, Trash, X } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, Copy, DownloadSimple, FloppyDisk, MagnifyingGlass, Note as NoteIcon, Plus, Tag, Trash, UploadSimple, X } from '@phosphor-icons/react';
+import { SNIPPET_TAG, filterSnippets, insertAtCursor, listSnippets, notesExportFileName, notesToJson, notesToMarkdown, parseNotesExport, snippetKeyboardTarget } from '../ui/note-snippets';
 import type { Note } from '../shared/contracts';
 import { ConfirmDialog } from '../ui/Dialog';
 import { Button, Empty, Field, Notice, PageHeader, Panel } from '../ui/primitives';
 import { parseQuery, searchState } from '../../electron/services/search';
 import { useReady } from '../ui/store';
-import { cx, errMsg, fmtDateTime, normalizeTag, relTime, truncate } from '../ui/util';
+import { cx, errMsg, fmtDateTime, localDateKey, normalizeTag, relTime, truncate } from '../ui/util';
 
 type Draft = { id?: string; title: string; body: string; tags: string[] };
 const blank = (): Draft => ({ title: '', body: '', tags: [] });
@@ -75,6 +76,17 @@ export function Notes({ initialItem }: { initialItem?: string } = {}) {
   const searchRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef<Draft | null>(draft);
   draftRef.current = draft;
+  // Snippets, export and import (all local: downloads use Blob URLs, imports go through the normal save path).
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const snippetListRef = useRef<HTMLUListElement>(null);
+  const [snippetOpen, setSnippetOpen] = useState(false);
+  const [snippetQuery, setSnippetQuery] = useState('');
+  const [snippetIndex, setSnippetIndex] = useState(0);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importBusy, setImportBusy] = useState(false);
+  const [importResult, setImportResult] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
 
   const current = state.notes.find((n) => n.id === selected) ?? null;
   const base = useMemo(() => (selected === 'new' ? blank() : current ? fromNote(current) : null), [selected, current]);
@@ -263,6 +275,101 @@ export function Notes({ initialItem }: { initialItem?: string } = {}) {
     else btns[next]?.focus();
   };
 
+  const snippetData = useMemo(() => listSnippets(state.notes.filter((n) => n.id !== draft?.id)), [state.notes, draft?.id]);
+  const snippetMatches = useMemo(() => filterSnippets(snippetData.snippets, snippetQuery), [snippetData, snippetQuery]);
+  useEffect(() => setSnippetIndex(0), [snippetQuery, snippetOpen]);
+  const isSnippet = Boolean(draft?.tags.includes(SNIPPET_TAG));
+
+  const closeSnippets = () => {
+    setSnippetOpen(false);
+    setSnippetQuery('');
+    setTimeout(() => bodyRef.current?.focus(), 0);
+  };
+  const insertSnippet = (snippetBody: string) => {
+    if (!draft) return;
+    const ta = bodyRef.current;
+    const len = draft.body.length;
+    const start = Math.min(len, Math.max(0, ta?.selectionStart ?? len));
+    const end = Math.min(len, Math.max(start, ta?.selectionEnd ?? start));
+    try {
+      const r = insertAtCursor(draft.body, start, end, snippetBody, MAX_BODY);
+      setDraft({ ...draft, body: r.body });
+      if (r.truncated) toast('info', `The snippet was cut to stay within ${MAX_BODY.toLocaleString()} characters.`);
+      setSnippetOpen(false);
+      setSnippetQuery('');
+      setTimeout(() => {
+        bodyRef.current?.focus();
+        bodyRef.current?.setSelectionRange(r.cursor, r.cursor);
+      }, 0);
+    } catch (e) {
+      toast('error', errMsg(e));
+    }
+  };
+  const onSnippetKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeSnippets();
+      return;
+    }
+    // From the search box only ArrowDown moves into the list (Home/End keep moving the text caret).
+    const fromRow = (e.target as HTMLElement).hasAttribute?.('data-snippet');
+    if (!fromRow && e.key !== 'ArrowDown') return;
+    const target = fromRow ? snippetKeyboardTarget(e.key, snippetIndex, snippetMatches.length) : snippetMatches.length ? Math.min(snippetIndex, snippetMatches.length - 1) : null;
+    if (target === null) return;
+    e.preventDefault();
+    setSnippetIndex(target);
+    snippetListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-snippet]')[target]?.focus();
+  };
+  const toggleSnippetTag = () => {
+    if (!draft) return;
+    if (isSnippet) setDraft({ ...draft, tags: draft.tags.filter((t) => t !== SNIPPET_TAG) });
+    else addTag(SNIPPET_TAG);
+  };
+
+  const download = (text: string, ext: 'md' | 'json', type: string) => {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = notesExportFileName(localDateKey(), ext);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setExportOpen(false);
+  };
+  const exportMarkdown = () => download(notesToMarkdown(list, { now: new Date() }), 'md', 'text/markdown;charset=utf-8');
+  const exportJson = () => download(notesToJson(state.notes, { now: new Date() }), 'json', 'application/json;charset=utf-8');
+  const runImport = async () => {
+    if (importBusy) return;
+    setImportResult(null);
+    let parsed: ReturnType<typeof parseNotesExport>;
+    try {
+      parsed = parseNotesExport(importText);
+    } catch (e) {
+      setImportResult({ tone: 'danger', text: `Nothing imported. ${errMsg(e)}` });
+      return;
+    }
+    setImportBusy(true);
+    let imported = 0;
+    let failed = 0;
+    for (const n of parsed.notes) {
+      let ok = false;
+      try {
+        ok = await mutate(() => api.saveNote({ title: n.title, body: n.body, tags: n.tags }));
+      } catch {
+        ok = false;
+      }
+      if (ok) imported++;
+      else failed++;
+    }
+    setImportBusy(false);
+    const dropped = parsed.dropped + failed;
+    const detail = parsed.errors.length ? ` First problem: ${parsed.errors[0]}.` : failed ? ` ${failed} could not be saved.` : '';
+    setImportResult({ tone: imported || !dropped ? 'info' : 'danger', text: `Imported ${imported} note${imported === 1 ? '' : 's'}, dropped ${dropped}.${detail}` });
+    if (imported) setImportText('');
+  };
+
   const clearFilters = () => {
     setQuery('');
     setTagFilter(null);
@@ -272,7 +379,37 @@ export function Notes({ initialItem }: { initialItem?: string } = {}) {
 
   return (
     <div className="page page-wide">
-      <PageHeader eyebrow="Work" title="Notes" subtitle="Plain-text notes with tags, stored on this computer." actions={<Button variant="primary" icon={Plus} onClick={() => requestOpen('new')}>New note</Button>} />
+      <PageHeader eyebrow="Work" title="Notes" subtitle="Plain-text notes with tags, stored on this computer." actions={
+          <>
+            <div className="menu-wrap" onKeyDown={(e) => { if (e.key === 'Escape' && exportOpen) { e.preventDefault(); setExportOpen(false); } }}>
+              <Button icon={DownloadSimple} aria-haspopup="menu" aria-expanded={exportOpen} onClick={() => setExportOpen(!exportOpen)}>Export</Button>
+              {exportOpen && (
+                <div className="menu" role="menu" aria-label="Export notes">
+                  <button type="button" role="menuitem" className="btn btn-quiet btn-sm" disabled={list.length === 0} onClick={exportMarkdown}>Download Markdown (filtered list)</button>
+                  <button type="button" role="menuitem" className="btn btn-quiet btn-sm" disabled={state.notes.length === 0} onClick={exportJson}>Download JSON (all notes)</button>
+                </div>
+              )}
+            </div>
+            <Button icon={UploadSimple} aria-expanded={importOpen} aria-controls="note-import-panel" onClick={() => setImportOpen(!importOpen)}>Import JSON</Button>
+            <Button variant="primary" icon={Plus} onClick={() => requestOpen('new')}>New note</Button>
+          </>
+        } />
+      {importOpen && (
+        <div id="note-import-panel">
+          <Panel title="Import notes from JSON" actions={<Button size="sm" icon={X} onClick={() => setImportOpen(false)}>Close</Button>}>
+            <div className="stack">
+              <p className="sub">Paste a desktop-companion-notes JSON export. Each valid note is saved as a new note; ids in the file are ignored and nothing is overwritten.</p>
+              <Field label="Export JSON">
+                {(id) => <textarea id={id} className="input" rows={6} maxLength={2000000} spellCheck={false} value={importText} onChange={(e) => setImportText(e.target.value)} />}
+              </Field>
+              <div role="status" aria-live="polite">{importResult && <Notice tone={importResult.tone}>{importResult.text}</Notice>}</div>
+              <div>
+                <Button variant="primary" busy={importBusy} disabled={!importText.trim()} onClick={() => void runImport()}>Import JSON</Button>
+              </div>
+            </div>
+          </Panel>
+        </div>
+      )}
 
       <div className="split">
         <aside className="split-list panel" aria-label="Note list">
@@ -386,8 +523,57 @@ export function Notes({ initialItem }: { initialItem?: string } = {}) {
                   {(id) => <input id={id} className="input input-title" value={draft.title} maxLength={120} placeholder="Untitled" onChange={(e) => setDraft({ ...draft, title: e.target.value })} />}
                 </Field>
                 <Field label="Body" hint={draft.body.length >= MAX_BODY ? `Limit of ${MAX_BODY.toLocaleString()} characters reached; extra text is cut off. Ctrl+S saves.` : `${draft.body.length.toLocaleString()} / ${MAX_BODY.toLocaleString()} characters · Ctrl+S saves`}>
-                  {(id, d) => <textarea id={id} aria-describedby={d} className="input note-body" rows={14} maxLength={MAX_BODY} spellCheck value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} />}
+                  {(id, d) => <textarea ref={bodyRef} id={id} aria-describedby={d} className="input note-body" rows={14} maxLength={MAX_BODY} spellCheck value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} />}
                 </Field>
+                <div className="row">
+                  <Button size="sm" icon={Plus} aria-expanded={snippetOpen} aria-controls="note-snippet-picker" onClick={() => (snippetOpen ? closeSnippets() : setSnippetOpen(true))}>Insert snippet</Button>
+                  <Button size="sm" icon={Tag} aria-pressed={isSnippet} disabled={!isSnippet && draft.tags.length >= MAX_TAGS} title={!isSnippet && draft.tags.length >= MAX_TAGS ? `Tag limit of ${MAX_TAGS} reached` : undefined} onClick={toggleSnippetTag}>{isSnippet ? 'Unmark snippet' : 'Mark as snippet'}</Button>
+                </div>
+                {snippetOpen && (
+                  <div id="note-snippet-picker" className="panel pad stack" onKeyDown={onSnippetKey}>
+                    <input
+                      type="search"
+                      className="input"
+                      aria-label="Search snippets"
+                      placeholder="Search snippets"
+                      maxLength={200}
+                      autoComplete="off"
+                      autoFocus
+                      value={snippetQuery}
+                      onChange={(e) => setSnippetQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && snippetMatches[snippetIndex]) {
+                          e.preventDefault();
+                          insertSnippet(snippetMatches[snippetIndex].body);
+                        }
+                      }}
+                    />
+                    {snippetData.snippets.length === 0 ? (
+                      <p className="sub">No snippets yet. Any note tagged #snippet appears here, ready to insert at the cursor; use Mark as snippet on a note to add it.</p>
+                    ) : snippetMatches.length === 0 ? (
+                      <p className="sub">No snippets match this search.</p>
+                    ) : (
+                      <ul className="select-list" ref={snippetListRef} aria-label="Snippets">
+                        {snippetMatches.map((s, i) => (
+                          <li key={s.id}>
+                            <button
+                              type="button"
+                              data-snippet
+                              className={cx('select-item', i === snippetIndex && 'on')}
+                              tabIndex={i === snippetIndex ? 0 : -1}
+                              onFocus={() => setSnippetIndex(i)}
+                              onClick={() => insertSnippet(s.body)}
+                            >
+                              <strong>{truncate(s.title || 'Untitled', 80)}</strong>
+                              <span className="sub">{noteSnippet(s.body) || 'Empty note'}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {snippetData.truncated && <p className="sub">Showing the first 200 snippets by title.</p>}
+                  </div>
+                )}
                 {refCount > 0 && <p className="field-hint">Referenced by capsule{refCount === 1 ? '' : 's'}: {usedBy.map((c) => c.name).join(', ')}.</p>}
                 <Field label="Tags" hint={`Press Enter or comma to add. Up to ${MAX_TAGS} tags.`}>
                   {(id, d) => (

@@ -2,7 +2,13 @@
 // mode and stored a key; the request goes through GuardedFetch (purpose 'cloud-chat'), which re-checks mode, key and origin.
 // The key is placed in one request header and is never logged, echoed in errors or returned.
 import type {GuardedFetch} from './netGuard';
-import {ANTHROPIC_ORIGIN} from './netGuard';
+import {ANTHROPIC_ORIGIN, chatUrlForProvider, originForProvider, type CompatProvider} from './netGuard';
+import type {CloudProvider} from '../../src/shared/contracts';
+
+/** Failures whose text this module wrote itself (status-only HTTP errors, empty reply). Safe to show verbatim. */
+export class CloudProviderError extends Error {
+  override name = 'CloudProviderError';
+}
 import {LineSplitter, STREAM_LIMITS, StreamAborted, StreamIncomplete, StreamProtocolError, appendCapped, pumpLines, readBoundedText, type StreamLimits, type StreamResult} from './ollama';
 
 export const ANTHROPIC_STREAM_VERSION = '2023-06-01';
@@ -119,6 +125,109 @@ export class AnthropicStreamValidator {
   }
 }
 
+/**
+ * OpenAI-compatible chat-completions stream (OpenAI and OpenRouter). Each event is one data line holding a JSON chunk with
+ * choices[0].delta.content (string or absent) and optional usage {prompt_tokens, completion_tokens}; the stream ends with the
+ * literal sentinel [DONE]. Anything after [DONE], malformed JSON or a malformed chunk is a StreamProtocolError. An error chunk
+ * surfaces only a short machine-readable code; provider free text is never kept.
+ */
+export class OpenAiStreamValidator {
+  private ended = false;
+  inputTokens: number | null = null;
+  outputTokens: number | null = null;
+
+  get done(): boolean { return this.ended; }
+
+  /** Returns the text delta carried by this event (empty for usage-only, role-only and the [DONE] event). */
+  accept(ev: SseEvent): string {
+    if (this.ended) throw new StreamProtocolError('The provider sent data after the end of the reply');
+    if (ev.data === '[DONE]') { this.ended = true; return ''; }
+    const malformed = () => new StreamProtocolError('The provider sent a malformed stream event');
+    let v: unknown;
+    try { v = JSON.parse(ev.data); } catch { throw malformed(); }
+    if (!isObj(v)) throw malformed();
+    if (v.error !== undefined && v.error !== null) {
+      const e = isObj(v.error) ? v.error : {};
+      const raw = typeof e.code === 'string' || typeof e.code === 'number' ? String(e.code) : typeof e.type === 'string' ? e.type : '';
+      const code = /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'error';
+      throw new StreamProtocolError(`Cloud provider reported an error during the reply (${code})`);
+    }
+    if (isObj(v.usage)) {
+      const p = tokenCount(v.usage.prompt_tokens), c = tokenCount(v.usage.completion_tokens);
+      if (p !== null && c !== null) { this.inputTokens = p; this.outputTokens = c; }
+    }
+    if (v.choices === undefined || v.choices === null) return '';
+    if (!Array.isArray(v.choices)) throw malformed();
+    if (!v.choices.length) return '';
+    const c0: unknown = v.choices[0];
+    if (!isObj(c0)) throw malformed();
+    if (c0.delta === undefined || c0.delta === null) return '';
+    if (!isObj(c0.delta)) throw malformed();
+    const content = c0.delta.content;
+    if (content === undefined || content === null) return '';
+    if (typeof content !== 'string') throw malformed();
+    return content;
+  }
+}
+
+export interface CompatStreamRequest extends CloudStreamRequest {
+  provider: CompatProvider;
+}
+
+/**
+ * Streams one reply from an OpenAI-compatible provider. Mirrors streamCloudChat: one bearer header holds the key (never
+ * logged or echoed), the same STREAM_LIMITS bounds, StreamAborted (with partial text) on cancel, StreamIncomplete when
+ * [DONE] never arrives, status-only HTTP errors. Reading stops at [DONE].
+ */
+export async function streamOpenAiCompatibleChat(guardedFetch: GuardedFetch, req: CompatStreamRequest): Promise<StreamResult> {
+  const limits: StreamLimits = {...STREAM_LIMITS, ...req.limits};
+  const acc = {text: ''};
+  if (req.provider !== 'openai' && req.provider !== 'openrouter') throw new CloudProviderError('Unknown cloud provider');
+  if (req.signal.aborted) throw new StreamAborted('', req.signal.reason);
+  let res: Response;
+  try {
+    res = await guardedFetch(chatUrlForProvider(req.provider, req.origin ?? originForProvider(req.provider)), {
+      method: 'POST',
+      headers: {'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${req.key}`},
+      body: JSON.stringify({model: req.model, messages: req.messages, stream: true, max_tokens: CLOUD_MAX_TOKENS, stream_options: {include_usage: true}}),
+      signal: req.signal,
+      timeoutMs: limits.totalMs,
+    }, 'cloud-chat');
+  } catch (e) {
+    if (req.signal.aborted) throw new StreamAborted('', req.signal.reason);
+    throw e;
+  }
+  if (!res.ok) throw await cloudHttpError(res, req.signal);
+  req.onOpen?.();
+  const sse = new SseParser(limits.lineChars);
+  const seq = new OpenAiStreamValidator();
+  let capped = false;
+  const handle = (ev: SseEvent | null): boolean => {
+    if (!ev) return false;
+    const text = seq.accept(ev);
+    if (text) {
+      const kept = appendCapped(acc, text, limits.replyChars);
+      if (kept) req.onDelta(kept);
+      if (acc.text.length >= limits.replyChars) { capped = true; return true; }
+    }
+    return seq.done;
+  };
+  let ended = false;
+  await pumpLines(res.body, new LineSplitter(limits), req.signal, limits.idleMs, (line) => (ended = handle(sse.line(line))), () => acc.text);
+  if (!ended && !capped) handle(sse.flush());
+  if (!seq.done && !capped) throw new StreamIncomplete(acc.text);
+  if (!acc.text.trim()) throw new CloudProviderError('The cloud provider returned an empty reply');
+  const usage = !capped && seq.inputTokens !== null && seq.outputTokens !== null ? {inputTokens: seq.inputTokens, outputTokens: seq.outputTokens, generationMs: null, promptMs: null} : null;
+  return {text: acc.text, complete: true, truncated: capped, usage};
+}
+
+/** Dispatches one streamed reply to the adapter and origin of the chosen provider. Never tries another provider. */
+export function streamProviderChat(provider: CloudProvider, guardedFetch: GuardedFetch, req: CloudStreamRequest): Promise<StreamResult> {
+  if (provider === 'anthropic') return streamCloudChat(guardedFetch, {...req, origin: req.origin ?? ANTHROPIC_ORIGIN});
+  if (provider === 'openai' || provider === 'openrouter') return streamOpenAiCompatibleChat(guardedFetch, {...req, provider});
+  return Promise.reject(new CloudProviderError('Unknown cloud provider'));
+}
+
 export interface CloudStreamRequest {
   origin?: string;
   key: string;
@@ -136,9 +245,9 @@ export interface CloudStreamRequest {
  */
 async function cloudHttpError(res: Response, signal: AbortSignal): Promise<Error> {
   await readBoundedText(res, 1024, signal);
-  if (res.status === 401 || res.status === 403) return new Error('The cloud provider rejected the API key');
-  if (res.status === 429) return new Error('The cloud provider is rate limiting requests (HTTP 429). Try again later');
-  return new Error(`Cloud provider returned HTTP ${res.status}`);
+  if (res.status === 401 || res.status === 403) return new CloudProviderError('The cloud provider rejected the API key');
+  if (res.status === 429) return new CloudProviderError('The cloud provider is rate limiting requests (HTTP 429). Try again later');
+  return new CloudProviderError(`Cloud provider returned HTTP ${res.status}`);
 }
 
 /** Streams one cloud reply. Throws StreamAborted / StreamIncomplete (with partial text) or a plain Error. */
@@ -178,7 +287,7 @@ export async function streamCloudChat(guardedFetch: GuardedFetch, req: CloudStre
   await pumpLines(res.body, new LineSplitter(limits), req.signal, limits.idleMs, (line) => (ended = handle(sse.line(line))), () => acc.text);
   if (!ended && !capped) handle(sse.flush());
   if (!seq.stopped && !capped) throw new StreamIncomplete(acc.text);
-  if (!acc.text.trim()) throw new Error('The cloud provider returned an empty reply');
+  if (!acc.text.trim()) throw new CloudProviderError('The cloud provider returned an empty reply');
   const usage = !capped && seq.inputTokens !== null && seq.outputTokens !== null ? {inputTokens: seq.inputTokens, outputTokens: seq.outputTokens, generationMs: null, promptMs: null} : null;
   return {text: acc.text, complete: true, truncated: capped, usage};
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Broom, ChatCircleDots, Lightning, MagnifyingGlass, Microphone, PaperPlaneRight, ShieldCheck, SpeakerHigh, Stop } from '@phosphor-icons/react';
-import type { ActionPreview, ActionRequest, ApiFeature, ChatMessage, ChatStreamEvent, ChatStreamRoute, IntentPlan, JarvisAPI } from '../shared/contracts';
+import type { ActionPreview, ActionRequest, ApiFeature, ChatMessage, ChatStreamEvent, ChatStreamRoute, CloudProvider, CloudProviderStatus, IntentPlan, JarvisAPI } from '../shared/contracts';
+import { DEFAULT_CLOUD_PROVIDER, cloudProviderInfo, effectiveCloudModel, isCloudProvider } from '../shared/contracts';
+import { cloudProvidersBridge } from '../ui/bridges';
 import { Avatar } from './Avatar';
 import { AvatarStudio } from './AvatarStudio';
 import { ConfirmDialog } from '../ui/Dialog';
@@ -9,6 +11,9 @@ import { ClipRecorder, MAX_CLIP_MS, bindLevel, createMicConsent, defaultConsentS
 import { actionOutcome, listedWindows, type ActionOutcome } from '../ui/action-result';
 import { hostVoiceLevel, useCompanion } from '../ui/companion';
 import { usePref } from '../ui/prefs';
+import { CONTEXT_POLICY_PREF_KEY, CONTEXT_SOURCES, DEFAULT_CONTEXT_POLICY, SOURCE_LABEL, buildContextPreview, decideContextShare, normalizeContextPolicy, parseAppList, type ContextItem, type ContextMode, type ContextPolicy } from '../ui/context-policy';
+import { HISTORY_PREF_KEY, chatToConversation, conversationToMarkdown, exportConversations, exportFileName, filterConversations, markdownFileName, mergeImported, normalizeHistory, parseConversationExport, summarizeConversation, type Conversation, type ParseResult } from '../ui/conversation-export';
+import { DICTATION_STYLES, buildDictationCleanupRequest, cleanTranscriptOffline, describeChanges, describeDestination, runDictationCleanup, type DictationStyle } from '../ui/dictation-cleanup';
 import { useReady } from '../ui/store';
 import { cx, errMsg, fmtTime, truncate } from '../ui/util';
 
@@ -141,13 +146,31 @@ export function endpointHost(endpoint: string | undefined): string | null {
   try { return endpoint ? new URL(endpoint).hostname.toLowerCase() : null; } catch { return null; }
 }
 
-export type RouteState = { tone: 'ok' | 'warn' | 'danger'; route: 'Local model' | 'Cloud model'; model: string; where: string; privacy: string; key: string | null; ready: boolean; blocker?: string };
+export type RouteState = { tone: 'ok' | 'warn' | 'danger'; route: 'Local model' | 'Cloud model'; model: string; where: string; privacy: string; key: string | null; ready: boolean; blocker?: string; providerName?: string };
+
+/**
+ * Online route for the selected cloud provider: its display name, its one host, the model actually sent (provider default when
+ * the saved name belongs to another provider) and that provider's own key state. A missing key blocks sending with the same
+ * words the backend uses; no other provider is offered as a substitute.
+ */
+export function providerRouteState(provider: CloudProvider, model: string | undefined, configured: boolean, reason: string, hasKey: boolean | null): RouteState {
+  const info = cloudProviderInfo(provider);
+  const noKey = hasKey === false;
+  const ready = configured && !noKey;
+  const key = hasKey === null ? `${info.name} key: not checked yet` : hasKey ? `${info.name} key: saved on this computer (never shown here)` : `${info.name}: no key stored`;
+  return {
+    tone: ready ? 'warn' : 'danger', route: 'Cloud model', model: effectiveCloudModel(provider, model), where: info.host, key, ready, providerName: info.name,
+    privacy: `Each message you send, plus the earlier conversation included for context, leaves this computer for ${info.name} (${info.host}) using your own key. No other provider is tried. Nothing is sent until you press Send.`,
+    ...(ready ? {} : { blocker: noKey ? `No API key stored for ${info.name}. Add it in Settings or switch to offline mode` : reason }),
+  };
+}
 /**
  * The visible route / key / privacy summary for the chat composer. Derived only from the settings and the backend's own
  * capability answer; it never implies a fallback to the other route, because the backend has none.
  */
-export function routeState(i: { online: boolean; model: string | undefined; endpoint: string | undefined; configured: boolean; reason: string; cloudConfigured: boolean | null }): RouteState {
+export function routeState(i: { online: boolean; model: string | undefined; endpoint: string | undefined; configured: boolean; reason: string; cloudConfigured: boolean | null; provider?: CloudProvider; providerHasKey?: boolean | null }): RouteState {
   const model = i.model?.trim() || 'not set';
+  if (i.online && i.provider !== undefined && isCloudProvider(i.provider)) return providerRouteState(i.provider, i.model, i.configured, i.reason, i.providerHasKey ?? (i.provider === 'anthropic' ? i.cloudConfigured : null));
   if (i.online) {
     const key = i.cloudConfigured === null ? 'API key: not checked yet' : i.cloudConfigured ? 'API key: saved on this computer (never shown here)' : 'API key: not saved';
     return {
@@ -404,6 +427,314 @@ function Waited() {
   return <span className="sub"> · {Math.max(0, Math.floor((now - t0) / 1000))} s</span>;
 }
 
+/** No screen, app or clipboard capture exists in this build, so there are never captured items to attach. */
+const NO_CONTEXT_ITEMS: ContextItem[] = [];
+
+/** Explicit screen / active app / clipboard sharing controls. Settings only: nothing is captured or attached here. */
+export function ContextControls() {
+  const [stored, setStored] = usePref<unknown>(CONTEXT_POLICY_PREF_KEY, DEFAULT_CONTEXT_POLICY);
+  const policy = useMemo(() => normalizeContextPolicy(stored), [stored]);
+  const [allowedDraft, setAllowedDraft] = useState(() => policy.allowedApps.join(', '));
+  const [deniedDraft, setDeniedDraft] = useState(() => policy.deniedApps.join(', '));
+  useEffect(() => { setAllowedDraft(policy.allowedApps.join(', ')); setDeniedDraft(policy.deniedApps.join(', ')); }, [policy.allowedApps, policy.deniedApps]);
+  const save = (next: Partial<ContextPolicy>) => setStored(normalizeContextPolicy({ ...policy, ...next }));
+  const preview = useMemo(() => buildContextPreview(NO_CONTEXT_ITEMS, policy), [policy]);
+  const modeLabel: Record<ContextMode, string> = { off: 'Off', ask: 'Ask', on: 'On' };
+  return (
+    <Panel title="Context controls" eyebrow="Screen · app · clipboard">
+      <p className="field-hint">Choose what may ever be shared with a message. Everything is Off by default. Denied apps always win over allowed apps.</p>
+      {CONTEXT_SOURCES.map((s) => (
+        <div className="field" key={s}>
+          <label htmlFor={`ctx-${s}`}>Share {SOURCE_LABEL[s]}</label>
+          <select id={`ctx-${s}`} className="input" value={policy[s]} onChange={(e) => save({ [s]: e.target.value as ContextMode })}>
+            {(['off', 'ask', 'on'] as ContextMode[]).map((m) => <option key={m} value={m}>{modeLabel[m]}</option>)}
+          </select>
+        </div>
+      ))}
+      <div className="field">
+        <label htmlFor="ctx-allowed">Allowed apps (comma-separated; empty means any app not denied)</label>
+        <input id="ctx-allowed" className="input" value={allowedDraft} onChange={(e) => setAllowedDraft(e.target.value)} onBlur={() => save({ allowedApps: parseAppList(allowedDraft) })} />
+      </div>
+      <div className="field">
+        <label htmlFor="ctx-denied">Denied apps (comma-separated)</label>
+        <input id="ctx-denied" className="input" value={deniedDraft} onChange={(e) => setDeniedDraft(e.target.value)} onBlur={() => save({ deniedApps: parseAppList(deniedDraft) })} />
+      </div>
+      <section aria-label="What would be shared">
+        <p className="field-hint"><strong>What would be shared</strong> (read-only)</p>
+        <ul className="chips-col">
+          {CONTEXT_SOURCES.map((s) => {
+            const d = decideContextShare(policy, { source: s });
+            return <li key={s}>{SOURCE_LABEL[s]}: <Badge tone={d.allowed ? 'warn' : d.requiresPrompt ? 'accent' : 'muted'}>{d.allowed ? 'Would share' : d.requiresPrompt ? 'Ask first' : 'Not shared'}</Badge> <span className="sub">{d.reason}</span></li>;
+          })}
+          {preview.included.map((i, n) => <li key={`in-${n}`}>{SOURCE_LABEL[i.source]}{i.appName ? ` (${i.appName})` : ''}: {i.chars} characters · <code>{i.excerpt}</code></li>)}
+        </ul>
+        <p className="field-hint">No capture attached in this build: no screen, app or clipboard content is read or sent. {preview.totalChars} characters would be attached.</p>
+      </section>
+    </Panel>
+  );
+}
+
+/** Saves text as a local download. The object URL is revoked immediately after the click. Nothing is uploaded. */
+function downloadText(name: string, text: string, type: string) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Saved conversations: search, date window, Markdown/JSON export and a validated JSON import. Local only. */
+export function ConversationHistory({ chat, busy }: { chat: ChatMessage[]; busy: boolean }) {
+  const [stored, setStored] = usePref<unknown>(HISTORY_PREF_KEY, []);
+  const history = useMemo(() => normalizeHistory(stored), [stored]);
+  const [query, setQuery] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [note, setNote] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null);
+  const [importText, setImportText] = useState('');
+  const [checked, setChecked] = useState<{ text: string; result: ParseResult } | null>(null);
+  const filtered = useMemo(() => {
+    try { return { list: filterConversations(history, { query, from, to }), error: null as string | null }; }
+    catch (e) { return { list: [] as Conversation[], error: errMsg(e) }; }
+  }, [history, query, from, to]);
+
+  const saveCurrent = () => {
+    if (chat.length === 0) return;
+    const now = new Date();
+    const conv = chatToConversation(chat, now, `conv-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+    setStored([...history, conv]);
+    setNote({ tone: 'info', text: `Saved "${conv.title}" (${conv.messages.length} messages) to history on this computer.` });
+  };
+  const copyMarkdown = async (c: Conversation) => {
+    try {
+      await navigator.clipboard.writeText(conversationToMarkdown(c, { includeMeta: true }));
+      setNote({ tone: 'info', text: `Copied "${c.title}" as Markdown.` });
+    } catch (e) {
+      setNote({ tone: 'warn', text: errMsg(e, 'The clipboard is not available.') });
+    }
+  };
+  const exportAll = () => {
+    const now = new Date();
+    downloadText(exportFileName(now), JSON.stringify(exportConversations(history, now), null, 2), 'application/json');
+  };
+  const validate = () => setChecked({ text: importText, result: parseConversationExport(importText) });
+  const doImport = () => {
+    if (!checked || checked.text !== importText || !checked.result.ok) return;
+    const r = mergeImported(history, checked.result.conversations);
+    setStored(r.merged);
+    setNote({ tone: r.added > 0 ? 'info' : 'warn', text: `Imported ${r.added} conversation${r.added === 1 ? '' : 's'}. ${r.skippedExisting} already in history were skipped. ${r.skippedOverCap} skipped because history is full.` });
+    setImportText('');
+    setChecked(null);
+  };
+  const remove = (id: string) => { setStored(history.filter((c) => c.id !== id)); if (openId === id) setOpenId(null); };
+  const result = checked && checked.text === importText ? checked.result : null;
+
+  return (
+    <Panel title="History" eyebrow="Saved conversations · export">
+      <p className="field-hint">The backend keeps only the current conversation. Saved conversations are kept in this app's local preferences under "assistant.history" on this computer; nothing is uploaded.</p>
+      <div className="row wrap">
+        <Button size="sm" disabled={chat.length === 0 || busy} title={busy ? 'Wait for the reply to finish first.' : undefined} onClick={saveCurrent}>Save current conversation</Button>
+        <Button size="sm" disabled={history.length === 0} onClick={exportAll}>Export all (JSON)</Button>
+      </div>
+      <div className="field">
+        <label htmlFor="history-search" className="sr-only">Search conversation history</label>
+        <input id="history-search" className="input" type="search" aria-label="Search conversation history" placeholder="Search titles and messages" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
+      <div className="row wrap">
+        <label className="sub">From (UTC) <input className="input" type="date" aria-label="From date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="sub">Before (UTC, not included) <input className="input" type="date" aria-label="To date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+      </div>
+      {filtered.error && <Notice tone="warn" title="Date filter not applied">{filtered.error}</Notice>}
+      <p className="sub" role="status">{filtered.list.length} of {history.length} conversations match</p>
+      {note && <Notice tone={note.tone}>{note.text}</Notice>}
+      <ul className="chips-col">
+        {filtered.list.map((c) => {
+          const s = summarizeConversation(c);
+          return (
+            <li key={c.id}>
+              <div className="row wrap">
+                <strong>{truncate(c.title || 'Untitled conversation', 80)}</strong>
+                {c.imported && <Badge tone="muted">imported</Badge>}
+                <time className="sub" dateTime={c.createdAt}>{c.createdAt}</time>
+                <span className="sub">{s.messages} messages · {s.userTurns} from you · {s.assistantTurns} replies</span>
+              </div>
+              <div className="row wrap">
+                <Button size="sm" variant="quiet" aria-expanded={openId === c.id} onClick={() => setOpenId(openId === c.id ? null : c.id)}>{openId === c.id ? 'Close' : 'Open'}</Button>
+                <Button size="sm" variant="quiet" onClick={() => void copyMarkdown(c)}>Copy Markdown</Button>
+                <Button size="sm" variant="quiet" onClick={() => downloadText(markdownFileName(c), conversationToMarkdown(c, { includeMeta: true }), 'text/markdown')}>Download .md</Button>
+                <Button size="sm" variant="quiet" onClick={() => remove(c.id)}>Remove</Button>
+              </div>
+              {openId === c.id && (
+                <section aria-label={`Conversation: ${c.title}`} className="stack">
+                  <p className="field-hint">Read-only copy. It does not replace or send the current conversation.</p>
+                  {c.messages.map((m, i) => (
+                    <article key={i} className={cx('msg', `msg-${m.role === 'user' ? 'user' : 'assistant'}`)}>
+                      <header><span className="msg-who">{m.role === 'user' ? 'You' : m.role === 'assistant' ? 'Assistant' : 'System'}</span><time dateTime={m.timestamp}>{m.timestamp}</time></header>
+                      <MessageText text={m.content} />
+                    </article>
+                  ))}
+                </section>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="field">
+        <label htmlFor="history-import">Import JSON</label>
+        <textarea id="history-import" className="input" rows={3} value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Paste a desktop-companion-conversations export" />
+      </div>
+      <div className="row wrap">
+        <Button size="sm" disabled={!importText.trim()} onClick={validate}>Validate</Button>
+        <Button size="sm" variant="primary" disabled={!result?.ok} onClick={doImport}>Import</Button>
+      </div>
+      {result && (
+        <div aria-live="polite">
+          <Notice tone={result.ok ? 'info' : 'danger'} title={result.ok ? `${result.conversations.length} conversations ready to import` : 'Not importable'}>
+            {result.errors.length > 0 && <ul>{result.errors.map((e, i) => <li key={`e${i}`} className="mono">{e}</li>)}</ul>}
+            {result.warnings.length > 0 && <ul>{result.warnings.map((w, i) => <li key={`w${i}`} className="mono">{w}</li>)}</ul>}
+            <p className="sub">Dropped: {result.droppedDuplicates} duplicate ids, {result.droppedOverCap} over the limit.</p>
+          </Notice>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+const preWrap = { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } as const;
+
+/**
+ * "Clean up dictation" step for a fresh voice transcript: original vs cleaned side by side. The offline rules are applied by
+ * default without any model call; "Clean with AI" shows the exact prompt and only sends after an explicit click (for the cloud,
+ * after re-checking that a key is stored). Nothing is inserted into the message box until "Use cleaned" or "Use original".
+ */
+export function DictationCleanup({ api, mode, original, aiBlocked, onUse, onDismiss, onAiFinished }: {
+  api: JarvisAPI;
+  mode: import('../shared/contracts').Mode;
+  original: string;
+  /** Why the model cannot be asked right now (for example a chat reply is in progress); null when it can. */
+  aiBlocked: string | null;
+  onUse: (text: string, which: 'cleaned' | 'original') => void;
+  onDismiss: () => void;
+  onAiFinished?: () => void;
+}) {
+  const offline = useMemo(() => cleanTranscriptOffline(original), [original]);
+  const [cleaned, setCleaned] = useState<{ text: string; via: 'offline' | 'local' | 'cloud'; note?: string }>(() => ({ text: offline.text, via: 'offline' }));
+  const [aiOpen, setAiOpen] = useState(false);
+  const [style, setStyle] = useState<DictationStyle>('plain');
+  const [busy, setBusy] = useState(false);
+  const [aiError, setAiError] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null);
+  const [keyMissing, setKeyMissing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
+  /** Taken synchronously so a double click cannot send the prompt twice. */
+  const sendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; abortRef.current?.abort(); }; }, []);
+  const dest = describeDestination(mode);
+  const built = useMemo(() => {
+    try { return { request: buildDictationCleanupRequest(original, { style }), error: null }; }
+    catch (e) { return { request: null, error: errMsg(e, 'The request could not be built.') }; }
+  }, [original, style]);
+  const request = built.request;
+  const changed = offline.text !== original.trim();
+  const sendChars = request?.preview.length ?? 0;
+
+  const cleanWithAi = async () => {
+    if (!request || sendingRef.current || busy || aiBlocked) return;
+    sendingRef.current = true;
+    setBusy(true);
+    setAiError(null);
+    setKeyMissing(false);
+    setDraft('');
+    try {
+      if (dest.requiresConfirmation && typeof api.cloudKeyStatus === 'function') {
+        const status = await api.cloudKeyStatus().catch(() => null);
+        if (!mountedRef.current) return;
+        if (!status?.configured) { setKeyMissing(true); return; }
+      }
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      const r = await runDictationCleanup(api, request, { signal: ctrl.signal, onDelta: (_d, soFar) => { if (mountedRef.current) setDraft(soFar); } });
+      if (!mountedRef.current) return;
+      if (r.status === 'complete' || r.status === 'truncated') {
+        setCleaned({ text: r.text, via: r.source === 'cloud' ? 'cloud' : 'local', note: r.status === 'truncated' ? 'The reply reached the length limit and was cut.' : undefined });
+      } else if (r.status === 'cancelled') {
+        setAiError({ tone: 'info', text: `Cancelled. The preview still shows the earlier cleaned text. ${r.reason ?? ''}`.trim() });
+      } else if (r.status === 'incomplete') {
+        setAiError({ tone: 'warn', text: r.reason ?? 'The reply ended early. The preview still shows the earlier cleaned text.' });
+      } else {
+        setAiError({ tone: 'danger', text: r.reason ?? 'The assistant could not clean the dictation.' });
+      }
+      onAiFinished?.();
+    } finally {
+      abortRef.current = null;
+      sendingRef.current = false;
+      if (mountedRef.current) { setBusy(false); setDraft(''); }
+    }
+  };
+  const cancelAi = () => abortRef.current?.abort();
+  const viaLabel = cleaned.via === 'offline' ? 'Offline rules (no model)' : cleaned.via === 'cloud' ? 'Cleaned by Anthropic cloud' : 'Cleaned by local model';
+
+  return (
+    <section className="chat-error stack" aria-label="Clean up dictation">
+      <div className="row wrap">
+        <Badge tone="accent">Clean up dictation</Badge>
+        <span className="sub">The transcript is already in the message box. Choose which version to keep.</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(14rem, 1fr))', gap: '0.75rem' }}>
+        <div>
+          <p className="field-hint"><strong>Original</strong> ({original.length} characters)</p>
+          <p className="mono" style={preWrap} data-testid="dictation-original">{original}</p>
+        </div>
+        <div>
+          <p className="field-hint"><strong>Cleaned</strong> · {viaLabel} ({cleaned.text.length} characters)</p>
+          <p className="mono" style={preWrap} data-testid="dictation-cleaned">{cleaned.text}</p>
+        </div>
+      </div>
+      <p className="sub" role="status">{cleaned.via === 'offline' ? (changed ? `Offline cleanup applied: ${describeChanges(offline)}` : describeChanges(offline)) : 'AI cleanup result. Review it before using it.'}{cleaned.note ? ` ${cleaned.note}` : ''}</p>
+      <div className="row wrap">
+        <Button size="sm" variant="primary" disabled={busy || !cleaned.text.trim()} onClick={() => onUse(cleaned.text, 'cleaned')}>Use cleaned</Button>
+        <Button size="sm" disabled={busy} onClick={() => onUse(original, 'original')}>Use original</Button>
+        <Button size="sm" variant="quiet" aria-expanded={aiOpen} disabled={busy} onClick={() => setAiOpen((v) => !v)}>{aiOpen ? 'Hide AI cleanup' : 'Clean with AI'}</Button>
+        <Button size="sm" variant="quiet" disabled={busy} onClick={onDismiss}>Dismiss</Button>
+      </div>
+      {aiOpen && (
+        <div className="stack" aria-label="Clean with AI">
+          <div className="row wrap">
+            <label className="sub" htmlFor="dictation-style">Style</label>
+            <select id="dictation-style" className="input" value={style} disabled={busy} onChange={(e) => setStyle(e.target.value as DictationStyle)}>
+              {DICTATION_STYLES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+            <Badge tone={dest.requiresConfirmation ? 'warn' : 'ok'}>Destination: {dest.label}</Badge>
+          </div>
+          {built.error && <Notice tone="warn" title="Nothing to send">{built.error}</Notice>}
+          {request && (
+            <>
+              <p className="field-hint">What will be sent ({sendChars} characters, {request.sentChars} of them your transcript). Only this text is sent; nothing else from the conversation is added by this step, and the request and reply are saved in the Assistant conversation like any message.</p>
+              {request.warnings.map((w, i) => <p key={i} className="field-hint">{w}</p>)}
+              <pre className="mono" style={{ ...preWrap, maxHeight: '12rem', overflow: 'auto' }} tabIndex={0} aria-label="Exact prompt preview">{request.preview}</pre>
+              <div className="row wrap">
+                {dest.requiresConfirmation ? (
+                  <Button size="sm" variant="primary" busy={busy} disabled={busy || aiBlocked !== null} onClick={() => void cleanWithAi()}>Send {sendChars} characters to Anthropic cloud</Button>
+                ) : (
+                  <Button size="sm" variant="primary" busy={busy} disabled={busy || aiBlocked !== null} onClick={() => void cleanWithAi()}>Clean locally</Button>
+                )}
+                {busy && <Button size="sm" variant="quiet" icon={Stop} onClick={cancelAi}>Cancel</Button>}
+                {aiBlocked && !busy && <span className="sub">{aiBlocked}</span>}
+              </div>
+            </>
+          )}
+          {busy && <p className="sub" role="status"><Spinner size={14} /> Cleaning… {draft ? `${draft.length} characters received.` : 'Waiting for the model.'}</p>}
+          {keyMissing && <Notice tone="warn" title="No cloud key">Add your key in Settings. Nothing was sent.</Notice>}
+          {aiError && <Notice tone={aiError.tone} title={aiError.tone === 'info' ? 'Stopped' : 'AI cleanup did not finish'}>{aiError.text}</Notice>}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function LevelMeter({ level, active }: { level: number; active: boolean }) {
   return (
     <div className={cx('meter', active && 'on')} aria-hidden="true">
@@ -434,6 +765,8 @@ export function Assistant() {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [avatarPreview, setAvatarPreview] = useState(false);
   const [voiceNote, setVoiceNote] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null);
+  /** The latest voice transcript awaiting the "Clean up dictation" choice. `n` re-keys the step for each new transcript. */
+  const [dictation, setDictation] = useState<{ n: number; text: string } | null>(null);
   const [autoSpeak, setAutoSpeak] = usePref('autoSpeak', false);
   const [speakText, setSpeakText] = useState('');
   const [speaking, setSpeaking] = useState(false);
@@ -515,13 +848,24 @@ export function Assistant() {
   const incomplete = useMemo(() => incompleteReplyIds(state.chat), [state.chat]);
   const capability = (id: string) => system?.capabilities.find(c => c.id === id);
   const route = capability(online ? 'cloud' : 'local-llm');
-  const configured = route?.available === true && !systemError;
+  // The selected cloud provider and its own key state. Only that provider's key counts; another provider's key never unblocks it.
+  const provider: CloudProvider = isCloudProvider(settings.cloudProvider) ? settings.cloudProvider : DEFAULT_CLOUD_PROVIDER;
+  const providerName = cloudProviderInfo(provider).name;
+  const [providerStatus, setProviderStatus] = useState<CloudProviderStatus[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    cloudProvidersBridge(api).status().then((s) => { if (alive) setProviderStatus(s); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [api, cloudConfigured, provider]);
+  const providerHasKey = provider === 'anthropic' ? cloudConfigured : providerStatus?.find((s) => s.provider === provider)?.hasKey ?? null;
+  const providerNoKey = online && provider !== 'anthropic' && providerHasKey === false;
+  const configured = route?.available === true && !systemError && !providerNoKey;
   const tts = capability('tts'), stt = capability('stt');
   const ttsReady = tts?.available === true && !systemError;
   const sttReady = stt?.available === true && !systemError;
   const unavailable = (reason?: string) => systemError || reason || (systemLoading ? 'Checking system capability…' : 'Capability has not been checked.');
-  const routeReason = unavailable(route?.reason);
-  const rs = routeState({ online, model: online ? settings.cloudModel : settings.localModel, endpoint: settings.localEndpoint, configured, reason: routeReason, cloudConfigured });
+  const routeReason = providerNoKey ? `No API key stored for ${providerName}. Add it in Settings or switch to offline mode` : unavailable(route?.reason);
+  const rs = routeState({ online, model: online ? settings.cloudModel : settings.localModel, endpoint: settings.localEndpoint, configured, reason: routeReason, cloudConfigured, ...(online && provider !== 'anthropic' ? { provider, providerHasKey } : {}) });
   const retry = useMemo(() => retryCandidate(state.chat), [state.chat]);
   const chatWindow = useMemo(() => windowMessages(state.chat, showEarlier), [state.chat, showEarlier]);
   const replyBusy = pending !== null || live !== null || settling;
@@ -764,6 +1108,7 @@ export function Assistant() {
       if (out.text.trim()) {
         setInput((prev) => (prev.trim() ? `${prev.trim()} ${out.text.trim()}` : out.text.trim()).slice(0, MAX_CHARS));
         setVoiceNote({ tone: 'info', text: 'Transcript added to the message box. Review it, then send.' });
+        setDictation((d) => ({ n: (d?.n ?? 0) + 1, text: out.text.trim() }));
         inputRef.current?.focus();
         companion.set('idle');
       } else {
@@ -793,6 +1138,20 @@ export function Assistant() {
       companion.setSource('none');
       setVoiceNote({ tone: 'info', text: 'Recording cancelled. Any pending transcript will be discarded.' });
     }
+  };
+
+  /** Explicit "Use cleaned"/"Use original": swaps the transcript already placed in the message box, or adds it if it is gone. */
+  const applyDictation = (text: string, which: 'cleaned' | 'original') => {
+    const original = dictation?.text ?? '';
+    const chosen = text.trim();
+    setInput((prev) => {
+      const at = original ? prev.lastIndexOf(original) : -1;
+      const next = at >= 0 ? `${prev.slice(0, at)}${chosen}${prev.slice(at + original.length)}` : (prev.trim() ? `${prev.trim()} ${chosen}` : chosen);
+      return next.slice(0, MAX_CHARS);
+    });
+    setDictation(null);
+    setVoiceNote({ tone: 'info', text: which === 'cleaned' ? 'Cleaned transcript placed in the message box. Review it, then send.' : 'Original transcript kept in the message box. Review it, then send.' });
+    inputRef.current?.focus();
   };
 
   const press = () => {
@@ -972,6 +1331,19 @@ export function Assistant() {
 
           {step && <CommandFlow step={step} busy={stepBusy} onPreview={(r) => void previewStep(r)} onDecide={(a) => void decideStep(a)} onDismiss={() => setStep(null)} />}
 
+          {dictation && (
+            <DictationCleanup
+              key={dictation.n}
+              api={api}
+              mode={online ? 'online' : 'offline'}
+              original={dictation.text}
+              aiBlocked={replyBusy ? 'A chat reply is in progress. Wait for it to finish first.' : !configured ? routeReason : null}
+              onUse={applyDictation}
+              onDismiss={() => { setDictation(null); inputRef.current?.focus(); }}
+              onAiFinished={() => { void reload().catch(() => undefined); }}
+            />
+          )}
+
           <div className="row wrap pad">
             <Segmented<ComposerMode>
               label="What the message box does"
@@ -989,8 +1361,9 @@ export function Assistant() {
             <div className="row wrap">
               <Badge tone={rs.tone === 'danger' ? 'danger' : rs.tone === 'warn' ? 'warn' : 'ok'}>{mode === 'command' ? 'Desktop command' : rs.route}</Badge>
               {mode === 'chat' ? <span className="mono">{rs.model}</span> : <span className="sub">{modelAssist && modelAssistReady ? 'Rule planner, then the local model if unrecognized' : 'Offline rule planner only'}</span>}
+              {mode === 'chat' && online && <Badge tone="muted">{`Provider: ${providerName}`}</Badge>}
               {mode === 'chat' && <span className="sub mono">{rs.where}</span>}
-              {mode === 'chat' && rs.key && <Badge tone={cloudConfigured ? 'ok' : 'warn'}>{rs.key}</Badge>}
+              {mode === 'chat' && rs.key && <Badge tone={providerHasKey ? 'ok' : 'warn'}>{rs.key}</Badge>}
               <Badge tone={rs.ready ? 'ok' : 'danger'}>{rs.ready ? 'Ready' : 'Unavailable'}</Badge>
             </div>
             <p className="field-hint" id="route-privacy">{mode === 'command' ? 'A command is planned here on this computer. It is not sent to a chat model, and nothing runs until you approve it in the Windows confirmation.' : rs.privacy}</p>
@@ -1147,6 +1520,10 @@ export function Assistant() {
               onChange={setModelAssist}
             />
           </Panel>
+
+          <ContextControls />
+
+          <ConversationHistory chat={state.chat} busy={replyBusy} />
 
           <Panel title="Model route" eyebrow="Backend capability">
             <Notice tone={configured?'info':'warn'} title={configured?'Available':'Unavailable'}>{route?.reason || routeReason}</Notice>

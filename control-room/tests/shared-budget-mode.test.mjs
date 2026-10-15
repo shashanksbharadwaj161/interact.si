@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {Budget} from '../server/budget.mjs';
+import {Budget,MAX_APPROVED_BUDGET} from '../server/budget.mjs';
 import {Room} from '../server/room.mjs';
 const model='claude-opus-5-5';
 async function fixture(run){const dir=await mkdtemp(path.join(os.tmpdir(),'shared-budget-'));try{await run(dir);}finally{await rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:100});}}
@@ -25,7 +25,7 @@ test('thirty mixed workers serialize under the global ceiling and retain unknown
 test('shared reservations fail closed for invalid modes, amounts, models, and token bounds',()=>fixture(async dir=>{
  const b=new Budget(dir);await b.init();
  for(const budgetMode of [null,'unlimited',false,{},0])await assert.rejects(b.reserve({id:'a',budget:500,budgetMode},model,1,1),/budget mode/);
- for(const budget of [null,NaN,Infinity,-1,0,501,'500'])await assert.rejects(b.reserve({id:'a',budget,budgetMode:'shared'},model,1,1),/task budget/);
+ for(const budget of [null,NaN,Infinity,-1,0,MAX_APPROVED_BUDGET+1,'500'])await assert.rejects(b.reserve({id:'a',budget,budgetMode:'shared'},model,1,1),/task budget/);
  for(const bad of ['unknown','toString','__proto__'])await assert.rejects(b.reserve({id:'a',budget:500,budgetMode:'shared'},bad,1,1),/spending policy/);
  await assert.rejects(b.reserve({id:'a',budget:500,budgetMode:'shared'},model,250001,1),/context/);
  await assert.rejects(b.reserve({id:'a',budget:500,budgetMode:'shared'},model,1,16385),/output limit/);
@@ -34,9 +34,9 @@ test('shared reservations fail closed for invalid modes, amounts, models, and to
 test('Room creation exposes finite shared policy and rejects malformed budgets without queueing',()=>fixture(async dir=>{
  const room=new Room(dir,{}, {get:async()=>'',cached:''});room.kick=()=>{};await room.init();room.online=true;
  const base={name:'Worker',prompt:'Local feature',model:'opus',projectId:'p',mode:'real',launchMode:'tui-native'};
- const shared=await room.create({...base,budgetMode:'shared'});assert.equal(shared.budgetMode,'shared');assert.equal(shared.budget,500);assert.equal(shared.launchMode,'tui-native');assert.equal(shared.effort,'high');
+ const shared=await room.create({...base,budgetMode:'shared'});assert.equal(shared.budgetMode,'shared');assert.equal(shared.budget,MAX_APPROVED_BUDGET);assert.equal(shared.launchMode,'tui-native');assert.equal(shared.effort,'high');
  const legacy=await room.create(base);assert.equal(legacy.budgetMode,'task');assert.equal(legacy.budget,5);
- for(const budget of [null,'',false,[],{},Infinity,'NaN',0,501])await assert.rejects(room.create({...base,budgetMode:'shared',budget}),/budget/);
+ for(const budget of [null,'',false,[],{},Infinity,'NaN',0,MAX_APPROVED_BUDGET+1])await assert.rejects(room.create({...base,budgetMode:'shared',budget}),/budget/);
  await assert.rejects(room.create({...base,budgetMode:'unlimited'}),/budget mode/);
  await assert.rejects(room.create({...base,launchMode:'anything',budgetMode:'shared'}),/launch mode/);
  await assert.rejects(room.create({...base,model:'unknown',budgetMode:'shared'}),/verified development/);

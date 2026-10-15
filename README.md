@@ -1,3 +1,5 @@
+> Latest checkpoint: 16 October 2026. User rejected installed usability/functionality. Product unfinished; paid workers stopped. Start with [CLAUDE_HANDOFF.md](CLAUDE_HANDOFF.md). Older evidence below is historical.
+
 # Desktop Companion — development checkpoint
 
 Saved 15 October 2026. Product name is temporary. This is an unfinished Windows desktop prototype plus its local agent control room.

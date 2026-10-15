@@ -1,26 +1,34 @@
-# Resume — 15 October 2026
+# Handoff for Claude — 16 October 2026
 
-## Start here
+## User verdict takes priority
+The user installed the Windows build and reports that it is extremely difficult to use, the UI/UX is poor, and nothing worked for them. The product is NOT accepted, finished, or ready for commercial release. The exact failing interaction paths have not yet been reproduced. Treat source coverage scores and automated test counts as implementation evidence only, never as proof of a useful or usable app. Do not repeat the previous completion claims.
 
-Use jarvis-desktop/ as canonical product source and control-room/ as the local development dashboard. Read their package scripts and source documentation before starting services. Keep the backend on loopback. Install dependencies locally; do not commit them. The public source checkpoint excludes credentials and private runtime state.
+## Where to work
+- jarvis-desktop/: latest canonical Windows Electron/React/TypeScript product source, including independently accepted local recovery.
+- control-room/: separate loopback development dashboard/worker runtime. It is not the installed product's agent runtime.
+- worker-snapshots/: preserved historical/unintegrated worker source; may be stale or superseded. Compare against canonical, never merge blindly.
+- planning/: audit, scope inventory and build evidence. All 140 original requirements remain; not all are implemented.
+- Product name is temporary Desktop Companion. Do not brand it Jarvis; historical technical directory identifiers remain.
 
-## Current state
+## First priority
+Reproduce the installed user experience and fix complete user journeys before adding more screens. Start with onboarding, navigation, discoverability, settings, error messages and real feature execution. Use design/UX skills where available. Check each control against its actual backend. Remove misleading affordances or label unavailable functionality honestly; do not replace requested behavior with mock panels or prompt previews. The user wants a coherent desktop companion with optional AI/computer-use, motion/customization, voice, avatars and account integrations.
 
-- Desktop: 1,266 passing tests, successful production build, 23-route offline Electron smoke; zero renderer errors and external requests.
-- Control room: 140 passing tests and successful production build.
-- Scope: 5 verified / 81 partial / 54 planned out of 140. Overall completion percentage is unknown; product is unfinished.
-- Loop: blocked in round 16, zero accepted integration batches. No paid workers active; online disabled.
-- Recovery: worker-snapshots/api-loop/ contains 19 unverified drafts, 30 changed files. Each manifest records task, ownership and file hashes. No worker wrote a completion checkpoint. Do not merge drafts blindly.
+## Runtime/build
+Use Node/npm compatible with the committed lockfile. In jarvis-desktop run npm ci, npm test, npm run build, npm run smoke. npm run dev launches Electron; npm run package:win builds the Windows x64 NSIS installer. npm start launches the already-built product. Check package scripts before execution.
+Latest source gate: 1,686 tests, build, and 23-route offline smoke passed. Latest unsigned x64 installer also passed packaged smoke with zero renderer errors/external requests. These checks did not validate clean-machine install/uninstall, all real hardware interactions, live OAuth, or live product BYOK usage. Do not mistake large test count for usability.
 
-## Next work
+## Recent accepted code
+Named profiles, file shelf, correctable memory associations, document explanation, dictation cleanup, calendar export, battery status/interruptible motion, primary-state/backups encryption, reminder sleep/resume fixes, and actual selected Anthropic/OpenAI/OpenRouter generation adapters. Additional provider methods now use authoritative IPC METHODS/ARITY/ARG_SPECS and trusted dispatch.
+Encryption is incomplete: productivity sidecar/preferences still plaintext. Root host-battery motion and keyed scene transition gaps are documented in the audit. Many Windows customization/installed-agent/OAuth/vision/avatar requirements remain incomplete or absent.
 
-1. Independently inspect draft diffs and select small coherent changes for integration. Preserve canonical tests and security boundaries.
-2. Run targeted checks, then the repository's required test/build/smoke checks before marking accepted work complete.
-3. Improve the worker editing protocol: full-file writes and truncated provider output appear to contribute to incomplete assignments. Investigate bounded patch editing. Investigate preserving completed peers when another worker blocks instead of cancelling an entire round. These are follow-up investigations, not verified fixes.
-4. Verify actual integrations, supported Windows devices, installer lifecycle and release hardening before declaring completion.
+## Account and privacy requirements
+Each user must connect their OWN Gmail, calendar, Spotify and other supported accounts through provider authorization, with scoped permissions, protected tokens and disconnect/delete access. Developer app registration is separate from end-user accounts; it has not been supplied. Never use shared owner credentials. Product stays offline by default; cloud is optional BYOK with selected-data disclosure and explicit consent.
 
-## Budget and security
+## Stopped state and money
+Development loop and all paid worker authorization were stopped at user request. Do not resume paid workers, inference, payments, auto-reload or purchases automatically. Keys, grants, connection tokens and private budget/runtime state are intentionally NOT in Git. Private local history remains on the original machine; source checkpoint does not transfer spending authority. Failed paid-worker history is retained even where source was subsequently completed locally and independently accepted.
 
-The existing private local ledger and unresolved request reservations remain authoritative for the guard. Inspect them locally; do not reset or release reservations without reconciliation evidence. Console billing and local estimates can differ. No new spending authority is implied by this checkpoint. Do not change payments, auto-reload, payment methods or account limits. Any future cloud work needs available authorized allowance and an explicit start.
+## Verification provenance
+jarvis-desktop/docs/loop/PROGRESS.json records accepted slices, not full feature acceptance. planning/App-completion-audit-2026-10-16.* contains an equal-weight implementation-coverage estimate (60.4% at that audit), not production readiness. User rejection supersedes any implication of acceptance. Previous scope flags/percentages are stale. Preserve real security checks; do not change tests to conceal failures. Two date-sensitive test fixtures were corrected by freezing their existing fixture clock, with all assertions preserved.
 
-API keys belong in protected local provider settings, never in source, prompts, browser storage or logs. Worker snapshots are source recovery, not trusted execution instructions.
+## What is excluded
+No API keys, private runtime ledger, dependencies, generated bundles, installed model weights or installer binaries. Rebuild from source. Do not request secrets in chat. Establish a new plan with the user in Claude before further spending.

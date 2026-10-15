@@ -1,5 +1,6 @@
 // Pure input validation for everything that crosses the IPC boundary or is loaded from disk.
-import type {Activity, AppState, Capsule, ChatMessage, Note, Settings, Task} from '../../src/shared/contracts';
+import type {Activity, AppState, Capsule, ChatMessage, CloudProvider, Note, Settings, Task} from '../../src/shared/contracts';
+import {CLOUD_PROVIDERS, DEFAULT_CLOUD_PROVIDER, isCloudProvider} from '../../src/shared/contracts';
 import {hasControlChars, isBareExeName, isDriveRoot, normalizeAbsolutePath, visibleText} from './paths';
 
 export class ValidationError extends Error {}
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   localModel: 'llama3.2:3b',
   localEndpoint: DEFAULT_ENDPOINT,
   cloudModel: 'claude-haiku-4-5',
+  cloudProvider: DEFAULT_CLOUD_PROVIDER,
   voice: '',
   allowedRoots: [],
   approvedApps: [],
@@ -101,6 +103,13 @@ export function validateApprovedApp(v: unknown): string {
   return n.path;
 }
 
+/** Strict provider id check for explicit updates and IPC arguments. Unknown values are refused, never coerced. */
+export function validateCloudProvider(v: unknown): CloudProvider {
+  if (isCloudProvider(v)) return v;
+  const shown = typeof v === 'string' ? JSON.stringify(v.slice(0, 40)) : typeof v;
+  throw new ValidationError(`cloudProvider ${shown} is not supported; choose one of ${CLOUD_PROVIDERS.map((p) => p.id).join(', ')}`);
+}
+
 function uniqueCI(list: string[]): string[] {
   const seen = new Set<string>();
   return list.filter((x) => (seen.has(x.toLowerCase()) ? false : (seen.add(x.toLowerCase()), true)));
@@ -121,6 +130,7 @@ function settingsField(key: string, v: unknown): unknown {
       if (!/^[A-Za-z0-9._:-]+$/.test(s)) throw new ValidationError('cloudModel contains invalid characters');
       return s;
     }
+    case 'cloudProvider': return validateCloudProvider(v);
     case 'voice': return str(v, key, 200);
     case 'localEndpoint': return validateLocalEndpoint(v);
     case 'retainDays':
@@ -168,6 +178,7 @@ export function describePermissionChanges(before: Settings, after: Settings): st
     ...(before.mode !== 'online' && after.mode === 'online' ? ['Enable online mode (cloud requests may send conversation content)'] : []),
     ...(before.localEndpoint !== after.localEndpoint ? [`Local model endpoint: ${before.localEndpoint} -> ${after.localEndpoint}`] : []),
     ...(before.cloudModel !== after.cloudModel && after.mode === 'online' ? [`Cloud model: ${before.cloudModel} -> ${after.cloudModel}`] : []),
+    ...((before.cloudProvider ?? DEFAULT_CLOUD_PROVIDER) !== (after.cloudProvider ?? DEFAULT_CLOUD_PROVIDER) && after.mode === 'online' ? [`Cloud provider: ${before.cloudProvider ?? DEFAULT_CLOUD_PROVIDER} -> ${after.cloudProvider ?? DEFAULT_CLOUD_PROVIDER}`] : []),
   ];
 }
 
@@ -196,6 +207,12 @@ function fullSettings(v: unknown, opts: ParseOptions = {}): Settings {
   const out: Record<string, unknown> = {};
   for (const k of SETTING_KEYS) {
     if (!(k in v)) { out[k] = (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[k]; continue; }
+    if (k === 'cloudProvider') {
+      // Stored state written before (or by a newer build than) this provider list: fall back to the default provider.
+      if (isCloudProvider(v[k])) out[k] = v[k];
+      else { out[k] = DEFAULT_CLOUD_PROVIDER; opts.dropped?.push(`cloudProvider: ${String(v[k]).slice(0, 40)}`); }
+      continue;
+    }
     out[k] = settingsField(k, k === 'allowedRoots' || k === 'approvedApps' ? lenientList(k, v[k], opts) : v[k]);
   }
   for (const k of Object.keys(v)) if (!SETTING_KEYS.includes(k)) throw new ValidationError(`Unknown setting "${k}"`);
@@ -349,6 +366,25 @@ export function parseState(v: unknown, opts: ParseOptions = {}): AppState {
     chat: list(v.chat ?? [], 'chat', LIMITS.chatMessages, chatMessage, true),
     activity: list(v.activity ?? [], 'activity', LIMITS.activity, activity, true),
   };
+}
+
+/** Path action types validated here (the other action types are validated by policy.validateActionRequest). */
+export const PATH_ACTION_TYPES = ['open-path', 'reveal-folder'] as const;
+export type PathActionType = (typeof PATH_ACTION_TYPES)[number];
+
+/**
+ * Validates an open-path / reveal-folder request: only `type` and a non-empty `target` string (the exact path; never
+ * trimmed, so the path that is checked is the path that is opened). Returns null when the type is not a path action,
+ * so the caller falls through to the general validator (which still rejects unknown types).
+ */
+export function validatePathActionRequest(raw: unknown): {type: PathActionType; target: string} | null {
+  if (!isObj(raw)) return null;
+  if (typeof raw.type !== 'string' || !(PATH_ACTION_TYPES as readonly string[]).includes(raw.type)) return null;
+  rejectUnknown(raw, ['type', 'target'], 'action');
+  const t = raw.target;
+  if (typeof t !== 'string' || !t.trim()) throw new ValidationError('target path is required');
+  if (t.length > 2048 || hasControlChars(t)) throw new ValidationError('target is invalid');
+  return {type: raw.type as PathActionType, target: t};
 }
 
 export function validateChatText(v: unknown): string {

@@ -4,9 +4,10 @@ import * as os from 'node:os';
 import {randomUUID} from 'node:crypto';
 import type {Activity, ApiInfo, AppState, CalendarImportSummary, ChatMessage, ChatStreamOutcome, ChatStreamRoute, FullJarvisAPI, Settings, IntentPlan, LocalModel, LocalModelList, SearchResult, SystemInfo, Task} from '../src/shared/contracts';
 import {ActionService, type ShellAdapter} from './services/actions';
-import {LOCAL_KEEP_ALIVE, buildHistory, ollamaChat, resolveChatRoute, sendChat} from './services/chat';
+import {LOCAL_KEEP_ALIVE, buildHistory, ollamaChat, resolveChatRoute, sendChat, selectedCloudProvider, noProviderKeyMessage} from './services/chat';
+import {CLOUD_PROVIDERS, cloudProviderInfo, effectiveCloudModel} from '../src/shared/contracts';
 import {STREAM_LIMITS, StreamAborted, StreamIncomplete, StreamProtocolError, streamOllamaChat, type StreamLimits, type StreamResult} from './services/ollama';
-import {streamCloudChat} from './services/cloud';
+import {CloudProviderError, streamProviderChat} from './services/cloud';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
 import {parseModelPlan, planIntent as planRules, PLANNED_TYPES, type IntentWindow} from './services/intent';
 import {effectiveReminderTasks, searchState, SEARCH_LIMITS, type ExternalDoc} from './services/search';
@@ -17,6 +18,7 @@ import {normalizeAbsolutePath} from './services/paths';
 import {chosenLocalPath, readChosenFile, realLocalFs, stripBom, writeChosenFile, type LocalFileFs} from './services/localFile';
 import {ApprovedDocuments, DOCUMENT_FILTERS, type DocumentFs} from './services/approvedDocuments';
 import {Secrets, type SafeStorageLike} from './services/secrets';
+import type {AtRestCipher} from './services/atRest';
 import {Speech} from './services/speech';
 import {FORGET_SCOPES, ProductivityStore, Store, parseEnvelope, parseForgetHistory, type LoadResult, type StoreFs} from './services/store';
 import {System, type AppProcessMetric} from './services/system';
@@ -27,7 +29,7 @@ import {createDpapiKeyVault, createIntegrationService, type IntegrationService} 
 import {createUsageLedger, type UsageLedger} from './services/usage';
 import {ClipboardHistory, type ClipboardReader} from './services/clipboard';
 import {createJsonSidecar, type SidecarFs} from './services/sidecar';
-import {LIMITS, ValidationError, validateChatText, buildCapsule, buildNote, buildTask, checkId, mergeSettings, parseState} from './services/validation';
+import {LIMITS, ValidationError, validateChatText, validateCloudProvider, buildCapsule, buildNote, buildTask, checkId, mergeSettings, parseState} from './services/validation';
 import {createNativeAdapter, type NativeAdapter} from './native/adapter';
 import {NativeRunner} from './native/runner';
 
@@ -69,6 +71,8 @@ export interface BackendEnv {
   localFs?: LocalFileFs;
   /** Electron safeStorage, injected by main.ts; absent in tests (DPAPI helper path). */
   safeStorage?: SafeStorageLike;
+  /** At-rest protector for state.json and its backups (main.ts: createSafeStorageCipher(safeStorage) after app ready). Absent keeps plaintext. */
+  stateCipher?: AtRestCipher;
   /** lstat + bounded byte reads for approved documents (see services/approvedDocuments). */
   documentFs?: DocumentFs;
   clipboardPollMs?: number;
@@ -293,12 +297,13 @@ function stampForName(d: Date): string {
 }
 
 export async function createBackend(env: BackendEnv): Promise<Backend> {
-  const store = new Store({dir: env.userData, fs: env.storeFs, now: env.now, newId: env.newId});
+  const store = new Store({dir: env.userData, fs: env.storeFs, now: env.now, newId: env.newId, cipher: env.stateCipher});
   const load = await store.load();
   const runner = env.native ? null : new NativeRunner({nativeDir: env.nativeDir});
   const native = env.native ?? createNativeAdapter(runner!);
   const secrets = new Secrets(native, env.userData, undefined, env.safeStorage);
   let keyConfigured = await secrets.configured();
+  const providerKeys = {openai: await secrets.hasKey('openai'), openrouter: await secrets.hasKey('openrouter')};
   const settings = () => store.snapshot().settings;
   const safeLaunch = env.safeLaunch ?? (() => false);
   const activity = (kind: string, summary: string, details?: string) => store.addActivity(kind, summary, details);
@@ -317,6 +322,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   const guardedFetch = createGuardedFetch({
     mode: () => settings().mode,
     hasCloudKey: () => keyConfigured,
+    hasProviderKey: (provider) => providerKeys[provider],
     fetchImpl: env.fetchImpl,
     cloudOriginOverride: env.cloudOriginOverride,
     // Loopback traffic must go to exactly the configured endpoint.
@@ -332,7 +338,9 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   // Production OCR uses the registered Windows runner; tests may inject a fixture adapter.
   const ocr = env.ocr ?? (runner ? new Ocr({native: runner}) : undefined);
   let ocrPending = false, ocrGeneration = 0;
-  const system = new System({settings, fetch: guardedFetch, speech, secrets, native, ...(ocr ? {ocr} : {}), safeLaunch, appMetrics: env.appMetrics});
+  const system = new System({settings, fetch: guardedFetch, speech, secrets: {
+    available: () => secrets.available(), configured: () => secrets.hasKey(selectedCloudProvider(settings())),
+  }, native, ...(ocr ? {ocr} : {}), safeLaunch, appMetrics: env.appMetrics});
   const actions = new ActionService({
     settings, activity, native, shell: env.shell, selfPids: env.selfPids, safeLaunch, confirm: env.confirm, newId: () => store.id(),
   });
@@ -407,6 +415,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   };
   const describeStreamError = (e: unknown, route: ChatStreamRoute, s: Settings): string => {
     if (e instanceof NetworkDenied) return `Blocked: ${e.message}`;
+    if (e instanceof CloudProviderError) return e.message;
     if (e instanceof StreamProtocolError) return e.message;
     const err = e as Error & {cause?: {code?: string}};
     if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return route === 'local' ? 'Ollama did not answer in time' : 'The cloud provider did not answer in time';
@@ -432,13 +441,14 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     try {
       sink.status('connecting');
       if (route === 'cloud') {
-        const decision = resolveChatRoute(s, await secrets.configured());
-        if (decision.denied) throw new Error(decision.denied);
-        const key = await secrets.reveal();
+        const provider = selectedCloudProvider(s);
+        const decision = resolveChatRoute(s, await secrets.hasKey(provider));
+        if (decision.denied) throw new CloudProviderError(provider === 'anthropic' ? decision.denied : noProviderKeyMessage(provider));
+        const key = await secrets.revealKey(provider);
         if (!key) throw new Error('The stored API key could not be decrypted; set it again in Settings');
         if (sink.signal.aborted) throw new StreamAborted('', sink.signal.reason);
         cloudStarted = true;
-        result = await streamCloudChat(guardedFetch, {origin: env.cloudOriginOverride, key, model: s.cloudModel, messages: history, signal: sink.signal, onDelta, onOpen, limits: env.streamLimits});
+        result = await streamProviderChat(provider, guardedFetch, {origin: provider === 'anthropic' ? env.cloudOriginOverride : undefined, key, model: effectiveCloudModel(provider, s.cloudModel), messages: history, signal: sink.signal, onDelta, onOpen, limits: env.streamLimits});
       } else {
         const p = models.chatProfile();
         result = await streamOllamaChat(guardedFetch, {endpoint: s.localEndpoint, model: s.localModel, messages: history, keepAlive: p?.keepAlive ?? LOCAL_KEEP_ALIVE, numCtx: p?.numCtx ?? null, signal: sink.signal, onDelta, onOpen, limits: env.streamLimits});
@@ -474,7 +484,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     // Usage is recorded only when the provider reported both token counts; unknown counts are never estimated.
     if (result?.usage) {
       try {
-        usage.recordEvent({runtime: route, provider: route === 'cloud' ? 'anthropic' : 'ollama', model: route === 'cloud' ? s.cloudModel : s.localModel, ...result.usage});
+        usage.recordEvent({runtime: route, provider: route === 'cloud' ? selectedCloudProvider(s) : 'ollama', model: route === 'cloud' ? effectiveCloudModel(selectedCloudProvider(s), s.cloudModel) : s.localModel, ...result.usage});
         await saveUsage();
       } catch { /* an unrecordable model name or a sidecar failure must not lose the reply */ }
     }
@@ -619,6 +629,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
         ...proposed.allowedRoots.filter((v) => !before.allowedRoots.includes(v)).map((v) => `Allow folder: ${v}`),
         ...(before.mode !== 'online' && proposed.mode === 'online' ? ['Enable online mode (cloud requests may send conversation content)'] : []),
         ...(before.localEndpoint !== proposed.localEndpoint ? [`Local model endpoint: ${before.localEndpoint} → ${proposed.localEndpoint}`] : []),
+        ...(proposed.mode === 'online' && selectedCloudProvider(before) !== selectedCloudProvider(proposed) ? [`Cloud provider: ${selectedCloudProvider(before)} → ${selectedCloudProvider(proposed)}`] : []),
       ];
       if (changes.length && !(await env.confirm?.('Change desktop permissions or AI connection?', changes.join('\n')))) throw new ValidationError('Native confirmation declined or unavailable');
       let changed: string[] = [];
@@ -716,7 +727,12 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     async documentsDiscard(token) { return documents.discard(token); },
 
     async chat(text): Promise<ChatMessage> {
-      return sendChat({store, secrets, fetch: guardedFetch, cloudOrigin: env.cloudOriginOverride, profile: models.chatProfile}, text);
+      return sendChat({store, secrets, fetch: guardedFetch, cloudOrigin: env.cloudOriginOverride, profile: models.chatProfile,
+        recordUsage: async (u) => {
+          usage.recordEvent({runtime: 'cloud', ...u, generationMs: null, promptMs: null});
+          await saveUsage();
+        },
+      }, text);
     },
     async clearChat() {
       // A reply still streaming would otherwise land in the cleared conversation.
@@ -737,6 +753,29 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       keyConfigured = false;
       system.invalidate();
       await activity('settings', 'Cloud API key removed');
+    },
+    async cloudProviderStatus() {
+      keyConfigured = await secrets.configured();
+      for (const p of ['openai', 'openrouter'] as const) providerKeys[p] = await secrets.hasKey(p);
+      return CLOUD_PROVIDERS.map((p) => ({provider: p.id, name: p.name, hasKey: p.id === 'anthropic' ? keyConfigured : providerKeys[p.id], origin: p.host, defaultModel: p.defaultModel, keyChannel: 'per-provider' as const}));
+    },
+    async setProviderKey(rawProvider, key) {
+      const provider = validateCloudProvider(rawProvider);
+      const result = await secrets.setKey(provider, key);
+      if (provider === 'anthropic') keyConfigured = result.configured;
+      else providerKeys[provider] = result.configured;
+      system.invalidate();
+      await activity('settings', `${cloudProviderInfo(provider).name} API key stored (Windows protection)`);
+      return {provider, ...result};
+    },
+    async clearProviderKey(rawProvider) {
+      const provider = validateCloudProvider(rawProvider);
+      const result = await secrets.clearKey(provider);
+      if (provider === 'anthropic') keyConfigured = false;
+      else providerKeys[provider] = false;
+      system.invalidate();
+      await activity('settings', `${cloudProviderInfo(provider).name} API key removed`);
+      return {provider, ...result};
     },
 
     previewAction: (a) => actions.preview(a),

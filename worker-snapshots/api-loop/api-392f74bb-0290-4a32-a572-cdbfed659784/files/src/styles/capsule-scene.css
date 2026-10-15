@@ -1,0 +1,16 @@
+/* Project scene control in the capsule detail (goals 44/67). Layout only; the backdrop crossfade lives in views.css. */
+.capsule-scene-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 12px);
+  align-items: flex-end;
+}
+
+.capsule-scene-control > :first-child {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.capsule-scene-note {
+  margin-top: var(--space-2, 8px);
+}

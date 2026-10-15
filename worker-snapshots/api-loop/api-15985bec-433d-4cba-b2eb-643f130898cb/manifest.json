@@ -10,7 +10,12 @@
       "path": "src/ui/error-diagnosis.ts",
       "bytes": 37207,
       "sha256": "469db48c738d4a181be41cb7954107af195e13e07120007f425e0b62e0ef18d6"
+    },
+    {
+      "path": "src/components/Computer.tsx",
+      "bytes": 28862,
+      "sha256": "93fd000615c9ff6911b0e888c9030e49885ae031c0a47c2d206962152f381a1e"
     }
   ],
-  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
 }

@@ -1,0 +1,16 @@
+{
+  "task": "Loop 32: file-shelf",
+  "sessionId": "api-16a9328f-5df1-4d87-b625-f7e4726a48e1",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/styles/views.css",
+      "bytes": 19197,
+      "sha256": "66b223a743556bfb538a9c00f1f52d192741e3bc6b4ff8e00172e3a43017498e"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

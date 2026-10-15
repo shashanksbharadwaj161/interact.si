@@ -12,15 +12,45 @@
       "sha256": "453bfe8b642f34f2a5e443f893caedc3577019eec374ebb53ce82370738f88ab"
     },
     {
+      "path": "electron/backend.ts",
+      "bytes": 69499,
+      "sha256": "98c0ac55f1d86070d213b11d22b455c0e3450dd6daec911df31eaccdf8ac98c3"
+    },
+    {
       "path": "electron/channels.ts",
       "bytes": 4333,
       "sha256": "3ad525a713a4bba623c416515ac96635efd4b10e9616ed144b9c81bfb65256dc"
     },
     {
+      "path": "electron/ipcCore.ts",
+      "bytes": 25345,
+      "sha256": "334f4b866878c1f5d56cc9e7d7c236d82bb08e1fdc47e406601adb4c368b9061"
+    },
+    {
+      "path": "electron/preload.ts",
+      "bytes": 6931,
+      "sha256": "3902255605451186442899d70327a2eff5eabb21e589204f1a81ec461b614dba"
+    },
+    {
       "path": "src/shared/contracts.ts",
       "bytes": 14955,
       "sha256": "17995871372afbbf5b23e8c5d8af27dd9377879ec96d120967eef4d186ed0611"
+    },
+    {
+      "path": "src/ui/bridges.ts",
+      "bytes": 14217,
+      "sha256": "01f2e8b785ad1f9c545663f024a7e89c0eaedb3e8dc922a537564abb161ffd9b"
+    },
+    {
+      "path": "src/components/MemoryWorkbench.tsx",
+      "bytes": 32851,
+      "sha256": "f84a81e36124ac76e344bcf3d4c58fe1d621be800ea0c996c05ad468d2d34b4b"
+    },
+    {
+      "path": "src/styles/views.css",
+      "bytes": 17738,
+      "sha256": "8967288bfafd8a64b633352660eb4ae10b3737196a9e4ce766bff0a9448c3598"
     }
   ],
-  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
 }

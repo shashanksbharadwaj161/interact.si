@@ -20,6 +20,29 @@ import {
   type ModTouch,
 } from '../ui/mod-catalog';
 import { usePref } from '../ui/prefs';
+import { useState } from 'react';
+import {
+  TASKBAR_PRESETS,
+  TASKBAR_SETTINGS,
+  TASKBAR_SNAPSHOT_PREF_KEY,
+  buildPlan,
+  captureSnapshot,
+  normalizeManualValues,
+  serializePlan,
+  type TaskbarPlan,
+} from '../ui/taskbar-presets';
+import {
+  EXPLORER_PRESETS,
+  EXPLORER_SCOPES,
+  EXPLORER_SNAPSHOT_PREF_KEY,
+  buildPlan as buildExplorerPlan,
+  captureSnapshot as captureExplorerSnapshot,
+  normalizeManualValues as normalizeExplorerValues,
+  serializePlan as serializeExplorerPlan,
+  settingsByScope as explorerSettingsByScope,
+  type ExplorerPlan,
+  type ExplorerScope,
+} from '../ui/explorer-presets';
 import { Badge, Button, Field, KV, Notice, PageHeader, Panel, Segmented, Switch } from '../ui/primitives';
 
 type Props = { system?: Pick<SystemInfo, 'platform' | 'arch'> | null };
@@ -38,6 +61,246 @@ function downloadText(text: string) {
   a.download = 'customization-preferences.json';
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function TaskbarPresetsPanel() {
+  const [storedSnapshot, setStoredSnapshot] = usePref<unknown>(TASKBAR_SNAPSHOT_PREF_KEY, null);
+  const manual = normalizeManualValues(storedSnapshot);
+  const [presetId, setPresetId] = useState<string>(TASKBAR_PRESETS[0].id);
+  const [plan, setPlan] = useState<TaskbarPlan | null>(null);
+  const [planText, setPlanText] = useState('');
+  const [status, setStatus] = useState('');
+
+  const preview = () => {
+    try {
+      const snap = captureSnapshot(manual, Date.now());
+      const next = buildPlan(snap, presetId, Date.now());
+      setPlan(next);
+      setPlanText(serializePlan(next));
+      setStatus(next.applySteps.length ? `${next.applySteps.length} change(s) planned. Nothing was applied.` : 'Your values already match this preset. Nothing to change.');
+    } catch (e) {
+      setPlan(null);
+      setPlanText('');
+      setStatus(e instanceof Error ? e.message : 'Could not build the plan.');
+    }
+  };
+
+  const copy = async () => {
+    if (!planText) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) throw new Error('Clipboard not available');
+      await navigator.clipboard.writeText(planText);
+      setStatus('Plan JSON copied.');
+    } catch {
+      setStatus('Copy failed. Select the plan text and copy it yourself.');
+    }
+  };
+
+  return (
+    <Panel title="Taskbar and Start presets (preview only)" eyebrow="Roadmap 73 · Gate G5 unverified">
+      <Notice tone="warn" title="Applying is not available">
+        Applying is not available in this build pending licence/safety gate G5. This panel only previews a plan and its exact undo steps. It changes no Windows setting.
+      </Notice>
+      <Field label="Taskbar preset" hint={TASKBAR_PRESETS.find((p) => p.id === presetId)?.note}>
+        {(id, describedBy) => (
+          <select
+            id={id}
+            className="input"
+            value={presetId}
+            aria-describedby={describedBy}
+            onChange={(e) => {
+              setPresetId(e.target.value);
+              setPlan(null);
+              setPlanText('');
+            }}
+          >
+            {TASKBAR_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      <fieldset>
+        <legend>Enter your current values manually — this build does not read the registry</legend>
+        {TASKBAR_SETTINGS.map((s) => (
+          <Field key={s.key} label={`${s.label} (${s.key})`} hint={s.description}>
+            {(id, describedBy) => (
+              <select
+                id={id}
+                className="input"
+                value={manual[s.key]}
+                aria-describedby={describedBy}
+                onChange={(e) => {
+                  setStoredSnapshot({ ...manual, [s.key]: Number(e.target.value) });
+                  setPlan(null);
+                  setPlanText('');
+                }}
+              >
+                {s.allowed.map((v) => (
+                  <option key={v} value={v}>
+                    {v} — {s.valueLabels[v]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        ))}
+      </fieldset>
+      <div className="row">
+        <Button onClick={preview}>Preview plan</Button>
+        <Button onClick={() => void copy()} disabled={!planText}>
+          Copy plan JSON
+        </Button>
+      </div>
+      <p className="field-hint" role="status">
+        {status}
+      </p>
+      {plan && (
+        <>
+          <p className="field-hint">Apply steps</p>
+          <ol aria-label="Apply steps">
+            {plan.applySteps.map((s) => (
+              <li key={`a-${s.key}`}>{s.label}</li>
+            ))}
+          </ol>
+          <p className="field-hint">Undo steps</p>
+          <ol aria-label="Undo steps">
+            {plan.undoSteps.map((s) => (
+              <li key={`u-${s.key}`}>{s.label}</li>
+            ))}
+          </ol>
+          <p className="field-hint">
+            {plan.explorerRestartRequired ? 'File Explorer would need to restart for some steps.' : 'No File Explorer restart expected.'} Requires confirmation. Not applied.
+          </p>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+const EXPLORER_SCOPE_LABEL: Record<ExplorerScope, string> = { explorer: 'File Explorer', notifications: 'Notifications' };
+
+function ExplorerPresetsPanel() {
+  const [storedSnapshot, setStoredSnapshot] = usePref<unknown>(EXPLORER_SNAPSHOT_PREF_KEY, null);
+  const manual = normalizeExplorerValues(storedSnapshot);
+  const [presetId, setPresetId] = useState<string>(EXPLORER_PRESETS[0].id);
+  const [plan, setPlan] = useState<ExplorerPlan | null>(null);
+  const [planText, setPlanText] = useState('');
+  const [status, setStatus] = useState('');
+
+  const reset = () => {
+    setPlan(null);
+    setPlanText('');
+  };
+
+  const preview = () => {
+    try {
+      const snap = captureExplorerSnapshot(manual, Date.now());
+      const next = buildExplorerPlan(snap, presetId, Date.now());
+      setPlan(next);
+      setPlanText(serializeExplorerPlan(next));
+      setStatus(next.applySteps.length ? `${next.applySteps.length} change(s) planned. Nothing was applied.` : 'Your values already match this preset. Nothing to change.');
+    } catch (e) {
+      reset();
+      setStatus(e instanceof Error ? e.message : 'Could not build the plan.');
+    }
+  };
+
+  const copy = async () => {
+    if (!planText) return;
+    try {
+      if (typeof navigator === 'undefined' || !navigator.clipboard) throw new Error('Clipboard not available');
+      await navigator.clipboard.writeText(planText);
+      setStatus('Plan JSON copied.');
+    } catch {
+      setStatus('Copy failed. Select the plan text and copy it yourself.');
+    }
+  };
+
+  return (
+    <Panel title="Explorer and notification presets (preview only)" eyebrow="Roadmap 74 · Gate G5 unverified">
+      <Notice tone="warn" title="Applying is not available">
+        Applying is not available in this build pending licence/safety gate G5. This panel only previews a plan and its exact undo steps. It changes no Windows setting and nothing is applied.
+      </Notice>
+      <Field label="Explorer and notification preset" hint={EXPLORER_PRESETS.find((p) => p.id === presetId)?.note}>
+        {(id, describedBy) => (
+          <select
+            id={id}
+            className="input"
+            value={presetId}
+            aria-describedby={describedBy}
+            onChange={(e) => {
+              setPresetId(e.target.value);
+              reset();
+            }}
+          >
+            {EXPLORER_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      {EXPLORER_SCOPES.map((scope) => (
+        <fieldset key={scope}>
+          <legend>{EXPLORER_SCOPE_LABEL[scope]}: enter your current values manually — this build does not read the registry</legend>
+          {explorerSettingsByScope(scope).map((s) => (
+            <Field key={s.key} label={`${s.label} (${s.key})`} hint={`${s.description} Location: ${s.location}`}>
+              {(id, describedBy) => (
+                <select
+                  id={id}
+                  className="input"
+                  value={manual[s.key]}
+                  aria-describedby={describedBy}
+                  onChange={(e) => {
+                    setStoredSnapshot({ ...manual, [s.key]: Number(e.target.value) });
+                    reset();
+                  }}
+                >
+                  {s.allowed.map((v) => (
+                    <option key={v} value={v}>
+                      {v} — {s.valueLabels[v]}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+          ))}
+        </fieldset>
+      ))}
+      <div className="row">
+        <Button onClick={preview}>Preview plan</Button>
+        <Button onClick={() => void copy()} disabled={!planText}>
+          Copy plan JSON
+        </Button>
+      </div>
+      <p className="field-hint" role="status">
+        {status}
+      </p>
+      {plan && (
+        <>
+          <p className="field-hint">Apply steps</p>
+          <ol aria-label="Explorer apply steps">
+            {plan.applySteps.map((s) => (
+              <li key={`a-${s.key}`}>{s.label}</li>
+            ))}
+          </ol>
+          <p className="field-hint">Undo steps</p>
+          <ol aria-label="Explorer undo steps">
+            {plan.undoSteps.map((s) => (
+              <li key={`u-${s.key}`}>{s.label}</li>
+            ))}
+          </ol>
+          <p className="field-hint">
+            {plan.explorerRestartNeeded ? 'File Explorer would need to restart for some steps.' : 'No File Explorer restart expected.'} Requires confirmation. Not applied.
+          </p>
+        </>
+      )}
+    </Panel>
+  );
 }
 
 export function Customization({ system }: Props) {
@@ -149,6 +412,10 @@ export function Customization({ system }: Props) {
           ))}
         </ul>
       </Panel>
+
+      <TaskbarPresetsPanel />
+
+      <ExplorerPresetsPanel />
 
       <Panel title="Save and export" eyebrow="Roadmap 75 · Expansion">
         <p className="field-hint">Preferences are kept in this app’s UI storage. Export writes them to a file you choose to save. The export never claims a Windows change.</p>

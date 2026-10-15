@@ -1,0 +1,16 @@
+{
+  "task": "Loop 26: encrypted-bundle",
+  "sessionId": "api-19f6308c-bc64-4924-b463-534a79640822",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Settings.tsx",
+      "bytes": 55529,
+      "sha256": "d534fac3c68988348504cfef2321c9638e0f625f38e61d9ae0bc8d3de5632e69"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

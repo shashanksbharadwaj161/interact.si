@@ -1,0 +1,41 @@
+{
+  "task": "Loop 39: capsule-scene-resume",
+  "sessionId": "api-392f74bb-0290-4a32-a572-cdbfed659784",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/ui/capsule-scene.ts",
+      "bytes": 5542,
+      "sha256": "3db4aa18d90334c0fe0f390a2650cf1b9db9a531ffe6836b7aff63ec0d15d765"
+    },
+    {
+      "path": "src/ui/store.tsx",
+      "bytes": 18798,
+      "sha256": "c6d9853ba59b9471bc00b2d8c0793f08c475f4d2169fd57972d3addab6f01d75"
+    },
+    {
+      "path": "src/ui/scenes.ts",
+      "bytes": 1791,
+      "sha256": "11ab883bdbd0305b31da984f927359637c2955fd35fa18dbe3bf7d17f826a82c"
+    },
+    {
+      "path": "src/components/Capsules.tsx",
+      "bytes": 64000,
+      "sha256": "6fcdcda55ee2b5b9209b98680c004d1238a28eabe636ff68e7714457b815431a"
+    },
+    {
+      "path": "src/styles/capsule-scene.css",
+      "bytes": 376,
+      "sha256": "56bbdd88c86a5aa0fbbcc9366bd89ddff3643c17497bd5f860ca0f031161aa1b"
+    },
+    {
+      "path": "tests/slice-capsule-scene.test.mjs",
+      "bytes": 9005,
+      "sha256": "bc93a0504a93950f46b3462180686c24f16ec1b8aa7ac1fdb76cf8c1a08ad672"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

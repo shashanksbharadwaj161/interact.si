@@ -7,6 +7,7 @@
  * A suggestion names a proposed change; nothing is applied until the user confirms it.
  */
 import type {BatteryReading} from '../../electron/services/system';
+import type {BatterySource} from '../shared/contracts';
 
 export const REFRESH_MS = {active: 5_000, min: 2_000, max: 300_000} as const;
 
@@ -142,3 +143,108 @@ export function createResourcePolicy(thresholds: typeof POLICY_THRESHOLDS = POLI
 }
 
 export type ResourcePolicy = ReturnType<typeof createResourcePolicy>;
+
+// ---------- Battery source fallback: Battery Status API -> host bridge -> unmeasured ----------
+
+/** Longest a single battery reader may take before it is treated as unavailable. */
+export const BATTERY_READ_TIMEOUT_MS = 2_000;
+
+/** A battery/power state with an honest source label. level and charging are null unless the source measured them. */
+export interface ResolvedBattery {
+  source: BatterySource;
+  onBattery: boolean | null;
+  charging: boolean | null;
+  level: number | null;
+  measuredAt: string;
+}
+
+/**
+ * Readers are injected (this module never touches DOM or Electron globals). browser is the Battery Status API reader
+ * built by navigatorBatteryReader in src/ui/bridges.ts, which labels its own result; host is the read-only host bridge.
+ */
+export interface BatteryReaders {
+  browser?: (() => Promise<unknown>) | null;
+  host?: (() => Promise<unknown>) | null;
+  timeoutMs?: number;
+  now?: () => number;
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const isoAt = (now: () => number) => new Date(now()).toISOString();
+
+export function unmeasuredBattery(now: () => number = Date.now): ResolvedBattery {
+  return {source: 'unmeasured', onBattery: null, charging: null, level: null, measuredAt: isoAt(now)};
+}
+
+/** Battery Status API reading -> ResolvedBattery, or null when it is not a real measurement. */
+export function normalizeBrowserBattery(v: unknown, now: () => number = Date.now): ResolvedBattery | null {
+  if (!isObj(v) || typeof v.charging !== 'boolean') return null;
+  const source = v.source;
+  if (typeof source !== 'string' || !source || source === 'host' || source === 'unmeasured') return null;
+  const level = finite(v.level) && v.level >= 0 && v.level <= 1 ? v.level : null;
+  return {source: source as BatterySource, onBattery: !v.charging, charging: v.charging, level, measuredAt: isoAt(now)};
+}
+
+/** Host bridge reading -> ResolvedBattery, or null when the host reported unmeasured or something malformed. Never a level. */
+export function normalizeHostBattery(v: unknown, now: () => number = Date.now): ResolvedBattery | null {
+  if (!isObj(v) || v.source !== 'host' || typeof v.onBattery !== 'boolean') return null;
+  const at = typeof v.measuredAt === 'string' && v.measuredAt.length <= 40 && Number.isFinite(Date.parse(v.measuredAt)) ? v.measuredAt : isoAt(now);
+  return {source: 'host', onBattery: v.onBattery, charging: null, level: null, measuredAt: at};
+}
+
+async function attempt(reader: (() => Promise<unknown>) | null | undefined, ms: number): Promise<unknown> {
+  if (typeof reader !== 'function') return undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(reader),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Battery read timed out')), ms); }),
+    ]);
+  } catch {
+    return undefined;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
+ * Fallback order: the Battery Status API reader first, then the host bridge, then unmeasured. A reader that is absent,
+ * rejects, times out or returns something malformed is skipped. Never throws and never invents a value.
+ */
+export async function resolveBatteryStatus(readers: BatteryReaders = {}): Promise<ResolvedBattery> {
+  const now = readers.now ?? Date.now;
+  const ms = finite(readers.timeoutMs) && readers.timeoutMs > 0 ? readers.timeoutMs : BATTERY_READ_TIMEOUT_MS;
+  const fromBrowser = normalizeBrowserBattery(await attempt(readers.browser, ms), now);
+  if (fromBrowser) return fromBrowser;
+  const fromHost = normalizeHostBattery(await attempt(readers.host, ms), now);
+  if (fromHost) return fromHost;
+  return unmeasuredBattery(now);
+}
+
+/**
+ * Applies a host on-battery/on-ac change. A Battery Status API reading stays in charge (it has more detail); otherwise a
+ * valid host event replaces the current state. A malformed event leaves the current state unchanged.
+ */
+export function applyHostBatteryEvent(current: ResolvedBattery | null, event: unknown, now: () => number = Date.now): ResolvedBattery | null {
+  if (current && current.source !== 'host' && current.source !== 'unmeasured') return current;
+  return normalizeHostBattery(event, now) ?? current;
+}
+
+/** Telemetry for createResourcePolicy: only a source that measured both level and charging counts; host-only is unknown. */
+export function batteryTelemetry(b: ResolvedBattery | null): BatteryReading | null {
+  if (!b || typeof b.charging !== 'boolean' || !finite(b.level)) return null;
+  return {charging: b.charging, level: b.level};
+}
+
+/** Battery-saver motion applies only when the user turned it on and some source says the machine runs on battery. */
+export function batterySaverMotionActive(b: ResolvedBattery | null, batteryMotionOn: boolean): boolean {
+  return batteryMotionOn === true && b?.onBattery === true;
+}
+
+/** Plain label with the source named honestly, for example "Battery: on battery (host)" or "Battery: unmeasured". */
+export function batteryLabel(b: ResolvedBattery | null): string {
+  if (!b || b.source === 'unmeasured' || b.onBattery === null) return 'Battery: unmeasured';
+  const state = b.onBattery ? 'on battery' : 'on AC power';
+  const level = finite(b.level) ? `, ${Math.round(b.level * 100)}%` : '';
+  return `Battery: ${state}${level} (${b.source})`;
+}

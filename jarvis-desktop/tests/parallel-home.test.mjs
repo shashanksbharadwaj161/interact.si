@@ -3,7 +3,7 @@
 // The real Home.tsx and SceneBackdrop.tsx are bundled in memory with esbuild and rendered with
 // react-dom/server, the same way tests/milestone-home-widgets.test.mjs does it. Clicks are not simulated
 // (no DOM library is in the lockfile); every decision that drives the markup is a pure function tested here.
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile, readdir } from 'node:fs/promises';
@@ -91,6 +91,9 @@ const { home, SceneBackdrop, ambientMode, TestStoreContext, CompanionProvider, l
 
 const TODAY = '2026-10-15';
 const NOW = new Date('2026-10-15T12:00:00').getTime();
+// Renderer date defaults must use the same clock as the fixed fixture records.
+mock.timers.enable({ apis: ['Date'], now: NOW });
+test.after(() => mock.timers.reset());
 const STAMP = '2026-10-10T09:00:00.000Z';
 const task = (id, title, due, over = {}) => ({ id, title, done: false, createdAt: STAMP, ...(due ? { due } : {}), ...over });
 const settings = (over = {}) => ({

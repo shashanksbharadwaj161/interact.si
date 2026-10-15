@@ -9,6 +9,9 @@ import { cx, errMsg, relTime, safeJson, truncate } from '../ui/util';
 
 import { actionOutcome, buildAction, listedWindows, type ActionForm, type ListedWindow } from '../ui/action-result';
 import { explainNotRun, notRunCause, usePreviewExpired } from './Assistant';
+import { usePref } from '../ui/prefs';
+import { WORKER_ROLES } from '../ui/worker-roles';
+import { ACTION_SCOPES, KNOWN_SCOPES, MANUAL_ROLE, SCOPE_POLICY_PREF_KEY, effectivePolicy, evaluateActionScope, normalizeScopePref, requiredScopeFor, type ScopePref } from '../ui/tool-scope-policy';
 
 type ActionType = ActionRequest['type'];
 type Risk = 'low' | 'medium' | 'high';
@@ -132,6 +135,16 @@ export function Computer() {
   const live = useMemo(() => buildAction(form), [form]);
   const expired = usePreviewExpired(prev?.preview.id);
   const stale = prev !== null && (!live.action || JSON.stringify(live.action) !== JSON.stringify(prev.action));
+  const [scopePrefRaw, setScopePrefRaw] = usePref<unknown>(SCOPE_POLICY_PREF_KEY, null);
+  const scopePref = useMemo(() => normalizeScopePref(scopePrefRaw), [scopePrefRaw]);
+  const [hostsDraft, setHostsDraft] = useState(() => scopePref.allowedHosts.join(', '));
+  const policy = useMemo(() => effectivePolicy(scopePref, settings), [scopePref, settings]);
+  const saveScopePref = (p: Partial<ScopePref>) => setScopePrefRaw(normalizeScopePref({ ...scopePref, ...p }));
+  const formScope = requiredScopeFor({ type: form.type });
+  const scopeCheck = live.action ? evaluateActionScope(live.action, policy) : policy.scopes.includes(formScope) ? null : { allowed: false, scope: formScope, reasons: [`Missing scope ${formScope}.`] };
+  // Opt-in: until a scope source is chosen and saved, the pre-check is off and Preview behaves as before.
+  const scopeOn = scopePrefRaw !== null && scopePrefRaw !== undefined;
+  const scopeDenied = scopeOn && scopeCheck !== null && !scopeCheck.allowed;
   const patch = (p: Partial<Form>) => {
     setForm((f) => ({ ...f, ...p }));
     setErrors({});
@@ -143,6 +156,7 @@ export function Computer() {
     if (needsDesktop && !desktopReady) return setPreviewError(desktopReason);
     const built = buildAction(form);
     if (!built.action) return setErrors(built.errors);
+    if (scopeOn && !evaluateActionScope(built.action, policy).allowed) return;
     setPreviewing(true);
     setPreviewError(null);
     setResult(null);
@@ -275,6 +289,47 @@ export function Computer() {
               <p className="field-hint"><strong>Needs:</strong> {meta.needs}</p>
             </div>
 
+            <fieldset className="stack" aria-label="Action scope (renderer pre-check)">
+              <legend><strong>Action scope (renderer pre-check)</strong></legend>
+              <p className="field-hint">This is a renderer-side pre-check. The main process still previews, requires approval and enforces its own limits.</p>
+              <Field label="Scope source" hint="Off keeps Preview as before. Worker roles describe task records; they grant no computer-action scopes. Choose Manual to tick scopes.">
+                {(id, d) => (
+                  <select id={id} aria-describedby={d} className="input" value={scopeOn ? scopePref.roleId : 'off'} onChange={(e) => e.target.value === 'off' ? setScopePrefRaw(null) : saveScopePref({ roleId: e.target.value })}>
+                    <option value="off">Off (no pre-check)</option>
+                    <option value={MANUAL_ROLE}>Manual</option>
+                    {WORKER_ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                  </select>
+                )}
+              </Field>
+              <div className="row wrap" role="group" aria-label="Scopes">
+                {KNOWN_SCOPES.map((s) => (
+                  <label key={s} className="row">
+                    <input type="checkbox" checked={scopeOn && policy.scopes.includes(s)} disabled={!scopeOn || scopePref.roleId !== MANUAL_ROLE} onChange={(e) => saveScopePref({ scopes: e.target.checked ? [...scopePref.scopes, s] : scopePref.scopes.filter((x) => x !== s) })} />
+                    <span className={ACTION_SCOPES.includes(s) ? 'mono' : 'mono sub'}>{s}</span>
+                  </label>
+                ))}
+              </div>
+              <Field label="Allowed hosts (comma separated)" hint="Exact host, or .example.com for that domain and its subdomains.">
+                {(id, d) => <input id={id} aria-describedby={d} className="input" value={hostsDraft} disabled={!scopeOn} spellCheck={false} maxLength={4000} onChange={(e) => { setHostsDraft(e.target.value); saveScopePref({ allowedHosts: e.target.value.split(',') }); }} />}
+              </Field>
+              <Field label="Max text chars" hint="1 to 20000.">
+                {(id, d) => <input id={id} aria-describedby={d} className="input" inputMode="numeric" value={String(scopePref.maxTextChars)} disabled={!scopeOn} onChange={(e) => saveScopePref({ maxTextChars: Number(e.target.value) })} />}
+              </Field>
+              <div aria-live="polite">
+                {!scopeOn ? (
+                  <p className="sub">Pre-check is off. Choose Manual or a role to check actions against a scope policy.</p>
+                ) : scopeDenied && scopeCheck ? (
+                  <Notice tone="warn" title={`Scope ${scopeCheck.scope || '(unknown)'}: denied by policy`}>
+                    <ul>{scopeCheck.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                  </Notice>
+                ) : scopeCheck ? (
+                  <p className="sub">Scope {scopeCheck.scope}: within policy</p>
+                ) : (
+                  <p className="sub">Scope {formScope}: granted; complete the request to check its details.</p>
+                )}
+              </div>
+            </fieldset>
+
             {form.type !== 'list-windows' && (
               <Field label={form.type === 'open-url' ? 'Web address' : form.type === 'launch' ? 'App name or path' : form.type === 'type-text' || form.type === 'click' ? 'Target window (required)' : 'Window title or process'} error={errors.target}>
                 {(id, d) => (
@@ -304,7 +359,7 @@ export function Computer() {
             )}
 
             <div className="row">
-              <Button variant="primary" icon={MagnifyingGlass} busy={previewing} disabled={needsDesktop&&!desktopReady || executing !== null} onClick={() => void doPreview()}>
+              <Button variant="primary" icon={MagnifyingGlass} busy={previewing} disabled={needsDesktop&&!desktopReady || executing !== null || scopeDenied} onClick={() => void doPreview()}>
                 Preview action
               </Button>
               <span className="sub">Preview asks the backend what would happen. It does not run anything.</span>

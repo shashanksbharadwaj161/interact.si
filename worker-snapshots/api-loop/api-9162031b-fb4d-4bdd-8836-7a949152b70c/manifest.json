@@ -1,0 +1,16 @@
+{
+  "task": "Loop 19: download-manifest",
+  "sessionId": "api-9162031b-fb4d-4bdd-8836-7a949152b70c",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/Models.tsx",
+      "bytes": 18723,
+      "sha256": "00743aa7c48c4d705a994e6414328a615ff66d514a71d41e4ebfc3702d5d5bd5"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

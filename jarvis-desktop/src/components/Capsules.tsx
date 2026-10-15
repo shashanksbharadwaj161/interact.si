@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { AppWindow, ArrowDown, ArrowUp, BookmarkSimple, CheckCircle, Copy, Cube, DownloadSimple, Export, Eye, File as FileIcon, FloppyDisk, FolderOpen, Link as LinkIcon, MagnifyingGlass, PencilSimple, Play, Plus, Trash, UploadSimple, WarningCircle } from '@phosphor-icons/react';
 import type { Capsule } from '../shared/contracts';
 import type { ReferenceKind } from '../../electron/services/store';
@@ -10,6 +10,10 @@ import { Badge, Button, Empty, Field, IconButton, Notice, PageHeader, Panel } fr
 import { useReady } from '../ui/store';
 import { SCENES, isKnownScene, sceneName } from '../ui/scenes';
 import { cx, fmtDateTime, parseHttpUrl, relTime, truncate } from '../ui/util';
+import { parseBrowserRefs, splitAgainstCapsule, toCapsuleItems, type BrowserRef, type BrowserRefsResult } from '../ui/browser-refs';
+import { buildProjectMap, mapKeyboardTarget, type MapNode, type ProjectMap } from '../ui/project-map';
+// src/styles/project-map.css holds the .project-map* rules. It is not imported here because existing test bundles of
+// this file have no CSS loader; the SVG below carries presentation attributes so it renders without the stylesheet.
 
 type Kind = Capsule['items'][number]['kind'];
 type Item = Capsule['items'][number];
@@ -332,6 +336,8 @@ export function Capsules({ initialItem }: { initialItem?: string } = {}) {
 
               {draft.id && current && <ProjectMemory capsule={current} />}
 
+              {draft.id && current && <BrowserRefsImport key={current.id} capsule={current} dirty={dirty} onSaved={(c) => setDraft(fromCapsule(c))} />}
+
               {draft.id && (
                 <Panel title="Restore" eyebrow="Reopen everything">
                   <p className="field-hint">
@@ -401,6 +407,8 @@ export function Capsules({ initialItem }: { initialItem?: string } = {}) {
         <p>This capsule has edits that were not saved.</p>
       </ConfirmDialog>
 
+      <ProjectMapPanel selectedId={typeof selected === 'string' && selected !== 'new' ? selected : null} onSelect={requestOpen} />
+
       <ConfirmDialog open={confirmDelete} title={`Delete “${truncate(draft?.name ?? '', 40)}”?`} confirmLabel="Delete capsule" danger busy={saving} onCancel={() => setConfirmDelete(false)} onConfirm={() => void doDelete()}>
         <p>The capsule and its list of items are removed. The files, folders and apps themselves are not touched.</p>
       </ConfirmDialog>
@@ -418,6 +426,234 @@ export function Capsules({ initialItem }: { initialItem?: string } = {}) {
         </ul>
       </ConfirmDialog>
     </div>
+  );
+}
+
+// ---- Browser bookmarks / tabs import (scope 47): pasted text only ---------------------------------------------
+
+export const BROWSER_IMPORT_NOTE = 'This build reads only text you paste. It does not read browser profiles or live tabs; no browser extension is included.';
+
+export function BrowserRefsImport({ capsule, dirty, onSaved }: { capsule: Capsule; dirty: boolean; onSaved: (c: Capsule) => void }) {
+  const { api, mutate } = useReady();
+  const [text, setText] = useState('');
+  const [result, setResult] = useState<BrowserRefsResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [folder, setFolder] = useState('');
+  const [checked, setChecked] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const split = useMemo(() => (result ? splitAgainstCapsule(result.items, capsule.items) : null), [result, capsule.items]);
+  const present = useMemo(() => new Set((split?.alreadyPresent ?? []).map((i) => i.target)), [split]);
+  const visible = useMemo(() => (result ? result.items.filter((i) => !folder || i.folder === folder || (i.folder ?? '').startsWith(`${folder}/`)) : []), [result, folder]);
+  const selectedItems: BrowserRef[] = useMemo(() => (split ? split.fresh.filter((i) => checked.includes(i.target)) : []), [split, checked]);
+  const room = Math.max(0, MAX_ITEMS - capsule.items.length);
+  const overCapacity = selectedItems.length > room;
+
+  const parse = () => {
+    try {
+      const r = parseBrowserRefs(text);
+      setResult(r);
+      setError(null);
+      setFolder('');
+      const s = splitAgainstCapsule(r.items, capsule.items);
+      setChecked(s.fresh.map((i) => i.target));
+    } catch (e) {
+      setResult(null);
+      setChecked([]);
+      setError(e instanceof Error ? e.message : 'The text could not be parsed.');
+    }
+  };
+
+  const add = async () => {
+    if (!selectedItems.length || overCapacity || dirty) return;
+    setSaving(true);
+    let updated: Capsule | undefined;
+    const ok = await mutate(async () => {
+      const next = await api.saveCapsule({ id: capsule.id, items: [...capsule.items, ...toCapsuleItems(selectedItems)] });
+      updated = next.capsules.find((c) => c.id === capsule.id);
+      return next;
+    }, `Added ${selectedItems.length} link(s) to ${capsule.name}.`);
+    setSaving(false);
+    if (ok) {
+      if (updated) onSaved(updated);
+      setResult(null);
+      setChecked([]);
+      setText('');
+    }
+  };
+
+  const reasons = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of result?.skipped ?? []) m.set(s.reason, (m.get(s.reason) ?? 0) + 1);
+    return [...m.entries()];
+  }, [result]);
+
+  return (
+    <Panel title="Import browser bookmarks or tabs (paste, offline)" eyebrow="Adds links to this capsule">
+      <p className="field-hint">{BROWSER_IMPORT_NOTE}</p>
+      <Field label="Bookmarks or tab list" hint="Paste a bookmark HTML export, a JSON array of {title, url}, Markdown [title](url) links, or one 'title<TAB>url', 'url' or 'title - url' per line. Only http and https links are kept.">
+        {(id, d) => <textarea id={id} aria-describedby={d} className="input mono" rows={5} value={text} spellCheck={false} onChange={(e) => { setText(e.target.value); setError(null); }} />}
+      </Field>
+      <div className="row">
+        <Button icon={MagnifyingGlass} disabled={!text.trim()} onClick={parse}>Parse</Button>
+        {result && <Button onClick={() => { setResult(null); setChecked([]); }}>Discard</Button>}
+      </div>
+      {error && <Notice tone="warn">{error}</Notice>}
+      {result && split && (
+        <div className="stack tight" aria-live="polite">
+          <p className="field-hint">
+            Detected format: <strong>{result.detected}</strong> · kept {result.items.length} · skipped {result.skipped.length} · already in this capsule {split.alreadyPresent.length}
+            {result.truncated && ' · truncated: only the first 500 links were kept'}
+          </p>
+          {reasons.length > 0 && (
+            <ul className="list compact" aria-label="Skipped reasons">
+              {reasons.map(([reason, n]) => (
+                <li key={reason} className="list-row"><span className="grow sub">{reason}</span><Badge tone="muted">{n}</Badge></li>
+              ))}
+            </ul>
+          )}
+          {result.folders.length > 0 && (
+            <Field label="Folder">
+              {(id) => (
+                <select id={id} className="input" value={folder} onChange={(e) => setFolder(e.target.value)}>
+                  <option value="">All folders</option>
+                  {result.folders.map((f) => <option key={f} value={f}>{truncate(f, 80)}</option>)}
+                </select>
+              )}
+            </Field>
+          )}
+          {visible.length > 0 && (
+            <fieldset className="stack tight">
+              <legend>Links</legend>
+              <div className="row">
+                <Button size="sm" onClick={() => setChecked([...new Set([...checked, ...visible.filter((i) => !present.has(i.target)).map((i) => i.target)])])}>Select shown</Button>
+                <Button size="sm" onClick={() => setChecked(checked.filter((t) => !visible.some((i) => i.target === t)))}>Clear shown</Button>
+              </div>
+              <ul className="list compact" aria-label="Parsed links">
+                {visible.map((i) => {
+                  const dup = present.has(i.target);
+                  return (
+                    <li key={i.target} className="list-row">
+                      <label className="row grow">
+                        <input type="checkbox" disabled={dup} checked={!dup && checked.includes(i.target)} onChange={(e) => setChecked(e.target.checked ? [...checked, i.target] : checked.filter((t) => t !== i.target))} />
+                        <span className="grow"><strong>{truncate(i.label, 80)}</strong><code className="sub block" title={i.target}>{truncate(i.target, 90)}</code>{i.folder && <span className="sub block">{truncate(i.folder, 80)}</span>}</span>
+                      </label>
+                      {dup && <Badge tone="muted">Already in capsule</Badge>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+          )}
+          {overCapacity && <Notice tone="warn">A capsule holds at most {MAX_ITEMS} items; this one has room for {room} more. Untick some links.</Notice>}
+          <div className="row">
+            <Button variant="primary" icon={Plus} busy={saving} disabled={selectedItems.length === 0 || overCapacity || dirty} title={dirty ? 'Save your changes first' : undefined} onClick={() => void add()}>
+              Add {selectedItems.length} links to {truncate(capsule.name, 40)}
+            </Button>
+            {dirty && <span className="sub">Save changes first.</span>}
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+// ---- Project map (goal 50): real capsules, checkpoints and tasks as lanes; static SVG, no animation ------------
+
+const MAP_W = 720;
+const MAP_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End']);
+
+export function ProjectMapPanel({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string) => void }) {
+  const { state, productivity } = useReady();
+  const checkpoints = productivity?.checkpoints ?? [];
+  const laneCount = Math.min(state.capsules.length, 100);
+  const height = Math.max(96, laneCount * 56 + 32);
+  const built = useMemo((): { map: ProjectMap | null; error: string | null } => {
+    try {
+      return { map: buildProjectMap({ capsules: state.capsules, checkpoints, tasks: state.tasks }, { width: MAP_W, height, selectedCapsuleId: selectedId ?? undefined }), error: null };
+    } catch (e) {
+      return { map: null, error: e instanceof Error ? e.message : 'The project map could not be built.' };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.capsules, state.tasks, productivity, height, selectedId]);
+  const map = built.map;
+  const allNodes = useMemo(() => (map ? map.lanes.flatMap((l) => l.nodes) : []), [map]);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
+  const refs = useRef(new Map<string, SVGGElement>());
+  const activeId = focusId && allNodes.some((n) => n.id === focusId) ? focusId : (allNodes[0]?.id ?? null);
+  const pos = useMemo(() => new Map(allNodes.map((n) => [n.id, n])), [allNodes]);
+
+  const activate = (n: MapNode) => {
+    setFocusId(n.id);
+    if (n.kind === 'capsule') onSelect(n.id.slice('capsule:'.length));
+    else if (n.kind === 'checkpoint') {
+      const cp = checkpoints.find((c) => `checkpoint:${c.id}` === n.id);
+      setDetail(cp ? `${cp.title} · ${cp.createdAt} · ${n.refs} ref${n.refs === 1 ? '' : 's'}` : null);
+    }
+  };
+  const onKey = (e: ReactKeyboardEvent<SVGGElement>, n: MapNode) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      activate(n);
+      return;
+    }
+    if (!map || !MAP_KEYS.has(e.key)) return;
+    e.preventDefault();
+    const next = mapKeyboardTarget(map, n.id, e.key);
+    if (next) {
+      setFocusId(next);
+      refs.current.get(next)?.focus();
+    }
+  };
+
+  return (
+    <Panel title="Project map" eyebrow="From saved capsules and checkpoints">
+      {built.error ? (
+        <Notice tone="warn">{built.error}</Notice>
+      ) : !map || map.lanes.length === 0 ? (
+        <p className="field-hint project-map-empty">No capsules yet, so there is nothing to map. Create a capsule and save checkpoints to see its history here.</p>
+      ) : (
+        <div className="project-map">
+          <p className="field-hint">
+            One lane per capsule. Checkpoints sit on a shared timeline{map.timeRange ? ` (${map.timeRange.since} → ${map.timeRange.until})` : ''}; undated checkpoints and linked tasks are in the right-hand column. Use the arrow keys, Home and End to move; Enter opens a capsule or shows checkpoint details.
+          </p>
+          <svg className="project-map-svg" role="group" aria-label="Project map" viewBox={`0 0 ${MAP_W} ${height}`} width="100%" preserveAspectRatio="xMinYMin meet">
+            {map.lanes.map((l) => (
+              <g key={l.capsuleId} className="project-map-lane" aria-hidden="true">
+                <line x1={0} x2={MAP_W} y1={l.y} y2={l.y} stroke="currentColor" strokeOpacity={0.15} />
+              </g>
+            ))}
+            {map.edges.map((e) => {
+              const a = pos.get(e.from), b = pos.get(e.to);
+              return a && b ? <line key={`${e.kind}:${e.from}:${e.to}`} aria-hidden="true" className={cx('project-map-edge', `project-map-edge-${e.kind}`)} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="currentColor" strokeOpacity={e.kind === 'timeline' ? 0.55 : 0.35} strokeDasharray={e.kind === 'reference' ? '4 3' : undefined} /> : null;
+            })}
+            {allNodes.map((n) => (
+              <g
+                key={n.id}
+                ref={(el) => { if (el) refs.current.set(n.id, el); else refs.current.delete(n.id); }}
+                className={cx('project-map-node', `project-map-node-${n.kind}`, n.kind === 'capsule' && `capsule:${selectedId}` === n.id && 'project-map-node-selected')}
+                tabIndex={n.id === activeId ? 0 : -1}
+                role="button"
+                aria-label={`${n.kind}: ${n.label}${n.at ? `, ${n.at}` : n.kind === 'checkpoint' ? ', undated' : ''}`}
+                onFocus={() => setFocusId(n.id)}
+                onClick={() => activate(n)}
+                onKeyDown={(e) => onKey(e, n)}
+                fill="currentColor"
+              >
+                {n.kind === 'capsule' ? <rect x={n.x - 8} y={n.y - 8} width={16} height={16} rx={3} /> : n.kind === 'checkpoint' ? <circle cx={n.x} cy={n.y} r={6} /> : <rect x={n.x - 5} y={n.y - 5} width={10} height={10} />}
+                {n.kind === 'capsule' && <text x={n.x + 14} y={n.y - 12}>{truncate(n.label, 24)}</text>}
+                <title>{n.label}</title>
+              </g>
+            ))}
+          </svg>
+          {detail && <p className="project-map-detail" aria-live="polite">{detail}</p>}
+          {(map.truncated.capsules > 0 || map.truncated.nodes > 0) && (
+            <p className="field-hint project-map-truncated">Not shown: {map.truncated.capsules} capsule(s) and {map.truncated.nodes} node(s) over the map limits.</p>
+          )}
+        </div>
+      )}
+    </Panel>
   );
 }
 

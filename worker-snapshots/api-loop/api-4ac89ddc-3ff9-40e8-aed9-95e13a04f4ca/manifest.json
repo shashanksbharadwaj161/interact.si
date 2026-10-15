@@ -10,7 +10,12 @@
       "path": "src/ui/worklog.ts",
       "bytes": 20454,
       "sha256": "049e50da77ad0b4c1bcef072db4517b101628a607ab0153f4f9351e6da4dddd3"
+    },
+    {
+      "path": "src/components/MemoryWorkbench.tsx",
+      "bytes": 32851,
+      "sha256": "f84a81e36124ac76e344bcf3d4c58fe1d621be800ea0c996c05ad468d2d34b4b"
     }
   ],
-  "note": "Partial work recovered after cancellation/failure. No loop batch passed canonical integration. Do not merge blindly."
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
 }

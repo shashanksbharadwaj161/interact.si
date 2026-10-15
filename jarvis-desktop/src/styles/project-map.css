@@ -1,0 +1,19 @@
+/* Goal 50: project map. Scoped .project-map* classes only; static (no transitions or animation). */
+.project-map { display: grid; gap: 8px; }
+.project-map-svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.project-map-lane line { stroke: currentColor; stroke-opacity: 0.15; stroke-width: 1; }
+.project-map-edge { stroke-width: 1.5; fill: none; }
+.project-map-edge-timeline { stroke: currentColor; stroke-opacity: 0.55; }
+.project-map-edge-reference { stroke: currentColor; stroke-opacity: 0.35; stroke-dasharray: 4 3; }
+.project-map-node { cursor: pointer; outline: none; }
+.project-map-node rect,
+.project-map-node circle { fill: currentColor; fill-opacity: 0.7; stroke: currentColor; stroke-width: 1; }
+.project-map-node-checkpoint circle { fill-opacity: 0.9; }
+.project-map-node-task rect { fill-opacity: 0.35; }
+.project-map-node text { fill: currentColor; font-size: 12px; }
+.project-map-node-selected rect { stroke-width: 3; }
+.project-map-node:focus-visible rect,
+.project-map-node:focus-visible circle { stroke-width: 3; stroke: Highlight; }
+.project-map-detail { margin: 0; font-variant-numeric: tabular-nums; }
+.project-map-truncated,
+.project-map-empty { margin: 0; }

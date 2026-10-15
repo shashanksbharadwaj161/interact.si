@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Avatar, AVATAR_STATES, type AvatarState } from './Avatar';
 import { SceneBackdrop } from './SceneBackdrop';
 import { PageHeader, Panel, Segmented, Switch, Notice } from '../ui/primitives';
-import { useCompanion } from '../ui/companion';
+import { readReducedMotion, useAnimMachine, useCompanion } from '../ui/companion';
 import { usePref } from '../ui/prefs';
 import { useReady } from '../ui/store';
 import { DEFAULT_SCENE, SCENES } from '../ui/scenes';
@@ -14,6 +14,11 @@ export function Companion() {
   const [scene, setScene] = usePref('scene', DEFAULT_SCENE);
   const [pose, setPose] = useState<AvatarState | 'live'>('live');
   const shown = pose === 'live' ? live.state : pose;
+  const reducedMotion = settings.reduceMotion || readReducedMotion();
+  // Status badge: opens when the assistant becomes busy (listening/thinking/speaking/alert), crossfades between
+  // states and closes on idle. A change mid-fade interrupts from the current progress instead of restarting.
+  const status = useAnimMachine(shown === 'idle' ? null : shown, { reducedMotion });
+  const statusStyle = { '--anim-progress': status.progress } as CSSProperties;
 
   return (
     <div className="page">
@@ -25,6 +30,11 @@ export function Companion() {
           <div className="stage-avatar">
             <Avatar state={shown} size={240} level={pose === 'live' ? live.level : 0} />
           </div>
+          {status.shown !== null && (
+            <span className="stage-status anim-slot" data-anim-phase={status.phase} style={statusStyle} aria-hidden="true">
+              {status.shown}
+            </span>
+          )}
           <p className="stage-caption">
             {pose === 'live' ? `Live state: ${live.state}` : `Previewing pose: ${pose}`}
           </p>

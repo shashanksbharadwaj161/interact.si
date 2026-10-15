@@ -1,0 +1,16 @@
+{
+  "task": "Loop 24: coding-session-adapter",
+  "sessionId": "api-80251200-1e08-494d-8cdb-3f5c30576506",
+  "model": "claude-opus-5-5",
+  "status": "unverified-draft",
+  "integrated": false,
+  "checkpointWritten": false,
+  "files": [
+    {
+      "path": "src/components/MemoryWorkbench.tsx",
+      "bytes": 41414,
+      "sha256": "c0cd4022749a6827e713bd0ca7bc2eaa475cc4297a02b74440e8510e97238726"
+    }
+  ],
+  "note": "Partial work recovered after cancellation/failure. Canonical accepted work is in jarvis-desktop. This snapshot may be incomplete or superseded. Do not merge blindly."
+}

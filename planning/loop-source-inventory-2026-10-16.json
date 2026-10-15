@@ -1,0 +1,659 @@
+{
+  "at": "2026-10-15T16:38:13.325Z",
+  "canonicalAppBase": "6a58b6099730343b690f105a4de6a871c3952f96",
+  "scope": {
+    "working": 48,
+    "unverified": 22,
+    "partial": 34,
+    "preview": 12,
+    "missing": 24
+  },
+  "loop": {
+    "lastRound": 41,
+    "status": "stopped",
+    "acceptedBatches": 17
+  },
+  "workerDrafts": [
+    {
+      "task": "Loop 41: project-branches",
+      "sessionId": "api-af031971-1659-451c-8144-92f8f401f5f8",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/project-map.ts",
+        "src/ui/project-branches.ts",
+        "src/ui/store.tsx",
+        "src/components/Capsules.tsx",
+        "src/styles/project-branches.css"
+      ]
+    },
+    {
+      "task": "Loop 41: model-pinning-budget",
+      "sessionId": "api-3242a614-0c54-44b3-bee9-13c678526743",
+      "status": "unverified-draft",
+      "files": [
+        "src/shared/contracts.ts",
+        "electron/services/models.ts",
+        "electron/services/validation.ts",
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/preload.ts",
+        "src/ui/bridges.ts",
+        "src/ui/model-pinning.ts",
+        "src/components/Models.tsx"
+      ]
+    },
+    {
+      "task": "Loop 41: app-battery-motion",
+      "sessionId": "api-1614b0d4-9501-4b9b-816e-4bf2b7f0f60d",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/App.tsx",
+        "src/components/SceneBackdrop.tsx",
+        "src/ui/resource-policy.ts",
+        "src/ui/scenes.ts",
+        "src/styles/app-motion.css",
+        "tests/slice-app-battery-motion.test.mjs"
+      ]
+    },
+    {
+      "task": "Loop 40: state-encryption-at-rest",
+      "sessionId": "api-e449ee4e-f546-47b0-a99f-89742b129c5e",
+      "status": "unverified-draft",
+      "files": [
+        "electron/backend.ts"
+      ]
+    },
+    {
+      "task": "Loop 39: avatar-voice-link",
+      "sessionId": "api-2c42ba71-1886-43c2-b8fc-4f6ad9da1d94",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/avatar-voice.ts",
+        "src/ui/audio.ts",
+        "src/components/Avatar.tsx",
+        "src/components/AvatarStudio.tsx",
+        "src/styles/avatar-voice.css",
+        "tests/slice-avatar-voice.test.mjs"
+      ]
+    },
+    {
+      "task": "Loop 39: capsule-scene-resume",
+      "sessionId": "api-392f74bb-0290-4a32-a572-cdbfed659784",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/capsule-scene.ts",
+        "src/ui/store.tsx",
+        "src/ui/scenes.ts",
+        "src/components/Capsules.tsx",
+        "src/styles/capsule-scene.css",
+        "tests/slice-capsule-scene.test.mjs"
+      ]
+    },
+    {
+      "task": "Loop 39: model-digest-pinning",
+      "sessionId": "api-afc3befd-6125-447d-8cc9-14f97e1e46b1",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/model-pins.ts",
+        "electron/services/models.ts",
+        "src/shared/contracts.ts",
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/preload.ts",
+        "src/ui/bridges.ts",
+        "src/components/Models.tsx",
+        "src/styles/model-pins.css",
+        "tests/slice-model-pins.test.mjs"
+      ]
+    },
+    {
+      "task": "Loop 34: host-battery-resources",
+      "sessionId": "api-1a07deae-abb1-4d77-b42b-dd179cb2129f",
+      "status": "unverified-draft",
+      "files": [
+        "src/shared/contracts.ts",
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/preload.ts",
+        "src/ui/bridges.ts"
+      ]
+    },
+    {
+      "task": "Loop 32: file-shelf",
+      "sessionId": "api-16a9328f-5df1-4d87-b625-f7e4726a48e1",
+      "status": "unverified-draft",
+      "files": [
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 32: personal-profiles",
+      "sessionId": "api-39ca51c1-3a70-4333-b832-13393e7912ca",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Settings.tsx"
+      ]
+    },
+    {
+      "task": "Loop 32: reveal-path-action",
+      "sessionId": "api-ec889b54-1a16-4d9e-803a-b901cb3c9ed7",
+      "status": "unverified-draft",
+      "files": [
+        "src/shared/contracts.ts",
+        "electron/services/validation.ts",
+        "electron/ipc.ts"
+      ]
+    },
+    {
+      "task": "Loop 30: document-explain-ai",
+      "sessionId": "api-6c31e09b-57af-4e32-8f3f-eb00f37b7f6a",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/PromptTools.tsx"
+      ]
+    },
+    {
+      "task": "Loop 30: dictation-cleanup",
+      "sessionId": "api-72475a48-73c3-4402-82b3-fb1e066be5e8",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Assistant.tsx"
+      ]
+    },
+    {
+      "task": "Loop 29: ai-writing-actions",
+      "sessionId": "api-6d289d08-2431-47cc-a8a2-348bc5cbc7c9",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/PromptTools.tsx"
+      ]
+    },
+    {
+      "task": "Loop 28: calendar-ics-export",
+      "sessionId": "api-90462301-ae59-433e-8b2f-6ddd6a3472ec",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Calendar.tsx"
+      ]
+    },
+    {
+      "task": "Loop 28: conversation-history-export",
+      "sessionId": "api-8ffdf96a-b039-4f47-8b8f-36543ca86b76",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Assistant.tsx"
+      ]
+    },
+    {
+      "task": "Loop 27: offline-license-verify",
+      "sessionId": "api-36828187-3fc9-4944-9da9-0cc488ccbc79",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Settings.tsx"
+      ]
+    },
+    {
+      "task": "Loop 26: encrypted-bundle",
+      "sessionId": "api-19f6308c-bc64-4924-b463-534a79640822",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Settings.tsx"
+      ]
+    },
+    {
+      "task": "Loop 25: update-manifest-verify",
+      "sessionId": "api-ae78dbb4-8ea2-4d05-98c1-38519ff89959",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Status.tsx"
+      ]
+    },
+    {
+      "task": "Loop 25: browser-refs-import",
+      "sessionId": "api-c672131c-8ba9-44b5-a371-9b2bbd15572e",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Capsules.tsx"
+      ]
+    },
+    {
+      "task": "Loop 24: agent-session",
+      "sessionId": "api-231610b2-dfdd-4cd2-914b-87d3beec7455",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Developer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 24: document-explain",
+      "sessionId": "api-1c8ade64-bbfa-4477-9bc0-6f1dfaae41cc",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/document-explain.ts",
+        "src/components/PromptTools.tsx"
+      ]
+    },
+    {
+      "task": "Loop 24: coding-session-adapter",
+      "sessionId": "api-80251200-1e08-494d-8cdb-3f5c30576506",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/MemoryWorkbench.tsx"
+      ]
+    },
+    {
+      "task": "Loop 23: worker-roles",
+      "sessionId": "api-6f6dae3c-7ff2-42c6-80a1-63d93b77dbaa",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Developer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 23: tone-translate",
+      "sessionId": "api-347d7962-4dd4-411b-a8f3-2b1a81ea8f4a",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/PromptTools.tsx"
+      ]
+    },
+    {
+      "task": "Loop 23: local-retrieval",
+      "sessionId": "api-ac5a4818-7fa6-4c9d-b7de-f6cb518e0c88",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/MemorySearch.tsx"
+      ]
+    },
+    {
+      "task": "Loop 20: compat-tiers",
+      "sessionId": "api-4febad5c-8ff9-47f9-b14d-f664c63c482d",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Status.tsx"
+      ]
+    },
+    {
+      "task": "Loop 20: agent-log",
+      "sessionId": "api-cdfa3a91-9f5f-4ced-8ad9-a83cea76e69c",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Developer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 19: taskbar-presets",
+      "sessionId": "api-014cab19-7a7d-4349-9d54-b41886a0a2bb",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Customization.tsx"
+      ]
+    },
+    {
+      "task": "Loop 19: download-manifest",
+      "sessionId": "api-9162031b-fb4d-4bdd-8836-7a949152b70c",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Models.tsx"
+      ]
+    },
+    {
+      "task": "Loop 19: task-budget",
+      "sessionId": "api-4d82b2de-0540-4d5a-8144-bf81a0831b1f",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Developer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 18: task-board",
+      "sessionId": "api-d4e316b7-a3bb-4b67-9c81-36624584ecba",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Developer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 18: context-controls",
+      "sessionId": "api-926aa553-e9f9-43a7-813e-9301fc982c7f",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Assistant.tsx"
+      ]
+    },
+    {
+      "task": "Loop 18: scene-spec-validate",
+      "sessionId": "api-dd95393b-0323-454a-bace-bad72e6f47b3",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css"
+      ]
+    },
+    {
+      "task": "Loop 17: clip-export",
+      "sessionId": "api-47cb6e3a-7da5-4130-82ae-de03b3f1852b",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css"
+      ]
+    },
+    {
+      "task": "Loop 17: error-diagnosis",
+      "sessionId": "api-66c35260-8f20-43ee-9f29-ef02dab0c260",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/error-diagnosis.ts",
+        "src/components/PromptTools.tsx"
+      ]
+    },
+    {
+      "task": "Loop 17: worklog-draft",
+      "sessionId": "api-12e181c4-5ef9-4a3d-b452-c8e9c3e25bd9",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/MemoryWorkbench.tsx"
+      ]
+    },
+    {
+      "task": "Loop 16: explicit-context-controls",
+      "sessionId": "api-b93aa6d9-f385-47dc-9435-f7c943376107",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/chat.ts",
+        "electron/ipc.ts",
+        "electron/channels.ts",
+        "electron/preload.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "src/components/Assistant.tsx"
+      ]
+    },
+    {
+      "task": "Loop 16: error-diagnosis-actions",
+      "sessionId": "api-ec2cc46f-f283-4255-b6af-15cb0ded8d97",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Computer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 16: worklog-standup-drafts",
+      "sessionId": "api-e756fbe4-4bac-49f1-91bb-b8eaf6d0d295",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts",
+        "src/components/MemoryWorkbench.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 15: writing-tone-translation",
+      "sessionId": "api-9cf09bd6-8318-4586-aa20-0229a6d7928e",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/workbench.ts"
+      ]
+    },
+    {
+      "task": "Loop 15: worklog-standup-drafts",
+      "sessionId": "api-d373bc8f-39f9-4377-9973-4ccba07de65e",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts",
+        "src/components/MemoryWorkbench.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 15: error-diagnosis-service",
+      "sessionId": "api-07f011da-60c9-4dcf-97a9-c30e835dbf6e",
+      "status": "unverified-draft",
+      "files": [
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/preload.ts",
+        "src/shared/contracts.ts",
+        "src/components/PromptTools.tsx"
+      ]
+    },
+    {
+      "task": "Loop 14: error-diagnosis-proposals",
+      "sessionId": "api-0951be91-e698-4c69-ab60-cc5acdf3832c",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Assistant.tsx"
+      ]
+    },
+    {
+      "task": "Loop 14: motion-clip-export",
+      "sessionId": "api-0e23ab4d-fa8f-458d-9ed8-8c6ee43fe4cf",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/clip-export.ts",
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css"
+      ]
+    },
+    {
+      "task": "Loop 14: worklog-standup-drafts",
+      "sessionId": "api-c8b9b401-ba82-41d1-a33b-750d05b8a84f",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts",
+        "electron/backend.ts",
+        "electron/channels.ts",
+        "electron/ipcCore.ts",
+        "electron/preload.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "src/components/MemoryWorkbench.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 13: motion-clip-export",
+      "sessionId": "api-524d185d-669b-4a1d-b85b-111e8298af5a",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/motion-clip.ts",
+        "src/ui/scenes.ts",
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css",
+        "tests/round13-motion-clip.test.mjs"
+      ]
+    },
+    {
+      "task": "Loop 13: writing-tone-and-error-diagnosis",
+      "sessionId": "api-b3f1c53c-382c-4d70-981b-5ec3b535e638",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/prompt-tools.ts",
+        "src/ui/error-diagnosis.ts",
+        "src/components/PromptTools.tsx",
+        "src/components/Assistant.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 13: worklog-standup-drafts",
+      "sessionId": "api-fab0b72d-71c0-49e1-8b02-ca1ea7c02558",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts",
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/ipcCore.ts",
+        "electron/backend.ts",
+        "electron/preload.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "src/components/MemoryWorkbench.tsx"
+      ]
+    },
+    {
+      "task": "Loop 12: worklog-standup-drafts",
+      "sessionId": "api-5151085b-9a8f-4fec-9cee-1a5d868f3b48",
+      "status": "unverified-draft",
+      "files": [
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/preload.ts",
+        "electron/services/validation.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts"
+      ]
+    },
+    {
+      "task": "Loop 11: scene-spec-validator",
+      "sessionId": "api-49541483-d13d-4b48-a26d-9e1ab30aa7d3",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/scene-spec.ts",
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css"
+      ]
+    },
+    {
+      "task": "Loop 11: error-diagnosis",
+      "sessionId": "api-15985bec-433d-4cba-b2eb-643f130898cb",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/error-diagnosis.ts",
+        "src/components/Computer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 11: worklog-standup-drafts",
+      "sessionId": "api-4ac89ddc-3ff9-40e8-aed9-95e13a04f4ca",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts",
+        "src/components/MemoryWorkbench.tsx"
+      ]
+    },
+    {
+      "task": "Loop 10: worklog-drafts",
+      "sessionId": "api-0ef95e20-dae5-408d-be1f-9836f86535de",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/worklog.ts",
+        "src/components/MemoryWorkbench.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 10: scene-spec-validator",
+      "sessionId": "api-75e0d06d-3fda-4219-97ed-73a64859ba76",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/scene-spec.ts",
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css"
+      ]
+    },
+    {
+      "task": "Loop 9: validated-scene-spec",
+      "sessionId": "api-c865ba78-41d2-4c1d-950f-bbbad484f045",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css"
+      ]
+    },
+    {
+      "task": "Loop 9: error-diagnosis-tools",
+      "sessionId": "api-b9ad85e6-002d-42a4-b576-1527ef13e024",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/PromptTools.tsx"
+      ]
+    },
+    {
+      "task": "Loop 9: worklog-standup-drafts",
+      "sessionId": "api-8b44a87d-2a40-45b2-88ea-11fb8dee3b2c",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts",
+        "electron/channels.ts",
+        "electron/backend.ts",
+        "electron/ipcCore.ts",
+        "electron/ipc.ts",
+        "electron/preload.ts",
+        "src/ui/bridges.ts",
+        "src/components/MemoryWorkbench.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 8: writing-tone-translation",
+      "sessionId": "api-827a4923-ca7d-4662-aeb6-f05025ed1e02",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/tone-profiles.ts",
+        "src/ui/workbench.ts",
+        "src/components/PromptTools.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 8: motion-scene-validation-export",
+      "sessionId": "api-cc198d15-78a9-4c7f-9a24-f7380c8c5de0",
+      "status": "unverified-draft",
+      "files": [
+        "src/ui/scene-validator.ts",
+        "src/ui/clip-export.ts",
+        "src/components/MotionStudio.tsx",
+        "src/styles/motion-studio.css"
+      ]
+    },
+    {
+      "task": "Loop 8: worklog-standup-drafts",
+      "sessionId": "api-847acf0d-6061-4515-96dc-15bdc1eb4642",
+      "status": "unverified-draft",
+      "files": [
+        "electron/services/worklog.ts",
+        "electron/backend.ts",
+        "electron/channels.ts",
+        "electron/ipc.ts",
+        "electron/ipcCore.ts",
+        "electron/preload.ts",
+        "src/ui/bridges.ts",
+        "src/shared/contracts.ts",
+        "src/components/MemoryWorkbench.tsx"
+      ]
+    },
+    {
+      "task": "Loop 5: error-diagnosis",
+      "sessionId": "api-e65dce7c-1b61-4b3e-aea6-8942210e0340",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/Computer.tsx"
+      ]
+    },
+    {
+      "task": "Loop 5: writing-tone-translation",
+      "sessionId": "api-d361a739-055c-44da-ac08-7ff42b699dbb",
+      "status": "unverified-draft",
+      "files": [
+        "src/components/PromptTools.tsx",
+        "src/styles/views.css"
+      ]
+    },
+    {
+      "task": "Loop 5: memory-recap-worklog",
+      "sessionId": "api-9f1e2da7-3f0a-4817-9a6f-989a8e929a80",
+      "status": "unverified-draft",
+      "files": [
+        "electron/backend.ts",
+        "electron/channels.ts",
+        "electron/preload.ts",
+        "src/shared/contracts.ts",
+        "src/ui/bridges.ts",
+        "src/components/MemoryWorkbench.tsx"
+      ]
+    }
+  ],
+  "credentialsIncluded": false
+}

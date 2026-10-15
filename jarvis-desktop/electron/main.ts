@@ -13,6 +13,7 @@ import {IdleGovernor, LaunchGuard, resolveUserDataDir, summarizeMetrics} from '.
 import {configureNativeIntegrity, isNativeManifest, type NativeManifest} from './native/integrity';
 import {debounced, registerHotkey} from './native/startup';
 import {Reminders} from './services/reminders';
+import {createSafeStorageCipher} from './services/atRest';
 import {createTrustedConfirm, safeErrorMessage, isAllowedRequestUrl, isTestFixtureDir, isTrustedUrl, parseDevOrigin} from './ipcCore';
 import {registerIpc} from './ipc';
 import {METHODS, ACTIVITY_CHANNEL} from './channels';
@@ -293,6 +294,8 @@ async function boot() {
     confirm,
     clipboard: clipboardReader,
     appMetrics,
+    // state.json and its backups are encrypted at rest with the same per-user protector (boot runs after app ready).
+    stateCipher: createSafeStorageCipher(safeStorage),
     // Preferred key protector (no PowerShell child); Secrets falls back to the DPAPI helper when it is unavailable.
     safeStorage,
   });
