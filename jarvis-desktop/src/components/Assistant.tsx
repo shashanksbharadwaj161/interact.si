@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Broom, ChatCircleDots, Lightning, MagnifyingGlass, Microphone, PaperPlaneRight, ShieldCheck, SpeakerHigh, Stop } from '@phosphor-icons/react';
+import { ArrowClockwise, Broom, CaretDown, ChatCircleDots, ClockCounterClockwise, Lightning, MagnifyingGlass, Microphone, PaperPlaneRight, ShieldCheck, SlidersHorizontal, SpeakerHigh, Stop, WarningCircle, X } from '@phosphor-icons/react';
 import type { ActionPreview, ActionRequest, ApiFeature, ChatMessage, ChatStreamEvent, ChatStreamRoute, CloudProvider, CloudProviderStatus, IntentPlan, JarvisAPI } from '../shared/contracts';
 import { DEFAULT_CLOUD_PROVIDER, cloudProviderInfo, effectiveCloudModel, isCloudProvider } from '../shared/contracts';
 import { cloudProvidersBridge } from '../ui/bridges';
-import { Avatar } from './Avatar';
-import { AvatarStudio } from './AvatarStudio';
-import { ConfirmDialog } from '../ui/Dialog';
-import { Badge, Button, Empty, Notice, PageHeader, Panel, Segmented, Spinner, Switch } from '../ui/primitives';
+import { CompanionOrb } from './CompanionOrb';
+import { AiSetup } from './AiSetup';
+import { ConfirmDialog, Dialog } from '../ui/Dialog';
+import { Badge, Button, Notice, Panel, Segmented, Spinner, Switch, Tabs } from '../ui/primitives';
+import '../styles/assistant.css';
 import { ClipRecorder, MAX_CLIP_MS, bindLevel, createMicConsent, defaultConsentStorage, micErrorMessage, micSupport, remainingMs } from '../ui/audio';
 import { actionOutcome, listedWindows, type ActionOutcome } from '../ui/action-result';
-import { hostVoiceLevel, useCompanion } from '../ui/companion';
+import { useCompanion } from '../ui/companion';
 import { usePref } from '../ui/prefs';
 import { CONTEXT_POLICY_PREF_KEY, CONTEXT_SOURCES, DEFAULT_CONTEXT_POLICY, SOURCE_LABEL, buildContextPreview, decideContextShare, normalizeContextPolicy, parseAppList, type ContextItem, type ContextMode, type ContextPolicy } from '../ui/context-policy';
 import { HISTORY_PREF_KEY, chatToConversation, conversationToMarkdown, exportConversations, exportFileName, filterConversations, markdownFileName, mergeImported, normalizeHistory, parseConversationExport, summarizeConversation, type Conversation, type ParseResult } from '../ui/conversation-export';
@@ -18,6 +19,7 @@ import { useReady } from '../ui/store';
 import { cx, errMsg, fmtTime, truncate } from '../ui/util';
 
 type RecPhase = 'idle' | 'starting' | 'recording' | 'transcribing';
+type DrawerTab = 'history' | 'voice' | 'context' | 'actions';
 type ComposerMode = 'chat' | 'command';
 const HOLD_MS = 400;
 const MAX_CHARS = 4000;
@@ -745,10 +747,11 @@ function LevelMeter({ level, active }: { level: number; active: boolean }) {
   );
 }
 
-export function Assistant() {
+/** `initialDraft` (the route's `draft` parameter) only fills the message box. Nothing is sent until the user presses Send. */
+export function Assistant({ initialDraft, initialSetup }: { initialDraft?: string; initialSetup?: boolean } = {}) {
   const { api, state, settings, cloudConfigured, run, toast, reload, system, systemLoading, systemError, refreshSystem } = useReady();
   const companion = useCompanion();
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => (initialDraft ?? '').slice(0, MAX_CHARS));
   const [pending, setPending] = useState<string | null>(null);
   const [live, setLive] = useState<LiveReply | null>(null);
   const [streamNote, setStreamNote] = useState<{ tone: 'warn' | 'danger'; text: string } | null>(null);
@@ -763,7 +766,8 @@ export function Assistant() {
   const [micAllowed, setMicAllowedState] = useState(() => consent.granted());
   const support = useMemo(() => micSupport(), []);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [avatarPreview, setAvatarPreview] = useState(false);
+  const [drawer, setDrawer] = useState<DrawerTab | null>(null);
+  const [setupOpen, setSetupOpen] = useState(Boolean(initialSetup));
   const [voiceNote, setVoiceNote] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null);
   /** The latest voice transcript awaiting the "Clean up dictation" choice. `n` re-keys the step for each new transcript. */
   const [dictation, setDictation] = useState<{ n: number; text: string } | null>(null);
@@ -1098,7 +1102,7 @@ export function Assistant() {
     const r = recorder.current;
     if (phaseRef.current !== 'recording' || !r) return;
     setPhaseBoth('transcribing');
-    companion.set('thinking');
+    companion.set('transcribing');
     companion.setSource('none');
     try {
       const clip = await r.stop();
@@ -1191,38 +1195,108 @@ export function Assistant() {
     return () => window.clearInterval(id);
   }, [phase]);
 
-  const micBlocked = !support.supported ? support.reason ?? 'Microphone capture is not available in this window.' : !micAllowed ? 'Turn on "Allow the microphone" in the Push to talk panel first.' : null;
+  const micBlocked = !support.supported ? support.reason ?? 'Microphone capture is not available in this window.' : !micAllowed ? 'Allow the microphone first. Nothing is recorded until you do.' : null;
   const blocker = sendBlocker({ mode, text: input, locked: sendLock.current, pending: pending !== null, live: live !== null, settling, transcribing: phase === 'transcribing', configured, routeReason, plannerReady, stepBusy: stepBusy !== null });
-  const recLabel = phase === 'recording' ? 'Recording — release to stop' : phase === 'starting' ? 'Starting microphone…' : phase === 'transcribing' ? 'Transcribing…' : 'Hold to talk';
+  const recLabel = phase === 'recording' ? 'Recording, release or tap to stop' : phase === 'starting' ? 'Starting microphone…' : phase === 'transcribing' ? 'Transcribing…' : 'Hold to talk';
+  const noDot = (t: string) => t.replace(/[.\s]+$/, '');
+  const routeName = rs.providerName ? `${rs.providerName}` : rs.route === 'Local model' ? 'Local model' : 'Cloud model';
+  const blockedTitle = !configured && !systemLoading && route ? `${online ? routeName : 'The local model'} cannot answer yet` : null;
+  const empty = state.chat.length === 0 && pending === null && live === null;
+  const suggestions = online || configured ? ['Help me plan the rest of my day', 'Draft a short, friendly reply to an email', 'Explain a concept in plain words'] : [];
+  const tabs: { value: DrawerTab; label: string }[] = [
+    { value: 'history', label: 'History' },
+    { value: 'voice', label: 'Voice' },
+    { value: 'context', label: 'Context' },
+    { value: 'actions', label: 'Actions' },
+  ];
 
   return (
-    <div className="page page-wide">
-      <PageHeader
-        eyebrow="Cockpit"
-        title="Assistant"
-        subtitle={online ? 'Online mode: messages go to your cloud model with your own key.' : 'Offline mode: messages go only to your local model endpoint.'}
-        actions={
-          <Button icon={Broom} onClick={() => setConfirmClear(true)} disabled={state.chat.length === 0 || replyBusy} title={replyBusy ? 'Stop the reply or wait for it to finish first.' : undefined}>
-            Clear conversation
-          </Button>
-        }
-      />
+    <div className={cx('assistant', drawer && 'has-drawer')}>
+      <div className="assist-main">
+        <header className="assist-head">
+          <h1>Assistant</h1>
+          <details className="route-pop">
+            <summary className={cx('route-chip', `is-${configured ? (online ? 'warn' : 'ok') : 'bad'}`)} aria-label={`Where messages go: ${rs.route}, ${rs.model}, ${rs.ready ? 'ready' : 'unavailable'}. Show details.`}>
+              <span className={cx('dot', configured ? 'dot-ok' : 'dot-warn')} aria-hidden />
+              <span className="route-chip-text">
+                {online ? `${routeName} · ${rs.model}` : `On this computer · ${rs.model}`}
+              </span>
+              <CaretDown size={14} aria-hidden />
+            </summary>
+            <div className="route-panel" role="group" aria-label="Where this message goes">
+              <Notice tone={configured ? 'info' : 'warn'} title={configured ? 'Available' : 'Unavailable'}>
+                {configured ? (route?.reason || (online ? `Messages go to ${routeName} with your key.` : 'The local model answered its last check.')) : routeReason}
+              </Notice>
+              <p className="field-hint" id="route-privacy">{mode === 'command' ? 'A desktop action is planned on this computer. It is not sent to a chat model, and nothing runs until you approve it in the Windows confirmation.' : rs.privacy}</p>
+              <dl className="kv-list">
+                <div className="kv"><dt>Mode</dt><dd>{online ? 'Online, by your choice' : 'Offline'}</dd></div>
+                <div className="kv"><dt>{online ? 'Provider' : 'Address'}</dt><dd className={online ? undefined : 'mono'}>{online ? `${providerName} (${rs.where})` : rs.where}</dd></div>
+                <div className="kv"><dt>Model</dt><dd className="mono">{rs.model}</dd></div>
+                {rs.key && <div className="kv"><dt>Key</dt><dd>{rs.key}</dd></div>}
+                <div className="kv"><dt>Live replies</dt><dd>{streaming ? (streaming.available ? 'Streamed as they are written' : `Arrive complete${streaming.reason ? `: ${noDot(streaming.reason)}` : ''}`) : 'Not reported yet'}</dd></div>
+                <div className="kv"><dt>Stop a reply</dt><dd>{cancelFeat ? (cancelFeat.available ? 'Available' : `Not available${cancelFeat.reason ? `: ${noDot(cancelFeat.reason)}` : ''}`) : 'Not reported yet'}</dd></div>
+                <div className="kv"><dt>Voice input</dt><dd>{sttReady ? 'Available' : `Unavailable: ${noDot(sttReason)}`}</dd></div>
+                <div className="kv"><dt>Read aloud</dt><dd>{ttsReady ? 'Available' : `Unavailable: ${noDot(ttsReason)}`}</dd></div>
+              </dl>
+              <div className="row wrap">
+                <Button size="sm" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button>
+                <Button size="sm" variant="quiet" onClick={() => setSetupOpen(true)}>Change AI setup</Button>
+                <a className="btn btn-quiet btn-sm" href="#/status">System status</a>
+              </div>
+            </div>
+          </details>
+          <div className="assist-tools">
+            <Button size="sm" variant="quiet" icon={ClockCounterClockwise} aria-expanded={drawer === 'history'} onClick={() => setDrawer(drawer === 'history' ? null : 'history')}>History</Button>
+            <Button size="sm" variant="quiet" icon={SlidersHorizontal} aria-expanded={drawer !== null && drawer !== 'history'} onClick={() => setDrawer(drawer && drawer !== 'history' ? null : 'voice')}>Options</Button>
+            <Button size="sm" variant="quiet" icon={Broom} onClick={() => setConfirmClear(true)} disabled={state.chat.length === 0 || replyBusy} title={replyBusy ? 'Stop the reply or wait for it to finish first.' : undefined}>
+              Clear
+            </Button>
+          </div>
+        </header>
 
-      <div className="assist-grid">
-        <section className="chat panel" aria-label="Conversation">
+        {blockedTitle && mode === 'chat' && !empty && (
+          <div className="assist-blocked" role="status">
+            <WarningCircle size={18} aria-hidden />
+            <div className="grow">
+              <strong>{blockedTitle}</strong>
+              <span className="sub">{noDot(routeReason)}. Notes, tasks and search still work.</span>
+            </div>
+            <Button size="sm" variant="primary" onClick={() => setSetupOpen(true)}>Set up AI</Button>
+            <Button size="sm" variant="quiet" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button>
+          </div>
+        )}
+
+        <section className="chat" aria-label="Conversation">
           <div className="chat-log" ref={logRef} role="log" aria-live="polite" aria-label="Messages" aria-relevant="additions" tabIndex={0} onScroll={(e) => { stickToEnd.current = isNearBottom(e.currentTarget); }}>
-            {state.chat.length === 0 && pending === null && live === null ? (
-              <Empty icon={ChatCircleDots} title="No messages yet">
-                {configured
-                  ? `Your next message goes to ${online ? `the cloud model “${settings.cloudModel}”` : `the local model “${settings.localModel}”`}. Replies are generated by that model, not scripted.`
-                  : online
-                    ? `Cloud chat unavailable: ${routeReason.replace(/[.]+$/, "")}. Check Settings or System status.`
-                    : `Ollama (local) unavailable: ${routeReason.replace(/[.]+$/, "")}. Check System status, then check again.`}
-              </Empty>
+            {empty ? (
+              <div className="chat-empty">
+                <CompanionOrb size={132} />
+                <h2>{configured ? 'What can I help with?' : 'Chat is not set up yet'}</h2>
+                <p className="field-hint">
+                  {configured
+                    ? `Your message goes to ${online ? `${routeName}, model “${rs.model}”` : `the model “${rs.model}” on this computer`} when you press Send. Replies are written by that model.`
+                    : online
+                      ? `${routeName} cannot answer: ${noDot(routeReason)}. Set up AI fixes this; nothing is sent until then.`
+                      : `Ollama (local) unavailable: ${noDot(routeReason)}. Set up AI walks you through it.`}
+                </p>
+                {suggestions.length > 0 && (
+                  <div className="chips chat-suggest">
+                    {suggestions.map((t) => (
+                      <button key={t} type="button" className="chip" onClick={() => { setInput(t); inputRef.current?.focus(); }}>{t}</button>
+                    ))}
+                    {plannerReady && (
+                      <button type="button" className="chip" onClick={() => { setMode('command'); inputRef.current?.focus(); }}>
+                        <Lightning size={14} aria-hidden /> Plan a desktop action
+                      </button>
+                    )}
+                  </div>
+                )}
+                {!configured && <Button variant="primary" onClick={() => setSetupOpen(true)}>Set up AI</Button>}
+              </div>
             ) : (
               <>
                 {chatWindow.hidden > 0 && (
-                  <div className="row wrap">
+                  <div className="row wrap chat-earlier">
                     <span className="sub">{chatWindow.hidden} earlier message{chatWindow.hidden === 1 ? ' is' : 's are'} saved but not drawn, to keep this window responsive.</span>
                     <Button size="sm" variant="quiet" onClick={() => setShowEarlier(true)}>Show earlier messages</Button>
                   </div>
@@ -1235,7 +1309,12 @@ export function Assistant() {
                       <div key={m.id} className="chat-error">
                         <Notice tone={kind === 'stopped' ? 'info' : kind === 'incomplete' ? 'warn' : 'danger'} title={kind === 'stopped' ? 'You stopped this reply' : kind === 'incomplete' ? 'The reply was cut off' : unavail ? `${unavail.route} model unavailable` : 'The model did not answer'}>
                           {m.text}
-                          {(kind === 'unavailable' || kind === 'note') && <div className="row wrap"><a className="btn btn-ghost btn-sm" href="#/status">Open System status</a><Button size="sm" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button></div>}
+                          {(kind === 'unavailable' || kind === 'note') && (
+                            <span className="row wrap notice-actions">
+                              <Button size="sm" onClick={() => setSetupOpen(true)}>Set up AI</Button>
+                              <Button size="sm" variant="quiet" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button>
+                            </span>
+                          )}
                         </Notice>
                       </div>
                     );
@@ -1249,7 +1328,7 @@ export function Assistant() {
                         <time dateTime={m.createdAt}>{fmtTime(m.createdAt)}</time>
                         {m.role === 'assistant' && (
                           <button type="button" className="iconbtn" aria-label="Read this reply aloud" disabled={speaking || !ttsReady} title={ttsReady ? 'Read aloud' : ttsReason} onClick={() => void speak(m.text)}>
-                            <SpeakerHigh size={14} aria-hidden />
+                            <SpeakerHigh size={15} aria-hidden />
                           </button>
                         )}
                       </header>
@@ -1257,6 +1336,21 @@ export function Assistant() {
                     </article>
                   );
                 })}
+                {pending !== null && (
+                  <>
+                    <article className="msg msg-user msg-pending">
+                      <header>
+                        <span className="msg-who">You</span>
+                        <span className="sub">sending…</span>
+                      </header>
+                      <p>{pending}</p>
+                    </article>
+                    <div className="typing" role="status" aria-label="Waiting for the model">
+                      <CompanionOrb size={28} decorative />
+                      <span>Waiting for the {online ? 'cloud' : 'local'} model…{cancelFeat?.available === false ? ' The reply arrives complete and cannot be stopped once sent.' : ''}<Waited /></span>
+                    </div>
+                  </>
+                )}
                 {live !== null && (
                   <article className="msg msg-assistant msg-pending" aria-busy="true">
                     <header>
@@ -1270,110 +1364,58 @@ export function Assistant() {
                       return (
                         <>
                           {d.hidden > 0 && <p className="field-hint">Showing the latest {d.shown.length.toLocaleString()} of {d.total.toLocaleString()} characters. The whole reply is saved when it finishes.</p>}
-                          <p>{d.hidden > 0 ? '…' : ''}{d.shown}</p>
+                          <p>{d.hidden > 0 ? '…' : ''}{d.shown}<span className="caret" aria-hidden="true" /></p>
                         </>
                       );
                     })() : (
                       <div className="typing" role="status" aria-label="Waiting for the model">
-                        <i /><i /><i />
-                        <span>Waiting for {live.route === 'cloud' ? 'cloud' : 'local'} model…</span>
+                        <CompanionOrb size={28} decorative />
+                        <span>Waiting for the {live.route === 'cloud' ? 'cloud' : 'local'} model…</span>
                       </div>
                     )}
-                    <div className="row">
-                      <Button size="sm" variant="quiet" icon={Stop} aria-keyshortcuts="Escape" busy={live.status === 'stopping' && !stopSlow} disabled={live.status === 'stopping' && !stopSlow} onClick={() => void stopStream()}>{stopSlow ? 'Stop again' : 'Stop'}</Button>
-                      <span className="sub">{live.status === 'stopping' ? 'Stop requested. What has arrived is saved.' : 'Esc in the message box also stops the reply.'}</span>
+                    <div className="row msg-stop">
+                      <Button size="sm" icon={Stop} aria-keyshortcuts="Escape" busy={live.status === 'stopping' && !stopSlow} disabled={live.status === 'stopping' && !stopSlow} onClick={() => void stopStream()}>{stopSlow ? 'Stop again' : 'Stop'}</Button>
+                      <span className="sub">{live.status === 'stopping' ? 'Stop requested. What has arrived is saved.' : 'Esc also stops the reply.'}</span>
                     </div>
-                    {stopSlow && <Notice tone="warn" title="The stop is not confirmed yet">The backend has not reported that the reply ended. It may still be running. You can press Stop again; nothing else is sent meanwhile.</Notice>}
+                    {stopSlow && <Notice tone="warn" title="The stop is not confirmed yet">The app has not heard that the reply ended. It may still be running. You can press Stop again; nothing else is sent meanwhile.</Notice>}
                   </article>
-                )}
-                {pending !== null && (
-                  <>
-                    <article className="msg msg-user msg-pending">
-                      <header>
-                        <span className="msg-who">You</span>
-                        <span className="sub">sending…</span>
-                      </header>
-                      <p>{pending}</p>
-                    </article>
-                    <div className="typing" role="status" aria-label="Waiting for the model">
-                      <i /><i /><i />
-                      <span>Waiting for {online ? 'cloud' : 'local'} model…{cancelFeat?.available === false ? ' The reply arrives complete and cannot be stopped once sent.' : ''}<Waited /></span>
-                    </div>
-                  </>
                 )}
               </>
             )}
           </div>
 
-          {streamNote && (
-            <div className="chat-error">
-              <Notice tone={streamNote.tone} title={streamNote.tone === 'danger' ? 'Live reply interrupted' : 'Reply cut off'}>{streamNote.text}</Notice>
-            </div>
-          )}
-
-          {sendError && (
-            <div className="chat-error">
-              <Notice tone="danger" title="The message was not answered">{sendError}</Notice>
-            </div>
-          )}
-
-          {retry && !replyBusy && mode === 'chat' && (
-            <div className="chat-error">
+          <div className="chat-notes">
+            {streamNote && <Notice tone={streamNote.tone} title={streamNote.tone === 'danger' ? 'Live reply interrupted' : 'Reply cut off'}>{streamNote.text}</Notice>}
+            {sendError && <Notice tone="danger" title="The message was not answered">{sendError}</Notice>}
+            {retry && !replyBusy && mode === 'chat' && (
               <Notice tone="info" title="Send the last message again?">
                 {`No reply was kept because ${retry.why}. Retrying adds your message to the conversation a second time and sends it to the ${rs.route.toLowerCase()} (${rs.model}). Nothing is sent unless you press Retry.`}
-                <div className="row wrap">
-                  <Button size="sm" icon={PaperPlaneRight} disabled={!configured} onClick={sendAgain}>Retry</Button>
+                <span className="row wrap notice-actions">
+                  <Button size="sm" icon={ArrowClockwise} disabled={!configured} onClick={sendAgain}>Retry</Button>
                   {!configured && <span className="sub">Unavailable: {routeReason}</span>}
-                </div>
+                </span>
               </Notice>
-            </div>
-          )}
-
-          {step && <CommandFlow step={step} busy={stepBusy} onPreview={(r) => void previewStep(r)} onDecide={(a) => void decideStep(a)} onDismiss={() => setStep(null)} />}
-
-          {dictation && (
-            <DictationCleanup
-              key={dictation.n}
-              api={api}
-              mode={online ? 'online' : 'offline'}
-              original={dictation.text}
-              aiBlocked={replyBusy ? 'A chat reply is in progress. Wait for it to finish first.' : !configured ? routeReason : null}
-              onUse={applyDictation}
-              onDismiss={() => { setDictation(null); inputRef.current?.focus(); }}
-              onAiFinished={() => { void reload().catch(() => undefined); }}
-            />
-          )}
-
-          <div className="row wrap pad">
-            <Segmented<ComposerMode>
-              label="What the message box does"
-              value={mode}
-              onChange={setMode}
-              options={[
-                { value: 'chat', label: 'Chat', icon: ChatCircleDots, hint: 'Send a message to the model' },
-                { value: 'command', label: 'Desktop command', icon: Lightning, hint: 'Plan one desktop action; you preview and approve before anything runs' },
-              ]}
-            />
-            {mode === 'command' && <span className="sub">{plannerReady ? 'One action per command. You preview it, then approve it in a Windows confirmation.' : PLANNER_UNAVAILABLE}</span>}
-          </div>
-
-          <div className="chat-error" aria-label="Where this message goes" role="group">
-            <div className="row wrap">
-              <Badge tone={rs.tone === 'danger' ? 'danger' : rs.tone === 'warn' ? 'warn' : 'ok'}>{mode === 'command' ? 'Desktop command' : rs.route}</Badge>
-              {mode === 'chat' ? <span className="mono">{rs.model}</span> : <span className="sub">{modelAssist && modelAssistReady ? 'Rule planner, then the local model if unrecognized' : 'Offline rule planner only'}</span>}
-              {mode === 'chat' && online && <Badge tone="muted">{`Provider: ${providerName}`}</Badge>}
-              {mode === 'chat' && <span className="sub mono">{rs.where}</span>}
-              {mode === 'chat' && rs.key && <Badge tone={providerHasKey ? 'ok' : 'warn'}>{rs.key}</Badge>}
-              <Badge tone={rs.ready ? 'ok' : 'danger'}>{rs.ready ? 'Ready' : 'Unavailable'}</Badge>
-            </div>
-            <p className="field-hint" id="route-privacy">{mode === 'command' ? 'A command is planned here on this computer. It is not sent to a chat model, and nothing runs until you approve it in the Windows confirmation.' : rs.privacy}</p>
-            {mode === 'chat' && !rs.ready && <p className="field-hint">Sending is off: {rs.blocker}</p>}
+            )}
+            {step && <CommandFlow step={step} busy={stepBusy} onPreview={(r) => void previewStep(r)} onDecide={(a) => void decideStep(a)} onDismiss={() => setStep(null)} />}
+            {dictation && (
+              <DictationCleanup
+                key={dictation.n}
+                api={api}
+                mode={online ? 'online' : 'offline'}
+                original={dictation.text}
+                aiBlocked={replyBusy ? 'A chat reply is in progress. Wait for it to finish first.' : !configured ? routeReason : null}
+                onUse={applyDictation}
+                onDismiss={() => { setDictation(null); inputRef.current?.focus(); }}
+                onAiFinished={() => { void reload().catch(() => undefined); }}
+              />
+            )}
+            {voiceNote && <div aria-live="polite"><Notice tone={voiceNote.tone}>{voiceNote.text}</Notice></div>}
           </div>
 
           <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announce.text}</div>
 
           <form
-            className="composer"
+            className={cx('composer', mode === 'command' && 'is-command')}
             onSubmit={(e) => {
               e.preventDefault();
               void send();
@@ -1385,10 +1427,10 @@ export function Assistant() {
             <textarea
               id="chat-input"
               ref={inputRef}
-              className="input"
+              className="composer-input"
               rows={2}
               maxLength={mode === 'command' ? MAX_COMMAND_CHARS : MAX_CHARS}
-              placeholder={mode === 'command' ? 'One desktop action, e.g. list windows · focus "Untitled - Notepad" · open https://example.com' : 'Type a message. Enter sends, Shift+Enter adds a line.'}
+              placeholder={mode === 'command' ? 'One desktop action, for example: list windows, or focus “Untitled - Notepad”' : configured ? 'Message the assistant. Enter sends, Shift+Enter adds a line.' : 'You can type now. Sending needs AI to be set up.'}
               value={input}
               aria-describedby="route-privacy"
               onChange={(e) => setInput(e.target.value)}
@@ -1403,45 +1445,66 @@ export function Assistant() {
               }}
             />
             <div className="composer-actions">
-              <button
-                type="button"
-                className={cx('ptt', phase !== 'idle' && `ptt-${phase}`)}
-                aria-pressed={phase === 'recording'}
-                aria-label={recLabel}
-                title={micBlocked ?? 'Hold to record, or tap once to start and tap again to stop. Esc cancels.'}
-                disabled={phase === 'transcribing' || replyBusy || (phase === 'idle' && (!sttReady || micBlocked !== null))}
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  press();
-                }}
-                onPointerUp={release}
-                onPointerCancel={cancelRec}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') cancelRec();
-                  if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
-                    e.preventDefault();
+              <Segmented<ComposerMode>
+                label="What the message box does"
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { value: 'chat', label: 'Chat', icon: ChatCircleDots, hint: 'Send a message to the model' },
+                  { value: 'command', label: 'Desktop action', icon: Lightning, hint: 'Plan one desktop action; you preview and approve before anything runs' },
+                ]}
+              />
+              <div className={cx('voice', phase !== 'idle' && `voice-${phase}`)}>
+                <button
+                  type="button"
+                  className={cx('ptt', phase !== 'idle' && `ptt-${phase}`)}
+                  aria-pressed={phase === 'recording'}
+                  aria-label={recLabel}
+                  title={micBlocked ?? (sttReady ? 'Hold to record, or tap once to start and again to stop. Esc cancels.' : sttReason)}
+                  disabled={phase === 'transcribing' || replyBusy || (phase === 'idle' && (!sttReady || micBlocked !== null))}
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId);
                     press();
-                  }
-                }}
-                onKeyUp={(e) => {
-                  if (e.key === ' ' || e.key === 'Enter') {
-                    e.preventDefault();
-                    release();
-                  }
-                }}
-                onClick={(e) => {
-                  if (e.detail === 0) press();
-                }}
-              >
-                {phase === 'transcribing' || phase === 'starting' ? <Spinner size={16} /> : phase === 'recording' ? <Stop size={16} weight="fill" aria-hidden /> : <Microphone size={16} aria-hidden />}
-                <span>{phase === 'recording' ? 'Release' : phase === 'transcribing' ? 'Transcribing' : 'Push to talk'}</span>
-              </button>
-              {mode === 'chat' && blocker && input.trim() && <span className="sub" id="send-blocker">{blocker}</span>}
+                  }}
+                  onPointerUp={release}
+                  onPointerCancel={cancelRec}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') cancelRec();
+                    if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+                      e.preventDefault();
+                      press();
+                    }
+                  }}
+                  onKeyUp={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      release();
+                    }
+                  }}
+                  onClick={(e) => {
+                    if (e.detail === 0) press();
+                  }}
+                >
+                  {phase === 'transcribing' || phase === 'starting' ? <Spinner size={16} /> : phase === 'recording' ? <Stop size={16} weight="fill" aria-hidden /> : <Microphone size={16} aria-hidden />}
+                  <span>{phase === 'recording' ? 'Stop' : phase === 'transcribing' ? 'Transcribing' : 'Talk'}</span>
+                </button>
+                {phase === 'recording' && (
+                  <>
+                    <LevelMeter level={level} active />
+                    <span className="voice-time" aria-live="polite">{Math.ceil(remainingMs(elapsedMs) / 1000)} s left</span>
+                    <Button size="sm" variant="quiet" onClick={cancelRec}>Cancel</Button>
+                  </>
+                )}
+                {phase === 'idle' && sttReady && !micAllowed && support.supported && (
+                  <button type="button" className="linkbtn voice-allow" onClick={() => setDrawer('voice')}>Allow microphone</button>
+                )}
+              </div>
+              {mode === 'chat' && blocker && input.trim() && <span className="sub composer-why" id="send-blocker">{blocker}</span>}
               <span className="counter" aria-hidden={input.length < 3500}>
                 {input.length >= 3500 ? `${input.length}/${MAX_CHARS}` : ''}
               </span>
               {mode === 'command' ? (
-                <Button type="submit" variant="primary" icon={Lightning} busy={stepBusy === 'plan'} disabled={!input.trim() || stepBusy !== null || phase === 'transcribing' || !plannerReady}>
+                <Button type="submit" variant="primary" icon={Lightning} busy={stepBusy === 'plan'} disabled={!input.trim() || stepBusy !== null || phase === 'transcribing' || !plannerReady} title={plannerReady ? undefined : PLANNER_UNAVAILABLE}>
                   Plan
                 </Button>
               ) : (
@@ -1450,98 +1513,85 @@ export function Assistant() {
                 </Button>
               )}
             </div>
+            {mode === 'command' && <p className="field-hint composer-mode-hint">{plannerReady ? 'One action at a time. You preview it, then approve it in a Windows confirmation that defaults to Cancel.' : PLANNER_UNAVAILABLE}</p>}
           </form>
         </section>
-
-        <div className="stack">
-          <Panel title="Companion" eyebrow="State" className="panel-companion">
-            <div className="companion-mini">
-              <Avatar state={companion.state} size={104} level={level} />
-              <p className="field-hint">Shows what this window is doing: recording, waiting for a reply, speaking aloud, or an error.</p>
-            </div>
-            <Button size="sm" aria-expanded={avatarPreview} aria-controls="assistant-avatar-preview" onClick={() => setAvatarPreview((v) => !v)}>{avatarPreview ? 'Close avatar preview' : 'Open avatar preview'}</Button>
-          </Panel>
-          {avatarPreview && <section id="assistant-avatar-preview" aria-label="Live avatar preview">
-            <p className="field-hint">Live microphone amplitude while you record here. Timelines stay still in this compact preview; use Avatar Studio for animation editing. With no recording attached, its slider is a labelled simulation.</p>
-            <AvatarStudio reducedMotion={true} voiceLevel={hostVoiceLevel(companion)} voiceSourceLabel="Assistant microphone" />
-          </section>}
-
-          <Panel title="Push to talk" eyebrow="Basic · Windows Speech">
-            {!sttReady&&<Notice tone="warn" title="Speech recognition unavailable">{sttReason}<div className="row"><Button size="sm" busy={systemLoading} onClick={()=>void refreshSystem()}>Check again</Button><a className="btn btn-ghost btn-sm" href="#/status">System status</a></div></Notice>}
-            {!support.supported && <Notice tone="warn" title="Microphone unavailable">{support.reason}</Notice>}
-            <Switch
-              label="Allow the microphone in Desktop Companion"
-              description={micAllowed ? 'On: the microphone opens only while you hold or tap the talk button and is released as soon as you stop or cancel. Turning this off cancels any recording and forgets the permission.' : 'Off: the talk button stays disabled and this window never opens the microphone. This is separate from the Windows microphone permission.'}
-              checked={micAllowed}
-              disabled={!support.supported}
-              onChange={setMicAllowed}
-            />
-            <LevelMeter level={level} active={phase === 'recording'} />
-            {phase === 'recording' && (
-              <p className="field-hint" aria-live="polite">
-                Recording: {Math.ceil(remainingMs(elapsedMs) / 1000)} s left before it stops on its own. Esc cancels.
-              </p>
-            )}
-            <p className="field-hint">
-              Records up to {MAX_CLIP_MS / 1000} s from the default microphone as 16 kHz mono WAV and sends it to the backend’s speech recognizer. The text lands in the message box for you to review; nothing is sent automatically.
-            </p>
-            {voiceNote && (
-              <div aria-live="polite">
-                <Notice tone={voiceNote.tone}>{voiceNote.text}</Notice>
-              </div>
-            )}
-          </Panel>
-
-          <Panel title="Read aloud" eyebrow="Local speech">
-            <p className="field-hint">
-              Voice: <strong>{settings.voice || 'backend default'}</strong> (change in Settings). Playback uses the Windows speech engine when its capability check passes. There is no stop control yet.
-            </p>
-            {!ttsReady&&<Notice tone="warn" title="Read aloud unavailable">{ttsReason}<div className="row"><Button size="sm" busy={systemLoading} onClick={()=>void refreshSystem()}>Check again</Button><a className="btn btn-ghost btn-sm" href="#/status">System status</a></div></Notice>}
-            <Switch label="Read replies aloud automatically" checked={autoSpeak} disabled={!ttsReady} onChange={setAutoSpeak} />
-            <div className="field">
-              <label htmlFor="speak-text">Speak this text</label>
-              <textarea id="speak-text" className="input" rows={2} maxLength={2000} value={speakText} onChange={(e) => setSpeakText(e.target.value)} placeholder="Type something to hear it" />
-            </div>
-            <Button icon={SpeakerHigh} busy={speaking} disabled={!speakText.trim() || !ttsReady} onClick={() => void speak(speakText)}>
-              Speak
-            </Button>
-          </Panel>
-
-          <Panel title="Desktop commands" eyebrow="Plan · preview · approve">
-            {!plannerReady && <Notice tone="warn" title="Planner unavailable">{PLANNER_UNAVAILABLE}</Notice>}
-            <p className="field-hint">
-              Switch the message box to Desktop command. The offline rule planner turns one command into one proposed action. You preview it, then approve it in a Windows confirmation that defaults to Cancel. Nothing types, clicks or launches on its own.
-            </p>
-            <Switch
-              label="Ask the local model when a command is not recognized"
-              description={modelAssistReady ? `Uses only “${settings.localModel}” on ${settings.localEndpoint}. Never the cloud. Its plan is checked by the same rules.` : `Unavailable: ${unavailable(localRoute?.reason)}`}
-              checked={modelAssist && modelAssistReady}
-              disabled={!modelAssistReady}
-              onChange={setModelAssist}
-            />
-          </Panel>
-
-          <ContextControls />
-
-          <ConversationHistory chat={state.chat} busy={replyBusy} />
-
-          <Panel title="Model route" eyebrow="Backend capability">
-            <Notice tone={configured?'info':'warn'} title={configured?'Available':'Unavailable'}>{route?.reason || routeReason}</Notice>
-            <div className="row wrap"><Button size="sm" busy={systemLoading} onClick={()=>void refreshSystem()}>Check again</Button><a className="btn btn-ghost btn-sm" href="#/status">System status</a></div>
-            <dl className="kv-list">
-              <div className="kv"><dt>Mode</dt><dd>{online ? 'Online' : 'Offline'}</dd></div>
-              <div className="kv"><dt>{online ? 'Cloud model' : 'Local model'}</dt><dd>{(online ? settings.cloudModel : settings.localModel) || 'not set'}</dd></div>
-              {!online && <div className="kv"><dt>Endpoint</dt><dd className="mono">{settings.localEndpoint || 'not set'}</dd></div>}
-              <div className="kv"><dt>Streaming</dt><dd>{streaming ? (streaming.available ? 'Available' : 'Not available') : 'unknown'}{streaming?.reason ? <span className="sub"> · {streaming.reason}</span> : null}</dd></div>
-              <div className="kv"><dt>Stop a reply</dt><dd>{cancelFeat ? (cancelFeat.available ? 'Available' : 'Not available') : 'unknown'}{cancelFeat?.reason ? <span className="sub"> · {cancelFeat.reason}</span> : null}</dd></div>
-              {online && <div className="kv"><dt>API key</dt><dd>{cloudConfigured === null ? 'unknown' : cloudConfigured ? 'saved' : 'not saved'}</dd></div>}
-            </dl>
-          </Panel>
-        </div>
       </div>
 
+      {drawer && (
+        <aside className="assist-drawer" aria-label="Assistant options">
+          <div className="drawer-head">
+            <Tabs<DrawerTab> label="Assistant options" idBase="assist-drawer" value={drawer} onChange={setDrawer} tabs={tabs} />
+            <button type="button" className="iconbtn" aria-label="Close options" onClick={() => setDrawer(null)}><X size={16} aria-hidden /></button>
+          </div>
+          <div className="drawer-body" id="assist-drawer-panel" role="tabpanel" aria-labelledby={`assist-drawer-tab-${drawer}`}>
+            {drawer === 'history' && <ConversationHistory chat={state.chat} busy={replyBusy} />}
+            {drawer === 'voice' && (
+              <div className="stack">
+                <section className="section" aria-label="Talk">
+                  <h2>Talk</h2>
+                  {!sttReady && <Notice tone="warn" title="Speech recognition unavailable">{sttReason}</Notice>}
+                  {!support.supported && <Notice tone="warn" title="Microphone unavailable">{support.reason}</Notice>}
+                  <Switch
+                    label="Allow the microphone in Desktop Companion"
+                    description={micAllowed ? 'On: the microphone opens only while you hold or tap Talk, and closes as soon as you stop or cancel. Turning this off cancels any recording.' : 'Off: Talk stays disabled and this window never opens the microphone. This is separate from the Windows microphone permission.'}
+                    checked={micAllowed}
+                    disabled={!support.supported}
+                    onChange={setMicAllowed}
+                  />
+                  <p className="field-hint">Records up to {MAX_CLIP_MS / 1000} s from the default microphone and turns it into text on this computer. The text goes into the message box for you to review; nothing is sent automatically.</p>
+                </section>
+                <section className="section" aria-label="Read aloud">
+                  <h2>Read aloud</h2>
+                  {!ttsReady && <Notice tone="warn" title="Read aloud unavailable">{ttsReason}</Notice>}
+                  <Switch label="Read replies aloud automatically" checked={autoSpeak} disabled={!ttsReady} onChange={setAutoSpeak} />
+                  <div className="field">
+                    <label htmlFor="speak-text">Speak this text</label>
+                    <textarea id="speak-text" className="input" rows={2} maxLength={2000} value={speakText} onChange={(e) => setSpeakText(e.target.value)} placeholder="Type something to hear it" />
+                  </div>
+                  <div className="row">
+                    <Button icon={SpeakerHigh} busy={speaking} disabled={!speakText.trim() || !ttsReady} onClick={() => void speak(speakText)}>Speak</Button>
+                    <span className="sub">Voice: {settings.voice || 'Windows default'}. There is no stop control for playback yet.</span>
+                  </div>
+                </section>
+              </div>
+            )}
+            {drawer === 'context' && <ContextControls />}
+            {drawer === 'actions' && (
+              <div className="stack">
+                <section className="section" aria-label="Desktop actions">
+                  <h2>Desktop actions</h2>
+                  {!plannerReady && <Notice tone="warn" title="Planning unavailable">{PLANNER_UNAVAILABLE}</Notice>}
+                  <p className="field-hint">Switch the message box to Desktop action. One request becomes one proposed action. You preview it, then approve it in a Windows confirmation that defaults to Cancel. Nothing types, clicks or opens on its own.</p>
+                  <Switch
+                    label="Ask the local model when a request is not recognized"
+                    description={modelAssistReady ? `Uses only “${settings.localModel}” on ${settings.localEndpoint}. Never the cloud. Its plan is checked by the same rules.` : `Unavailable: ${unavailable(localRoute?.reason)}`}
+                    checked={modelAssist && modelAssistReady}
+                    disabled={!modelAssistReady}
+                    onChange={setModelAssist}
+                  />
+                  <a className="btn btn-sm" href="#/computer">Open Desktop actions</a>
+                </section>
+              </div>
+            )}
+          </div>
+        </aside>
+      )}
+
+      <Dialog open={setupOpen} onClose={() => setSetupOpen(false)} title="Set up AI" description="Choose where answers come from. Notes, tasks and search keep working either way." size="md">
+        {setupOpen && (
+          <AiSetup
+            initialRoute={online ? 'cloud' : 'choose'}
+            onDone={() => {
+              setSetupOpen(false);
+              void refreshSystem();
+            }}
+          />
+        )}
+      </Dialog>
+
       <ConfirmDialog open={confirmClear} title="Clear the conversation?" confirmLabel="Clear" danger busy={clearing} onCancel={() => setConfirmClear(false)} onConfirm={() => void doClear()}>
-        <p>All {state.chat.length} saved messages are deleted from this computer. Notes, tasks and capsules are not affected.</p>
+        <p>All {state.chat.length} saved messages are deleted from this computer. Notes, tasks and setups are not affected.</p>
       </ConfirmDialog>
     </div>
   );

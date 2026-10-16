@@ -1,0 +1,173 @@
+/* Connect AI (first run and the Assistant's setup dialog). */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: var(--t-small);
+}
+
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.choice,
+.provider {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s4);
+  text-align: left;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+}
+
+.choice:hover,
+.provider:hover:not(:disabled) {
+  border-color: var(--field-line);
+  box-shadow: var(--shadow-1);
+}
+
+.choice .grow,
+.provider .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choice strong {
+  font-size: var(--t-body);
+  font-weight: 600;
+}
+
+.choice-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.provider-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s2);
+}
+
+.provider-list > .field-label {
+  grid-column: 1 / -1;
+}
+
+.provider {
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-md);
+}
+
+.provider strong {
+  font-weight: 600;
+}
+
+.provider.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.provider:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.key-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.key-box > .row > svg {
+  color: var(--muted);
+}
+
+.ai-result {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-md);
+}
+
+.ai-result.is-ok {
+  background: var(--ok-soft);
+}
+
+.ai-result.is-ok > svg {
+  color: var(--ok);
+}
+
+.ai-result.is-bad {
+  background: var(--warn-soft);
+}
+
+.ai-result.is-bad > svg {
+  color: var(--warn);
+}
+
+.ai-result strong {
+  font-weight: 600;
+}
+
+.ai-recover {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.ai-recover ol {
+  list-style: decimal;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--t-small);
+}
+
+.copy-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.copy-line .iconbtn {
+  width: 26px;
+  height: 26px;
+}
+
+.ai-test {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+@media (max-width: 720px) {
+  .provider-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

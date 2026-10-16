@@ -1,30 +1,39 @@
 import type { ComponentType } from 'react';
-import { ChatCircleDots, CheckSquare, Code, Cube, Desktop, Flask, GearSix, House, Note, Pulse, Robot } from '@phosphor-icons/react';
-// The two newest views take their glyphs through the package namespace so the icon list in the
-// existing navigation test (which stubs the package with a fixed set of names) keeps building.
-// Rollup resolves static namespace member access, so this does not change tree-shaking.
+import { ChatCircleDots, CheckSquare, Code, Cube, Desktop, Flask, GearSix, House, Note, Pulse } from '@phosphor-icons/react';
+// The newer glyphs are taken through the package namespace so the icon list in the existing navigation test (which
+// stubs the package with a fixed set of names) keeps building. Rollup resolves static namespace access, so this does not
+// change tree-shaking.
 import * as Phosphor from '@phosphor-icons/react';
 
 export type ViewId = 'home' | 'assistant' | 'companion' | 'capsules' | 'notes' | 'tasks' | 'computer' | 'status' | 'settings' | 'lab' | 'developer' | 'search' | 'motion' | 'routines' | 'integrations' | 'models' | 'usage' | 'clipboard' | 'calendar' | 'avatar' | 'memory' | 'writing' | 'guide';
 
-export type NavIcon = ComponentType<{ size?: number | string; weight?: 'regular' | 'fill' | 'duotone'; 'aria-hidden'?: boolean }>;
+export type NavIcon = ComponentType<{ size?: number | string; weight?: 'regular' | 'fill' | 'duotone' | 'bold'; 'aria-hidden'?: boolean }>;
+
+/** The six places in the rail, plus Settings in the rail footer. Every view belongs to exactly one area. */
+export type AreaId = 'today' | 'assistant' | 'workspace' | 'memory' | 'automations' | 'studio' | 'settings';
 
 export type ViewDef = {
   id: ViewId;
   label: string;
   icon: NavIcon;
+  /** Display name of the area this view sits in (kept as `group` for older callers). */
   group: string;
-  /** One line shown in the help dialog and the quick-jump list. */
+  area: AreaId;
+  /** One line shown in help, the quick-jump palette and empty states. */
   blurb: string;
   /** Keyboard shortcut label, when the view has one. Alt+1…9 and Alt+0 are positional; others are fixed. */
   shortcut?: string;
+  /** Shown under "Advanced" in its area: diagnostics and developer tools. */
+  advanced?: boolean;
 };
+
+export type AreaDef = { id: AreaId; label: string; icon: NavIcon; blurb: string; views: ViewId[]; footer?: boolean };
 
 const SearchIcon = Phosphor.MagnifyingGlass as NavIcon;
 const MotionIcon = Phosphor.Waveform as NavIcon;
 const RoutinesIcon = Phosphor.ListChecks as NavIcon;
 const IntegrationsIcon = Phosphor.PlugsConnected as NavIcon;
-const ModelsIcon = Phosphor.Brain as NavIcon;
+const ModelsIcon = Phosphor.Cpu as NavIcon;
 const UsageIcon = Phosphor.ChartBar as NavIcon;
 const ClipboardIcon = Phosphor.Clipboard as NavIcon;
 const CalendarIcon = Phosphor.CalendarBlank as NavIcon;
@@ -32,36 +41,64 @@ const AvatarIcon = Phosphor.UserCircle as NavIcon;
 const MemoryIcon = Phosphor.Notebook as NavIcon;
 const WritingIcon = Phosphor.PenNib as NavIcon;
 const GuideIcon = Phosphor.Compass as NavIcon;
+const WorkspaceIcon = Phosphor.Stack as NavIcon;
+const AutomationsIcon = Phosphor.Repeat as NavIcon;
+const StudioIcon = Phosphor.Sparkle as NavIcon;
+const ArchiveIcon = Phosphor.Archive as NavIcon;
+const CompanionIcon = Phosphor.Circle as NavIcon;
+
+export const AREAS: AreaDef[] = [
+  { id: 'today', label: 'Today', icon: House, blurb: 'Start something or pick up where you left off.', views: ['home'] },
+  { id: 'assistant', label: 'Assistant', icon: ChatCircleDots, blurb: 'Ask, talk and review actions on this computer.', views: ['assistant', 'computer'] },
+  { id: 'workspace', label: 'Workspace', icon: WorkspaceIcon, blurb: 'Notes, writing, tasks, calendar, setups and clipboard.', views: ['notes', 'writing', 'tasks', 'calendar', 'capsules', 'clipboard'] },
+  { id: 'memory', label: 'Memory', icon: ArchiveIcon, blurb: 'Search everything saved here and choose what is remembered.', views: ['search', 'memory'] },
+  { id: 'automations', label: 'Automations', icon: AutomationsIcon, blurb: 'Routines you run by hand or on a schedule.', views: ['routines'] },
+  { id: 'studio', label: 'Studio', icon: StudioIcon, blurb: 'Choose how your companion looks and moves.', views: ['companion', 'avatar', 'motion'] },
+  { id: 'settings', label: 'Settings', icon: GearSix, blurb: 'Preferences, AI, connections, help and diagnostics.', views: ['settings', 'integrations', 'models', 'usage', 'guide', 'status', 'developer', 'lab'], footer: true },
+];
+
+const AREA_OF = new Map<ViewId, AreaDef>(AREAS.flatMap((a) => a.views.map((v) => [v, a] as const)));
+
+type Base = Omit<ViewDef, 'group' | 'area'>;
+const view = (v: Base): ViewDef => {
+  const a = AREA_OF.get(v.id) as AreaDef;
+  return { ...v, area: a.id, group: a.label };
+};
 
 /**
- * Order matters in two places: the first ten entries get Alt+1…9 and Alt+0, and views are listed
- * on screen grouped by `group` in this order. New views are appended so existing shortcuts stay put.
+ * Order matters: the first ten entries get Alt+1…9 and Alt+0 and that order never changes, so existing shortcuts and
+ * deep links keep working. Screens are listed on screen by area, not by this order.
  */
 export const VIEWS: ViewDef[] = [
-  { id: 'home', label: 'Home', icon: House, group: 'Cockpit', blurb: 'Overview of what is saved on this computer.' },
-  { id: 'assistant', label: 'Assistant', icon: ChatCircleDots, group: 'Cockpit', blurb: 'Chat with the local or cloud model.' },
-  { id: 'companion', label: 'Companion', icon: Robot, group: 'Cockpit', blurb: 'Avatar poses and scene backdrop.' },
-  { id: 'capsules', label: 'Capsules', icon: Cube, group: 'Work', blurb: 'Project bundles of files, folders, apps and links.' },
-  { id: 'notes', label: 'Notes', icon: Note, group: 'Work', blurb: 'Tagged notes kept on this computer.' },
-  { id: 'tasks', label: 'Tasks & focus', icon: CheckSquare, group: 'Work', blurb: 'Tasks with due dates and a focus timer.' },
-  { id: 'computer', label: 'Computer', icon: Desktop, group: 'Work', blurb: 'Preview and approve actions on this computer.' },
-  { id: 'status', label: 'System status', icon: Pulse, group: 'System', blurb: 'What this app detected and what is unavailable.' },
-  { id: 'settings', label: 'Settings', icon: GearSix, group: 'System', blurb: 'Mode, models, access, data and appearance.' },
-  { id: 'lab', label: 'Feature Lab', icon: Flask, group: 'System', blurb: 'Roadmap status for every planned scope.' },
-  { id: 'developer', label: 'Developer', icon: Code, group: 'System', blurb: 'Diagnostics and shortcut reference.' },
-  { id: 'search', label: 'Memory search', icon: SearchIcon, group: 'Work', blurb: 'Search saved notes, tasks, capsules and chat.', shortcut: 'Ctrl+K' },
-  { id: 'motion', label: 'Motion studio', icon: MotionIcon, group: 'Cockpit', blurb: 'Original wave, particle and orbit effects with presets.' },
-  { id: 'avatar', label: 'Avatar', icon: AvatarIcon, group: 'Cockpit', blurb: 'Live avatar preview and whether avatar editing is connected.' },
-  { id: 'routines', label: 'Routines', icon: RoutinesIcon, group: 'Work', blurb: 'Saved step lists you run by hand or on a schedule.' },
-  { id: 'clipboard', label: 'Clipboard history', icon: ClipboardIcon, group: 'Work', blurb: 'Opt-in history of copied text, kept on this computer.' },
-  { id: 'calendar', label: 'Calendar', icon: CalendarIcon, group: 'Work', blurb: 'Local .ics calendar import; shows whether it is connected.' },
-  { id: 'models', label: 'Models', icon: ModelsIcon, group: 'System', blurb: 'Local model manager for Ollama on this computer.' },
-  { id: 'integrations', label: 'Integrations', icon: IntegrationsIcon, group: 'System', blurb: 'Optional providers: API connections, websites and device links.' },
-  { id: 'usage', label: 'Usage', icon: UsageIcon, group: 'System', blurb: 'Local token and spend ledger with export.' },
-  { id: 'memory', label: 'Memory', icon: MemoryIcon, group: 'Work', blurb: 'Projects, checkpoints, shelf, opt-in timeline and source-linked recaps kept on this computer.' },
-  { id: 'writing', label: 'Writing', icon: WritingIcon, group: 'Work', blurb: 'Notes editor, scratch pad and reviewed prompt drafts for the assistant.' },
-  { id: 'guide', label: 'Guided setup', icon: GuideIcon, group: 'System', blurb: 'Short local tours and a setup checklist driven by what this computer reports.' },
+  view({ id: 'home', label: 'Today', icon: House, blurb: 'Start something useful or continue recent work.' }),
+  view({ id: 'assistant', label: 'Assistant', icon: ChatCircleDots, blurb: 'Chat with your local or cloud model, or speak to it.' }),
+  view({ id: 'companion', label: 'Companion', icon: CompanionIcon, blurb: 'Choose the companion shown across the app.' }),
+  view({ id: 'capsules', label: 'Setups', icon: Cube, blurb: 'Files, folders, apps and links you open together.' }),
+  view({ id: 'notes', label: 'Notes', icon: Note, blurb: 'Notes with tags, kept on this computer.' }),
+  view({ id: 'tasks', label: 'Tasks', icon: CheckSquare, blurb: 'To-dos with due dates and a focus timer.' }),
+  view({ id: 'computer', label: 'Desktop actions', icon: Desktop, blurb: 'Preview an action on this computer, then approve it.' }),
+  view({ id: 'status', label: 'System status', icon: Pulse, blurb: 'What this computer supports and why something is unavailable.', advanced: true }),
+  view({ id: 'settings', label: 'Settings', icon: GearSix, blurb: 'Appearance, AI, privacy, data and startup.' }),
+  view({ id: 'lab', label: 'Roadmap', icon: Flask, blurb: 'Which planned features are built, partial or not started.', advanced: true }),
+  view({ id: 'developer', label: 'Developer', icon: Code, blurb: 'Diagnostics, logs and the shortcut reference.', advanced: true }),
+  view({ id: 'search', label: 'Search', icon: SearchIcon, blurb: 'Find anything saved: notes, tasks, setups and chat.', shortcut: 'Ctrl+K' }),
+  view({ id: 'motion', label: 'Motion studio', icon: MotionIcon, blurb: 'Original wave, particle and 3D scenes with presets.' }),
+  view({ id: 'avatar', label: 'Character editor', icon: AvatarIcon, blurb: 'Edit the classic character pack: shape, expressions and timelines.' }),
+  view({ id: 'routines', label: 'Automations', icon: RoutinesIcon, blurb: 'Saved steps you review and run by hand or on a schedule.' }),
+  view({ id: 'clipboard', label: 'Clipboard', icon: ClipboardIcon, blurb: 'Opt-in history of copied text, kept on this computer.' }),
+  view({ id: 'calendar', label: 'Calendar', icon: CalendarIcon, blurb: 'Events imported from a local .ics file.' }),
+  view({ id: 'models', label: 'Local models', icon: ModelsIcon, blurb: 'Models installed in Ollama on this computer.' }),
+  view({ id: 'integrations', label: 'Connections', icon: IntegrationsIcon, blurb: 'AI providers, accounts and devices you connect yourself.' }),
+  view({ id: 'usage', label: 'Usage', icon: UsageIcon, blurb: 'Tokens and estimated spend recorded on this computer.' }),
+  view({ id: 'memory', label: 'Memory', icon: MemoryIcon, blurb: 'Projects, checkpoints, the shelf and opt-in history.' }),
+  view({ id: 'writing', label: 'Writing', icon: WritingIcon, blurb: 'Longer drafts, a scratch pad and reviewed prompts.' }),
+  view({ id: 'guide', label: 'Help & setup', icon: GuideIcon, blurb: 'Short tours and a checklist based on what this computer reports.' }),
 ];
+
+export const areaById = (id: AreaId): AreaDef => AREAS.find((a) => a.id === id) ?? AREAS[0];
+export const areaOf = (v: ViewId): AreaDef => AREA_OF.get(v) ?? AREAS[0];
+/** The screen an area opens on when chosen in the rail. */
+export const areaHome = (a: AreaDef): ViewId => a.views[0];
 
 /** Alt+1…9 and Alt+0 reach the first ten views; later views have no positional shortcut. */
 export function positionalShortcut(index: number): string | null {
@@ -78,10 +115,9 @@ export const VIEW_IDS = VIEWS.map((v) => v.id);
 
 export const viewById = (id: ViewId): ViewDef => VIEWS.find((v) => v.id === id) ?? VIEWS[0];
 
-/** Views grouped in display order, preserving the first-seen order of group names. */
+/** Views grouped by area in rail order; inside an area, in that area's own order. */
 export function navGroups(): { name: string; views: ViewDef[] }[] {
-  const names = Array.from(new Set(VIEWS.map((v) => v.group)));
-  return names.map((name) => ({ name, views: VIEWS.filter((v) => v.group === name) }));
+  return AREAS.map((a) => ({ name: a.label, views: a.views.map((id) => viewById(id)) }));
 }
 
 export type HashLocation = { view: ViewId; params: Record<string, string> };
@@ -118,8 +154,8 @@ export const VIEW_FOR_CATEGORY: Record<'note' | 'task' | 'capsule' | 'chat', Vie
 export type ShortcutAction = { kind: 'view'; view: ViewId } | { kind: 'help' } | { kind: 'search' };
 
 /**
- * Global keyboard map, pure so it can be tested: Alt+digit jumps to a view, Ctrl+K opens memory
- * search, F1 opens help. Returns null for anything else, and always null while a modal dialog is
+ * Global keyboard map, pure so it can be tested: Alt+digit jumps to a view, Ctrl+K opens search (the quick-search
+ * palette searches saved memory first and also lists every screen), F1 opens help. Returns null for anything else, and always null while a modal dialog is
  * open so a shortcut never discards a dialog's unsaved state.
  */
 export function shortcutAction(e: { key: string; altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }, modalOpen: boolean): ShortcutAction | null {

@@ -1,0 +1,235 @@
+/* First run: one welcoming scene. Content on the left, the companion on a quiet stage on the right. */
+.onboard-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.onboard {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  min-height: 0;
+}
+
+.ob-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--s5);
+  padding: var(--s8) clamp(24px, 6vw, 88px);
+  min-width: 0;
+}
+
+.ob-brand {
+  font-weight: 600;
+  font-size: var(--t-small);
+  color: var(--muted);
+}
+
+.ob-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  max-width: 560px;
+  animation: view-in var(--dur-route) var(--ease-out) both;
+}
+
+.ob-step h1 {
+  outline: none;
+}
+
+.ob-step h1.display {
+  font-size: clamp(40px, 4.6vw, 58px);
+}
+
+.ob-step h1:not(.display) {
+  font-size: 30px;
+}
+
+.ob-lead {
+  font-size: var(--t-lead);
+  color: var(--ink-2);
+  max-width: 52ch;
+}
+
+.ob-paths {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.ob-path {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s4) var(--s5);
+  text-align: left;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease);
+}
+
+.ob-path:hover {
+  border-color: var(--field-line);
+  box-shadow: var(--shadow-2);
+}
+
+.ob-path .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ob-path strong {
+  font-size: var(--t-lead);
+  font-weight: 600;
+}
+
+.ob-path .grow > span {
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+
+.ob-path > svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.ob-path.is-primary {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow-1);
+}
+
+.ob-path-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ob-path.is-primary .ob-path-icon {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.ob-prefs {
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+  flex-wrap: wrap;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+.ob-prefs .switch-row {
+  flex: 1 1 260px;
+}
+
+.ob-first {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.ob-input {
+  min-height: 48px;
+  font-size: var(--t-lead);
+}
+
+.ob-record {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s4);
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  animation: dialog-in var(--dur-route) var(--ease-out) both;
+}
+
+.ob-record strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.ob-record-body {
+  margin-top: var(--s2);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+
+.ob-record-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--ok);
+}
+
+.ob-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s4);
+  padding: var(--s7);
+  background: var(--bg-2);
+  border-left: 1px solid var(--line);
+  text-align: center;
+}
+
+.ob-stage .sub {
+  max-width: 34ch;
+}
+
+.ob-orb {
+  display: grid;
+  place-items: center;
+  width: min(380px, 80%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--surface) 0%, transparent 100%);
+}
+
+@media (max-width: 960px) {
+  .onboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ob-stage {
+    order: -1;
+    padding: var(--s5);
+    border-left: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ob-orb {
+    width: 160px;
+  }
+
+  .ob-orb .orb {
+    --orb-size: 140px !important;
+  }
+
+  .ob-main {
+    padding: var(--s6) var(--s5);
+  }
+}

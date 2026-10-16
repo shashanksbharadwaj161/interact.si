@@ -1,0 +1,263 @@
+/* Scene backdrops (SceneBackdrop.tsx): used for workspace thumbnails and the Studio scene preview, not behind the app. */
+.scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #070a10;
+  --s-blue: rgba(94, 170, 255, 0.22);
+  --s-amber: rgba(242, 180, 65, 0.16);
+}
+
+.scene > * {
+  position: absolute;
+}
+
+.scene-wash {
+  inset: 0;
+  background: radial-gradient(ellipse 60% 55% at 18% 8%, var(--s-blue), transparent 70%), radial-gradient(ellipse 50% 45% at 88% 96%, var(--s-amber), transparent 70%);
+}
+
+.scene-vignette {
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(3, 5, 9, 0.55) 100%);
+}
+
+.scene-stars {
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  transform-origin: 0 0;
+  transform: scale(2.4);
+}
+
+.scene-stars-a {
+  animation: twinkle 7s ease-in-out infinite;
+}
+
+.scene-stars-b {
+  transform: scale(2.4) translate(310px, 140px);
+  animation: twinkle 11s ease-in-out -4s infinite;
+}
+
+@keyframes twinkle {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.scene-orbit {
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.scene-orbit i {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(94, 170, 255, 0.28);
+  animation: spin 60s linear infinite;
+}
+
+.scene-orbit i:nth-child(1) {
+  width: 34vmin;
+  height: 34vmin;
+}
+
+.scene-orbit i:nth-child(2) {
+  width: 58vmin;
+  height: 58vmin;
+  border-style: dashed;
+  border-color: rgba(242, 180, 65, 0.24);
+  animation-duration: 90s;
+  animation-direction: reverse;
+}
+
+.scene-orbit i:nth-child(3) {
+  width: 86vmin;
+  height: 86vmin;
+  animation-duration: 140s;
+}
+
+.scene-orbit i::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.scene-orbit b {
+  width: 6vmin;
+  height: 6vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 180, 65, 0.7), transparent 70%);
+}
+
+.scene[data-scene="aurora"] {
+  background: linear-gradient(180deg, #050a14, #08131c 70%, #0a1a20);
+}
+
+.scene-ribbon {
+  left: -20%;
+  width: 140%;
+  height: 40%;
+  filter: blur(34px);
+  opacity: 0.55;
+  border-radius: 50%;
+}
+
+.scene-ribbon-a {
+  top: 6%;
+  background: linear-gradient(90deg, transparent, rgba(80, 230, 190, 0.7), rgba(94, 170, 255, 0.6), transparent);
+  animation: ribbon 16s ease-in-out infinite alternate;
+}
+
+.scene-ribbon-b {
+  top: 26%;
+  height: 30%;
+  background: linear-gradient(90deg, transparent, rgba(120, 140, 255, 0.55), rgba(80, 230, 190, 0.45), transparent);
+  animation: ribbon 22s ease-in-out -6s infinite alternate-reverse;
+}
+
+.scene-ribbon-c {
+  top: 44%;
+  height: 22%;
+  background: linear-gradient(90deg, transparent, rgba(242, 180, 65, 0.35), transparent);
+  animation: ribbon 28s ease-in-out -12s infinite alternate;
+}
+
+@keyframes ribbon {
+  from {
+    transform: translateX(-6%) skewY(-4deg);
+  }
+  to {
+    transform: translateX(6%) skewY(5deg);
+  }
+}
+
+.scene[data-scene="horizon"] {
+  background: linear-gradient(180deg, #060912 0%, #0c1020 52%, #1a1420 100%);
+}
+
+.scene-sun {
+  left: 50%;
+  top: 40%;
+  width: 36vmin;
+  height: 36vmin;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #ffcf7a 0%, #f2b441 30%, rgba(242, 130, 65, 0.4) 55%, transparent 72%);
+  opacity: 0.85;
+}
+
+.scene-sun-low {
+  top: 46%;
+  opacity: 0.9;
+}
+
+.scene-grid {
+  left: -50%;
+  right: -50%;
+  top: 56%;
+  bottom: -30%;
+  background-image: linear-gradient(rgba(94, 170, 255, 0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(94, 170, 255, 0.45) 1px, transparent 1px);
+  background-size: 46px 46px;
+  transform: perspective(240px) rotateX(62deg);
+  transform-origin: top;
+  -webkit-mask-image: linear-gradient(transparent, #000 40%);
+  mask-image: linear-gradient(transparent, #000 40%);
+  animation: grid-run 4s linear infinite;
+}
+
+@keyframes grid-run {
+  to {
+    background-position: 0 46px, 0 0;
+  }
+}
+
+.scene[data-scene="dusk"] {
+  background: linear-gradient(180deg, #0b0f24 0%, #2a2145 42%, #7a4a52 68%, #d28a4a 86%);
+}
+
+.scene[data-scene="dusk"] .scene-wash {
+  opacity: 0.5;
+}
+
+.scene-ridge {
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.scene-ridge-a {
+  height: 42%;
+  background: #3a2b45;
+  clip-path: polygon(0 60%, 10% 40%, 22% 55%, 36% 28%, 50% 52%, 64% 34%, 78% 58%, 90% 38%, 100% 52%, 100% 100%, 0 100%);
+}
+
+.scene-ridge-b {
+  height: 32%;
+  background: #241a33;
+  clip-path: polygon(0 50%, 14% 62%, 28% 36%, 44% 60%, 58% 30%, 72% 56%, 86% 34%, 100% 58%, 100% 100%, 0 100%);
+}
+
+.scene-ridge-c {
+  height: 20%;
+  background: #120d1d;
+  clip-path: polygon(0 55%, 18% 30%, 34% 60%, 52% 24%, 70% 58%, 88% 28%, 100% 50%, 100% 100%, 0 100%);
+}
+
+.scene-thumb .scene-sun {
+  width: 40px;
+  height: 40px;
+}
+
+.scene-thumb .scene-orbit i:nth-child(n) {
+  width: 44px;
+  height: 44px;
+}
+
+.scene-thumb .scene-orbit i:nth-child(2) {
+  width: 70px;
+  height: 70px;
+}
+
+.scene-thumb .scene-orbit i:nth-child(3) {
+  width: 100px;
+  height: 100px;
+}
+
+/* ---------- Reduced motion ---------- */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-motion="reduced"] .typing i {
+  opacity: 0.7;
+}
+
+:root[data-motion="reduced"] .spin {
+  animation: none !important;
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

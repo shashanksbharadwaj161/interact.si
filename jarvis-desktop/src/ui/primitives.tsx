@@ -12,12 +12,12 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'ghost' | 'danger' | 'quiet';
   icon?: IconType;
   busy?: boolean;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
 };
 
 export function Button({ variant = 'ghost', icon: Icon, busy, size = 'md', className, children, disabled, type = 'button', ...rest }: ButtonProps) {
   return (
-    <button type={type} className={cx('btn', `btn-${variant}`, size === 'sm' && 'btn-sm', className)} disabled={disabled || busy} aria-busy={busy || undefined} {...rest}>
+    <button type={type} className={cx('btn', `btn-${variant}`, size === 'sm' && 'btn-sm', size === 'lg' && 'btn-lg', className)} disabled={disabled || busy} aria-busy={busy || undefined} {...rest}>
       {busy ? <Spinner /> : Icon ? <Icon size={size === 'sm' ? 14 : 16} aria-hidden /> : null}
       {children && <span>{children}</span>}
     </button>
@@ -76,16 +76,71 @@ export function Panel({ title, eyebrow, actions, children, className, as: Tag = 
   );
 }
 
-export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow: string; title: string; subtitle?: string; actions?: ReactNode }) {
+/**
+ * Screen heading. The eyebrow is optional and is no longer shown as a decorative label: the shell's
+ * contextual tabs already say where the user is. It stays in the API so older screens keep compiling.
+ */
+export function PageHeader({ title, subtitle, actions }: { eyebrow?: string; title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <header className="page-head">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
+      <div className="page-head-text">
         <h1>{title}</h1>
         {subtitle && <p className="page-sub">{subtitle}</p>}
       </div>
       {actions && <div className="page-actions">{actions}</div>}
     </header>
+  );
+}
+
+/** A borderless titled group: the default way to separate content on a screen instead of another card. */
+export function Section({ title, actions, children, className, description }: { title: string; actions?: ReactNode; children: ReactNode; className?: string; description?: ReactNode }) {
+  const id = useId();
+  return (
+    <section className={cx('section', className)} aria-labelledby={id}>
+      <header className="section-head">
+        <div>
+          <h2 id={id}>{title}</h2>
+          {description && <p className="field-hint">{description}</p>}
+        </div>
+        {actions && <div className="panel-actions">{actions}</div>}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * In-page tabs with roving focus (arrow keys, Home, End). Panels are rendered by the caller; this only owns the
+ * tab list, so every tab body keeps its own state and lazy loading.
+ */
+export function Tabs<T extends string>({ value, onChange, tabs, label, idBase }: { value: T; onChange: (v: T) => void; tabs: { value: T; label: string; badge?: ReactNode }[]; label: string; idBase: string }) {
+  return (
+    <div className="tabs" role="tablist" aria-label={label}>
+      {tabs.map((t, index) => (
+        <button
+          key={t.value}
+          type="button"
+          role="tab"
+          id={`${idBase}-tab-${t.value}`}
+          aria-controls={`${idBase}-panel`}
+          aria-selected={value === t.value}
+          tabIndex={value === t.value ? 0 : -1}
+          onClick={() => onChange(t.value)}
+          onKeyDown={(e) => {
+            const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+            const jump = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+            if (!step && jump < 0) return;
+            e.preventDefault();
+            const next = jump >= 0 ? tabs[jump] : tabs[(index + step + tabs.length) % tabs.length];
+            onChange(next.value);
+            e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role=tab]')[tabs.indexOf(next)]?.focus();
+          }}
+        >
+          {t.label}
+          {t.badge}
+        </button>
+      ))}
+    </div>
   );
 }
 

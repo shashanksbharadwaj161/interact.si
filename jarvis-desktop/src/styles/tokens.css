@@ -1,88 +1,172 @@
-/* Design tokens. Fonts are system fonts only; nothing is loaded from the network. */
-:root {
-  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-  --font-display: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --sidebar-w: 236px;
+/*
+ * Porcelain / Ink design tokens. Light porcelain is the base; Ink is the dark theme.
+ * The shell resolves the theme (system, light or dark) and writes data-theme="light" | "dark" on <html>.
+ * Before that script runs, the media query below follows the operating system so there is no flash.
+ * Fonts are bundled in src/assets/fonts (SIL OFL 1.1); nothing is loaded from the network.
+ * Older token names (--panel-solid, --raised, --text-2, ...) are kept as real values so route styles keep working.
+ */
 
-  --bg: #0b0d10;
-  --bg-2: #101318;
-  --panel: rgba(21, 25, 31, 0.88);
-  --panel-solid: #151920;
-  --raised: #1c212a;
-  --sunken: #090b0e;
-  --line: #262c35;
-  --line-strong: #38414e;
-  --field-line: #66717f; /* text-field boundary: 3:1 or better on --panel-solid, --sunken and --raised (WCAG 1.4.11) */
-  --text: #e8ebf0;
-  --text-2: #b5bdc9;
-  --muted: #8591a1;
-  --accent: #5eaaff;
-  --accent-ink: #051528;
-  --accent-soft: rgba(94, 170, 255, 0.14);
-  --amber: #f2b441;
-  --amber-soft: rgba(242, 180, 65, 0.14);
-  --ok: #5fd3a2;
-  --ok-soft: rgba(95, 211, 162, 0.13);
-  --warn: #f2b441;
-  --danger: #ff7272;
-  --danger-soft: rgba(255, 114, 114, 0.13);
-  --focus: #8cc4ff;
-  --shadow: 0 14px 40px rgba(0, 0, 0, 0.4);
-  --scene-opacity: 0.5;
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("../assets/fonts/InstrumentSans-latin-variable.woff2") format("woff2-variations");
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("../assets/fonts/InstrumentSerif-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("../assets/fonts/InstrumentSerif-latin-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --font-ui: "Instrument Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
+
+  /* Type scale (px). Body text never goes below 13px. */
+  --t-meta: 13px;
+  --t-small: 14px;
+  --t-body: 15px;
+  --t-lead: 17px;
+  --t-h2: 18px;
+  --t-h1: 24px;
+  --t-display: 44px;
+
+  /* 4/8 spacing scale. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 48px;
+
+  --r-sm: 6px;
+  --r-ctl: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* Motion. Work surfaces use the short tokens; the companion and Studio may use the spring. */
+  --dur-fast: 140ms;
+  --dur-mid: 210ms;
+  --dur-route: 240ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+
+  --rail-w: 224px;
+  --content-max: 1080px;
+
+  /* Porcelain (light). */
+  --bg: #f5f4ef;
+  --bg-2: #efeee8;
+  --surface: #ffffff;
+  --surface-2: #f8f7f3;
+  --sunken: #ecebe5;
+  --hover: #ebeae4;
+  --line: #e1e0d9;
+  --line-strong: #cfcec6;
+  --field-line: #868b84;
+  --ink: #20221f;
+  --ink-2: #444842;
+  --muted: #61665f;
+  --accent: #3459d1;
+  --accent-hover: #2a4bb8;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8edfb;
+  --accent-line: #b9c7f1;
+  --focus: #3459d1;
+  --ok: #2b7149;
+  --ok-soft: #e4f1e8;
+  --warn: #8a5a00;
+  --warn-soft: #f8eedb;
+  --danger: #b3261e;
+  --danger-soft: #fae7e5;
+  --overlay: rgba(32, 34, 31, 0.32);
+  --shadow-1: 0 1px 2px rgba(32, 34, 31, 0.05), 0 2px 8px rgba(32, 34, 31, 0.04);
+  --shadow-2: 0 2px 6px rgba(32, 34, 31, 0.06), 0 16px 40px rgba(32, 34, 31, 0.1);
+  --shadow-3: 0 24px 80px rgba(32, 34, 31, 0.18);
+
+  /* Compatibility names used by route styles. */
+  --panel: #ffffff;
+  --panel-solid: #ffffff;
+  --raised: #f8f7f3;
+  --text: #20221f;
+  --text-2: #444842;
+  --amber: #8a5a00;
+  --amber-soft: #f8eedb;
+  --shadow: 0 2px 6px rgba(32, 34, 31, 0.06), 0 16px 40px rgba(32, 34, 31, 0.1);
+  --scene-opacity: 0.12;
+  color-scheme: light;
+}
+
+/* Ink (dark): explicit choice, or the system choice resolved by the shell. */
+:root[data-theme="dark"] {
+  --bg: #131513;
+  --bg-2: #171917;
+  --surface: #1b1e1b;
+  --surface-2: #202320;
+  --sunken: #101210;
+  --hover: #262a26;
+  --line: #2b2f2b;
+  --line-strong: #3b403b;
+  --field-line: #747a72;
+  --ink: #f2f3ed;
+  --ink-2: #d2d6cd;
+  --muted: #a8aea5;
+  --accent: #9bb4ff;
+  --accent-hover: #b4c7ff;
+  --accent-ink: #0f1a3a;
+  --accent-soft: #232b40;
+  --accent-line: #3d4c78;
+  --focus: #9bb4ff;
+  --ok: #7fcf9c;
+  --ok-soft: #1c2b21;
+  --warn: #e7b75c;
+  --warn-soft: #2e2615;
+  --danger: #ff8f84;
+  --danger-soft: #331d1b;
+  --overlay: rgba(0, 0, 0, 0.55);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 24px 80px rgba(0, 0, 0, 0.55);
+  --panel: #1b1e1b;
+  --panel-solid: #1b1e1b;
+  --raised: #202320;
+  --text: #f2f3ed;
+  --text-2: #d2d6cd;
+  --amber: #e7b75c;
+  --amber-soft: #2e2615;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
+  --scene-opacity: 0.35;
   color-scheme: dark;
 }
 
-:root[data-theme="nebula"] {
-  --bg: #0c0b17;
-  --bg-2: #11101f;
-  --panel: rgba(25, 23, 44, 0.88);
-  --panel-solid: #191730;
-  --raised: #221f3c;
-  --sunken: #090814;
-  --line: #2b2848;
-  --line-strong: #403b66;
-  --field-line: #74709a;
-  --text: #ebe9f7;
-  --text-2: #bcb8d6;
-  --muted: #8f8bb0;
-  --accent: #8fa2ff;
-  --accent-ink: #0b0d2e;
-  --accent-soft: rgba(143, 162, 255, 0.15);
-  --amber: #f4b56a;
-  --amber-soft: rgba(244, 181, 106, 0.14);
-  --focus: #b0bcff;
-}
-
-:root[data-theme="paper"] {
-  --bg: #eceff2;
-  --bg-2: #e4e8ec;
-  --panel: rgba(255, 255, 255, 0.92);
-  --panel-solid: #ffffff;
-  --raised: #f3f5f8;
-  --sunken: #e9edf1;
-  --line: #d3d9e0;
-  --line-strong: #b4bdc8;
-  --field-line: #717d8b;
-  --text: #171c23;
-  --text-2: #39424f;
-  --muted: #5a6574;
-  --accent: #1f5fbf;
-  --accent-ink: #ffffff;
-  --accent-soft: rgba(31, 95, 191, 0.1);
-  --amber: #946000; /* same as paper --warn; 4.63:1 on --bg, 5.34:1 on --panel-solid (the lighter #a86a0a was 3.85:1) */
-  --amber-soft: rgba(168, 106, 10, 0.12);
-  --ok: #17784f;
-  --ok-soft: rgba(23, 120, 79, 0.1);
-  --warn: #946000;
-  --danger: #bf2f2f;
-  --danger-soft: rgba(191, 47, 47, 0.09);
-  --focus: #1f5fbf;
-  --shadow: 0 10px 30px rgba(30, 40, 60, 0.12);
-  --scene-opacity: 0.12;
-  color-scheme: light;
+/* Before the shell resolves the theme, follow the operating system (same values as above). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #131513;
+    --surface: #1b1e1b;
+    --panel-solid: #1b1e1b;
+    --ink: #f2f3ed;
+    --text: #f2f3ed;
+    --muted: #a8aea5;
+    --accent: #9bb4ff;
+    color-scheme: dark;
+  }
 }

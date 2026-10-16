@@ -1,0 +1,23 @@
+/* The companion placement. The canvas is drawn by the shared renderer; this only sizes it and keeps it crisp. */
+.orb {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  line-height: 0;
+}
+
+.orb canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Windows high contrast: the canvas would be the only carrier of the companion, so give it a system outline. */
+@media (forced-colors: active) {
+  .orb {
+    border: 1px solid CanvasText;
+    border-radius: 50%;
+  }
+}

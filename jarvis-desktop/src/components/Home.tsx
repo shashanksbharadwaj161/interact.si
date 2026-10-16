@@ -1,23 +1,16 @@
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { ArrowDown, ArrowRight, ArrowUp, ArrowsClockwise, ChatCircleDots, CheckSquare, Cube, EyeSlash, Lightning, Note as NoteIcon, Plus, SquaresFour, WarningCircle } from '@phosphor-icons/react';
-import type { ActionPreview, ActionRequest, Activity, Capability, Capsule, ChatMessage, Note, Task } from '../shared/contracts';
-import { Avatar } from './Avatar';
-import { MemorySearch } from './MemorySearch';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ArrowRight, ChatCircleDots, CheckSquare, Cube, Note as NoteIcon, NotePencil, Plus } from '@phosphor-icons/react';
+import type { Activity, Capability, Capsule, ChatMessage, Note, Task } from '../shared/contracts';
+import { CompanionOrb } from './CompanionOrb';
 import { SHELL_PREF, useShellPref } from './Settings';
-import { WidgetPicker } from './WidgetPicker';
-import { Badge, Button, Empty, Notice, PageHeader, Panel } from '../ui/primitives';
-import { useCompanion } from '../ui/companion';
+import { Button, Spinner } from '../ui/primitives';
 import { useReady } from '../ui/store';
-import { usePref } from '../ui/prefs';
-import * as dashboard from '../ui/widgets';
-import { VIEW_FOR_CATEGORY, type ViewId } from '../ui/nav';
+import { useCompanion } from '../ui/companion';
+import { stateLabel } from '../ui/appearance';
+import { type ViewId } from '../ui/nav';
 import { cx, dueBucket, dueKey, fmtDueKey, localDateKey, relTime, truncate } from '../ui/util';
-import { sceneName } from '../ui/scenes';
-import { ModelReadinessNotice, modelReadiness, useModelCheck } from './Onboarding';
-import '../styles/parallel-home.css';
-import * as shelfModel from '../ui/file-shelf';
-import { isPreviewBridge } from '../preview';
-import { actionOutcome } from '../ui/action-result';
+import { modelReadiness, useModelCheck } from './Onboarding';
+import '../styles/today.css';
 
 /* ---------- Widget registry and layout (pure, tested) ---------- */
 
@@ -261,590 +254,165 @@ export function captureDueKey(choice: CaptureDue, today: string): string {
   return localDateKey(d);
 }
 
-/* ---------- Screen ---------- */
+/* ---------- Today ---------- */
 
 type Go = (v: ViewId, params?: Record<string, string>) => void;
+type StartKind = 'note' | 'task' | 'ask';
 
-function WidgetFrame({ def, arranging, first, last, onMove, onHide, children }: { def: WidgetDef; arranging: boolean; first: boolean; last: boolean; onMove: (d: -1 | 1) => void; onHide: () => void; children: ReactNode }) {
-  return (
-    <div className={cx('widget', `widget-${def.span}`, arranging && 'is-arranging')} data-widget={def.id}>
-      {arranging && (
-        <div className="widget-tools" role="group" aria-label={`Arrange ${def.title}`}>
-          <span className="widget-name">{def.title}</span>
-          <button type="button" className="iconbtn" aria-label={`Move ${def.title} earlier`} disabled={first} onClick={() => onMove(-1)}>
-            <ArrowUp size={14} aria-hidden />
-          </button>
-          <button type="button" className="iconbtn" aria-label={`Move ${def.title} later`} disabled={last} onClick={() => onMove(1)}>
-            <ArrowDown size={14} aria-hidden />
-          </button>
-          <button type="button" className="iconbtn" aria-label={`Hide ${def.title}`} onClick={onHide}>
-            <EyeSlash size={14} aria-hidden />
-          </button>
-        </div>
-      )}
-      {children}
-    </div>
-  );
+/** Saved items for Continue and Recent, newest first. Built only from stored records. */
+export type RecentItem = { key: string; kind: 'note' | 'capsule' | 'chat'; title: string; detail: string; at: string; when: string; view: ViewId; params?: Record<string, string> };
+
+export function recentItems(input: { notes: Note[]; capsules: Capsule[]; chat: ChatMessage[] }, now?: number): RecentItem[] {
+  const when = (iso: string) => (now === undefined ? relTime(iso) : relTime(iso, now));
+  const items: RecentItem[] = [
+    ...input.notes.map((n): RecentItem => ({ key: `n-${n.id}`, kind: 'note', title: n.title || 'Untitled note', detail: truncate(n.body.replace(/\s+/g, ' ').trim(), 110) || 'Empty note', at: n.updatedAt, when: when(n.updatedAt), view: 'notes', params: { item: n.id } })),
+    ...input.capsules.map((c): RecentItem => ({ key: `c-${c.id}`, kind: 'capsule', title: c.name || 'Untitled setup', detail: c.description || `${c.items.length} ${c.items.length === 1 ? 'item' : 'items'}`, at: c.updatedAt, when: when(c.updatedAt), view: 'capsules', params: { item: c.id } })),
+  ];
+  const last = input.chat[input.chat.length - 1];
+  if (last) items.push({ key: `m-${last.id}`, kind: 'chat', title: 'Conversation', detail: truncate(last.text.replace(/\s+/g, ' '), 110), at: last.createdAt, when: when(last.createdAt), view: 'assistant' });
+  return items.sort((a, b) => b.at.localeCompare(a.at));
 }
 
-/* ---------- Status strip: one primary line, then the rest in tier order ---------- */
+/** The reason only; the full setup guidance lives in the AI setup flow. */
+export const firstSentence = (s: string): string => (/^[\s\S]*?[.!?](?=\s|$)/.exec(s.trim())?.[0] ?? s).trim();
 
-function StatusStrip({ items, mode, readiness, go }: { items: StatusItem[]; mode: 'offline' | 'online'; readiness: ReadinessLevel; go: Go }) {
-  const [primary, ...rest] = items;
-  return (
-    <section className={cx('panel ph-status', `ph-status-${primary.tier}`)} aria-label="Status" data-status-tier={primary.tier}>
-      <div className="ph-status-main">
-        <span className="ph-status-dot" aria-hidden="true" />
-        <div className="ph-status-text">
-          <p className="eyebrow">{primary.tier === 'attention' ? 'Needs attention' : primary.tier === 'notice' ? 'Worth knowing' : 'Status'}</p>
-          <h2 className="ph-status-title">{primary.title}</h2>
-          <p className="ph-status-detail">{primary.detail}</p>
-        </div>
-        {primary.view && (
-          <Button size="sm" icon={ArrowRight} onClick={() => go(primary.view!, primary.params)}>
-            {primary.actionLabel ?? 'Open'}
-          </Button>
-        )}
-      </div>
-      <div className="ph-status-side">
-        <ul className="ph-badges" aria-label="Mode and model">
-          <li>
-            <Badge tone={mode === 'online' ? 'warn' : 'ok'}>{mode === 'online' ? 'Online mode' : 'Offline mode'}</Badge>
-          </li>
-          <li>
-            <Badge tone={readiness === 'ready' ? 'ok' : readiness === 'blocked' ? 'danger' : 'muted'}>{readiness === 'ready' ? 'Model ready' : readiness === 'blocked' ? 'Model blocked' : 'Model not checked'}</Badge>
-          </li>
-        </ul>
-        {rest.length > 0 && (
-          <ul className="ph-status-rest" aria-label="Other status items">
-            {rest.map((s) => (
-              <li key={s.id} className={`ph-tier-${s.tier}`}>
-                {s.view ? (
-                  <button type="button" className="ph-status-link" onClick={() => go(s.view!, s.params)}>
-                    <span className="ph-status-mark" aria-hidden="true" />
-                    {s.title}
-                  </button>
-                ) : (
-                  <span>
-                    <span className="ph-status-mark" aria-hidden="true" />
-                    {s.title}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </section>
-  );
+const KIND_ICON = { note: NoteIcon, capsule: Cube, chat: ChatCircleDots } as const;
+const KIND_NAME = { note: 'Note', capsule: 'Setup', chat: 'Assistant' } as const;
+
+function todayLine(today: string, dueToday: number, overdue: number): string {
+  const d = new Date(`${today}T12:00:00`);
+  const date = Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(d);
+  const parts: string[] = [];
+  if (overdue) parts.push(`${overdue} overdue`);
+  if (dueToday) parts.push(`${dueToday} due today`);
+  return [date, parts.length ? parts.join(', ') : null].filter(Boolean).join(' · ');
 }
 
-/* ---------- Quick capture: real saves through the same contract Tasks and Notes use ---------- */
-
-function QuickCapture({ today, go }: { today: string; go: Go }) {
-  const { api, mutate } = useReady();
-  const [kind, setKind] = useState<'task' | 'note'>('task');
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+/** One start bar: write a note, add a task, or hand a question to the Assistant. Saves only after a real write. */
+function StartBar({ today, go }: { today: string; go: Go }) {
+  const { api, mutate, state } = useReady();
+  const [kind, setKind] = useState<StartKind>('note');
+  const [text, setText] = useState('');
   const [due, setDue] = useState<CaptureDue>('none');
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<{ text: string; view: ViewId; params?: Record<string, string> } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<string | null>(null);
-  const titleId = useId();
-  const bodyId = useId();
+  const inputId = useId();
   const dueId = useId();
-  const titleRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
-  const trimmed = title.trim();
+  const value = text.trim();
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!trimmed || savingRef.current) return;
+    if (!value || savingRef.current) return;
+    if (kind === 'ask') {
+      go('assistant', { draft: value.slice(0, 200) });
+      return;
+    }
     savingRef.current = true;
     setBusy(true);
     setError(null);
     setSaved(null);
-    const dueKeyValue = captureDueKey(due, today);
-    const ok = await mutate(() => (kind === 'task' ? api.saveTask({ title: trimmed, done: false, ...(dueKeyValue ? { due: dueKeyValue } : {}) }) : api.saveNote({ title: trimmed, body: body.trim(), tags: [] })));
+    const dueValue = captureDueKey(due, today);
+    const before = new Set((kind === 'note' ? state.notes : state.tasks).map((x) => x.id));
+    const ok = await mutate(() => (kind === 'task' ? api.saveTask({ title: value, done: false, ...(dueValue ? { due: dueValue } : {}) }) : api.saveNote({ title: value, body: '', tags: [] })));
     savingRef.current = false;
     setBusy(false);
     if (!ok) {
-      setError(kind === 'task' ? 'The task was not saved. Local storage did not accept it; see the message in the corner.' : 'The note was not saved. Local storage did not accept it; see the message in the corner.');
+      setError(kind === 'task' ? 'The task was not saved. Nothing was changed; try again.' : 'The note was not saved. Nothing was changed; try again.');
       return;
     }
-    setSaved(kind === 'task' ? `Task “${truncate(trimmed, 40)}” saved${dueKeyValue ? `, due ${due}` : ''}.` : `Note “${truncate(trimmed, 40)}” saved.`);
-    setTitle('');
-    setBody('');
+    const fresh = await api.getState().catch(() => null);
+    const created = fresh ? (kind === 'note' ? fresh.notes : fresh.tasks).find((x) => !before.has(x.id)) : undefined;
+    setSaved(kind === 'task' ? { text: `Task “${truncate(value, 48)}” saved${dueValue ? `, due ${due}` : ''}.`, view: 'tasks' } : { text: `Note “${truncate(value, 48)}” saved.`, view: 'notes', params: created ? { item: created.id } : undefined });
+    setText('');
     setDue('none');
-    titleRef.current?.focus();
+    inputRef.current?.focus();
   };
 
+  const placeholder = kind === 'note' ? 'Write a note title, for example “Ideas for the review”' : kind === 'task' ? 'What needs doing? For example “Call the bank”' : 'Ask anything. It opens in the Assistant; nothing is sent yet.';
+  const label = kind === 'note' ? 'New note title' : kind === 'task' ? 'New task' : 'Question for the assistant';
   return (
-    <Panel
-      title="Quick capture"
-      eyebrow="Add without leaving"
-      className="ph-capture"
-      actions={
-        <div className="ph-seg" role="radiogroup" aria-label="What to capture">
-          <button type="button" role="radio" aria-checked={kind === 'task'} className={cx('chip', kind === 'task' && 'on')} disabled={busy} onClick={() => setKind('task')}>
-            <CheckSquare size={13} aria-hidden /> Task
+    <form className="start" onSubmit={(e) => void submit(e)} aria-busy={busy} aria-label="Start something">
+      <div className="start-kinds" role="radiogroup" aria-label="What to start">
+        {(
+          [
+            ['note', 'Note', NotePencil],
+            ['task', 'Task', CheckSquare],
+            ['ask', 'Ask', ChatCircleDots],
+          ] as const
+        ).map(([k, name, Icon]) => (
+          <button
+            key={k}
+            type="button"
+            role="radio"
+            aria-checked={kind === k}
+            className={cx('start-kind', kind === k && 'on')}
+            onClick={() => {
+              setKind(k);
+              inputRef.current?.focus();
+            }}
+          >
+            <Icon size={16} weight={kind === k ? 'fill' : 'regular'} aria-hidden />
+            {name}
           </button>
-          <button type="button" role="radio" aria-checked={kind === 'note'} className={cx('chip', kind === 'note' && 'on')} disabled={busy} onClick={() => setKind('note')}>
-            <NoteIcon size={13} aria-hidden /> Note
-          </button>
-        </div>
-      }
-    >
-      <form className="ph-capture-form" onSubmit={(e) => void submit(e)} aria-busy={busy}>
-        <label htmlFor={titleId} className="ph-label">
-          {kind === 'task' ? 'Task' : 'Note title'}
+        ))}
+      </div>
+      <div className="start-row">
+        <label htmlFor={inputId} className="sr-only">
+          {label}
         </label>
-        <input id={titleId} ref={titleRef} className="input" value={title} maxLength={200} placeholder={kind === 'task' ? 'What needs doing?' : 'A short title'} onChange={(e) => setTitle(e.target.value)} disabled={busy} />
-        {kind === 'note' ? (
+        <input id={inputId} ref={inputRef} className="start-input" value={text} maxLength={200} placeholder={placeholder} onChange={(e) => setText(e.target.value)} disabled={busy} autoComplete="off" />
+        {kind === 'task' && (
           <>
-            <label htmlFor={bodyId} className="ph-label">
-              Body <span className="sub">optional</span>
-            </label>
-            <textarea id={bodyId} className="input ph-capture-body" rows={3} value={body} maxLength={4000} onChange={(e) => setBody(e.target.value)} disabled={busy} />
-          </>
-        ) : (
-          <>
-            <label htmlFor={dueId} className="ph-label">
+            <label htmlFor={dueId} className="sr-only">
               Due
             </label>
-            <select id={dueId} className="input" value={due} onChange={(e) => setDue(e.target.value as CaptureDue)} disabled={busy}>
+            <select id={dueId} className="input start-due" value={due} onChange={(e) => setDue(e.target.value as CaptureDue)} disabled={busy}>
               <option value="none">No date</option>
               <option value="today">Today</option>
               <option value="tomorrow">Tomorrow</option>
             </select>
           </>
         )}
-        <div className="ph-capture-row">
-          <Button type="submit" variant="primary" icon={Plus} busy={busy} disabled={!trimmed || busy}>
-            {kind === 'task' ? 'Add task' : 'Save note'}
-          </Button>
-          <Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go(kind === 'task' ? 'tasks' : 'notes')}>
-            {kind === 'task' ? 'All tasks' : 'All notes'}
-          </Button>
-        </div>
-        <p className="field-hint" role="status">
-          {saved ?? (busy ? 'Saving on this computer…' : 'Saved on this computer only. Nothing is sent anywhere.')}
-        </p>
-        {error && (
-          <Notice tone="danger" title="Not saved">
-            {error}
-          </Notice>
-        )}
-      </form>
-    </Panel>
-  );
-}
-
-/* ---------- File shelf: pinned files, folders and links; opening always goes through preview → Confirm → execute ---------- */
-
-type ShelfEdit = { id: string; label: string; note: string; tags: string };
-type ShelfPending = { item: shelfModel.ShelfItem; preview: ActionPreview };
-
-function shelfRequest(item: shelfModel.ShelfItem): ActionRequest {
-  return item.kind === 'url' ? { type: 'open-url', target: item.target } : { type: 'launch', target: item.target };
-}
-
-export function FileShelf() {
-  const { api } = useReady();
-  const [rawShelf, setRawShelf] = usePref<unknown>(shelfModel.SHELF_PREF_KEY, shelfModel.emptyShelf());
-  const shelf = useMemo(() => shelfModel.normalizeShelf(rawShelf), [rawShelf]);
-  const [query, setQuery] = useState('');
-  const [typed, setTyped] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [edit, setEdit] = useState<ShelfEdit | null>(null);
-  const [pending, setPending] = useState<ShelfPending | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const busyRef = useRef(false);
-  const queryId = useId();
-  const typedId = useId();
-  const preview = isPreviewBridge();
-  const canPick = !preview && typeof api.pickPath === 'function';
-  const canOpen = !preview && typeof api.previewAction === 'function' && typeof api.executeAction === 'function';
-  const filtered = useMemo(() => shelfModel.filterShelf(shelf, query), [shelf, query]);
-  const groups = useMemo(() => shelfModel.groupByKind(filtered), [filtered]);
-  const recent = useMemo(() => shelfModel.recentItems(shelf, 8), [shelf]);
-
-  const save = (next: shelfModel.Shelf) => setRawShelf(next);
-  const report = (ok: string | null, err: string | null) => {
-    setMessage(ok);
-    setError(err);
-  };
-
-  const add = (kind: shelfModel.ShelfKind, target: string): boolean => {
-    try {
-      const r = shelfModel.addShelfItem(shelf, { kind, target });
-      if (r.duplicate) {
-        report(`“${truncate(r.item.label, 50)}” is already on the shelf.`, null);
-      } else {
-        save(r.shelf);
-        report(`Added “${truncate(r.item.label, 50)}”.`, null);
-      }
-      return true;
-    } catch (e) {
-      report(null, e instanceof Error ? e.message : String(e));
-      return false;
-    }
-  };
-
-  const pick = async (kind: 'file' | 'folder') => {
-    if (!canPick || busyRef.current) return;
-    busyRef.current = true;
-    setBusy(`pick-${kind}`);
-    try {
-      const chosen = await api.pickPath(kind);
-      if (chosen) add(kind, chosen);
-      else report('Nothing was chosen.', null);
-    } catch (e) {
-      report(null, `The ${kind} picker failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      busyRef.current = false;
-      setBusy(null);
-    }
-  };
-
-  const addTyped = (e: FormEvent) => {
-    e.preventDefault();
-    const text = typed.trim();
-    if (!text) return;
-    if (add(shelfModel.guessKind(text), text)) setTyped('');
-  };
-
-  const startEdit = (item: shelfModel.ShelfItem) => setEdit({ id: item.id, label: item.label, note: item.note, tags: item.tags.join(', ') });
-  const saveEdit = () => {
-    if (!edit) return;
-    try {
-      save(shelfModel.updateShelfItem(shelf, edit.id, { label: edit.label, note: edit.note, tags: shelfModel.parseTagText(edit.tags) }));
-      setEdit(null);
-      report('Changes saved.', null);
-    } catch (e) {
-      report(null, e instanceof Error ? e.message : String(e));
-    }
-  };
-  const editKeys = (e: { key: string; preventDefault: () => void }) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveEdit();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setEdit(null);
-    }
-  };
-
-  const remove = (item: shelfModel.ShelfItem) => {
-    try {
-      save(shelfModel.removeShelfItem(shelf, item.id));
-      if (pending?.item.id === item.id) setPending(null);
-      if (edit?.id === item.id) setEdit(null);
-      report(`Removed “${truncate(item.label, 50)}” from the shelf. The ${item.kind} itself was not touched.`, null);
-    } catch (e) {
-      report(null, e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  // Step 1: ask the backend for a preview. Nothing runs here.
-  const requestOpen = async (item: shelfModel.ShelfItem) => {
-    if (!canOpen || busyRef.current) return;
-    busyRef.current = true;
-    setBusy(item.id);
-    setPending(null);
-    report(null, null);
-    try {
-      const p = await api.previewAction(shelfRequest(item));
-      setPending({ item, preview: p });
-    } catch (e) {
-      report(null, `Could not prepare “${truncate(item.label, 50)}”: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      busyRef.current = false;
-      setBusy(null);
-    }
-  };
-
-  // Step 2: only after an explicit Confirm click on an allowed preview.
-  const confirmOpen = async () => {
-    if (!pending || !pending.preview.allowed || busyRef.current) return;
-    const { item, preview: p } = pending;
-    busyRef.current = true;
-    setBusy(item.id);
-    try {
-      const outcome = actionOutcome(await api.executeAction(p.id, true), true);
-      setPending(null);
-      if (outcome.kind === 'ran') {
-        save(shelfModel.recordOpened(shelf, item.id));
-        report(`Opened “${truncate(item.label, 50)}”.`, null);
-      } else {
-        report(null, outcome.message ?? 'The item was not opened.');
-      }
-    } catch (e) {
-      setPending(null);
-      report(null, `“${truncate(item.label, 50)}” was not opened: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      busyRef.current = false;
-      setBusy(null);
-    }
-  };
-
-  const cancelOpen = () => {
-    setPending(null);
-    report('Cancelled. Nothing was opened.', null);
-  };
-
-  const unavailable = preview ? 'Unavailable in browser preview (no Electron backend).' : 'Unavailable: this bridge does not provide it.';
-
-  const renderItem = (item: shelfModel.ShelfItem) => {
-    const editing = edit?.id === item.id;
-    const isPending = pending?.item.id === item.id;
-    return (
-      <li key={item.id} className={cx('file-shelf-item', isPending && 'is-pending')} data-shelf-item={item.id}>
-        {editing && edit ? (
-          <div className="file-shelf-edit" role="group" aria-label={`Edit ${item.label}`}>
-            <label className="ph-label">
-              Label
-              <input className="input" value={edit.label} maxLength={shelfModel.SHELF_LIMITS.label} autoFocus onChange={(e) => setEdit({ ...edit, label: e.target.value })} onKeyDown={editKeys} />
-            </label>
-            <label className="ph-label">
-              Note
-              <input className="input" value={edit.note} maxLength={shelfModel.SHELF_LIMITS.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} onKeyDown={editKeys} />
-            </label>
-            <label className="ph-label">
-              Tags <span className="sub">comma separated</span>
-              <input className="input" value={edit.tags} onChange={(e) => setEdit({ ...edit, tags: e.target.value })} onKeyDown={editKeys} />
-            </label>
-            <div className="file-shelf-row">
-              <Button size="sm" variant="primary" onClick={saveEdit}>
-                Save
-              </Button>
-              <Button size="sm" variant="quiet" onClick={() => setEdit(null)}>
-                Cancel
-              </Button>
-              <span className="field-hint">Enter saves, Escape cancels.</span>
-            </div>
-          </div>
-        ) : (
-          <div className="file-shelf-main">
-            <span className="file-shelf-text">
-              <strong>{item.label}</strong>
-              <span className="sub file-shelf-target" title={item.target}>
-                {item.target}
-              </span>
-              {item.note && <span className="sub">{item.note}</span>}
-              {item.tags.length > 0 && <span className="sub">{item.tags.map((t) => `#${t}`).join(' ')}</span>}
-            </span>
-            <span className="file-shelf-actions">
-              <Button size="sm" disabled={!canOpen || busy !== null} busy={busy === item.id} aria-label={`Open ${item.label}`} onClick={() => void requestOpen(item)}>
-                Open
-              </Button>
-              <Button size="sm" variant="quiet" aria-label={`Edit ${item.label}`} onClick={() => startEdit(item)}>
-                Edit
-              </Button>
-              <Button size="sm" variant="quiet" aria-label={`Remove ${item.label}`} onClick={() => remove(item)}>
-                Remove
-              </Button>
-            </span>
-          </div>
-        )}
-        {isPending && pending && (
-          <div className="file-shelf-confirm" role="alertdialog" aria-label={`Confirm opening ${item.label}`}>
-            <p>
-              <strong>{pending.preview.summary}</strong>
-            </p>
-            {pending.preview.reason && <p className="field-hint">{pending.preview.reason}</p>}
-            {pending.preview.allowed ? (
-              <div className="file-shelf-row">
-                <Button size="sm" variant="primary" autoFocus busy={busy === item.id} disabled={busy !== null} onClick={() => void confirmOpen()}>
-                  Confirm
-                </Button>
-                <Button size="sm" variant="quiet" disabled={busy !== null} onClick={cancelOpen}>
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <div className="file-shelf-row">
-                <span className="field-hint">Not allowed{pending.preview.reason ? '' : ' by the app’s safety rules'}. Nothing was opened.</span>
-                <Button size="sm" variant="quiet" onClick={() => setPending(null)}>
-                  Dismiss
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-      </li>
-    );
-  };
-
-  return (
-    <Panel title="File shelf" eyebrow="Pinned files, folders and links" className="file-shelf">
-      <div className="file-shelf-add">
-        <div className="file-shelf-row">
-          <Button size="sm" icon={Plus} disabled={!canPick || busy !== null} busy={busy === 'pick-file'} onClick={() => void pick('file')}>
-            Add file…
-          </Button>
-          <Button size="sm" icon={Plus} disabled={!canPick || busy !== null} busy={busy === 'pick-folder'} onClick={() => void pick('folder')}>
-            Add folder…
-          </Button>
-          {!canPick && <span className="field-hint">File and folder pickers: {unavailable}</span>}
-        </div>
-        <form className="file-shelf-row" onSubmit={addTyped}>
-          <label htmlFor={typedId} className="ph-label">
-            Path or link
-          </label>
-          <input id={typedId} className="input grow" value={typed} maxLength={shelfModel.SHELF_LIMITS.target} placeholder={'C:\\Projects\\notes.txt or https://example.com'} onChange={(e) => setTyped(e.target.value)} />
-          <Button size="sm" type="submit" disabled={!typed.trim()}>
-            Add
-          </Button>
-        </form>
+        <Button type="submit" variant="primary" icon={kind === 'ask' ? ArrowRight : Plus} busy={busy} disabled={!value || busy}>
+          {kind === 'note' ? 'Save note' : kind === 'task' ? 'Add task' : 'Open in Assistant'}
+        </Button>
       </div>
-      {message && (
-        <p className="field-hint" role="status">
-          {message}
-        </p>
-      )}
-      {error && (
-        <Notice tone="danger" title="File shelf">
-          {error}
-        </Notice>
-      )}
-      {!canOpen && <p className="field-hint">Open: {unavailable}</p>}
-      {recent.length > 0 && (
-        <section className="file-shelf-recent" aria-label="Recently opened">
-          <h3 className="widget-name">Recently opened</h3>
-          <ul className="chips">
-            {recent.map((r) => (
-              <li key={r.id}>
-                <button type="button" className="chip" disabled={!canOpen || busy !== null} onClick={() => void requestOpen(r)} title={r.target}>
-                  {truncate(r.label, 30)}
-                  {r.lastOpenedAt && <span className="sub"> · {relTime(r.lastOpenedAt)}</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {shelf.items.length === 0 ? (
-        <Empty title="The shelf is empty">Pin files, folders or http(s) links you return to often. Opening one always asks you to confirm first.</Empty>
-      ) : (
-        <>
-          <label htmlFor={queryId} className="ph-label">
-            Search the shelf
-          </label>
-          <input id={queryId} type="search" className="input" value={query} placeholder="Label, path, tag…" onChange={(e) => setQuery(e.target.value)} />
-          {groups.length === 0 && <p className="field-hint">No shelf items match “{truncate(query, 40)}”.</p>}
-          {groups.map((g) => (
-            <section key={g.kind} className="file-shelf-group" aria-label={g.title}>
-              <h3 className="widget-name">
-                {g.title} <span className="sub">{g.items.length}</span>
-              </h3>
-              <ul className="file-shelf-list">{g.items.map(renderItem)}</ul>
-            </section>
-          ))}
-          <p className="field-hint">
-            {shelf.items.length} of {shelfModel.SHELF_LIMITS.items} items. Kept in this window’s preferences; the files themselves are never read or changed by the shelf.
-          </p>
-        </>
-      )}
-    </Panel>
-  );
-}
-
-/* ---------- Dashboard summaries (saved layout, picker, read-only data) ---------- */
-
-/**
- * Summary cards placed on the same 12-column grid that the picker previews. The layout is read from
- * the saved preference on every render and validated there; a saved value that does not pass is shown
- * as the default and the reason is reported above the grid. Card text comes from summarizeWidget, so a
- * source that has not loaded shows as 'Not loaded' instead of a made-up number.
- * `startEditing` only sets the first render; Home leaves the picker closed until the user opens it.
- */
-export function DashboardWidgets({ source, startEditing = false }: { source: dashboard.WidgetSource; startEditing?: boolean }) {
-  const [stored, setStored] = usePref<unknown>(dashboard.LAYOUT_PREF_KEY, null);
-  const [editing, setEditing] = useState(startEditing);
-  const pickerId = useId();
-  const { layout, issues } = typeof stored === 'string' ? dashboard.parseLayout(stored) : dashboard.normalizeLayout(stored);
-  const { items } = dashboard.packLayout(layout);
-  const isDefault = dashboard.serializeLayout(layout) === dashboard.serializeLayout(dashboard.defaultLayout());
-  const save = (next: dashboard.WidgetLayout) => setStored(dashboard.serializeLayout(next));
-
-  return (
-    <>
-      <Panel
-        title="At a glance"
-        eyebrow="Dashboard widgets"
-        actions={
-          <Button size="sm" variant="quiet" icon={SquaresFour} aria-expanded={editing} aria-controls={editing ? pickerId : undefined} onClick={() => setEditing((open) => !open)}>
-            {editing ? 'Done with widgets' : 'Choose widgets'}
-          </Button>
-        }
-      >
-        {issues.length > 0 && (
-          <Notice tone="warn" title="Saved widget layout was adjusted">
-            {issues.join(' ')}
-          </Notice>
-        )}
-        {items.length === 0 ? (
-          <Empty icon={SquaresFour} title="No widgets are shown">
-            Choose widgets to see summaries of your saved tasks, notes and capsules here.
-          </Empty>
+      <p className={cx('start-status', saved && 'ok', error && 'bad')} role="status">
+        {error ? (
+          error
+        ) : saved ? (
+          <>
+            {saved.text}{' '}
+            <button type="button" className="linkbtn" onClick={() => go(saved.view, saved.params)}>
+              Open it
+            </button>
+          </>
+        ) : busy ? (
+          'Saving on this computer…'
         ) : (
-          <div className="dash-wrap">
-          <div className="dash-grid">
-            {items.map((item) => {
-              const def = dashboard.widgetDef(item.kind);
-              if (!def) return null;
-              const summary = dashboard.summarizeWidget(item.kind, source);
-              const titleId = `${pickerId}-${item.kind}`;
-              return (
-                <section
-                  key={item.kind}
-                  className="panel dash-card"
-                  data-dash-widget={item.kind}
-                  aria-labelledby={titleId}
-                  style={dashboard.widgetPlacement(item) as CSSProperties}
-                >
-                  <h3 id={titleId} className="widget-name">
-                    {def.name}
-                  </h3>
-                  <p className="big-line">{summary.value}</p>
-                  <p className="field-hint">{summary.detail}</p>
-                </section>
-              );
-            })}
-          </div>
-          </div>
+          'Saved on this computer only. Nothing is sent anywhere.'
         )}
-        <p className="field-hint">
-          {isDefault
-            ? 'Showing the default layout: every widget, in its standard order and width.'
-            : 'Showing a customised layout. Choose widgets to change it or to go back to the default.'}
-        </p>
-      </Panel>
-      {editing && (
-        <div id={pickerId}>
-          <WidgetPicker layout={layout} onLayoutChange={save} onClose={() => setEditing(false)} />
-        </div>
-      )}
-    </>
+      </p>
+    </form>
   );
 }
 
 export function Home({ go }: { go: Go }) {
-  const { state, settings, system, systemError, systemLoading, cloudConfigured, api, mutate } = useReady();
+  const { state, settings, system, systemError, cloudConfigured, api, mutate } = useReady();
   const check = useModelCheck();
-  const { state: avatarState } = useCompanion();
-  const [rawLayout, setRawLayout] = useShellPref<unknown>(SHELL_PREF.homeLayout, DEFAULT_LAYOUT);
+  const { state: companionState } = useCompanion();
   const [displayName] = useShellPref<string>(SHELL_PREF.displayName, '');
-  const layout = useMemo(() => normalizeLayout(rawLayout), [rawLayout]);
-  const [arranging, setArranging] = useState(false);
   // The calendar day is read once per mount and refreshed when the window comes back; it is never computed inside the pure helpers.
   const [today, setToday] = useState(() => localDateKey());
+  const [hour, setHour] = useState(() => new Date().getHours());
   useEffect(() => {
     const refresh = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       setToday(localDateKey());
+      setHour(new Date().getHours());
     };
     document.addEventListener('visibilitychange', refresh);
     window.addEventListener('focus', refresh);
@@ -855,33 +423,11 @@ export function Home({ go }: { go: Go }) {
   }, []);
 
   const online = settings.mode === 'online';
-  // Readiness comes from the backend's live check (local) or the saved key (online), not from whether fields are filled in.
   const readiness = modelReadiness({ settings, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
-  const cockpit: CockpitInput = useMemo(
-    () => ({
-      tasks: state.tasks,
-      notes: state.notes,
-      capsules: state.capsules,
-      chat: state.chat,
-      activity: state.activity,
-      capabilities: system?.capabilities ?? null,
-      systemError,
-      systemLoading,
-      readiness: readiness.level,
-      mode: online ? 'online' : 'offline',
-      today,
-    }),
-    [state.tasks, state.notes, state.capsules, state.chat, state.activity, system, systemError, systemLoading, readiness.level, online, today],
-  );
   const triage = useMemo(() => triageTasks(state.tasks, today), [state.tasks, today]);
-  const status = useMemo(() => statusHierarchy(cockpit), [cockpit]);
-  const actions = useMemo(() => quickActions(cockpit), [cockpit]);
-  const activityGroups = useMemo(() => groupActivity(state.activity, today), [state.activity, today]);
-  const caps = capabilityView(system?.capabilities ?? null, systemError, systemLoading);
-  const urgent = useMemo(() => [...triage.overdue, ...triage.today, ...triage.week].slice(0, 6), [triage]);
-  const capsules = useMemo(() => [...state.capsules].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4), [state.capsules]);
-  const notes = useMemo(() => [...state.notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4), [state.notes]);
-  const lastChat = state.chat[state.chat.length - 1];
+  const upcoming = useMemo(() => [...triage.overdue, ...triage.today, ...triage.week, ...triage.later, ...triage.undated].slice(0, 5), [triage]);
+  const recent = useMemo(() => recentItems(state), [state]);
+  const [first, ...more] = recent;
   const [pendingTask, setPendingTask] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
   const completingRef = useRef(false);
@@ -895,312 +441,132 @@ export function Home({ go }: { go: Go }) {
     setPendingTask(null);
     if (!ok) setTaskError(`“${truncate(t.title, 50)}” was not marked done. Try again from Tasks.`);
   };
-  // Only data the app already holds. A null capability list (no successful system check) reads as 'Not loaded'.
-  const dashboardSource: dashboard.WidgetSource = {
-    settings,
-    tasks: state.tasks,
-    notes: state.notes,
-    capsules: state.capsules,
-    activity: state.activity,
-    capabilities: system?.capabilities ?? null,
-  };
 
-  const visible = layout.order.filter((id) => !layout.hidden.includes(id));
-  const hiddenDefs = WIDGETS.filter((w) => layout.hidden.includes(w.id));
-
-  const render = (id: WidgetId): ReactNode => {
-    switch (id) {
-      case 'status':
-        return <StatusStrip items={status} mode={online ? 'online' : 'offline'} readiness={readiness.level} go={go} />;
-      case 'capture':
-        return <QuickCapture today={today} go={go} />;
-      case 'actions':
-        return (
-          <Panel title="Quick actions" eyebrow="Open a screen" className="ph-actions">
-            <ul className="ph-action-list">
-              {actions.map((a) => (
-                <li key={a.id}>
-                  <button type="button" className="ph-action" data-action={a.id} onClick={() => go(a.view, a.params)}>
-                    <Lightning size={16} weight="duotone" aria-hidden />
-                    <span className="ph-action-text">
-                      <strong>{a.label}</strong>
-                      <span className="sub">{a.hint}</span>
-                    </span>
-                    <ArrowRight size={14} aria-hidden />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="field-hint">Each shortcut opens a screen. Nothing is sent or run until you act there.</p>
-          </Panel>
-        );
-      case 'totals':
-        return (
-          <section className="stat-row" aria-label="Totals">
-            <button className="stat" onClick={() => go('capsules')}>
-              <span className="stat-n">{state.capsules.length}</span>
-              <span className="stat-l">Capsules</span>
-            </button>
-            <button className="stat" onClick={() => go('notes')}>
-              <span className="stat-n">{state.notes.length}</span>
-              <span className="stat-l">Notes</span>
-            </button>
-            <button className={`stat ${triage.overdue.length ? 'warn' : ''}`} onClick={() => go('tasks')}>
-              <span className="stat-n">{triage.open}</span>
-              <span className="stat-l">Open tasks{triage.overdue.length ? ` · ${triage.overdue.length} overdue` : ''}</span>
-            </button>
-            <button className="stat" onClick={() => go('assistant')}>
-              <span className="stat-n">{state.chat.length}</span>
-              <span className="stat-l">Chat messages</span>
-            </button>
-          </section>
-        );
-      case 'readiness':
-        if (readiness.level === 'ready' && !arranging) return null;
-        return readiness.level === 'ready' ? (
-          <Notice title={readiness.title}>{readiness.detail}</Notice>
-        ) : (
-          <ModelReadinessNotice readiness={readiness} checking={check.checking} onRecheck={() => void check.recheck()} action={<Button size="sm" onClick={() => go('settings', { q: 'model' })}>Open Settings</Button>} />
-        );
-      case 'due':
-        return (
-          <Panel title="Due now" eyebrow="Tasks" className="ph-due" actions={<Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go('tasks')}>All tasks</Button>}>
-            {taskError && (
-              <Notice tone="danger" title="Not updated">
-                {taskError}
-              </Notice>
-            )}
-            {urgent.length === 0 ? (
-              <Empty icon={CheckSquare} title={triage.open ? 'Nothing due this week' : 'No open tasks'} action={triage.open ? undefined : <Button size="sm" onClick={() => go('tasks')}>Add a task</Button>}>
-                {triage.open ? `${triage.open} open ${triage.open === 1 ? 'task' : 'tasks'}${triage.undated.length ? `, ${triage.undated.length} without a date` : ''}.` : 'Tasks with due dates show up here, overdue first.'}
-              </Empty>
-            ) : (
-              <>
-                <ul className="list">
-                  {urgent.map((t) => {
-                    const b = dueBucket(t, today);
-                    return (
-                      <li key={t.id} className={cx('list-row', pendingTask === t.id && 'is-pending')}>
-                        <input type="checkbox" className="check" aria-label={`Mark “${t.title}” done`} checked={t.done} disabled={pendingTask !== null} onChange={() => void completeTask(t)} />
-                        <span className="grow">{t.title}</span>
-                        <Badge tone={b === 'overdue' ? 'danger' : b === 'today' ? 'warn' : 'muted'}>{dueLabel(t, today)}</Badge>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {triage.overdue.length + triage.today.length + triage.week.length > urgent.length && (
-                  <p className="field-hint">{triage.overdue.length + triage.today.length + triage.week.length - urgent.length} more due this week in Tasks.</p>
-                )}
-              </>
-            )}
-          </Panel>
-        );
-      case 'capsules':
-        return (
-          <Panel title="Recent capsules" eyebrow="Workspaces" actions={<Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go('capsules')}>Open</Button>}>
-            {capsules.length === 0 ? (
-              <Empty icon={Cube} title="No capsules yet" action={<Button size="sm" onClick={() => go('capsules')}>Create one</Button>}>
-                A capsule bundles files, folders, apps and URLs for one project so you can reopen them together.
-              </Empty>
-            ) : (
-              <ul className="list">
-                {capsules.map((c) => (
-                  <li key={c.id} className="list-row">
-                    <Cube size={16} aria-hidden />
-                    <button type="button" className="grow list-link" onClick={() => go('capsules', { item: c.id })}>
-                      <strong>{c.name}</strong>
-                      <span className="sub">
-                        {c.items.length} item{c.items.length === 1 ? '' : 's'} · {sceneName(c.scene)} · {relTime(c.updatedAt)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-        );
-      case 'notes':
-        return (
-          <Panel title="Recent notes" eyebrow="Memory" actions={<Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go('notes')}>Open</Button>}>
-            {notes.length === 0 ? (
-              <Empty icon={NoteIcon} title="No notes yet" action={<Button size="sm" onClick={() => go('notes')}>Write one</Button>}>
-                Notes are stored on this computer and searchable by text and tag.
-              </Empty>
-            ) : (
-              <ul className="list">
-                {notes.map((n) => (
-                  <li key={n.id} className="list-row">
-                    <button type="button" className="grow list-link" onClick={() => go('notes', { item: n.id })}>
-                      <strong>{n.title || 'Untitled'}</strong>
-                      <span className="sub">{truncate(n.body.replace(/\s+/g, ' '), 90) || 'Empty note'}</span>
-                    </button>
-                    <span className="sub">{relTime(n.updatedAt)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-        );
-      case 'search':
-        return (
-          <Panel title="Memory search" eyebrow="Saved items" actions={<Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go('search')}>Full search</Button>}>
-            <MemorySearch state={state} limit={5} onNavigate={(r) => go(VIEW_FOR_CATEGORY[r.category], { item: r.id })} />
-          </Panel>
-        );
-      case 'companion':
-        return (
-          <Panel title="Companion" eyebrow="Live state" className="panel-companion">
-            <div className="companion-mini">
-              <Avatar state={avatarState} size={120} />
-              <div className="stack tight">
-                <Badge tone={online ? 'warn' : 'ok'}>{online ? 'Online mode' : 'Offline mode'}</Badge>
-                <Badge tone={readiness.level === 'ready' ? 'ok' : readiness.level === 'blocked' ? 'warn' : 'muted'}>{readiness.level === 'ready' ? 'Model ready' : readiness.level === 'blocked' ? 'Model not ready' : 'Model not checked'}</Badge>
-                <p className="field-hint">
-                  {online ? `Cloud model: ${settings.cloudModel || 'not set'}. Key ${cloudConfigured ? 'saved' : cloudConfigured === false ? 'missing' : 'status unknown'}.` : `Local model: ${settings.localModel || 'not set'}.`}
-                </p>
-                {lastChat ? (
-                  <p className="quote">
-                    <span className="sub">Last message · {lastChat.role} · {relTime(lastChat.createdAt)}</span>
-                    {truncate(lastChat.text, 140)}
-                  </p>
-                ) : (
-                  <p className="field-hint">No chat yet. The companion is {avatarState}.</p>
-                )}
-              </div>
-            </div>
-          </Panel>
-        );
-      case 'capabilities':
-        return (
-          <Panel title="Capabilities" eyebrow="Checked by this app" actions={<Button size="sm" variant="quiet" icon={ArrowRight} onClick={() => go('status')}>Details</Button>}>
-            {caps.status === 'error' && <Notice tone="warn" title="The system check failed">{systemError}</Notice>}
-            {caps.status === 'loading' && <p className="field-hint" role="status">Checking what this computer supports…</p>}
-            {caps.status === 'unloaded' && (
-              <Empty icon={WarningCircle} title="Not checked yet" action={<Button size="sm" onClick={() => go('status')}>Open Status</Button>}>
-                The system check has not answered, so nothing is assumed about this computer.
-              </Empty>
-            )}
-            {caps.status === 'loaded' && (
-              <>
-                <p className="big-line">
-                  {caps.available}
-                  <span> of {caps.total} available</span>
-                </p>
-                {caps.unavailable.length > 0 ? (
-                  <ul className="list compact">
-                    {caps.unavailable.slice(0, 4).map((c) => (
-                      <li key={c.id} className="list-row">
-                        <WarningCircle size={15} aria-hidden />
-                        <span className="grow">
-                          {c.name}
-                          {c.reason && <span className="sub">{truncate(c.reason, 90)}</span>}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="field-hint">Everything the app checks for is available here.</p>
-                )}
-              </>
-            )}
-          </Panel>
-        );
-      case 'activity':
-        return (
-          <Panel title="Recent activity" eyebrow="Audit trail" className="ph-activity">
-            {activityGroups.length === 0 ? (
-              <Empty title="No activity recorded">Writes and approved actions appear here as they happen. Nothing is recorded in the background.</Empty>
-            ) : (
-              activityGroups.map((g) => (
-                <section key={g.label} className="ph-activity-group" aria-label={g.label}>
-                  <h3 className="ph-activity-day">{g.label}</h3>
-                  <ol className="timeline">
-                    {g.items.map((a) => (
-                      <li key={a.id}>
-                        <span className="tl-kind">{kindLabel(a.kind)}</span>
-                        <span>{truncate(a.summary, 120)}</span>
-                        <time dateTime={a.at}>{relTime(a.at)}</time>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              ))
-            )}
-          </Panel>
-        );
-      default:
-        return null;
-    }
-  };
-
+  const FirstIcon = first ? KIND_ICON[first.kind] : NoteIcon;
   return (
-    <div className="page ph-home">
-      <PageHeader
-        eyebrow="Cockpit"
-        title={greeting(new Date().getHours(), displayName)}
-        subtitle="What is saved on this computer right now."
-        actions={
-          <>
-            <Button icon={ChatCircleDots} variant="primary" onClick={() => go('assistant')}>
-              Ask the assistant
-            </Button>
-            <Button icon={Plus} onClick={() => go('notes')}>
-              New note
-            </Button>
-            <Button icon={SquaresFour} aria-pressed={arranging} onClick={() => setArranging((a) => !a)}>
-              {arranging ? 'Done arranging' : 'Arrange'}
-            </Button>
-          </>
-        }
-      />
+    <div className="page today">
+      <header className="today-hero">
+        <div className="today-hello">
+          <h1 className="display">{greeting(hour, displayName.trim())}</h1>
+          <p className="today-line">{todayLine(today, triage.today.length, triage.overdue.length)}</p>
+        </div>
+        <div className="today-companion" aria-live="polite">
+          <CompanionOrb size={112} />
+          <span className="sub">{stateLabel(companionState)}</span>
+        </div>
+      </header>
 
-      {arranging && (
-        <Notice
-          title="Arrange the dashboard"
-          action={
-            <Button size="sm" icon={ArrowsClockwise} disabled={layoutIsDefault(layout)} onClick={() => setRawLayout(DEFAULT_LAYOUT)}>
-              Reset layout
-            </Button>
-          }
-        >
-          Move panels earlier or later, or hide the ones you do not need. Changes show immediately and are kept in this window’s preferences.
-          {hiddenDefs.length > 0 && (
-            <ul className="chips" aria-label="Hidden panels">
-              {hiddenDefs.map((w) => (
-                <li key={w.id}>
-                  <button type="button" className="chip off" onClick={() => setRawLayout(setWidgetHidden(layout, w.id, false))} aria-label={`Show ${w.title}`}>
-                    <Plus size={12} aria-hidden /> {w.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Notice>
+      <StartBar today={today} go={go} />
+
+      {readiness.level !== 'ready' && (
+        <section className={cx('today-ai', readiness.level === 'blocked' ? 'is-blocked' : 'is-unknown')} aria-label="Assistant readiness">
+          <span className={cx('dot', readiness.level === 'blocked' ? 'dot-warn' : '')} aria-hidden />
+          <div className="grow">
+            <strong>{readiness.title}</strong>
+            <p className="field-hint">{firstSentence(readiness.detail)} Notes, tasks and search keep working without it.</p>
+          </div>
+          <Button size="sm" variant="primary" onClick={() => go('assistant', { setup: '1' })}>
+            {online ? 'Fix online setup' : 'Set up AI'}
+          </Button>
+          <Button size="sm" variant="quiet" busy={check.checking} onClick={() => void check.recheck()}>
+            Check again
+          </Button>
+        </section>
       )}
 
-      <DashboardWidgets source={dashboardSource} />
+      <div className="today-grid">
+        <section className="today-col" aria-labelledby="today-continue">
+          <h2 id="today-continue">Continue</h2>
+          {first ? (
+            <button type="button" className="today-continue" onClick={() => go(first.view, first.params)}>
+              <span className="today-continue-icon" aria-hidden="true">
+                <FirstIcon size={20} />
+              </span>
+              <span className="grow">
+                <span className="sub">
+                  {KIND_NAME[first.kind]} · {first.when}
+                </span>
+                <strong>{first.title}</strong>
+                <span className="today-continue-detail">{first.detail}</span>
+              </span>
+              <ArrowRight size={18} aria-hidden />
+            </button>
+          ) : (
+            <div className="today-empty">
+              <p>
+                <strong>Nothing to continue yet.</strong> Write a note or add a task above and it appears here.
+              </p>
+            </div>
+          )}
+          {more.length > 0 && (
+            <>
+              <h3 className="today-sub">Recently saved</h3>
+              <ul className="today-list">
+                {more.slice(0, 4).map((r) => {
+                  const Icon = KIND_ICON[r.kind];
+                  return (
+                    <li key={r.key}>
+                      <button type="button" className="today-row" onClick={() => go(r.view, r.params)}>
+                        <Icon size={18} aria-hidden />
+                        <span className="grow">
+                          <strong>{r.title}</strong>
+                          <span className="sub">{r.detail}</span>
+                        </span>
+                        <span className="sub today-when">{r.when}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </section>
 
-      <div className={cx('home-widgets', arranging && 'is-arranging')}>
-        {visible.map((id, i) => {
-          const def = WIDGETS.find((w) => w.id === id)!;
-          const body = render(id);
-          if (body === null) return null;
-          return (
-            <WidgetFrame key={id} def={def} arranging={arranging} first={i === 0} last={i === visible.length - 1} onMove={(d) => setRawLayout(moveWidget(layout, id, d))} onHide={() => setRawLayout(setWidgetHidden(layout, id, true))}>
-              {body}
-            </WidgetFrame>
-          );
-        })}
-        {visible.length === 0 && (
-          <div className="widget widget-full">
-            <Empty icon={SquaresFour} title="Every panel is hidden" action={<Button onClick={() => setRawLayout(DEFAULT_LAYOUT)}>Reset layout</Button>}>
-              Use Arrange to bring panels back.
-            </Empty>
+        <section className="today-col" aria-labelledby="today-up">
+          <div className="section-head">
+            <h2 id="today-up">Up next</h2>
+            {triage.open > 0 && (
+              <button type="button" className="linkbtn" onClick={() => go('tasks')}>
+                All {triage.open} open
+              </button>
+            )}
           </div>
-        )}
+          {upcoming.length === 0 ? (
+            <div className="today-empty">
+              <p>
+                <strong>{triage.done > 0 ? 'Everything is done.' : 'No tasks yet.'}</strong> Choose Task above to add one with a due date.
+              </p>
+            </div>
+          ) : (
+            <ul className="today-list">
+              {upcoming.map((t) => {
+                const bucket = dueBucket(t, today);
+                return (
+                  <li key={t.id} className="today-task">
+                    <input
+                      type="checkbox"
+                      className="check"
+                      checked={false}
+                      disabled={pendingTask !== null}
+                      aria-label={`Mark “${truncate(t.title, 60)}” done`}
+                      onChange={() => void completeTask(t)}
+                    />
+                    <button type="button" className="today-task-title" onClick={() => go('tasks')}>
+                      {t.title}
+                    </button>
+                    {pendingTask === t.id ? <Spinner /> : <span className={cx('today-due', bucket === 'overdue' && 'is-overdue', bucket === 'today' && 'is-today')}>{dueLabel(t, today)}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {taskError && (
+            <p className="field-error" role="alert">
+              {taskError}
+            </p>
+          )}
+        </section>
       </div>
-
-      <FileShelf />
     </div>
   );
 }

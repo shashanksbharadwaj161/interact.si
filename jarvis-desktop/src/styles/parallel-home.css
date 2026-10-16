@@ -73,7 +73,7 @@
 
 .ph-status-title {
   margin: 2px 0 4px;
-  font: 600 20px/1.2 var(--font-display);
+  font: 600 20px/1.2 var(--font-ui);
   color: var(--text);
   overflow-wrap: anywhere;
 }

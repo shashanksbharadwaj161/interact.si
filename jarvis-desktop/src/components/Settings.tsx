@@ -28,6 +28,7 @@ export const SHELL_PREF = {
   motionOnBattery: 'motion.onBattery',
   quietToasts: 'toasts.quiet',
   homeLayout: 'home.layout',
+  theme: 'appearance.theme',
 } as const;
 
 const PREF_EVENT = 'shell-pref-change';

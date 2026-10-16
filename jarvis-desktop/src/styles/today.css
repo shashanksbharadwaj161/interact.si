@@ -1,0 +1,373 @@
+/* Today: one greeting, one start bar, and at most three sections (Continue, Recently saved, Up next). */
+.today {
+  gap: var(--s6);
+}
+
+.today-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s6);
+}
+
+.today-hello {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.today-hello .display {
+  font-size: clamp(38px, 4.4vw, 52px);
+}
+
+.today-line {
+  color: var(--muted);
+  font-size: var(--t-lead);
+}
+
+.today-companion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-right: var(--s2);
+}
+
+/* Start bar */
+.start {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-2);
+}
+
+.start-kinds {
+  display: flex;
+  gap: var(--s1);
+}
+
+.start-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  font: 550 var(--t-small) var(--font-ui);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.start-kind:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+
+.start-kind.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.start-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.start-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 var(--s2);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  font: 400 var(--t-lead) var(--font-ui);
+}
+
+.start-input::placeholder {
+  color: var(--muted);
+}
+
+.start-input:focus-visible {
+  outline: none;
+}
+
+.start:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: var(--shadow-2), 0 0 0 3px var(--accent-soft);
+}
+
+.start-due {
+  width: auto;
+  min-width: 128px;
+}
+
+.start-row .btn {
+  min-height: 42px;
+  padding-inline: 18px;
+}
+
+.start-status {
+  padding: 0 var(--s2);
+  color: var(--muted);
+  font-size: var(--t-meta);
+}
+
+.start-status.ok {
+  color: var(--ok);
+}
+
+.start-status.bad {
+  color: var(--danger);
+}
+
+/* AI readiness, only when chat cannot answer */
+.today-ai {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.today-ai.is-blocked {
+  background: var(--warn-soft);
+  border-color: transparent;
+}
+
+.today-ai strong {
+  font-weight: 600;
+}
+
+/* Sections */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--s7);
+  align-items: start;
+}
+
+.today-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+.today-col h2 {
+  font-size: var(--t-lead);
+}
+
+.today-sub {
+  margin-top: var(--s3);
+  color: var(--muted);
+  font-size: var(--t-small);
+  font-weight: 550;
+}
+
+.today-continue {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s4) var(--s5);
+  text-align: left;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease);
+}
+
+.today-continue:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-2);
+}
+
+.today-continue > svg {
+  color: var(--muted);
+  flex: none;
+}
+
+.today-continue .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.today-continue strong {
+  font-size: var(--t-lead);
+  font-weight: 600;
+}
+
+.today-continue-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.today-continue-detail {
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.today-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.today-list > li {
+  border-bottom: 1px solid var(--line);
+}
+
+.today-list > li:last-child {
+  border-bottom: 0;
+}
+
+.today-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: 10px var(--s1);
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-ctl);
+  font: inherit;
+  cursor: pointer;
+}
+
+.today-row:hover {
+  background: var(--hover);
+}
+
+.today-row > svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.today-row .grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.today-row strong {
+  font-weight: 550;
+  font-size: var(--t-small);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-row .sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.today-when {
+  flex: none;
+}
+
+.today-task {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 9px var(--s1);
+}
+
+.today-task-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: var(--t-small);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.today-task-title:hover {
+  color: var(--accent);
+}
+
+.today-due {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--t-meta);
+}
+
+.today-due.is-overdue {
+  color: var(--danger);
+  font-weight: 550;
+}
+
+.today-due.is-today {
+  color: var(--accent);
+  font-weight: 550;
+}
+
+.today-empty {
+  padding: var(--s4) var(--s5);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+
+.today-empty strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (max-width: 1000px) {
+  .today-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s6);
+  }
+}
+
+@media (max-width: 640px) {
+  .today-companion {
+    display: none;
+  }
+
+  .start-row {
+    flex-wrap: wrap;
+  }
+
+  .start-row .btn {
+    width: 100%;
+  }
+}
