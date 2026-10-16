@@ -1,5 +1,8 @@
 # Handoff for Claude — 16 October 2026
 
+## Newest instruction: UI revamp authorized
+The user has now authorized Codex and browser Claude Code to redesign the product together. Read `planning/ui-revamp/REVAMP-BRIEF.md` for the current complete assignment and acceptance gates. This supersedes the stopped-development instruction only for this scoped Claude Code task. Historical paid API worker loops remain stopped; no payment changes or additional usage-credit purchases are authorized. User rejection below still applies until the redesigned installed experience is accepted.
+
 ## User verdict takes priority
 The user installed the Windows build and reports that it is extremely difficult to use, the UI/UX is poor, and nothing worked for them. The product is NOT accepted, finished, or ready for commercial release. The exact failing interaction paths have not yet been reproduced. Treat source coverage scores and automated test counts as implementation evidence only, never as proof of a useful or usable app. Do not repeat the previous completion claims.
 
