@@ -7,7 +7,9 @@ import {ActionService, type ShellAdapter} from './services/actions';
 import {LOCAL_KEEP_ALIVE, buildHistory, ollamaChat, resolveChatRoute, sendChat, selectedCloudProvider, noProviderKeyMessage} from './services/chat';
 import {CLOUD_PROVIDERS, cloudProviderInfo, effectiveCloudModel} from '../src/shared/contracts';
 import {STREAM_LIMITS, StreamAborted, StreamIncomplete, StreamProtocolError, streamOllamaChat, type StreamLimits, type StreamResult} from './services/ollama';
-import {CloudProviderError, modelListFailure, parseModelList, streamProviderChat} from './services/cloud';
+import {AGENT_MAX_TOKENS, CloudProviderError, createAnthropicMessage, modelListFailure, parseModelList, streamProviderChat} from './services/cloud';
+import {companionSystemPrompt, runAgent, type AgentEvent, type UndoHandle} from './services/agent';
+import {createAgentTools} from './services/agent-tools';
 import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
 import {parseModelPlan, planIntent as planRules, PLANNED_TYPES, type IntentWindow} from './services/intent';
@@ -102,9 +104,20 @@ export type Backend = Omit<FullJarvisAPI, 'productivity' | 'onChatStream'> & {
   usage: UsageLedger;
   clipboard: ClipboardHistory;
   runner: NativeRunner | null;
+  /** The desktop companion's request loop (main process only; reached through the companion window's own IPC). */
+  companion: CompanionService;
   runRetention(): Promise<void>;
   dispose(): Promise<void>;
 };
+
+export type CompanionReadiness = {ready: true; model: string} | {ready: false; reason: string};
+export interface CompanionService {
+  readiness(): Promise<CompanionReadiness>;
+  /** Runs one request. `confirm` is the trusted native confirmation owned by the companion window. */
+  run(input: {text: string; image?: {base64: string; width: number; height: number}}, hooks: {emit: (e: AgentEvent) => void; confirm: (summary: string, detail: string) => Promise<boolean>; signal: AbortSignal}): Promise<void>;
+  /** Reverses one change the companion just made (only what its receipt offered). */
+  undo(handle: UndoHandle): Promise<boolean>;
+}
 
 const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_LIST_BYTES = 2 * 1024 * 1024;
@@ -1123,10 +1136,66 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     },
   };
 
+  const localDay = () => {
+    const d = env.now ? env.now() : new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  // The companion uses Claude through the saved Anthropic key only: its tools rely on Anthropic tool use and image input.
+  const companionReadiness = async (): Promise<CompanionReadiness> => {
+    const s = settings();
+    if (s.mode !== 'online') return {ready: false, reason: 'AI requests are off. Connect Claude in the hub (Settings › AI) to use the companion.'};
+    if (selectedCloudProvider(s) !== 'anthropic') return {ready: false, reason: 'The companion needs Claude. Choose Anthropic as the provider in Settings › AI.'};
+    if (!(await secrets.hasKey('anthropic'))) return {ready: false, reason: 'No Anthropic API key is saved. Add it in Settings › AI.'};
+    return {ready: true, model: effectiveCloudModel('anthropic', s.cloudModel)};
+  };
+  const companion: CompanionService = {
+    readiness: companionReadiness,
+    async run(input, hooks) {
+      const r = await companionReadiness();
+      if (!r.ready) { hooks.emit({type: 'error', reason: 'setup', message: r.reason}); return; }
+      const key = await secrets.revealKey('anthropic');
+      if (!key) { hooks.emit({type: 'error', reason: 'setup', message: 'The stored API key could not be decrypted; set it again in Settings › AI.'}); return; }
+      const tools = createAgentTools({
+        snapshot: () => store.snapshot(),
+        saveTask: (t) => api.saveTask(t),
+        confirm: hooks.confirm,
+        today: localDay,
+      });
+      let steps = 0, inTok = 0, outTok = 0;
+      await runAgent({
+        text: input.text,
+        context: `Today is ${localDay()} (the person's local date).${input.image ? ` An image of a ${input.image.width}×${input.image.height} px screen region the person selected is attached.` : ''}`,
+        image: input.image,
+        model: r.model,
+        system: companionSystemPrompt(),
+        tools,
+        maxTokens: AGENT_MAX_TOKENS,
+        signal: hooks.signal,
+        emit: hooks.emit,
+        call: (body, signal) => { steps++; return createAnthropicMessage(guardedFetch, {origin: env.cloudOriginOverride, key, body, signal}); },
+        onUsage: (i, o) => {
+          inTok += i; outTok += o;
+          try { usage.recordEvent({runtime: 'cloud', provider: 'anthropic', model: r.model, inputTokens: i, outputTokens: o, generationMs: null, promptMs: null}); void saveUsage(); } catch { /* usage is best effort */ }
+        },
+      });
+      // Activity records that a request left the computer and how big it was; never its content.
+      await activity('companion', `Companion request sent to Anthropic (${steps} step${steps === 1 ? '' : 's'}${input.image ? ', with a screen region' : ''})`, `Model ${r.model}; tokens in ${inTok}, out ${outTok}`);
+    },
+    async undo(handle) {
+      if (handle.kind !== 'task' || typeof handle.id !== 'string') return false;
+      const exists = store.snapshot().tasks.some((t) => t.id === handle.id);
+      if (!exists) return false;
+      const after = await api.deleteTask(handle.id);
+      const gone = !after.tasks.some((t) => t.id === handle.id);
+      if (gone) await activity('companion', 'Companion change undone: a task it added was removed');
+      return gone;
+    },
+  };
+
   return {
     ...api,
     onActivity: (h: (a: Activity) => void) => store.onActivity(h),
-    load, store, productivity, actions, system, speech, routines, models, integrations, usage, clipboard, runner,
+    load, store, productivity, actions, system, speech, routines, models, integrations, usage, clipboard, runner, companion,
     reminderTasks: () => effectiveReminderTasks(store.snapshot().tasks, productivity.snapshot().reminders),
     async runRetention() { await store.applyRetention(); await productivity.applyRetention().catch(() => undefined); },
     async dispose() {

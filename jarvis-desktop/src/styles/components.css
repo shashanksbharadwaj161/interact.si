@@ -554,7 +554,8 @@
   margin-bottom: 2px;
 }
 
-.notice-body p + p {
+.notice-body p + p,
+.notice-text > * + * {
   margin-top: var(--s1);
 }
 

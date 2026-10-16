@@ -17,6 +17,7 @@ import {createSafeStorageCipher} from './services/atRest';
 import {createTrustedConfirm, safeErrorMessage, isAllowedRequestUrl, isTestFixtureDir, isTrustedUrl, parseDevOrigin} from './ipcCore';
 import {registerIpc} from './ipc';
 import {METHODS, ACTIVITY_CHANNEL} from './channels';
+import {createCompanion} from './companionWindow';
 
 // Test mode (no dialogs, no tray, auto-approved confirmations) is honoured only for an isolated temp userData with a fixture
 // prefix. Anywhere else a stray JARVIS_TEST_MODE=1 must never reach real user data, so the app refuses to start.
@@ -50,6 +51,7 @@ let reloadedOnce = false;
 let reminders: Reminders | null = null;
 let shuttingDown = false;
 let idle: IdleGovernor | null = null;
+let companion: ReturnType<typeof createCompanion> | null = null;
 const liveNotifications = new Set<Notification>();
 
 const distDir = () => path.join(__dirname, '..', 'dist');
@@ -225,6 +227,7 @@ function createTray() {
     t.setToolTip('Desktop Companion');
     t.setContextMenu(Menu.buildFromTemplate([
       {label: 'Show / hide Desktop Companion', click: toggleWindow},
+      {label: 'Show / hide the companion island', click: () => { if (companion?.isVisible()) companion.hide(); else companion?.show(); }},
       {type: 'separator'},
       {label: 'Quit', click: () => { quitting = true; app.quit(); }},
     ]));
@@ -318,6 +321,31 @@ async function boot() {
     },
   });
   createWindow();
+  // The desktop companion island: not in test mode (smoke runs drive the hub window) and not in safe launch.
+  if (!TEST_MODE && !launch.safe) {
+    const b = backend;
+    // The hub never depends on the island: if it cannot start, the hub keeps working and the reason is recorded.
+    try {
+      companion = createCompanion({
+        backend: b,
+        distDir: distDir(),
+        preloadPath: path.join(__dirname, 'companionPreload.cjs'),
+        userData,
+        devOrigin: DEV_ORIGIN ?? undefined,
+        record: (summary) => { void b.store.addActivity('companion', summary); },
+        // Opens the hub on one of the screens the companion links to; the view is an allowed name and the item an id.
+        openHub: (view, item) => {
+          showWindow();
+          const hash = `#/${view}${item ? `?item=${encodeURIComponent(item)}` : ''}`;
+          const w = mainWindow;
+          if (w && !w.isDestroyed()) void w.webContents.executeJavaScript(`location.hash = ${JSON.stringify(hash)}`).catch(() => undefined);
+        },
+      });
+    } catch (e) {
+      companion = null;
+      void b.store.addActivity('companion', `The companion island could not start (${e instanceof Error ? e.message.slice(0, 160) : 'unknown error'}). The hub still works; use it from the tray.`);
+    }
+  }
   scheduleRetention();
 }
 
@@ -346,6 +374,8 @@ if (TEST_REQUESTED && !TEST_MODE) {
     quitting = true;
     reminders?.dispose();
     idle?.dispose();
+    companion?.dispose();
+    companion = null;
     e.preventDefault();
     if (shuttingDown) return;
     shuttingDown = true;

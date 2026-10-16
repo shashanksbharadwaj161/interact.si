@@ -1,0 +1,446 @@
+{
+  "scripted": [
+    "provider replies (not Claude)",
+    "key protection stand-in",
+    "confirmation answers"
+  ],
+  "steps": [
+    {
+      "name": "rest-not-connected",
+      "surface": "rest",
+      "edge": "idle",
+      "focusedAtRest": false,
+      "skipTaskbar": true,
+      "file": "planning/ui-revamp/native-companion/01-rest-not-connected.jpg",
+      "island": {
+        "x": 957,
+        "y": 632,
+        "width": 323,
+        "height": 88
+      }
+    },
+    {
+      "name": "command-not-connected",
+      "surface": "command",
+      "inputDisabled": true,
+      "reason": "AI requests are off. Connect Claude in the hub (Settings › AI) to use the companion.",
+      "requestsSoFar": 0,
+      "file": "planning/ui-revamp/native-companion/02-command-not-connected.jpg",
+      "island": {
+        "x": 804,
+        "y": 439,
+        "width": 476,
+        "height": 281
+      }
+    },
+    {
+      "name": "online",
+      "hubDialog": "Change desktop permissions or AI connection?",
+      "readiness": {
+        "ready": true,
+        "model": "claude-haiku-4-5"
+      }
+    },
+    {
+      "name": "j4-working",
+      "surface": "working",
+      "edge": "working",
+      "steps": [
+        "is-done: Done Found 1 saved item for “router reset”checked"
+      ],
+      "file": "planning/ui-revamp/native-companion/03-j4-working.jpg",
+      "island": {
+        "x": 844,
+        "y": 532,
+        "width": 436,
+        "height": 188
+      }
+    },
+    {
+      "name": "j4-answer-with-citation",
+      "surface": "answer",
+      "edge": "done",
+      "citations": [
+        "note Router reset steps"
+      ],
+      "file": "planning/ui-revamp/native-companion/04-j4-answer.jpg",
+      "island": {
+        "x": 804,
+        "y": 463,
+        "width": 476,
+        "height": 257
+      }
+    },
+    {
+      "name": "j4-citation-opens-hub",
+      "hubHash": "#/notes?item=a60ee319-3df9-4c02-9bf3-e7164534d9fb",
+      "hubVisible": true,
+      "file": "planning/ui-revamp/native-companion/05-j4-citation-opens-hub.jpg",
+      "island": {
+        "x": 804,
+        "y": 463,
+        "width": 476,
+        "height": 257
+      }
+    },
+    {
+      "name": "j1-region-overlay",
+      "islandHiddenDuringCapture": true,
+      "selection": "620 × 340",
+      "file": "planning/ui-revamp/native-companion/06-j1-region-overlay.jpg"
+    },
+    {
+      "name": "j1-region-attached",
+      "overlayClosed": true,
+      "chip": "Region attached620×340 px. Sent with this request only, then forgotten.Remove",
+      "file": "planning/ui-revamp/native-companion/07-j1-region-attached.jpg",
+      "island": {
+        "x": 804,
+        "y": 462,
+        "width": 476,
+        "height": 258
+      }
+    },
+    {
+      "name": "j1-answer",
+      "imageSent": [
+        {
+          "media_type": "image/png",
+          "base64Chars": 69892
+        }
+      ],
+      "file": "planning/ui-revamp/native-companion/08-j1-answer.jpg",
+      "island": {
+        "x": 804,
+        "y": 476,
+        "width": 476,
+        "height": 244
+      }
+    },
+    {
+      "name": "j1-region-single-use",
+      "chipAfterAnswer": false
+    },
+    {
+      "name": "region-escape",
+      "overlayClosed": true,
+      "surface": "command",
+      "chip": false
+    },
+    {
+      "name": "j2-waiting-for-confirmation",
+      "edge": "waiting",
+      "step": "Needs your answer Waiting for your answer in the Windows confirmation",
+      "file": "planning/ui-revamp/native-companion/09-j2-waiting.jpg",
+      "island": {
+        "x": 844,
+        "y": 515,
+        "width": 436,
+        "height": 205
+      }
+    },
+    {
+      "name": "j2-task-added",
+      "receipt": "Added “Send the invoice to Priya”, due 2026-10-17Undo",
+      "tasksNow": [
+        "Send the invoice to Priya"
+      ],
+      "dialog": {
+        "message": "Add this task?",
+        "detail": "Title: Send the invoice to Priya\nDue: 2026-10-17\n\nRequested through the companion (Claude). It is saved to your task list on this computer only if you choose Continue.",
+        "buttons": [
+          "Cancel",
+          "Continue"
+        ],
+        "defaultId": 0,
+        "answered": "Continue"
+      },
+      "file": "planning/ui-revamp/native-companion/10-j2-added.jpg",
+      "island": {
+        "x": 804,
+        "y": 453,
+        "width": 476,
+        "height": 267
+      }
+    },
+    {
+      "name": "j2-undo",
+      "tasksNow": [],
+      "file": "planning/ui-revamp/native-companion/11-j2-undone.jpg",
+      "island": {
+        "x": 804,
+        "y": 453,
+        "width": 476,
+        "height": 267
+      }
+    },
+    {
+      "name": "j2-declined",
+      "tasksNow": [],
+      "dialog": {
+        "message": "Add this task?",
+        "detail": "Title: Book the dentist\nDue: 2026-10-17\n\nRequested through the companion (Claude). It is saved to your task list on this computer only if you choose Continue.",
+        "buttons": [
+          "Cancel",
+          "Continue"
+        ],
+        "defaultId": 0,
+        "answered": "Cancel"
+      },
+      "steps": [
+        "is-declined"
+      ],
+      "answer": "Okay, I did not add it.",
+      "file": "planning/ui-revamp/native-companion/12-j2-declined.jpg",
+      "island": {
+        "x": 804,
+        "y": 499,
+        "width": 476,
+        "height": 221
+      }
+    },
+    {
+      "name": "cancel",
+      "providerRequestAborted": true,
+      "title": "Stopped",
+      "message": "Stopped. Anything already confirmed stays done; nothing else will run.",
+      "edge": "error",
+      "file": "planning/ui-revamp/native-companion/13-cancelled.jpg",
+      "island": {
+        "x": 804,
+        "y": 518,
+        "width": 476,
+        "height": 202
+      }
+    },
+    {
+      "name": "provider-error",
+      "title": "Claude could not answer",
+      "message": "The cloud provider is overloaded right now (HTTP 529). Try again in a moment",
+      "edge": "error",
+      "file": "planning/ui-revamp/native-companion/14-provider-error.jpg",
+      "island": {
+        "x": 804,
+        "y": 518,
+        "width": 476,
+        "height": 202
+      }
+    },
+    {
+      "name": "network-error",
+      "title": "Could not reach Claude",
+      "message": "Anthropic could not be reached. Check the connection and try again. Nothing was sent after this point.",
+      "file": "planning/ui-revamp/native-companion/15-network-error.jpg",
+      "island": {
+        "x": 804,
+        "y": 518,
+        "width": 476,
+        "height": 202
+      }
+    },
+    {
+      "name": "offline-again",
+      "inputDisabled": true,
+      "reason": "AI requests are off. Connect Claude in the hub (Settings › AI) to use the companion.",
+      "newRequests": 0,
+      "file": "planning/ui-revamp/native-companion/16-offline-again.jpg",
+      "island": {
+        "x": 804,
+        "y": 382,
+        "width": 476,
+        "height": 338
+      }
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 1,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 3,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 1,
+      "image": [
+        {
+          "media_type": "image/png",
+          "base64Chars": 69892
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 1,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 3,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 1,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 3,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 1,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 1,
+      "image": []
+    },
+    {
+      "method": "POST",
+      "keyHeader": true,
+      "authorization": false,
+      "version": "2023-06-01",
+      "model": "claude-haiku-4-5",
+      "tools": [
+        "search_saved",
+        "read_saved_item",
+        "create_task"
+      ],
+      "messages": 1,
+      "image": []
+    }
+  ],
+  "dialogs": [
+    {
+      "message": "Change desktop permissions or AI connection?",
+      "detail": "Enable online mode (cloud requests may send conversation content)",
+      "buttons": [
+        "Cancel",
+        "Continue"
+      ],
+      "defaultId": 0,
+      "answered": "Continue"
+    },
+    {
+      "message": "Add this task?",
+      "detail": "Title: Send the invoice to Priya\nDue: 2026-10-17\n\nRequested through the companion (Claude). It is saved to your task list on this computer only if you choose Continue.",
+      "buttons": [
+        "Cancel",
+        "Continue"
+      ],
+      "defaultId": 0,
+      "answered": "Continue"
+    },
+    {
+      "message": "Add this task?",
+      "detail": "Title: Book the dentist\nDue: 2026-10-17\n\nRequested through the companion (Claude). It is saved to your task list on this computer only if you choose Continue.",
+      "buttons": [
+        "Cancel",
+        "Continue"
+      ],
+      "defaultId": 0,
+      "answered": "Cancel"
+    }
+  ],
+  "errors": [],
+  "activity": [
+    "Companion request sent to Anthropic (2 steps)",
+    "Screen region selected for the companion (620×340 px; kept in memory for up to 5 minutes, sent only if you ask)",
+    "Companion request sent to Anthropic (1 step, with a screen region)",
+    "Companion request sent to Anthropic (2 steps)",
+    "Companion change undone: a task it added was removed",
+    "Companion request sent to Anthropic (2 steps)",
+    "Companion request sent to Anthropic (1 step)",
+    "Companion request sent to Anthropic (1 step)",
+    "Companion request sent to Anthropic (1 step)"
+  ]
+}

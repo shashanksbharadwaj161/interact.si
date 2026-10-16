@@ -247,6 +247,7 @@ async function cloudHttpError(res: Response, signal: AbortSignal): Promise<Error
   await readBoundedText(res, 1024, signal);
   if (res.status === 401 || res.status === 403) return new CloudProviderError('The cloud provider rejected the API key');
   if (res.status === 429) return new CloudProviderError('The cloud provider is rate limiting requests (HTTP 429). Try again later');
+  if (res.status === 529 || res.status === 503) return new CloudProviderError(`The cloud provider is overloaded right now (HTTP ${res.status}). Try again in a moment`);
   return new CloudProviderError(`Cloud provider returned HTTP ${res.status}`);
 }
 
@@ -333,4 +334,73 @@ export function modelListFailure(status: number): string {
   if (status === 429) return 'The provider is rate limiting this key (HTTP 429). Wait a moment and check again.';
   if (status >= 500) return `The provider had a problem answering (HTTP ${status}). Try again later.`;
   return `The provider did not return a model list (HTTP ${status}).`;
+}
+
+// ---------- One non-streaming Messages request, for the companion's tool loop ----------
+
+/** Content blocks the companion sends. The model's own blocks (text, tool_use, thinking, …) are sent back unchanged. */
+export type AnthropicImageBlock = {type: 'image'; source: {type: 'base64'; media_type: 'image/png'; data: string}};
+export type AnthropicTextBlock = {type: 'text'; text: string};
+export type AnthropicToolResultBlock = {type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean};
+export type AnthropicToolUseBlock = {type: 'tool_use'; id: string; name: string; input: Record<string, unknown>};
+/** Any block the model returned. Kept as received so the next request can replay it exactly (thinking blocks included). */
+export type AnthropicResponseBlock = AnthropicToolUseBlock | AnthropicTextBlock | ({type: string} & Record<string, unknown>);
+export type AnthropicMessageParam =
+  | {role: 'user'; content: (AnthropicTextBlock | AnthropicImageBlock | AnthropicToolResultBlock)[]}
+  | {role: 'assistant'; content: AnthropicResponseBlock[]};
+export type AnthropicToolDef = {name: string; description: string; input_schema: Record<string, unknown>};
+export type AnthropicMessageBody = {model: string; max_tokens: number; system: string; tools: AnthropicToolDef[]; messages: AnthropicMessageParam[]};
+export type AnthropicMessageResult = {content: AnthropicResponseBlock[]; stopReason: string; inputTokens: number | null; outputTokens: number | null};
+
+/** Output budget for one companion step. Current models think before answering and that thinking counts towards it. */
+export const AGENT_MAX_TOKENS = 16000;
+/** A complete Messages response is read up to this many bytes (images are only ever sent, never returned). */
+export const AGENT_RESPONSE_MAX_BYTES = 2_000_000;
+
+const TOOL_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+
+/**
+ * Validates a parsed Messages response. Returns the blocks as received (so they can be replayed), with tool_use blocks
+ * checked for a usable id, a known-shape name and an object input. Anything else malformed is a protocol error.
+ */
+export function parseAnthropicMessage(v: unknown): AnthropicMessageResult {
+  const bad = () => new StreamProtocolError('The provider sent a malformed reply');
+  if (!isObj(v) || v.type !== 'message' || !Array.isArray(v.content) || typeof v.stop_reason !== 'string') throw bad();
+  if (v.content.length > 64) throw bad();
+  const content: AnthropicResponseBlock[] = [];
+  for (const b of v.content) {
+    if (!isObj(b) || typeof b.type !== 'string') throw bad();
+    if (b.type === 'text' && typeof b.text !== 'string') throw bad();
+    if (b.type === 'tool_use' && (typeof b.id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(b.id) || typeof b.name !== 'string' || !TOOL_NAME_RE.test(b.name) || !isObj(b.input))) throw bad();
+    content.push(b as AnthropicResponseBlock);
+  }
+  const u = isObj(v.usage) ? v.usage : {};
+  return {content, stopReason: v.stop_reason.slice(0, 40), inputTokens: tokenCount(u.input_tokens), outputTokens: tokenCount(u.output_tokens)};
+}
+
+/**
+ * Sends one Messages request (no streaming) through the guarded fetch: online mode, stored key, the exact /v1/messages
+ * path and only the x-api-key credential header, as for chat. Errors are status-only; provider text is never echoed.
+ */
+export async function createAnthropicMessage(guardedFetch: GuardedFetch, req: {origin?: string; key: string; body: AnthropicMessageBody; signal: AbortSignal; timeoutMs?: number}): Promise<AnthropicMessageResult> {
+  if (req.signal.aborted) throw new StreamAborted('', req.signal.reason);
+  let res: Response;
+  try {
+    res = await guardedFetch(`${req.origin ?? ANTHROPIC_ORIGIN}/v1/messages`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json', accept: 'application/json', 'x-api-key': req.key, 'anthropic-version': ANTHROPIC_STREAM_VERSION},
+      body: JSON.stringify(req.body),
+      signal: req.signal,
+      timeoutMs: req.timeoutMs ?? 180_000,
+    }, 'cloud-chat');
+  } catch (e) {
+    if (req.signal.aborted) throw new StreamAborted('', req.signal.reason);
+    throw e;
+  }
+  if (!res.ok) throw await cloudHttpError(res, req.signal);
+  const raw = await readBoundedText(res, AGENT_RESPONSE_MAX_BYTES, req.signal, 30_000);
+  if (req.signal.aborted) throw new StreamAborted('', req.signal.reason);
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { throw new StreamProtocolError('The provider sent a malformed reply'); }
+  return parseAnthropicMessage(parsed);
 }

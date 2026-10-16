@@ -21,3 +21,5 @@ writeFileSync(path.join(root, 'dist-electron', 'native-manifest.json'), JSON.str
 
 await build({entryPoints: ['electron/main.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: 'dist-electron/main.cjs', external: ['electron'], target: 'node22', define: {__NATIVE_MANIFEST__: JSON.stringify(manifest)}});
 await build({entryPoints: ['electron/preload.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: 'dist-electron/preload.cjs', external: ['electron'], target: 'node22'});
+// The companion island's own preload: only the companion methods (electron/companionCore.ts), never the hub's API.
+await build({entryPoints: ['electron/companionPreload.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: 'dist-electron/companionPreload.cjs', external: ['electron'], target: 'node22'});

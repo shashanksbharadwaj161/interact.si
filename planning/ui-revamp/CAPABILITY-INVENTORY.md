@@ -2,6 +2,8 @@
 
 Scope: what `jarvis-desktop/` can do today, read from source at the working tree on branch `claude/compassionate-hawking-m9x36g` (HEAD `ebfb1a5`; `prototype/` and CSS were being edited concurrently and are out of scope). Purpose: choose reusable paths for the companion "computer use" loop described in `FUTURE-COMPANION-PLAN.md` (journeys 1, 2, 4) and `HITODAMA-DEEP-STUDY.md` ("Actual gaps").
 
+> **Update, same day, after the native companion slice:** the following rows are now out of date. The companion window, its scoped IPC, selected-region capture, a Claude tool-use loop with image input, and companion tools for search, read and task creation (with trusted confirmation, read-back verification and undo) now exist. See `NATIVE-COMPANION-SLICE.md` for what is working, what is unverified on Windows, and what is still missing. The rows below describe the tree before that slice.
+
 Status meanings:
 - **Working**: renderer → IPC (`electron/channels.ts` METHODS, `electron/ipcCore.ts` ARG_SPECS, `electron/preload.ts`) → backend/native → result exists end to end in code.
 - **Partial**: a real path exists but a stated part of the capability is absent.

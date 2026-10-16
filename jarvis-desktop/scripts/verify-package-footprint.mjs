@@ -21,7 +21,7 @@ inventory(asar.getRawHeader(archive).header);
 const dependencies=fileEntries.filter(p=>p.split('/').includes('node_modules'));
 const builtins=new Set([...builtinModules,...builtinModules.map(m=>`node:${m}`),'electron']);
 const external=new Set();
-for(const bundle of ['dist-electron/main.cjs','dist-electron/preload.cjs']) {
+for(const bundle of ['dist-electron/main.cjs','dist-electron/preload.cjs','dist-electron/companionPreload.cjs']) {
   const source=asar.extractFile(archive,bundle).toString('utf8');
   const calls=[...source.matchAll(/\brequire\s*\(([^)]*)\)/g)];
   for(const [,arg] of calls) {

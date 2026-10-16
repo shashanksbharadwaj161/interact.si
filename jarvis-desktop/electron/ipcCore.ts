@@ -236,7 +236,11 @@ function argProblem(spec: ArgSpec, v: unknown): string | null {
 
 /** Returns a user-safe message for the first invalid argument, or null when every argument matches its spec. */
 export function validateArgs(method: MethodName, args: readonly unknown[]): string | null {
-  const specs = ARG_SPECS[method];
+  return validateArgsAgainst(method, ARG_SPECS[method], args);
+}
+
+/** The same check against any spec list (the companion window has its own method table). */
+export function validateArgsAgainst(method: string, specs: readonly ArgSpec[], args: readonly unknown[]): string | null {
   if (args.length > specs.length) return 'Wrong number of arguments';
   for (let i = 0; i < specs.length; i++) {
     const v = args[i];

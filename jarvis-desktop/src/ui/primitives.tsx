@@ -162,7 +162,8 @@ export function Notice({ tone = 'info', title, children, action }: { tone?: 'inf
       <Icon size={18} weight="duotone" aria-hidden />
       <div className="notice-body">
         {title && <strong>{title}</strong>}
-        {children && <p>{children}</p>}
+        {/* Callers may pass text or blocks (lists, rows), so the body is a div, not a p. */}
+        {children && <div className="notice-text">{children}</div>}
       </div>
       {action}
     </div>
