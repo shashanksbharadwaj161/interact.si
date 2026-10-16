@@ -1,12 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ChatCircleDots, CheckSquare, Cube, Note as NoteIcon, NotePencil, Plus } from '@phosphor-icons/react';
 import type { Activity, Capability, Capsule, ChatMessage, Note, Task } from '../shared/contracts';
-import { CompanionOrb } from './CompanionOrb';
+import { CoreFrame } from './CompanionOrb';
 import { SHELL_PREF, useShellPref } from './Settings';
 import { Button, Spinner } from '../ui/primitives';
 import { useReady } from '../ui/store';
-import { useCompanion } from '../ui/companion';
-import { stateLabel } from '../ui/appearance';
 import { type ViewId } from '../ui/nav';
 import { cx, dueBucket, dueKey, fmtDueKey, localDateKey, relTime, truncate } from '../ui/util';
 import { modelReadiness, useModelCheck } from './Onboarding';
@@ -279,13 +277,29 @@ export const firstSentence = (s: string): string => (/^[\s\S]*?[.!?](?=\s|$)/.ex
 const KIND_ICON = { note: NoteIcon, capsule: Cube, chat: ChatCircleDots } as const;
 const KIND_NAME = { note: 'Note', capsule: 'Setup', chat: 'Assistant' } as const;
 
-function todayLine(today: string, dueToday: number, overdue: number): string {
-  const d = new Date(`${today}T12:00:00`);
-  const date = Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(d);
+/** What is due, in words. Only real counts; nothing is said when nothing is due. */
+function dueLine(dueToday: number, overdue: number): string {
   const parts: string[] = [];
   if (overdue) parts.push(`${overdue} overdue`);
   if (dueToday) parts.push(`${dueToday} due today`);
-  return [date, parts.length ? parts.join(', ') : null].filter(Boolean).join(' · ');
+  return parts.length ? parts.join(' · ') : 'Nothing is due today.';
+}
+
+/** Local date and time for the hero readout, refreshed each minute while the window is visible. */
+function useClock(): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== 'hidden') setNow(new Date());
+    };
+    const id = window.setInterval(tick, 30_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, []);
+  return now;
 }
 
 /** One start bar: write a note, add a task, or hand a question to the Assistant. Saves only after a real write. */
@@ -403,7 +417,7 @@ function StartBar({ today, go }: { today: string; go: Go }) {
 export function Home({ go }: { go: Go }) {
   const { state, settings, system, systemError, cloudConfigured, api, mutate } = useReady();
   const check = useModelCheck();
-  const { state: companionState } = useCompanion();
+  const clock = useClock();
   const [displayName] = useShellPref<string>(SHELL_PREF.displayName, '');
   // The calendar day is read once per mount and refreshed when the window comes back; it is never computed inside the pure helpers.
   const [today, setToday] = useState(() => localDateKey());
@@ -444,16 +458,34 @@ export function Home({ go }: { go: Go }) {
 
   const FirstIcon = first ? KIND_ICON[first.kind] : NoteIcon;
   return (
-    <div className="page today">
+    <div className="page today enter">
       <header className="today-hero">
         <div className="today-hello">
+          <p className="hud today-clock">
+            <time dateTime={clock.toISOString()}>{new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(clock)}</time>
+            <span aria-hidden="true">/</span>
+            <span>{new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(clock)}</span>
+          </p>
           <h1 className="display">{greeting(hour, displayName.trim())}</h1>
-          <p className="today-line">{todayLine(today, triage.today.length, triage.overdue.length)}</p>
+          <p className="today-line">{dueLine(triage.today.length, triage.overdue.length)}</p>
+          {(triage.open > 0 || state.notes.length > 0 || state.capsules.length > 0) && (
+            <dl className="readouts" aria-label="Saved on this computer">
+              <div>
+                <dt>Open tasks</dt>
+                <dd>{triage.open}</dd>
+              </div>
+              <div>
+                <dt>Notes</dt>
+                <dd>{state.notes.length}</dd>
+              </div>
+              <div>
+                <dt>Setups</dt>
+                <dd>{state.capsules.length}</dd>
+              </div>
+            </dl>
+          )}
         </div>
-        <div className="today-companion" aria-live="polite">
-          <CompanionOrb size={112} />
-          <span className="sub">{stateLabel(companionState)}</span>
-        </div>
+        <CoreFrame size={210} className="today-core" />
       </header>
 
       <StartBar today={today} go={go} />
@@ -463,20 +495,24 @@ export function Home({ go }: { go: Go }) {
           <span className={cx('dot', readiness.level === 'blocked' ? 'dot-warn' : '')} aria-hidden />
           <div className="grow">
             <strong>{readiness.title}</strong>
-            <p className="field-hint">{firstSentence(readiness.detail)} Notes, tasks and search keep working without it.</p>
+            <p className="field-hint">{firstSentence(readiness.detail)}{online ? ' Notes, tasks and search keep working without it.' : ''}</p>
           </div>
           <Button size="sm" variant="primary" onClick={() => go('assistant', { setup: '1' })}>
-            {online ? 'Fix online setup' : 'Set up AI'}
+            {online ? 'Fix AI setup' : 'Connect Claude'}
           </Button>
-          <Button size="sm" variant="quiet" busy={check.checking} onClick={() => void check.recheck()}>
-            Check again
-          </Button>
+          {online && (
+            <Button size="sm" variant="quiet" busy={check.checking} onClick={() => void check.recheck()}>
+              Check again
+            </Button>
+          )}
         </section>
       )}
 
       <div className="today-grid">
         <section className="today-col" aria-labelledby="today-continue">
-          <h2 id="today-continue">Continue</h2>
+          <div className="section-head">
+            <h2 id="today-continue">Continue</h2>
+          </div>
           {first ? (
             <button type="button" className="today-continue" onClick={() => go(first.view, first.params)}>
               <span className="today-continue-icon" aria-hidden="true">

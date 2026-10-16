@@ -3,7 +3,7 @@ import { ArrowClockwise, Broom, CaretDown, ChatCircleDots, ClockCounterClockwise
 import type { ActionPreview, ActionRequest, ApiFeature, ChatMessage, ChatStreamEvent, ChatStreamRoute, CloudProvider, CloudProviderStatus, IntentPlan, JarvisAPI } from '../shared/contracts';
 import { DEFAULT_CLOUD_PROVIDER, cloudProviderInfo, effectiveCloudModel, isCloudProvider } from '../shared/contracts';
 import { cloudProvidersBridge } from '../ui/bridges';
-import { CompanionOrb } from './CompanionOrb';
+import { CompanionOrb, CoreFrame } from './CompanionOrb';
 import { AiSetup } from './AiSetup';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { Badge, Button, Notice, Panel, Segmented, Spinner, Switch, Tabs } from '../ui/primitives';
@@ -863,12 +863,18 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   }, [api, cloudConfigured, provider]);
   const providerHasKey = provider === 'anthropic' ? cloudConfigured : providerStatus?.find((s) => s.provider === provider)?.hasKey ?? null;
   const providerNoKey = online && provider !== 'anthropic' && providerHasKey === false;
-  const configured = route?.available === true && !systemError && !providerNoKey;
+  // Offline is "AI not connected", except an earlier local-model setup that still passes its live check (legacy).
+  const legacyLocal = !online && route?.available === true && !systemError && Boolean(settings.localModel.trim());
+  const configured = online ? route?.available === true && !systemError && !providerNoKey : legacyLocal;
   const tts = capability('tts'), stt = capability('stt');
   const ttsReady = tts?.available === true && !systemError;
   const sttReady = stt?.available === true && !systemError;
   const unavailable = (reason?: string) => systemError || reason || (systemLoading ? 'Checking system capability…' : 'Capability has not been checked.');
-  const routeReason = providerNoKey ? `No API key stored for ${providerName}. Add it in Settings or switch to offline mode` : unavailable(route?.reason);
+  const routeReason = providerNoKey
+    ? `No API key stored for ${providerName}. Add it in Connect AI`
+    : online
+      ? unavailable(route?.reason)
+      : systemError || 'AI is not connected. Connect Claude with your Anthropic API key to chat';
   const rs = routeState({ online, model: online ? settings.cloudModel : settings.localModel, endpoint: settings.localEndpoint, configured, reason: routeReason, cloudConfigured, ...(online && provider !== 'anthropic' ? { provider, providerHasKey } : {}) });
   const retry = useMemo(() => retryCandidate(state.chat), [state.chat]);
   const chatWindow = useMemo(() => windowMessages(state.chat, showEarlier), [state.chat, showEarlier]);
@@ -1199,8 +1205,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const blocker = sendBlocker({ mode, text: input, locked: sendLock.current, pending: pending !== null, live: live !== null, settling, transcribing: phase === 'transcribing', configured, routeReason, plannerReady, stepBusy: stepBusy !== null });
   const recLabel = phase === 'recording' ? 'Recording, release or tap to stop' : phase === 'starting' ? 'Starting microphone…' : phase === 'transcribing' ? 'Transcribing…' : 'Hold to talk';
   const noDot = (t: string) => t.replace(/[.\s]+$/, '');
-  const routeName = rs.providerName ? `${rs.providerName}` : rs.route === 'Local model' ? 'Local model' : 'Cloud model';
-  const blockedTitle = !configured && !systemLoading && route ? `${online ? routeName : 'The local model'} cannot answer yet` : null;
+  const routeName = online ? providerName : 'Legacy local model';
+  const blockedTitle = !configured && !systemLoading ? (online ? `${routeName} cannot answer yet` : 'AI is not connected') : null;
   const empty = state.chat.length === 0 && pending === null && live === null;
   const suggestions = online || configured ? ['Help me plan the rest of my day', 'Draft a short, friendly reply to an email', 'Explain a concept in plain words'] : [];
   const tabs: { value: DrawerTab; label: string }[] = [
@@ -1219,7 +1225,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
             <summary className={cx('route-chip', `is-${configured ? (online ? 'warn' : 'ok') : 'bad'}`)} aria-label={`Where messages go: ${rs.route}, ${rs.model}, ${rs.ready ? 'ready' : 'unavailable'}. Show details.`}>
               <span className={cx('dot', configured ? 'dot-ok' : 'dot-warn')} aria-hidden />
               <span className="route-chip-text">
-                {online ? `${routeName} · ${rs.model}` : `On this computer · ${rs.model}`}
+                {online ? `${routeName} · ${rs.model}` : legacyLocal ? `Legacy local model · ${rs.model}` : 'AI not connected'}
               </span>
               <CaretDown size={14} aria-hidden />
             </summary>
@@ -1227,11 +1233,11 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
               <Notice tone={configured ? 'info' : 'warn'} title={configured ? 'Available' : 'Unavailable'}>
                 {configured ? (route?.reason || (online ? `Messages go to ${routeName} with your key.` : 'The local model answered its last check.')) : routeReason}
               </Notice>
-              <p className="field-hint" id="route-privacy">{mode === 'command' ? 'A desktop action is planned on this computer. It is not sent to a chat model, and nothing runs until you approve it in the Windows confirmation.' : rs.privacy}</p>
+              <p className="field-hint" id="route-privacy">{mode === 'command' ? 'A desktop action is planned on this computer. It is not sent to a chat model, and nothing runs until you approve it in the Windows confirmation.' : !online && !legacyLocal ? 'AI requests are off. Nothing you type here is sent anywhere until you connect Claude.' : rs.privacy}</p>
               <dl className="kv-list">
-                <div className="kv"><dt>Mode</dt><dd>{online ? 'Online, by your choice' : 'Offline'}</dd></div>
-                <div className="kv"><dt>{online ? 'Provider' : 'Address'}</dt><dd className={online ? undefined : 'mono'}>{online ? `${providerName} (${rs.where})` : rs.where}</dd></div>
-                <div className="kv"><dt>Model</dt><dd className="mono">{rs.model}</dd></div>
+                <div className="kv"><dt>AI requests</dt><dd>{online ? `Online: sent to ${providerName} (${rs.where}) when you press Send` : 'Off: nothing is sent anywhere'}</dd></div>
+                {online && <div className="kv"><dt>Model</dt><dd className="mono">{rs.model}</dd></div>}
+                {!online && settings.localModel.trim() && <div className="kv"><dt>Legacy local model</dt><dd>{legacyLocal ? `Answering: ${settings.localModel}` : `Not answering: ${noDot(unavailable(route?.reason))}`}</dd></div>}
                 {rs.key && <div className="kv"><dt>Key</dt><dd>{rs.key}</dd></div>}
                 <div className="kv"><dt>Live replies</dt><dd>{streaming ? (streaming.available ? 'Streamed as they are written' : `Arrive complete${streaming.reason ? `: ${noDot(streaming.reason)}` : ''}`) : 'Not reported yet'}</dd></div>
                 <div className="kv"><dt>Stop a reply</dt><dd>{cancelFeat ? (cancelFeat.available ? 'Available' : `Not available${cancelFeat.reason ? `: ${noDot(cancelFeat.reason)}` : ''}`) : 'Not reported yet'}</dd></div>
@@ -1240,7 +1246,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
               </dl>
               <div className="row wrap">
                 <Button size="sm" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button>
-                <Button size="sm" variant="quiet" onClick={() => setSetupOpen(true)}>Change AI setup</Button>
+                <Button size="sm" variant="quiet" onClick={() => setSetupOpen(true)}>{online ? 'Change AI setup' : 'Connect Claude'}</Button>
                 <a className="btn btn-quiet btn-sm" href="#/status">System status</a>
               </div>
             </div>
@@ -1261,8 +1267,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
               <strong>{blockedTitle}</strong>
               <span className="sub">{noDot(routeReason)}. Notes, tasks and search still work.</span>
             </div>
-            <Button size="sm" variant="primary" onClick={() => setSetupOpen(true)}>Set up AI</Button>
-            <Button size="sm" variant="quiet" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button>
+            <Button size="sm" variant="primary" onClick={() => setSetupOpen(true)}>{online ? 'Fix AI setup' : 'Connect Claude'}</Button>
+            {online && <Button size="sm" variant="quiet" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button>}
           </div>
         )}
 
@@ -1270,14 +1276,16 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
           <div className="chat-log" ref={logRef} role="log" aria-live="polite" aria-label="Messages" aria-relevant="additions" tabIndex={0} onScroll={(e) => { stickToEnd.current = isNearBottom(e.currentTarget); }}>
             {empty ? (
               <div className="chat-empty">
-                <CompanionOrb size={132} />
-                <h2>{configured ? 'What can I help with?' : 'Chat is not set up yet'}</h2>
+                <CoreFrame size={190} />
+                <h2>{configured ? 'What can I help with?' : online ? `${routeName} cannot answer yet` : 'Connect Claude to chat'}</h2>
                 <p className="field-hint">
                   {configured
-                    ? `Your message goes to ${online ? `${routeName}, model “${rs.model}”` : `the model “${rs.model}” on this computer`} when you press Send. Replies are written by that model.`
+                    ? online
+                      ? `Your message goes to ${routeName} (${rs.where}), model “${rs.model}”, when you press Send. Notes and files are not attached unless you add them.`
+                      : `Replies come from the legacy local model “${rs.model}” on this computer.`
                     : online
-                      ? `${routeName} cannot answer: ${noDot(routeReason)}. Set up AI fixes this; nothing is sent until then.`
-                      : `Ollama (local) unavailable: ${noDot(routeReason)}. Set up AI walks you through it.`}
+                      ? `${noDot(routeReason)}. Nothing is sent until this is fixed.`
+                      : 'Chat uses Claude through your own Anthropic API key. Your notes, tasks and files stay on this computer either way.'}
                 </p>
                 {suggestions.length > 0 && (
                   <div className="chips chat-suggest">
@@ -1291,7 +1299,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                     )}
                   </div>
                 )}
-                {!configured && <Button variant="primary" onClick={() => setSetupOpen(true)}>Set up AI</Button>}
+                {!configured && <Button variant="primary" size="lg" icon={Lightning} onClick={() => setSetupOpen(true)}>{online ? 'Fix AI setup' : 'Connect Claude'}</Button>}
               </div>
             ) : (
               <>
@@ -1311,7 +1319,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                           {m.text}
                           {(kind === 'unavailable' || kind === 'note') && (
                             <span className="row wrap notice-actions">
-                              <Button size="sm" onClick={() => setSetupOpen(true)}>Set up AI</Button>
+                              <Button size="sm" onClick={() => setSetupOpen(true)}>Fix AI setup</Button>
                               <Button size="sm" variant="quiet" busy={systemLoading} onClick={() => void refreshSystem()}>Check again</Button>
                             </span>
                           )}
@@ -1323,7 +1331,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                     <article key={m.id} className={cx('msg', `msg-${m.role}`)}>
                       <header>
                         <span className="msg-who">{m.role === 'user' ? 'You' : 'Assistant'}</span>
-                        {m.role === 'assistant' && <Badge tone={m.source === 'cloud' ? 'warn' : m.source === 'local' ? 'accent' : 'muted'}>{sourceLabel(m.source)}</Badge>}
+                        {m.role === 'assistant' && <Badge tone={m.source === 'local' ? 'muted' : 'accent'}>{m.source === 'cloud' ? (online ? providerName : 'Cloud model') : sourceLabel(m.source)}</Badge>}
                         {incomplete.has(m.id) && <Badge tone="warn">Incomplete</Badge>}
                         <time dateTime={m.createdAt}>{fmtTime(m.createdAt)}</time>
                         {m.role === 'assistant' && (
@@ -1355,7 +1363,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                   <article className="msg msg-assistant msg-pending" aria-busy="true">
                     <header>
                       <span className="msg-who">Assistant</span>
-                      <Badge tone={live.route === 'cloud' ? 'warn' : 'accent'}>{live.route === 'cloud' ? 'Cloud model' : 'Local model'}</Badge>
+                      <Badge tone="accent">{live.route === 'cloud' ? providerName : 'Legacy local model'}</Badge>
                       <span className="sub">{live.status === 'connecting' ? 'connecting…' : live.status === 'stopping' ? 'stopping…' : 'writing…'}</span>
                       <Waited />
                     </header>
@@ -1430,7 +1438,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
               className="composer-input"
               rows={2}
               maxLength={mode === 'command' ? MAX_COMMAND_CHARS : MAX_CHARS}
-              placeholder={mode === 'command' ? 'One desktop action, for example: list windows, or focus “Untitled - Notepad”' : configured ? 'Message the assistant. Enter sends, Shift+Enter adds a line.' : 'You can type now. Sending needs AI to be set up.'}
+              placeholder={mode === 'command' ? 'One desktop action, for example: list windows, or focus “Untitled - Notepad”' : configured ? 'Message the assistant. Enter sends, Shift+Enter adds a line.' : 'You can type now. Sending needs Claude to be connected.'}
               value={input}
               aria-describedby="route-privacy"
               onChange={(e) => setInput(e.target.value)}
@@ -1578,10 +1586,9 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
         </aside>
       )}
 
-      <Dialog open={setupOpen} onClose={() => setSetupOpen(false)} title="Set up AI" description="Choose where answers come from. Notes, tasks and search keep working either way." size="md">
+      <Dialog open={setupOpen} onClose={() => setSetupOpen(false)} title="Connect AI" description="Claude through your own Anthropic API key. Notes, tasks and search keep working either way." size="md">
         {setupOpen && (
           <AiSetup
-            initialRoute={online ? 'cloud' : 'choose'}
             onDone={() => {
               setSetupOpen(false);
               void refreshSystem();

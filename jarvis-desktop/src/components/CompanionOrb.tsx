@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, type CSSProperties, type ReactNode } from 'react';
 import { stateLabel, type CompanionAppearance } from '../ui/appearance';
 import { useAppearance } from '../ui/appearance-context';
 import { hostVoiceLevel, readReducedMotion, useOptionalCompanion } from '../ui/companion';
@@ -89,5 +89,31 @@ export function CompanionOrb({
     >
       <canvas ref={canvasRef} aria-hidden="true" />
     </span>
+  );
+}
+
+/**
+ * The companion inside its HUD frame: four corner brackets and a caption line with the real state. Used wherever the
+ * companion is the focal point (Today, the empty Assistant, first run, Studio), so the motif means "this is the core".
+ * The caption is text outside the canvas, so state never depends on the drawing.
+ */
+export function CoreFrame({ size, state, caption, children, className, ...orb }: Parameters<typeof CompanionOrb>[0] & { caption?: string; children?: ReactNode }) {
+  const companion = useOptionalCompanion();
+  const [stored] = useAppearance();
+  const s = state ?? companion?.state ?? 'idle';
+  if (!(orb.appearance ?? stored).visible && !orb.showWhenHidden) return null;
+  return (
+    <div className={cx('core-frame', className)} data-state={s} style={{ '--frame': `${size}px` } as CSSProperties}>
+      <span className="core-corner tl" aria-hidden="true" />
+      <span className="core-corner tr" aria-hidden="true" />
+      <span className="core-corner bl" aria-hidden="true" />
+      <span className="core-corner br" aria-hidden="true" />
+      <CompanionOrb size={size} state={state} {...orb} />
+      <p className="core-caption" aria-live="polite">
+        <span className="core-diode" aria-hidden="true" />
+        {caption ?? `Core · ${stateLabel(s)}`}
+      </p>
+      {children}
+    </div>
   );
 }

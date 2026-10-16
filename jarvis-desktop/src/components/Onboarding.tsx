@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckSquare, NotePencil, Sparkle } from '@phosphor-icons/react';
 import type { Capability, Settings } from '../shared/contracts';
-import { CompanionOrb } from './CompanionOrb';
+import { CoreFrame } from './CompanionOrb';
 import { AiSetup, type AiSetupResult } from './AiSetup';
 import { SHELL_PREF, useShellPref } from './Settings';
 import { Button, Notice, Segmented, Switch } from '../ui/primitives';
@@ -72,32 +72,27 @@ type ReadinessInput = {
   cloudConfigured: boolean | null;
 };
 
-const OLLAMA_HINT = 'Offline chat needs Ollama running on this computer. Install it, start it, then install the model with “ollama pull” followed by the model name.';
-
 /**
- * What the assistant can actually do right now. Offline readiness comes from the backend's live Ollama check
- * (capability "local-llm"), never from whether the settings fields are filled in. Online readiness is whether
- * a model name and a saved key exist; the cloud provider itself is only reached when a message is sent.
+ * What the assistant can actually do right now. AI is a cloud service the user connects with their own key (Claude
+ * first). Online readiness is whether a model name and that provider's saved key exist; the provider itself is reached
+ * only when a message is sent. Offline means AI is not connected, except for an earlier local-model setup that still
+ * answers its live check: that keeps working and is labelled as the legacy local model.
  */
 export function modelReadiness(input: ReadinessInput): ModelReadiness {
   const { settings, capabilities, systemError, cloudConfigured } = input;
   if (settings.mode === 'online') {
-    if (!settings.cloudModel.trim()) return { route: 'cloud', level: 'blocked', title: 'Online mode has no model name', detail: 'Enter a cloud model name in Settings before using chat in online mode.' };
+    if (!settings.cloudModel.trim()) return { route: 'cloud', level: 'blocked', title: 'No model is chosen', detail: 'Choose a model in Connect AI before chatting. Nothing is sent until then.' };
     if (cloudConfigured === false) {
-      return { route: 'cloud', level: 'blocked', title: 'Online mode has no API key', detail: 'Chat shows an error and sends nothing until you save a key. It does not switch to the local model.' };
+      return { route: 'cloud', level: 'blocked', title: 'No API key is saved', detail: 'Chat shows an error and sends nothing until you save your key in Connect AI. It never switches to another provider.' };
     }
-    if (cloudConfigured === null) return { route: 'cloud', level: 'unknown', title: 'Key status unknown', detail: 'The saved-key check did not answer. Check again, or open Settings.' };
-    return { route: 'cloud', level: 'ready', title: 'Online mode is set up', detail: `Messages go to the cloud model “${settings.cloudModel}” with your saved key. Whether the provider is reachable is only known when a message is sent.` };
+    if (cloudConfigured === null) return { route: 'cloud', level: 'unknown', title: 'Key status unknown', detail: 'The saved-key check did not answer. Check again, or open Connect AI.' };
+    return { route: 'cloud', level: 'ready', title: 'AI is connected', detail: `Messages go to “${settings.cloudModel}” with your saved key when you send them. Whether the provider answers is shown in the conversation.` };
   }
-  if (localEndpointError(settings.localEndpoint) || localModelError(settings.localModel)) {
-    return { route: 'local', level: 'blocked', title: 'The local model settings are incomplete', detail: 'Fix the endpoint and model name in Settings.' };
+  const local = capabilities?.find((c) => c.id === 'local-llm');
+  if (!systemError && local?.available && settings.localModel.trim()) {
+    return { route: 'local', level: 'ready', title: 'Legacy local model is answering', detail: `Replies come from “${settings.localModel}” on this computer, set up in an earlier version. Connect Claude for the full assistant.` };
   }
-  if (systemError) return { route: 'local', level: 'unknown', title: 'The local model could not be checked', detail: systemError };
-  const cap = capabilities?.find((c) => c.id === 'local-llm');
-  if (!cap) return { route: 'local', level: 'unknown', title: 'Local model not checked yet', detail: 'Waiting for the check to finish.' };
-  if (cap.available) return { route: 'local', level: 'ready', title: 'Local model is ready', detail: `Ollama is running and “${settings.localModel}” is installed. Replies are generated on this computer.` };
-  const reason = cap.reason ?? 'Ollama did not respond.';
-  return { route: 'local', level: 'blocked', title: 'Local model is not available', detail: /ollama pull/i.test(reason) ? reason : `${reason}. ${OLLAMA_HINT}` };
+  return { route: 'cloud', level: 'blocked', title: 'AI is not connected', detail: 'Connect Claude with your own Anthropic API key to chat. Notes, tasks and search work on this computer without it.' };
 }
 
 /** The backend reports safe launch only through the desktop-control capability. Returns its reason, or null. */
@@ -208,21 +203,23 @@ export function Onboarding() {
   const prefs = (
     <div className="ob-prefs">
       <Segmented<ThemeChoice> label="Theme" value={theme} onChange={(v) => setThemeRaw(v)} options={THEME_CHOICES.map((c) => ({ value: c.value, label: c.label }))} />
-      <Switch label="Reduce motion" description="Calmer screens and a still companion. The Windows setting is respected too." checked={settings.reduceMotion} onChange={(v) => void mutate(() => api.saveSettings({ reduceMotion: v }))} />
+      <Switch label="Reduce motion" description="A still core and simpler transitions." checked={settings.reduceMotion} onChange={(v) => void mutate(() => api.saveSettings({ reduceMotion: v }))} />
     </div>
   );
 
   return (
     <div className="onboard">
       <section className="ob-main" aria-labelledby="ob-title">
-        <p className="ob-brand">Desktop Companion</p>
+        <p className="ob-brand">
+          <span className="brand-mark" aria-hidden="true" /> Desktop Companion
+        </p>
 
         {phase === 'welcome' && (
           <div className="ob-step">
             <h1 id="ob-title" ref={headRef} tabIndex={-1} className="display">
-              Let’s get one thing <em>done</em>.
+              Your computer, <em>awake</em>.
             </h1>
-            <p className="ob-lead">Keep notes, tasks and searches on this computer. AI is optional, and you can add it whenever you like.</p>
+            <p className="ob-lead">Keep notes, tasks and searches here, on this computer. Connect Claude when you want it to think with you.</p>
             <div className="ob-paths">
               <button type="button" className="ob-path is-primary" onClick={() => setPhase('first')}>
                 <span className="ob-path-icon" aria-hidden="true">
@@ -239,8 +236,8 @@ export function Onboarding() {
                   <Sparkle size={22} />
                 </span>
                 <span className="grow">
-                  <strong>Connect AI</strong>
-                  <span>A model on this computer, or your own key for Anthropic, OpenAI or OpenRouter.</span>
+                  <strong>Connect Claude</strong>
+                  <span>Use your own Anthropic API key. Notes stay here; only messages you send go to Anthropic.</span>
                 </span>
                 <ArrowRight size={18} aria-hidden />
               </button>
@@ -330,7 +327,7 @@ export function Onboarding() {
                 Open the {saved.kind}
               </Button>
               <button type="button" className="linkbtn" onClick={() => setPhase('ai')}>
-                Connect AI too
+                Connect Claude too
               </button>
             </div>
           </div>
@@ -342,10 +339,10 @@ export function Onboarding() {
               <ArrowLeft size={14} aria-hidden /> Back
             </button>
             <h1 id="ob-title" ref={headRef} tabIndex={-1}>
-              Connect AI
+              Connect Claude
             </h1>
-            <p className="ob-lead">Choose where answers come from. You can change this later in Settings.</p>
-            <AiSetup onDone={(r: AiSetupResult) => void finish({ view: r === 'local' || r === 'cloud' ? 'assistant' : 'home' })} onSkip={() => void finish({ view: 'home' })} />
+            <p className="ob-lead">Four short steps. Nothing is sent to Anthropic until you allow it, and you can change this later in Settings.</p>
+            <AiSetup onDone={(_r: AiSetupResult) => void finish({ view: 'assistant' })} onSkip={() => void finish({ view: 'home' })} />
             {finishFailed && (
               <Notice tone="danger" title="Setup was not finished">
                 The app could not save that setup is finished. Try again.
@@ -356,10 +353,8 @@ export function Onboarding() {
       </section>
 
       <aside className="ob-stage" aria-label="Your companion">
-        <div className="ob-orb">
-          <CompanionOrb size={300} label="Your companion" />
-        </div>
-        <p className="sub">This is your companion. It shows what the app is doing. Change how it looks in Studio.</p>
+        <CoreFrame size={320} label="Your companion" />
+        <p className="sub">This is your companion's core. It shows what the app is really doing. You can change its form in Studio.</p>
       </aside>
     </div>
   );

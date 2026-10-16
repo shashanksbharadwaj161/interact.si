@@ -21,3 +21,100 @@
     border-radius: 50%;
   }
 }
+
+/* The HUD frame: the one place corner brackets appear. */
+.core-frame {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+  padding: 14px 14px 10px;
+}
+
+.core-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--energy);
+  border-style: solid;
+  border-width: 0;
+  opacity: 0.75;
+  transition: transform var(--dur-panel) var(--spring), opacity var(--dur-mid);
+}
+
+.core-corner.tl {
+  top: 0;
+  left: 0;
+  border-top-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+.core-corner.tr {
+  top: 0;
+  right: 0;
+  border-top-width: 1.5px;
+  border-right-width: 1.5px;
+}
+
+.core-corner.bl {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 1.5px;
+  border-left-width: 1.5px;
+}
+
+.core-corner.br {
+  bottom: 0;
+  right: 0;
+  border-bottom-width: 1.5px;
+  border-right-width: 1.5px;
+}
+
+/* The brackets close in a little while the core is busy, and open again when it is idle. */
+.core-frame:not([data-state="idle"]) .core-corner.tl {
+  transform: translate(5px, 5px);
+}
+
+.core-frame:not([data-state="idle"]) .core-corner.tr {
+  transform: translate(-5px, 5px);
+}
+
+.core-frame:not([data-state="idle"]) .core-corner.bl {
+  transform: translate(5px, -5px);
+}
+
+.core-frame:not([data-state="idle"]) .core-corner.br {
+  transform: translate(-5px, -5px);
+}
+
+.core-frame[data-state="alert"] .core-corner {
+  border-color: var(--amber);
+}
+
+.core-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-2);
+  font: 600 var(--t-micro) var(--font-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.core-diode {
+  width: 6px;
+  height: 6px;
+  background: var(--energy);
+  box-shadow: 0 0 8px var(--energy);
+}
+
+.core-frame[data-state="alert"] .core-diode {
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+}
+
+.core-frame[data-state="listening"] .core-diode {
+  background: var(--lime);
+  box-shadow: 0 0 8px var(--lime);
+}

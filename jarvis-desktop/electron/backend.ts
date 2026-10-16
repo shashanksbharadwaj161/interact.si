@@ -2,12 +2,13 @@
 // (dialogs, shell, pids) are injected, so the whole JarvisAPI surface is testable under node --test.
 import * as os from 'node:os';
 import {randomUUID} from 'node:crypto';
-import type {Activity, ApiInfo, AppState, CalendarImportSummary, ChatMessage, ChatStreamOutcome, ChatStreamRoute, FullJarvisAPI, Settings, IntentPlan, LocalModel, LocalModelList, SearchResult, SystemInfo, Task} from '../src/shared/contracts';
+import type {Activity, ApiInfo, AppState, CalendarImportSummary, ChatMessage, ChatStreamOutcome, ChatStreamRoute, CloudModelList, FullJarvisAPI, Settings, IntentPlan, LocalModel, LocalModelList, SearchResult, SystemInfo, Task} from '../src/shared/contracts';
 import {ActionService, type ShellAdapter} from './services/actions';
 import {LOCAL_KEEP_ALIVE, buildHistory, ollamaChat, resolveChatRoute, sendChat, selectedCloudProvider, noProviderKeyMessage} from './services/chat';
 import {CLOUD_PROVIDERS, cloudProviderInfo, effectiveCloudModel} from '../src/shared/contracts';
 import {STREAM_LIMITS, StreamAborted, StreamIncomplete, StreamProtocolError, streamOllamaChat, type StreamLimits, type StreamResult} from './services/ollama';
-import {CloudProviderError, streamProviderChat} from './services/cloud';
+import {CloudProviderError, modelListFailure, parseModelList, streamProviderChat} from './services/cloud';
+import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
 import {parseModelPlan, planIntent as planRules, PLANNED_TYPES, type IntentWindow} from './services/intent';
 import {effectiveReminderTasks, searchState, SEARCH_LIMITS, type ExternalDoc} from './services/search';
@@ -767,6 +768,38 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       system.invalidate();
       await activity('settings', `${cloudProviderInfo(provider).name} API key stored (Windows protection)`);
       return {provider, ...result};
+    },
+    /**
+     * Which models the saved key can use. Runs only on request, only in online mode, through the network guard's
+     * provider-check route (GET /v1/models with that provider's single credential header). The key stays here.
+     */
+    async cloudModels(rawProvider): Promise<CloudModelList> {
+      const provider = validateCloudProvider(rawProvider);
+      const checkedAt = (env.now ?? (() => new Date()))().toISOString();
+      const no = (reason: string): CloudModelList => ({provider, available: false, models: [], reason, checkedAt});
+      const name = cloudProviderInfo(provider).name;
+      if (provider === 'openrouter') return no('OpenRouter does not offer a model list to this app. Type the model id under Advanced.');
+      if (settings().mode !== 'online') return no(`Online mode is off, so ${name} was not contacted. Turn on online mode to check which models your key can use.`);
+      const key = await secrets.revealKey(provider);
+      if (!key) return no(`No ${name} API key is saved on this computer.`);
+      const origin = provider === 'anthropic' ? env.cloudOriginOverride ?? ANTHROPIC_ORIGIN : OPENAI_ORIGIN;
+      const headers: Record<string, string> = provider === 'anthropic' ? {'x-api-key': key, 'anthropic-version': '2023-06-01', accept: 'application/json'} : {authorization: `Bearer ${key}`, accept: 'application/json'};
+      let res: Response;
+      try {
+        res = await guardedFetch(`${origin}/v1/models`, {method: 'GET', headers, timeoutMs: 10_000}, 'provider-check');
+      } catch (e) {
+        return no(e instanceof NetworkDenied ? `Blocked by this app's network rules: ${e.message}` : `${name} could not be reached. Check the internet connection and try again.`);
+      }
+      if (!res.ok) return no(modelListFailure(res.status));
+      let body: unknown;
+      try { body = JSON.parse((await res.text()).slice(0, 2_000_000)); } catch { return no(`${name} returned a model list this app could not read.`); }
+      try {
+        const models = parseModelList(provider, body);
+        await activity('settings', `Checked ${name} models: ${models.length} available to the saved key`);
+        return models.length ? {provider, available: true, models, checkedAt} : no(`${name} reported no chat models for this key.`);
+      } catch (e) {
+        return no(e instanceof Error ? e.message : `${name} returned a model list this app could not read.`);
+      }
     },
     async clearProviderKey(rawProvider) {
       const provider = validateCloudProvider(rawProvider);

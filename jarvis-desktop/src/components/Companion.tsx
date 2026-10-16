@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { ArrowCounterClockwise, Check, PencilSimple } from '@phosphor-icons/react';
-import { CompanionOrb } from './CompanionOrb';
+import { CompanionOrb, CoreFrame } from './CompanionOrb';
 import { SceneBackdrop } from './SceneBackdrop';
 import { Button, PageHeader, Segmented, Switch } from '../ui/primitives';
 import { readReducedMotion, useAnimMachine, useCompanion } from '../ui/companion';
@@ -72,13 +72,13 @@ export function Companion() {
         <section className="studio-stage-wrap" aria-label="Preview">
           <div className={cx('studio-stage', stageScene !== STAGE_PLAIN && 'has-scene')}>
             {stageScene !== STAGE_PLAIN && <SceneBackdrop scene={stageScene} className="stage-scene" />}
-            <CompanionOrb size={300} state={shown} level={preview === 'live' ? undefined : null} appearance={draft} showWhenHidden label={`${formInfo(draft.form).name} companion, ${stateLabel(shown)}${preview === 'live' ? '' : ' (preview)'}`} />
+            <CoreFrame size={340} state={shown} level={preview === 'live' ? undefined : null} appearance={draft} showWhenHidden caption={preview === 'live' ? `Live · ${stateLabel(live.state)}` : `Preview · ${stateLabel(preview)}`} label={`${formInfo(draft.form).name} companion, ${stateLabel(shown)}${preview === 'live' ? '' : ' (preview)'}`} />
             {status.shown !== null && (
               <span className="stage-status anim-slot" data-anim-phase={status.phase} style={statusStyle} aria-hidden="true">
                 {stateLabel(status.shown)}
               </span>
             )}
-            <p className="stage-caption">{preview === 'live' ? `Live: ${stateLabel(live.state)}` : `Preview only: ${stateLabel(preview)}. The app is not doing this.`}</p>
+            {preview !== 'live' && <p className="stage-caption">Preview only. The app is not doing this.</p>}
           </div>
           <div className="studio-preview">
             <Segmented<Preview>

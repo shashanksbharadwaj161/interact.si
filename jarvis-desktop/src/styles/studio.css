@@ -1,1 +1,221 @@
-/* Studio styles: replaced in the cyberpunk pass. */
+/* Studio: one large instrument stage drawn by the shared renderer, material controls beside it, explicit Apply. */
+.studio-apply {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.studio-dirty {
+  margin-right: var(--s2);
+  color: var(--muted);
+  font: 500 12px var(--font-mono);
+}
+
+.studio-dirty.on {
+  color: var(--amber);
+}
+
+.studio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(330px, 0.8fr);
+  gap: var(--s7);
+  align-items: start;
+}
+
+.studio-stage-wrap {
+  position: sticky;
+  top: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+.studio-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  min-height: 500px;
+  padding: var(--s6);
+  border: 1px solid var(--line-strong);
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 46%, color-mix(in oklab, var(--violet) 18%, transparent), transparent 58%), var(--sunken);
+}
+
+@supports (corner-shape: bevel) {
+  .studio-stage {
+    border-radius: var(--cut-lg) 0 var(--cut-lg) 0;
+    corner-shape: bevel;
+  }
+}
+
+.studio-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 30px 30px;
+  mask-image: radial-gradient(closest-side, #000 25%, transparent 100%);
+  pointer-events: none;
+}
+
+.studio-stage.has-scene {
+  background: #05070b;
+}
+
+.studio-stage > :not(.stage-scene) {
+  position: relative;
+  z-index: 2;
+}
+
+.studio-stage .stage-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.stage-caption {
+  color: var(--muted);
+  font: 400 12px var(--font-mono);
+  text-align: center;
+}
+
+.studio-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.studio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s6);
+  min-width: 0;
+}
+
+.studio-controls .section > h2 {
+  font: 600 var(--t-micro) var(--font-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--energy);
+}
+
+.form-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.form-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: var(--s2) var(--s4) var(--s2) var(--s2);
+  text-align: left;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-mid), transform var(--dur-press);
+}
+
+@supports (corner-shape: bevel) {
+  .form-card {
+    border-radius: var(--cut) 0 var(--cut) 0;
+    corner-shape: bevel;
+  }
+}
+
+.form-card:hover {
+  border-color: var(--energy-line);
+}
+
+.form-card:active {
+  transform: scale(0.99);
+}
+
+.form-card.on {
+  border-color: var(--energy);
+  background: var(--energy-soft);
+  box-shadow: 0 0 30px -16px var(--energy);
+}
+
+.form-card .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.form-card strong {
+  font: 600 var(--t-body) var(--font-display);
+  letter-spacing: 0.03em;
+}
+
+.form-check {
+  color: var(--energy);
+  flex: none;
+}
+
+.studio-edit {
+  width: fit-content;
+}
+
+.tint-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+.tint {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, var(--tint) 45%, color-mix(in oklab, var(--tint) 45%, #000000) 100%);
+  transform: rotate(45deg) scale(0.82);
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast), transform var(--dur-mid) var(--spring);
+}
+
+.tint:hover {
+  transform: rotate(45deg) scale(0.92);
+}
+
+.tint.on {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--energy), 0 0 14px var(--tint);
+  transform: rotate(45deg) scale(0.92);
+}
+
+.tint-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 140px;
+  margin-left: var(--s2);
+}
+
+.tint-custom .sub {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+@media (max-width: 1120px) {
+  .studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .studio-stage-wrap {
+    position: static;
+  }
+
+  .studio-stage {
+    min-height: 420px;
+  }
+}

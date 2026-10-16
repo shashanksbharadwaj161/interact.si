@@ -1,51 +1,72 @@
 /*
- * Porcelain / Ink design tokens. Light porcelain is the base; Ink is the dark theme.
- * The shell resolves the theme (system, light or dark) and writes data-theme="light" | "dark" on <html>.
- * Before that script runs, the media query below follows the operating system so there is no flash.
- * Fonts are bundled in src/assets/fonts (SIL OFL 1.1); nothing is loaded from the network.
- * Older token names (--panel-solid, --raised, --text-2, ...) are kept as real values so route styles keep working.
+ * Design tokens: "the computer's soul". Obsidian / graphite architecture, electric cyan energy, ultraviolet depth,
+ * scarce acid-lime and amber signals. Dark is the principal experience (bare :root); "Chrome" is an accessible light
+ * variant with the same geometry, type and energy (data-theme="light"). The shell writes data-theme on <html>.
+ *
+ * Type, bundled in src/assets/fonts (SIL OFL 1.1, licenses beside the files; nothing loads from the network):
+ *   Chakra Petch  display and navigation; its chamfered letterforms match the cut-corner geometry.
+ *   Saira         interface and reading text (variable weight and width); chosen over Rajdhani, whose small x-height
+ *                 was not legible at 14-15px on a laptop screen.
+ *   IBM Plex Mono sparse, real metadata only (model ids, hosts, times, counts).
  */
 
 @font-face {
-  font-family: "Instrument Sans";
-  src: url("../assets/fonts/InstrumentSans-latin-variable.woff2") format("woff2-variations");
-  font-weight: 400 700;
-  font-stretch: 75% 100%;
-  font-style: normal;
+  font-family: "Chakra Petch";
+  src: url("../assets/fonts/ChakraPetch-latin-500.woff2") format("woff2");
+  font-weight: 500;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Instrument Serif";
-  src: url("../assets/fonts/InstrumentSerif-latin-400.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
+  font-family: "Chakra Petch";
+  src: url("../assets/fonts/ChakraPetch-latin-600.woff2") format("woff2");
+  font-weight: 600;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Instrument Serif";
-  src: url("../assets/fonts/InstrumentSerif-latin-400-italic.woff2") format("woff2");
+  font-family: "Chakra Petch";
+  src: url("../assets/fonts/ChakraPetch-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Saira";
+  src: url("../assets/fonts/Saira-latin-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-stretch: 50% 125%;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../assets/fonts/IBMPlexMono-latin-400.woff2") format("woff2");
   font-weight: 400;
-  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../assets/fonts/IBMPlexMono-latin-500.woff2") format("woff2");
+  font-weight: 500;
   font-display: swap;
 }
 
 :root {
-  --font-ui: "Instrument Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
-  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "SFMono-Regular", Menlo, monospace;
+  --font-display: "Chakra Petch", "Bahnschrift", "Segoe UI", sans-serif;
+  --font-ui: "Saira", "Bahnschrift", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
 
-  /* Type scale (px). Body text never goes below 13px. */
+  --t-micro: 12px;
   --t-meta: 13px;
   --t-small: 14px;
   --t-body: 15px;
   --t-lead: 17px;
-  --t-h2: 18px;
-  --t-h1: 24px;
-  --t-display: 44px;
+  --t-h2: 19px;
+  --t-h1: 28px;
+  --t-display: 52px;
 
-  /* 4/8 spacing scale. */
   --s1: 4px;
   --s2: 8px;
   --s3: 12px;
@@ -55,118 +76,146 @@
   --s7: 32px;
   --s8: 48px;
 
-  --r-sm: 6px;
-  --r-ctl: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
+  /* Geometry: controlled cut corners (corner-shape: bevel where supported, rounded otherwise). */
+  --cut-lg: 14px;
+  --cut: 10px;
+  --cut-sm: 6px;
+  --r-sm: 4px;
+  --r-ctl: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
   --r-pill: 999px;
 
-  /* Motion. Work surfaces use the short tokens; the companion and Studio may use the spring. */
+  /* Motion: immediate response, short settle; one approach (CSS + the companion renderer). */
+  --dur-press: 90ms;
   --dur-fast: 140ms;
-  --dur-mid: 210ms;
-  --dur-route: 240ms;
+  --dur-mid: 220ms;
+  --dur-panel: 280ms;
+  --dur-scene: 400ms;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
+  --ease-in: cubic-bezier(0.55, 0, 0.75, 0.25);
+  /* Damped springs sampled from x(t) = 1 - e^(-zwt)(cos(wd t) + (zw/wd) sin(wd t)). spring: z 0.62 (8% overshoot). */
+  --spring: linear(0, 0.0388, 0.1361, 0.2666, 0.4106, 0.5534, 0.6849, 0.799, 0.8926, 0.9653, 1.0181, 1.0534, 1.0738, 1.0826, 1.0826, 1.0766, 1.0668, 1.0552, 1.043, 1.0315, 1.0212, 1.0126, 1.0056, 1.0004, 0.9968, 0.9945, 0.9934, 0.993, 0.9933, 0.994, 0.9949, 0.9959, 1);
+  --spring-soft: linear(0, 0.0513, 0.1679, 0.3093, 0.4512, 0.5801, 0.6898, 0.7789, 0.8482, 0.9004, 0.9382, 0.9647, 0.9825, 0.9939, 1.0007, 1.0044, 1.006, 1.0063, 1.0059, 1.0051, 1.0042, 1.0033, 1.0025, 1.0019, 1);
 
-  --rail-w: 224px;
-  --content-max: 1080px;
+  --rail-w: 236px;
+  --content-max: 1120px;
 
-  /* Porcelain (light). */
-  --bg: #f5f4ef;
-  --bg-2: #efeee8;
-  --surface: #ffffff;
-  --surface-2: #f8f7f3;
-  --sunken: #ecebe5;
-  --hover: #ebeae4;
-  --line: #e1e0d9;
-  --line-strong: #cfcec6;
-  --field-line: #868b84;
-  --ink: #20221f;
-  --ink-2: #444842;
-  --muted: #61665f;
-  --accent: #3459d1;
-  --accent-hover: #2a4bb8;
-  --accent-ink: #ffffff;
-  --accent-soft: #e8edfb;
-  --accent-line: #b9c7f1;
-  --focus: #3459d1;
-  --ok: #2b7149;
-  --ok-soft: #e4f1e8;
-  --warn: #8a5a00;
-  --warn-soft: #f8eedb;
-  --danger: #b3261e;
-  --danger-soft: #fae7e5;
-  --overlay: rgba(32, 34, 31, 0.32);
-  --shadow-1: 0 1px 2px rgba(32, 34, 31, 0.05), 0 2px 8px rgba(32, 34, 31, 0.04);
-  --shadow-2: 0 2px 6px rgba(32, 34, 31, 0.06), 0 16px 40px rgba(32, 34, 31, 0.1);
-  --shadow-3: 0 24px 80px rgba(32, 34, 31, 0.18);
+  /* Obsidian (principal, dark). */
+  --bg: #080b10;
+  --bg-2: #0b1017;
+  --surface: #101720;
+  --surface-2: #131c27;
+  --elevated: #17212d;
+  --sunken: #060910;
+  --hover: #1a2532;
+  --line: #1d2a38;
+  --line-strong: #2a3b4e;
+  --field-line: #5a7488;
+  --ink: #e6f4f7;
+  --ink-2: #c3d4dc;
+  --muted: #a1b3bf;
+  --energy: #63e8ff;
+  --energy-2: #2bc4e6;
+  --energy-ink: #03141a;
+  --energy-soft: #0f2b35;
+  --energy-line: #1f5c6e;
+  --violet: #a998ff;
+  --violet-soft: #1d1a3a;
+  --lime: #c8ff4d;
+  --lime-soft: #1d2a0c;
+  --amber: #ffb547;
+  --amber-soft: #2e2210;
+  --danger: #ff6b85;
+  --danger-soft: #331520;
+  --ok: #8dfcb4;
+  --ok-soft: #102a1d;
+  --glow: rgba(99, 232, 255, 0.35);
+  --glow-violet: rgba(169, 152, 255, 0.28);
+  --overlay: rgba(2, 5, 9, 0.72);
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 30px 90px rgba(0, 0, 0, 0.7);
+  --noise-opacity: 0.05;
+  --grid-line: rgba(99, 232, 255, 0.05);
 
-  /* Compatibility names used by route styles. */
-  --panel: #ffffff;
-  --panel-solid: #ffffff;
-  --raised: #f8f7f3;
-  --text: #20221f;
-  --text-2: #444842;
-  --amber: #8a5a00;
-  --amber-soft: #f8eedb;
-  --shadow: 0 2px 6px rgba(32, 34, 31, 0.06), 0 16px 40px rgba(32, 34, 31, 0.1);
-  --scene-opacity: 0.12;
-  color-scheme: light;
-}
-
-/* Ink (dark): explicit choice, or the system choice resolved by the shell. */
-:root[data-theme="dark"] {
-  --bg: #131513;
-  --bg-2: #171917;
-  --surface: #1b1e1b;
-  --surface-2: #202320;
-  --sunken: #101210;
-  --hover: #262a26;
-  --line: #2b2f2b;
-  --line-strong: #3b403b;
-  --field-line: #747a72;
-  --ink: #f2f3ed;
-  --ink-2: #d2d6cd;
-  --muted: #a8aea5;
-  --accent: #9bb4ff;
-  --accent-hover: #b4c7ff;
-  --accent-ink: #0f1a3a;
-  --accent-soft: #232b40;
-  --accent-line: #3d4c78;
-  --focus: #9bb4ff;
-  --ok: #7fcf9c;
-  --ok-soft: #1c2b21;
-  --warn: #e7b75c;
-  --warn-soft: #2e2615;
-  --danger: #ff8f84;
-  --danger-soft: #331d1b;
-  --overlay: rgba(0, 0, 0, 0.55);
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
-  --shadow-3: 0 24px 80px rgba(0, 0, 0, 0.55);
-  --panel: #1b1e1b;
-  --panel-solid: #1b1e1b;
-  --raised: #202320;
-  --text: #f2f3ed;
-  --text-2: #d2d6cd;
-  --amber: #e7b75c;
-  --amber-soft: #2e2615;
-  --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 16px 40px rgba(0, 0, 0, 0.35);
-  --scene-opacity: 0.35;
+  /* Names used by route styles and older components. */
+  --accent: #63e8ff;
+  --accent-hover: #8af0ff;
+  --accent-ink: #03141a;
+  --accent-soft: #0f2b35;
+  --accent-line: #1f5c6e;
+  --focus: #63e8ff;
+  --warn: #ffb547;
+  --warn-soft: #2e2210;
+  --panel: #101720;
+  --panel-solid: #101720;
+  --raised: #17212d;
+  --text: #e6f4f7;
+  --text-2: #c3d4dc;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.45);
+  --scene-opacity: 0.5;
   color-scheme: dark;
 }
 
-/* Before the shell resolves the theme, follow the operating system (same values as above). */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --bg: #131513;
-    --surface: #1b1e1b;
-    --panel-solid: #1b1e1b;
-    --ink: #f2f3ed;
-    --text: #f2f3ed;
-    --muted: #a8aea5;
-    --accent: #9bb4ff;
-    color-scheme: dark;
-  }
+/* Chrome (light variant): cool alloy surfaces, the same geometry and energy at reading contrast. */
+:root[data-theme="light"] {
+  --bg: #e7ecf0;
+  --bg-2: #dfe5ea;
+  --surface: #f6f9fb;
+  --surface-2: #eef3f6;
+  --elevated: #ffffff;
+  --sunken: #d9e0e6;
+  --hover: #e2e9ee;
+  --line: #ccd6de;
+  --line-strong: #b4c2cd;
+  --field-line: #66798a;
+  --ink: #0b1520;
+  --ink-2: #26394a;
+  --muted: #4a5d6c;
+  --energy: #006b7f;
+  --energy-2: #005a6b;
+  --energy-ink: #ffffff;
+  --energy-soft: #d6eef3;
+  --energy-line: #8ccad7;
+  --violet: #5b47d6;
+  --violet-soft: #e5e1fb;
+  --lime: #3f6200;
+  --lime-soft: #e6f2cf;
+  --amber: #8a5300;
+  --amber-soft: #f6e6c9;
+  --danger: #b4233f;
+  --danger-soft: #f8dde3;
+  --ok: #166638;
+  --ok-soft: #d8efe1;
+  --glow: rgba(0, 120, 143, 0.22);
+  --glow-violet: rgba(91, 71, 214, 0.18);
+  --overlay: rgba(15, 25, 35, 0.42);
+  --shadow-1: 0 1px 2px rgba(15, 30, 45, 0.08);
+  --shadow-2: 0 2px 6px rgba(15, 30, 45, 0.07), 0 14px 34px rgba(15, 30, 45, 0.1);
+  --shadow-3: 0 28px 80px rgba(15, 30, 45, 0.22);
+  --noise-opacity: 0.035;
+  --grid-line: rgba(0, 120, 143, 0.07);
+  --accent: #006b7f;
+  --accent-hover: #005a6b;
+  --accent-ink: #ffffff;
+  --accent-soft: #d6eef3;
+  --accent-line: #8ccad7;
+  --focus: #006b7f;
+  --warn: #8a5300;
+  --warn-soft: #f6e6c9;
+  --panel: #f6f9fb;
+  --panel-solid: #f6f9fb;
+  --raised: #ffffff;
+  --text: #0b1520;
+  --text-2: #26394a;
+  --shadow: 0 2px 6px rgba(15, 30, 45, 0.07), 0 14px 34px rgba(15, 30, 45, 0.1);
+  --scene-opacity: 0.2;
+  color-scheme: light;
+}
+
+/* An explicit dark choice uses the base values; listed so the toggle wins over a light operating system. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }

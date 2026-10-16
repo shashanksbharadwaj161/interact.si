@@ -35,9 +35,18 @@ export type OrbPlacement = {
 type Live = OrbPlacement & { cur: StateTargets; lastDraw: number; lastTick: number; dirty: boolean; ctx: CanvasRenderingContext2D | null };
 
 export type OrbBackend = 'webgl' | 'canvas2d' | 'none';
-export type OrbStats = { backend: OrbBackend; placements: number; visible: number; running: boolean; frames: number; lastFrameMs: number; contextLosses: number };
+export type OrbQuality = 'full' | 'reduced';
+export type OrbStats = { backend: OrbBackend; placements: number; visible: number; running: boolean; frames: number; lastFrameMs: number; contextLosses: number; quality: OrbQuality; qualityReason: string | null; renderer: string | null };
 
-const FORM_INDEX: Record<string, number> = { porcelain: 0, smoke: 1, ribbon: 2 };
+/** Software WebGL (no GPU acceleration) is far slower; the governor starts in reduced quality there. */
+const SOFTWARE_GL = /swiftshader|llvmpipe|softpipe|software|basic render/i;
+/** Average frame interval (ms) over the window below that switches to reduced quality. */
+const SLOW_FRAME_MS = 42;
+const FRAME_WINDOW = 40;
+
+const FORM_INDEX: Record<string, number> = { core: 0, lattice: 1, ribbon: 2, frost: 3 };
+/** Placements this large or larger also draw the particle ring and waveform line. */
+export const RING_MIN_SIZE = 96;
 
 type GLState = {
   gl: WebGLRenderingContext;
@@ -59,7 +68,7 @@ function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLSha
   return s;
 }
 
-const UNIFORMS = ['uRes', 'uTime', 'uForm', 'uTint', 'uTint2', 'uEnergy', 'uSwirl', 'uSweep', 'uPulse', 'uAlert', 'uLevel', 'uDark', 'uSeed'];
+const UNIFORMS = ['uRes', 'uTime', 'uForm', 'uTint', 'uTint2', 'uRing', 'uRingOn', 'uEnergy', 'uSwirl', 'uSweep', 'uPulse', 'uAlert', 'uLevel', 'uDark', 'uSeed'];
 
 class OrbEngine {
   private placements = new Set<Live>();
@@ -70,6 +79,11 @@ class OrbEngine {
   private lastFrameMs = 0;
   private contextLosses = 0;
   private packCache: { at: number; pack: AvatarPack } | null = null;
+  private quality: OrbQuality = 'full';
+  private qualityReason: string | null = null;
+  private renderer: string | null = null;
+  private intervals: number[] = [];
+  private lastNow = 0;
 
   constructor() {
     document.addEventListener('visibilitychange', () => {
@@ -115,7 +129,7 @@ class OrbEngine {
   stats(): OrbStats {
     let visible = 0;
     for (const p of this.placements) if (p.visible) visible++;
-    return { backend: this.backend(), placements: this.placements.size, visible, running: this.raf !== 0, frames: this.frames, lastFrameMs: this.lastFrameMs, contextLosses: this.contextLosses };
+    return { backend: this.backend(), placements: this.placements.size, visible, running: this.raf !== 0, frames: this.frames, lastFrameMs: this.lastFrameMs, contextLosses: this.contextLosses, quality: this.quality, qualityReason: this.qualityReason, renderer: this.renderer };
   }
 
   private backend(): OrbBackend {
@@ -126,6 +140,7 @@ class OrbEngine {
   private stop() {
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = 0;
+    this.lastNow = 0;
   }
 
   private kick() {
@@ -159,6 +174,9 @@ class OrbEngine {
       return null;
     }
     gl.useProgram(program);
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    this.renderer = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)).slice(0, 120) : null;
+    if (this.renderer && SOFTWARE_GL.test(this.renderer)) this.reduceQuality('Software WebGL renderer');
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
@@ -188,8 +206,23 @@ class OrbEngine {
     return this.packCache.pack;
   }
 
+  /** Lower frame rate and internal resolution. One way only: quality returns to full on the next launch. */
+  private reduceQuality(reason: string) {
+    if (this.quality === 'reduced') return;
+    this.quality = 'reduced';
+    this.qualityReason = reason;
+    this.invalidateAll();
+  }
+
   private frame = (now: number) => {
     this.raf = 0;
+    // Governor: frames that keep arriving late mean the GPU (or software GL) cannot keep up.
+    if (this.lastNow && now - this.lastNow < 1000) {
+      this.intervals.push(now - this.lastNow);
+      if (this.intervals.length > FRAME_WINDOW) this.intervals.shift();
+      if (this.quality === 'full' && this.intervals.length === FRAME_WINDOW && this.intervals.reduce((a, b) => a + b, 0) / FRAME_WINDOW > SLOW_FRAME_MS) this.reduceQuality('Frames were arriving slowly');
+    }
+    this.lastNow = now;
     const t0 = performance.now();
     let again = false;
     const dark = document.documentElement.dataset.theme === 'dark';
@@ -197,7 +230,7 @@ class OrbEngine {
       if (!p.visible || !p.canvas.isConnected) continue;
       const prm = p.params();
       const lowPower = document.documentElement.dataset.motion === 'reduced';
-      const fps = placementFps({ motion: prm.appearance.motion, reducedMotion: prm.reducedMotion || lowPower, state: prm.state, cssSize: p.cssSize });
+      const fps = placementFps({ motion: prm.appearance.motion, reducedMotion: prm.reducedMotion || lowPower, state: prm.state, cssSize: p.cssSize, lowPower: this.quality === 'reduced' });
       const dt = p.lastTick ? now - p.lastTick : 0;
       p.lastTick = now;
       const target = stateTargets(prm.state);
@@ -216,7 +249,7 @@ class OrbEngine {
   };
 
   private ensureCanvas(p: Live): { w: number; h: number; dpr: number; ctx: CanvasRenderingContext2D | null } {
-    const dpr = placementDpr(window.devicePixelRatio, p.cssSize);
+    const dpr = placementDpr(window.devicePixelRatio, p.cssSize) * (this.quality === 'reduced' && p.cssSize > 100 ? 0.7 : 1);
     const px = Math.max(8, Math.round(p.cssSize * dpr));
     if (p.canvas.width !== px || p.canvas.height !== px) {
       p.canvas.width = px;
@@ -249,13 +282,17 @@ class OrbEngine {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      const [r, gg, b] = hueToRgb(prm.appearance.tint, prm.appearance.form === 'smoke' ? 0.55 : 0.68, prm.appearance.form === 'smoke' ? 0.6 : 0.56);
+      const form = prm.appearance.form;
+      const [r, gg, b] = hueToRgb(prm.appearance.tint, form === 'frost' ? 0.6 : 0.95, form === 'frost' ? 0.56 : 0.62);
+      // Ultraviolet depth sits about 65 degrees from the energy hue; ribbons spread a little wider.
+      const [r2, g2, b2] = hueToRgb(prm.appearance.tint + (form === 'ribbon' ? 80 : 65), 0.85, 0.66);
+      gl.uniform3f(u.uTint, r, gg, b);
+      gl.uniform3f(u.uTint2, r2, g2, b2);
+      gl.uniform1f(u.uRing, p.cur.ring);
+      gl.uniform1f(u.uRingOn, p.cssSize >= RING_MIN_SIZE ? 1 : 0);
       gl.uniform2f(u.uRes, w, h);
       gl.uniform1f(u.uTime, time);
       gl.uniform1f(u.uForm, FORM_INDEX[prm.appearance.form] ?? 0);
-      gl.uniform3f(u.uTint, r, gg, b);
-      const [r2, g2, b2] = hueToRgb(prm.appearance.tint + (prm.appearance.form === 'ribbon' ? 44 : -30), 0.7, 0.6);
-      gl.uniform3f(u.uTint2, r2, g2, b2);
       gl.uniform1f(u.uEnergy, p.cur.energy);
       gl.uniform1f(u.uSwirl, p.cur.swirl);
       gl.uniform1f(u.uSweep, p.cur.sweep);
@@ -307,9 +344,9 @@ export function paintFallbackOrb(ctx: CanvasRenderingContext2D, w: number, h: nu
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.clip();
   const base = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-  if (a.form === 'smoke') {
-    base.addColorStop(0, `hsl(${hue} 18% 26%)`);
-    base.addColorStop(1, `hsl(${hue} 14% 8%)`);
+  if (a.form === 'core' || a.form === 'lattice') {
+    base.addColorStop(0, `hsl(${hue} 30% 18%)`);
+    base.addColorStop(1, `hsl(${hue + 60} 30% 5%)`);
   } else if (a.form === 'ribbon') {
     base.addColorStop(0, dark ? `hsl(${hue} 15% 22%)` : '#f4f5f8');
     base.addColorStop(1, dark ? `hsl(${hue} 15% 8%)` : '#c9ccd4');
@@ -364,5 +401,5 @@ export function orbEngine(): OrbEngine | null {
 }
 
 export function orbStats(): OrbStats {
-  return engine ? engine.stats() : { backend: 'none', placements: 0, visible: 0, running: false, frames: 0, lastFrameMs: 0, contextLosses: 0 };
+  return engine ? engine.stats() : { backend: 'none', placements: 0, visible: 0, running: false, frames: 0, lastFrameMs: 0, contextLosses: 0, quality: 'full', qualityReason: null, renderer: null };
 }

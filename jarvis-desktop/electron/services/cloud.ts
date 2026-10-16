@@ -3,7 +3,7 @@
 // The key is placed in one request header and is never logged, echoed in errors or returned.
 import type {GuardedFetch} from './netGuard';
 import {ANTHROPIC_ORIGIN, chatUrlForProvider, originForProvider, type CompatProvider} from './netGuard';
-import type {CloudProvider} from '../../src/shared/contracts';
+import type {CloudModelInfo, CloudProvider} from '../../src/shared/contracts';
 
 /** Failures whose text this module wrote itself (status-only HTTP errors, empty reply). Safe to show verbatim. */
 export class CloudProviderError extends Error {
@@ -290,4 +290,47 @@ export async function streamCloudChat(guardedFetch: GuardedFetch, req: CloudStre
   if (!acc.text.trim()) throw new CloudProviderError('The cloud provider returned an empty reply');
   const usage = !capped && seq.inputTokens !== null && seq.outputTokens !== null ? {inputTokens: seq.inputTokens, outputTokens: seq.outputTokens, generationMs: null, promptMs: null} : null;
   return {text: acc.text, complete: true, truncated: capped, usage};
+}
+
+/* ---------- Model availability (GET /v1/models) ---------- */
+
+/** Most models listed for one provider; the rest are dropped rather than paged through. */
+export const MAX_LISTED_MODELS = 60;
+const MODEL_ID_RE = /^[A-Za-z0-9._:/-]{1,100}$/;
+
+/** OpenAI lists embedding, audio and image models too; only chat-capable families are offered for the chat route. */
+const OPENAI_CHAT_RE = /^(gpt-|chatgpt-|o[1-9](-|$))/i;
+
+/**
+ * Parses a provider's model list. Pure and bounded: only ids that pass the same character rule as the cloudModel
+ * setting are kept, names are trimmed to 100 characters, and nothing from the response is executed or rendered as HTML.
+ * Anthropic returns {data:[{id, display_name, created_at}]}; OpenAI returns {data:[{id, created}]}.
+ */
+export function parseModelList(provider: CloudProvider, body: unknown): CloudModelInfo[] {
+  const data = body && typeof body === 'object' && Array.isArray((body as {data?: unknown}).data) ? (body as {data: unknown[]}).data : null;
+  if (!data) throw new CloudProviderError('The provider returned a model list this app could not read');
+  const out: CloudModelInfo[] = [];
+  const seen = new Set<string>();
+  for (const raw of data) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const id = typeof r.id === 'string' ? r.id.trim() : '';
+    if (!MODEL_ID_RE.test(id) || seen.has(id)) continue;
+    if (provider === 'openai' && !OPENAI_CHAT_RE.test(id)) continue;
+    seen.add(id);
+    const name = typeof r.display_name === 'string' && r.display_name.trim() ? r.display_name.trim().slice(0, 100) : id;
+    const created = typeof r.created_at === 'string' ? r.created_at : typeof r.created === 'number' && Number.isFinite(r.created) ? new Date(r.created * 1000).toISOString() : undefined;
+    out.push(created && !Number.isNaN(Date.parse(created)) ? {id, name, createdAt: new Date(created).toISOString()} : {id, name});
+    if (out.length >= MAX_LISTED_MODELS) break;
+  }
+  // Newest first when the provider gives dates; otherwise the provider's own order is kept.
+  return out.every((m) => m.createdAt) ? out.sort((a, b) => (b.createdAt as string).localeCompare(a.createdAt as string)) : out;
+}
+
+/** Plain-language reason for a failed model list request, by HTTP status. */
+export function modelListFailure(status: number): string {
+  if (status === 401 || status === 403) return `The provider rejected the saved key (HTTP ${status}). Check the key or save a new one.`;
+  if (status === 429) return 'The provider is rate limiting this key (HTTP 429). Wait a moment and check again.';
+  if (status >= 500) return `The provider had a problem answering (HTTP ${status}). Try again later.`;
+  return `The provider did not return a model list (HTTP ${status}).`;
 }

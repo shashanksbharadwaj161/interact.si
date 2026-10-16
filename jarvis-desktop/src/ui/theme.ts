@@ -1,7 +1,7 @@
 /**
- * Theme choice for the Porcelain / Ink system. The choice is a UI preference (System by default); the stored
- * settings.theme value from earlier builds is kept untouched for compatibility and only used to migrate:
- * an explicit Paper choice becomes Light, the older dark themes follow the system.
+ * Theme choice. The principal experience is the dark Obsidian theme, so Dark is the default; Chrome (light) and
+ * System are explicit choices. The stored settings.theme value from earlier builds is kept untouched for compatibility
+ * and only used to migrate: an explicit Paper choice becomes Light.
  */
 export type ThemeChoice = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
@@ -9,14 +9,14 @@ export type ResolvedTheme = 'light' | 'dark';
 export const THEME_PREF_KEY = 'appearance.theme';
 
 export const THEME_CHOICES: readonly { value: ThemeChoice; label: string }[] = [
+  { value: 'dark', label: 'Obsidian' },
+  { value: 'light', label: 'Chrome' },
   { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
 ];
 
 export function normalizeThemeChoice(raw: unknown, legacy?: string): ThemeChoice {
   if (raw === 'system' || raw === 'light' || raw === 'dark') return raw;
-  return legacy === 'paper' ? 'light' : 'system';
+  return legacy === 'paper' ? 'light' : 'dark';
 }
 
 export function resolveTheme(choice: ThemeChoice, systemDark: boolean): ResolvedTheme {

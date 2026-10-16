@@ -1,4 +1,4 @@
-/* Element defaults and form controls for the Porcelain / Ink system. */
+/* Element defaults, atmosphere and form controls. Light and glow sit behind content; reading text is never blurred. */
 *,
 *::before,
 *::after {
@@ -13,13 +13,42 @@ body,
 }
 
 body {
+  position: relative;
   background: var(--bg);
   color: var(--ink);
   font: 400 var(--t-body) / 1.55 var(--font-ui);
-  font-optical-sizing: auto;
+  font-stretch: 100%;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
+}
+
+/* Atmosphere: an ultraviolet depth field and a cyan horizon behind everything, plus fine grain. Static, cheap. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  background:
+    radial-gradient(1100px 620px at 88% -10%, var(--glow-violet), transparent 62%),
+    radial-gradient(900px 520px at 8% 115%, var(--glow), transparent 60%);
+  opacity: 0.55;
+}
+
+body::after {
+  opacity: var(--noise-opacity);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 h1,
@@ -41,14 +70,14 @@ ol {
 }
 
 h1 {
-  font: 600 var(--t-h1) / 1.2 var(--font-ui);
-  letter-spacing: -0.012em;
+  font: 600 var(--t-h1) / 1.15 var(--font-display);
+  letter-spacing: 0.005em;
   text-wrap: balance;
 }
 
 h2 {
-  font: 600 var(--t-h2) / 1.3 var(--font-ui);
-  letter-spacing: -0.006em;
+  font: 600 var(--t-h2) / 1.25 var(--font-display);
+  letter-spacing: 0.01em;
   text-wrap: balance;
 }
 
@@ -58,21 +87,42 @@ h3 {
   color: var(--ink);
 }
 
+/* Large display lines: Chakra Petch with a cool metallic fill. Solid colour is the fallback and the forced-colors value. */
 .display {
-  font: 400 var(--t-display) / 1.05 var(--font-display);
-  letter-spacing: -0.01em;
+  font: 600 var(--t-display) / 1.02 var(--font-display);
+  letter-spacing: -0.005em;
   text-wrap: balance;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--ink) 30%, color-mix(in oklab, var(--ink) 70%, var(--energy)) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.display em,
-.display i {
-  font-style: italic;
-  color: var(--accent);
+.display em {
+  font-style: normal;
+  background: linear-gradient(90deg, var(--energy), var(--violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* HUD label: sparse section markers and real state captions. Uppercase only here, with tracking, at 12px or more. */
+.hud,
+.eyebrow {
+  font: 600 var(--t-micro) / 1.3 var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--energy);
+}
+
+.eyebrow {
+  margin-bottom: 4px;
 }
 
 a {
-  color: var(--accent);
-  text-underline-offset: 2px;
+  color: var(--energy);
+  text-underline-offset: 3px;
 }
 
 a:hover {
@@ -84,34 +134,36 @@ code,
 kbd,
 pre {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 code {
   overflow-wrap: anywhere;
-  padding: 1px 5px;
-  border-radius: 5px;
+  padding: 1px 6px;
+  border-radius: 4px;
   background: var(--sunken);
   color: var(--ink-2);
+  border: 1px solid var(--line);
 }
 
 pre code {
   padding: 0;
   background: none;
+  border: 0;
 }
 
 kbd {
   display: inline-block;
   min-width: 22px;
-  padding: 1px 6px;
+  padding: 0 6px;
   border: 1px solid var(--line-strong);
   border-bottom-width: 2px;
-  border-radius: 6px;
-  background: var(--surface);
+  border-radius: 4px;
+  background: var(--surface-2);
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.6;
   text-align: center;
-  line-height: 1.5;
 }
 
 :focus {
@@ -133,7 +185,6 @@ kbd {
   white-space: nowrap;
 }
 
-/* Secondary text. Kept at 13px so it stays readable at 1366x768. */
 .sub {
   display: block;
   color: var(--muted);
@@ -150,26 +201,19 @@ kbd {
   padding: var(--s2) var(--s3);
 }
 
-/* A quiet section label, sentence case. Not a decorative monospace eyebrow. */
-.eyebrow {
-  font: 500 var(--t-meta) / 1.3 var(--font-ui);
-  color: var(--muted);
-  margin-bottom: 2px;
-}
-
 ::selection {
-  background: var(--accent-soft);
-  color: var(--ink);
+  background: var(--energy);
+  color: var(--energy-ink);
 }
 
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--line-strong);
-  border-radius: 8px;
+  border-radius: 2px;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
@@ -188,21 +232,30 @@ kbd {
 select.input,
 textarea.input {
   width: 100%;
-  min-height: 38px;
+  min-height: 40px;
   padding: 8px 12px;
   color: var(--ink);
-  background: var(--surface);
+  background: var(--sunken);
   border: 1px solid var(--field-line);
-  border-radius: var(--r-ctl);
+  border-radius: var(--r-ctl) 0 var(--r-ctl) var(--r-ctl);
   font: inherit;
   font-size: var(--t-body);
-  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), background var(--dur-fast);
+}
+
+@supports (corner-shape: bevel) {
+  .input,
+  select.input,
+  textarea.input {
+    border-radius: 0 var(--cut-sm) 0 0;
+    corner-shape: bevel;
+  }
 }
 
 select.input {
   appearance: none;
   padding-right: 34px;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, var(--energy) 50%), linear-gradient(135deg, var(--energy) 50%, transparent 50%);
   background-position: calc(100% - 17px) 52%, calc(100% - 12px) 52%;
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
@@ -215,21 +268,23 @@ textarea.input {
 
 .input::placeholder {
   color: var(--muted);
+  opacity: 0.85;
 }
 
 .input:hover {
-  border-color: var(--ink-2);
+  border-color: var(--energy-line);
 }
 
 .input:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--energy);
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--energy), 0 0 18px -6px var(--glow);
 }
 
 .input:disabled {
-  background: var(--sunken);
   color: var(--muted);
+  border-color: var(--line-strong);
   cursor: not-allowed;
 }
 
@@ -253,7 +308,7 @@ textarea.input {
 }
 
 .input-title {
-  font: 600 var(--t-h2) / 1.3 var(--font-ui);
+  font: 600 var(--t-h2) / 1.3 var(--font-display);
 }
 
 .note-body {
@@ -272,7 +327,7 @@ input[type="time"] {
 }
 
 input[type="range"] {
-  accent-color: var(--accent);
+  accent-color: var(--energy);
 }
 
 .check {
@@ -282,29 +337,30 @@ input[type="range"] {
   height: 18px;
   margin: 0;
   border: 1.5px solid var(--field-line);
-  border-radius: 5px;
-  background: var(--surface);
+  border-radius: 3px;
+  background: var(--sunken);
   display: inline-grid;
   place-content: center;
   cursor: pointer;
-  transition: background var(--dur-fast), border-color var(--dur-fast);
+  transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
 
 .check:hover {
-  border-color: var(--accent);
+  border-color: var(--energy);
+  box-shadow: 0 0 10px -3px var(--glow);
 }
 
 .check:checked {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--energy);
+  border-color: var(--energy);
 }
 
 .check:checked::after {
   content: "";
   width: 9px;
   height: 5px;
-  border-left: 2px solid var(--accent-ink);
-  border-bottom: 2px solid var(--accent-ink);
+  border-left: 2px solid var(--energy-ink);
+  border-bottom: 2px solid var(--energy-ink);
   transform: translateY(-1px) rotate(-45deg);
 }
 

@@ -1,10 +1,9 @@
-/* First run: one welcoming scene. Content on the left, the companion on a quiet stage on the right. */
+/* First run: one scene. Content on the left; the core on a dark instrument stage on the right. */
 .onboard-wrap {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: auto;
-  background: var(--bg);
 }
 
 .onboard {
@@ -19,22 +18,42 @@
   flex-direction: column;
   justify-content: center;
   gap: var(--s5);
-  padding: var(--s8) clamp(24px, 6vw, 88px);
+  padding: var(--s6) clamp(24px, 6vw, 88px);
   min-width: 0;
 }
 
 .ob-brand {
-  font-weight: 600;
-  font-size: var(--t-small);
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 700 var(--t-small) var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
 }
 
 .ob-step {
   display: flex;
   flex-direction: column;
-  gap: var(--s5);
-  max-width: 560px;
-  animation: view-in var(--dur-route) var(--ease-out) both;
+  gap: var(--s4);
+  max-width: 600px;
+  animation: rise var(--dur-panel) var(--spring-soft) both;
+}
+
+.ob-step > * {
+  animation: rise var(--dur-panel) var(--spring-soft) both;
+}
+
+.ob-step > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+
+.ob-step > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+
+.ob-step > *:nth-child(n + 4) {
+  animation-delay: 140ms;
 }
 
 .ob-step h1 {
@@ -42,17 +61,17 @@
 }
 
 .ob-step h1.display {
-  font-size: clamp(40px, 4.6vw, 58px);
+  font-size: clamp(44px, 5vw, 64px);
 }
 
 .ob-step h1:not(.display) {
-  font-size: 30px;
+  font-size: 32px;
 }
 
 .ob-lead {
   font-size: var(--t-lead);
   color: var(--ink-2);
-  max-width: 52ch;
+  max-width: 54ch;
 }
 
 .ob-paths {
@@ -62,6 +81,7 @@
 }
 
 .ob-path {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--s4);
@@ -69,17 +89,29 @@
   padding: var(--s4) var(--s5);
   text-align: left;
   color: var(--ink);
-  background: var(--surface);
+  background: linear-gradient(110deg, var(--elevated), var(--surface) 70%);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
   font: inherit;
   cursor: pointer;
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease);
+  overflow: hidden;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-mid), transform var(--dur-press);
+}
+
+@supports (corner-shape: bevel) {
+  .ob-path {
+    border-radius: var(--cut-lg) 0 var(--cut-lg) 0;
+    corner-shape: bevel;
+  }
 }
 
 .ob-path:hover {
-  border-color: var(--field-line);
-  box-shadow: var(--shadow-2);
+  border-color: var(--energy-line);
+  box-shadow: 0 0 44px -22px var(--energy);
+}
+
+.ob-path:active {
+  transform: scale(0.995);
 }
 
 .ob-path .grow {
@@ -89,8 +121,8 @@
 }
 
 .ob-path strong {
-  font-size: var(--t-lead);
-  font-weight: 600;
+  font: 600 var(--t-h2) var(--font-display);
+  letter-spacing: 0.02em;
 }
 
 .ob-path .grow > span {
@@ -100,28 +132,34 @@
 
 .ob-path > svg {
   flex: none;
-  color: var(--muted);
+  color: var(--energy);
+  transition: transform var(--dur-mid) var(--spring);
+}
+
+.ob-path:hover > svg {
+  transform: translateX(4px);
 }
 
 .ob-path.is-primary {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow-1);
+  border-color: var(--energy-line);
+  box-shadow: inset 2px 0 0 var(--energy);
 }
 
 .ob-path-icon {
   display: grid;
   place-items: center;
   flex: none;
-  width: 46px;
-  height: 46px;
-  border-radius: 13px;
-  color: var(--accent);
-  background: var(--accent-soft);
+  width: 48px;
+  height: 48px;
+  color: var(--energy);
+  background: var(--energy-soft);
+  border: 1px solid var(--energy-line);
 }
 
 .ob-path.is-primary .ob-path-icon {
-  color: var(--accent-ink);
-  background: var(--accent);
+  color: var(--energy-ink);
+  background: var(--energy);
+  box-shadow: 0 0 20px -4px var(--glow);
 }
 
 .ob-prefs {
@@ -144,27 +182,38 @@
 }
 
 .ob-input {
-  min-height: 48px;
+  min-height: 52px;
   font-size: var(--t-lead);
 }
 
 .ob-record {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: var(--s4);
   padding: var(--s5);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-2);
-  animation: dialog-in var(--dur-route) var(--ease-out) both;
+  background: linear-gradient(110deg, var(--elevated), var(--surface));
+  border: 1px solid var(--energy-line);
+  box-shadow: 0 0 50px -26px var(--energy);
+  animation: dialog-in var(--dur-panel) var(--spring) both;
+}
+
+@supports (corner-shape: bevel) {
+  .ob-record {
+    border-radius: var(--cut-lg) 0 var(--cut-lg) 0;
+    corner-shape: bevel;
+  }
 }
 
 .ob-record strong {
   display: block;
   margin-top: 2px;
-  font-size: 20px;
-  font-weight: 600;
+  font: 600 22px var(--font-display);
+}
+
+.ob-record .sub {
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 .ob-record-body {
@@ -179,34 +228,38 @@
   flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
-  color: #ffffff;
-  background: var(--ok);
+  color: var(--energy-ink);
+  background: var(--lime);
+  box-shadow: 0 0 16px -2px var(--lime);
 }
 
 .ob-stage {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: var(--s4);
   padding: var(--s7);
-  background: var(--bg-2);
   border-left: 1px solid var(--line);
   text-align: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, color-mix(in oklab, var(--violet) 14%, transparent), transparent 55%), var(--bg-2);
+}
+
+.ob-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(closest-side, #000 20%, transparent 100%);
+  pointer-events: none;
 }
 
 .ob-stage .sub {
-  max-width: 34ch;
-}
-
-.ob-orb {
-  display: grid;
-  place-items: center;
-  width: min(380px, 80%);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--surface) 0%, transparent 100%);
+  position: relative;
+  max-width: 36ch;
 }
 
 @media (max-width: 960px) {
@@ -221,12 +274,8 @@
     border-bottom: 1px solid var(--line);
   }
 
-  .ob-orb {
-    width: 160px;
-  }
-
-  .ob-orb .orb {
-    --orb-size: 140px !important;
+  .ob-stage .sub {
+    display: none;
   }
 
   .ob-main {

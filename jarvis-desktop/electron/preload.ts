@@ -34,6 +34,7 @@ const flat: Omit<FullJarvisAPI, 'productivity'> = {
   // Per-provider cloud keys: only a provider id and (for set) the key go in; only booleans and provider metadata come back.
   cloudProviderStatus: () => call('cloudProviderStatus'),
   setProviderKey: (provider, key) => call('setProviderKey', provider, key),
+  cloudModels: (provider) => call('cloudModels', provider),
   clearProviderKey: (provider) => call('clearProviderKey', provider),
   // Optional arguments are forwarded only when given, so the main-process arity/shape check sees exactly what the caller passed.
   planIntent: (command, options) => (options === undefined ? call('planIntent', command) : call('planIntent', command, options)),

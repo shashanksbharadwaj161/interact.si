@@ -40,6 +40,10 @@ export function effectiveCloudModel(provider:unknown,cloudModel:unknown):string{
 }
 /** Per-provider key status for the renderer. Never carries a key. keyChannel says how keys are stored for this provider in this build. */
 export type CloudProviderStatus={provider:CloudProvider;name:string;hasKey:boolean|null;origin:string;defaultModel:string;keyChannel?:'per-provider'|'legacy'|'unavailable';reason?:string};
+/** One model a provider reports as available to the saved key. Ids come from the provider, never from this app. */
+export type CloudModelInfo={id:string;name:string;createdAt?:string};
+/** Result of asking a provider which models the saved key can use. available=false always carries a reason. */
+export type CloudModelList={provider:CloudProvider;available:boolean;models:CloudModelInfo[];reason?:string;checkedAt:string};
 /** Per-provider key methods are required in the full host; partial preview clients may omit them. */
 export type CloudProviderMethod='cloudProviderStatus'|'setProviderKey'|'clearProviderKey';
 export type Settings={onboarded:boolean;mode:Mode;theme:'graphite'|'nebula'|'paper';reduceMotion:boolean;startInTray:boolean;localModel:string;localEndpoint:string;cloudModel:string;/** Always present in state parsed by the backend (defaults to 'anthropic'); optional only so older literal Settings still type-check. */cloudProvider?:CloudProvider;voice:string;allowedRoots:string[];approvedApps:string[];retainDays:number};
@@ -108,6 +112,8 @@ export interface JarvisAPI {
  getApiInfo?():Promise<ApiInfo>;
  /** Per-provider cloud keys (goal 102), optional. Provider ids are validated before any secret is touched; keys are never returned. */
  cloudProviderStatus?():Promise<CloudProviderStatus[]>;setProviderKey?(provider:CloudProvider,key:string):Promise<{provider:CloudProvider;configured:boolean}>;clearProviderKey?(provider:CloudProvider):Promise<{provider:CloudProvider;configured:boolean}>;
+ /** Models the saved key for this provider can use (GET /v1/models through the network guard). Online mode only; the key never leaves the main process. */
+ cloudModels?(provider:CloudProvider):Promise<CloudModelList>;
  planIntent?(command:string,options?:IntentOptions):Promise<IntentPlan>;
  search?(query:string,options?:SearchOptions):Promise<SearchResult[]>;
  listLocalModels?():Promise<LocalModelList>;

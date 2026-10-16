@@ -20,6 +20,8 @@ import { resetPreviewData, seedPreviewDemo } from '../preview';
 import { calendarBridge, clipboardBridge, integrationsBridge, modelsBridge, routinesBridge, usageBridge } from '../ui/bridges';
 import type { UsageSummary } from '../shared/contracts';
 import { cx, errMsg } from '../ui/util';
+import { useIndicator } from '../ui/indicator';
+import type { CSSProperties } from 'react';
 
 const Assistant = lazy(() => import('./Assistant').then((m) => ({ default: m.Assistant })));
 const Companion = lazy(() => import('./Companion').then((m) => ({ default: m.Companion })));
@@ -433,7 +435,7 @@ function Presence({ go }: { go: Go }) {
   if (!settings) return null;
   const online = settings.mode === 'online';
   const readiness = modelReadiness({ settings, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
-  const chat = readiness.level === 'ready' ? (online ? 'Cloud AI ready' : 'Local AI ready') : readiness.level === 'blocked' ? 'AI not set up' : 'AI not checked';
+  const chat = readiness.level === 'ready' ? (online ? 'AI connected' : 'Legacy local AI') : readiness.level === 'blocked' ? (online ? 'AI needs attention' : 'AI not connected') : 'AI not checked';
   return (
     <a
       className="presence"
@@ -486,6 +488,7 @@ function RailLink({ area, view, go }: { area: AreaDef; view: ViewId; go: Go }) {
 
 /** Contextual screens of the current area. Advanced screens sit after a quiet divider. */
 function AreaTabs({ area, view, go }: { area: AreaDef; view: ViewId; go: Go }) {
+  const [ref, box] = useIndicator<HTMLElement>('.tab[aria-current="page"]', `${area.id}:${view}`);
   if (area.views.length < 2) return null;
   const defs = area.views.map(viewById);
   const main = defs.filter((v) => !v.advanced);
@@ -511,7 +514,8 @@ function AreaTabs({ area, view, go }: { area: AreaDef; view: ViewId; go: Go }) {
     );
   };
   return (
-    <nav className="area-tabs tabs" aria-label={`${area.label} screens`}>
+    <nav ref={ref} className="area-tabs tabs has-indicator" aria-label={`${area.label} screens`}>
+      {box && <span className="tab-indicator" aria-hidden="true" style={{ '--ix': `${box.x}px`, '--iw': `${box.w}px` } as CSSProperties} />}
       {main.map(link)}
       {advanced.length > 0 && (
         <>
@@ -810,6 +814,7 @@ function Shell({ motion }: { motion: MotionState }) {
 
   const current = viewById(view);
   const area = areaOf(view);
+  const [railRef, railBox] = useIndicator<HTMLElement>('.rail-item.active', view);
   const primary = AREAS.filter((a) => !a.footer);
   const footer = AREAS.filter((a) => a.footer);
 
@@ -820,9 +825,10 @@ function Shell({ motion }: { motion: MotionState }) {
       </a>
       <aside className="rail">
         <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
           <div className="brand-text">
             <strong>Desktop Companion</strong>
-            <span>{settings?.mode === 'online' ? 'Online by your choice' : 'Works offline'}</span>
+            <span>{settings?.mode === 'online' ? 'AI online · files local' : 'Files local · AI off'}</span>
           </div>
         </div>
         <button type="button" className="rail-search" aria-keyshortcuts="Control+K" title="Quick search (Ctrl+K)" onClick={() => setPalette(true)}>
@@ -830,7 +836,8 @@ function Shell({ motion }: { motion: MotionState }) {
           <span>Search</span>
           <kbd>Ctrl K</kbd>
         </button>
-        <nav aria-label="Primary" className="rail-nav">
+        <nav ref={railRef} aria-label="Primary" className="rail-nav">
+          {railBox && <span className="rail-indicator" aria-hidden="true" style={{ '--iy': `${railBox.y}px`, '--ih': `${railBox.h}px` } as CSSProperties} />}
           {primary.map((a) => <RailLink key={a.id} area={a} view={view} go={go} />)}
           <span className="rail-spacer" aria-hidden="true" />
           {footer.map((a) => <RailLink key={a.id} area={a} view={view} go={go} />)}

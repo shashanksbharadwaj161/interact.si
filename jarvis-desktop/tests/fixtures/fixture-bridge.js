@@ -19,7 +19,7 @@
   };
   const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString();
   const base = () => ({
-    settings: { onboarded: cfg.onboarded, mode: cfg.mode, theme: 'graphite', reduceMotion: false, startInTray: false, localModel: 'llama3.2:3b', localEndpoint: 'http://127.0.0.1:11434', cloudModel: '', cloudProvider: 'anthropic', voice: '', allowedRoots: [], approvedApps: [], retainDays: 90 },
+    settings: { onboarded: cfg.onboarded, mode: cfg.chat === 'ready' ? 'online' : 'offline', theme: 'graphite', reduceMotion: false, startInTray: false, localModel: '', localEndpoint: 'http://127.0.0.1:11434', cloudModel: cfg.chat === 'ready' ? 'fixture-claude-model' : '', cloudProvider: 'anthropic', voice: '', allowedRoots: [], approvedApps: [], retainDays: 90 },
     capsules: [],
     notes: [],
     tasks: [],
@@ -63,10 +63,10 @@
     }
     return JSON.parse(JSON.stringify(state));
   };
-  const keys = { anthropic: false, openai: false, openrouter: false };
+  const keys = { anthropic: cfg.chat === 'ready', openai: false, openrouter: false };
   const caps = () => [
-    cfg.chat === 'ready' ? { id: 'local-llm', name: 'Local model', available: true } : { id: 'local-llm', name: 'Local model', available: false, reason: 'Ollama did not respond at http://127.0.0.1:11434' },
-    keys.anthropic || keys.openai || keys.openrouter ? { id: 'cloud', name: 'Cloud model', available: state.settings.mode === 'online' } : { id: 'cloud', name: 'Cloud model', available: false, reason: 'No API key is saved' },
+    { id: 'local-llm', name: 'Local model', available: false, reason: 'No local model is set up (fixture)' },
+    keys[state.settings.cloudProvider || 'anthropic'] && state.settings.mode === 'online' ? { id: 'cloud', name: 'Cloud model', available: true } : { id: 'cloud', name: 'Cloud model', available: false, reason: state.settings.mode === 'online' ? 'No API key is saved' : 'Online mode is off' },
     cfg.tts ? { id: 'tts', name: 'Read aloud', available: true } : { id: 'tts', name: 'Read aloud', available: false, reason: 'Fixture backend has no speech engine' },
     cfg.stt ? { id: 'stt', name: 'Speech recognition', available: true } : { id: 'stt', name: 'Speech recognition', available: false, reason: 'Fixture backend has no speech recognizer' },
     { id: 'ui-automation', name: 'Windows desktop control', available: false, reason: 'Fixture backend cannot control a desktop' },
@@ -99,8 +99,9 @@
     async saveTask(t) { const ex = state.tasks.find((x) => x.id === t.id); if (ex) Object.assign(ex, t); else state.tasks.unshift({ id: id('t'), title: '', done: false, createdAt: now(), ...t }); activity('task', 'Task saved'); return save(); },
     async deleteTask(tid) { state.tasks = state.tasks.filter((t) => t.id !== tid); return save(); },
     async chat(text) {
-      state.chat.push({ id: id('m'), role: 'user', text, createdAt: now(), source: 'local' });
-      const m = cfg.chat === 'ready' ? { id: id('m'), role: 'assistant', text: REPLY, createdAt: now(), source: 'local' } : { id: id('m'), role: 'assistant', text: 'Local model unavailable: Ollama did not respond. No reply was generated.', createdAt: now(), source: 'system' };
+      state.chat.push({ id: id('m'), role: 'user', text, createdAt: now(), source: 'cloud' });
+      const ok = state.settings.mode === 'online' && keys.anthropic;
+      const m = ok ? { id: id('m'), role: 'assistant', text: REPLY, createdAt: now(), source: 'cloud' } : { id: id('m'), role: 'assistant', text: 'Cloud model unavailable: No API key is saved. No reply was generated.', createdAt: now(), source: 'system' };
       state.chat.push(m);
       save();
       return m;
@@ -116,6 +117,14 @@
         { provider: 'openrouter', name: 'OpenRouter', hasKey: keys.openrouter, origin: 'https://openrouter.ai', defaultModel: 'openrouter/fixture', keyChannel: 'per-provider' },
       ];
     },
+    async cloudModels(provider) {
+      const checkedAt = now();
+      if (state.settings.mode !== 'online') return { provider, available: false, models: [], reason: 'Online mode is off, so the provider was not contacted.', checkedAt };
+      if (!keys[provider]) return { provider, available: false, models: [], reason: 'No API key is saved on this computer.', checkedAt };
+      if (provider !== 'anthropic') return { provider, available: false, models: [], reason: 'Fixture backend lists models for Anthropic only.', checkedAt };
+      // Clearly fake ids: the fixture never claims real model names.
+      return { provider, available: true, checkedAt, models: [{ id: 'fixture-claude-model', name: 'Fixture model A (test data)' }, { id: 'fixture-claude-model-b', name: 'Fixture model B (test data)' }] };
+    },
     async setProviderKey(provider, k) { if (String(k).length < 8) throw new Error('That does not look like a full API key.'); keys[provider] = true; return { provider, configured: true }; },
     async clearProviderKey(provider) { keys[provider] = false; return { provider, configured: false }; },
     async previewAction(a) { return { id: id('p'), summary: `Fixture preview: ${a.type}`, requiresApproval: a.type !== 'list-windows', allowed: false, reason: 'Fixture backend cannot control a desktop.' }; },
@@ -130,12 +139,9 @@
       return { apiVersion: 2, features: [{ id: 'chat-streaming', available: true }, { id: 'chat-cancel', available: true }, { id: 'intent-planner', available: false, reason: 'Fixture backend has no planner' }, { id: 'search', available: true }] };
     },
     async chatStreamStart(text) {
-      if (cfg.chat !== 'ready') {
-        state.chat.push({ id: id('m'), role: 'user', text, createdAt: now(), source: 'local' });
-        save();
-      } else state.chat.push({ id: id('m'), role: 'user', text, createdAt: now(), source: 'local' });
+      state.chat.push({ id: id('m'), role: 'user', text, createdAt: now(), source: 'cloud' });
       save();
-      const start = { streamId: id('s'), generation: ++generation, route: 'local' };
+      const start = { streamId: id('s'), generation: ++generation, route: 'cloud' };
       streams.set(start.streamId, { text: '', cancelled: false });
       return start;
     },
@@ -146,7 +152,7 @@
       let alive = true;
       const s = streams.get(start.streamId);
       const finish = (outcome, text, note) => {
-        const reply = { id: id('m'), role: 'assistant', text, createdAt: now(), source: outcome === 'failed' ? 'system' : 'local' };
+        const reply = { id: id('m'), role: 'assistant', text, createdAt: now(), source: outcome === 'failed' ? 'system' : 'cloud' };
         if (text) state.chat.push(reply);
         if (note) state.chat.push({ id: id('m'), role: 'assistant', text: note, createdAt: now(), source: 'system' });
         save();
@@ -155,8 +161,8 @@
       setTimeout(() => {
         if (!alive) return;
         handler({ ...tag(++n), type: 'status', status: 'connecting' });
-        if (cfg.chat !== 'ready') {
-          setTimeout(() => finish('failed', '', 'Local model unavailable: Ollama did not respond at http://127.0.0.1:11434. No reply was generated. Start Ollama, then try again.'), 500);
+        if (!(state.settings.mode === 'online' && keys.anthropic)) {
+          setTimeout(() => finish('failed', '', 'Cloud model unavailable: No API key is saved. No reply was generated.'), 500);
           return;
         }
         const words = REPLY.split(' ');

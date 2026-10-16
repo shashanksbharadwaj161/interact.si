@@ -4,7 +4,7 @@ export const METHODS = [
   'saveCapsule', 'deleteCapsule', 'restoreCapsule',
   'saveNote', 'deleteNote', 'saveTask', 'deleteTask',
   'chat', 'clearChat', 'setCloudKey', 'cloudKeyStatus', 'deleteCloudKey',
-  'cloudProviderStatus', 'setProviderKey', 'clearProviderKey',
+  'cloudProviderStatus', 'setProviderKey', 'clearProviderKey', 'cloudModels',
   'previewAction', 'executeAction', 'speak', 'transcribe',
   'exportData', 'importData', 'pickPath',
   // API v2
@@ -35,7 +35,7 @@ export const ARITY: Record<MethodName, number> = {
   saveCapsule: 1, deleteCapsule: 1, restoreCapsule: 1,
   saveNote: 1, deleteNote: 1, saveTask: 1, deleteTask: 1,
   chat: 1, clearChat: 0, setCloudKey: 1, cloudKeyStatus: 0, deleteCloudKey: 0,
-  cloudProviderStatus: 0, setProviderKey: 2, clearProviderKey: 1,
+  cloudProviderStatus: 0, setProviderKey: 2, clearProviderKey: 1, cloudModels: 1,
   previewAction: 1, executeAction: 2, speak: 1, transcribe: 1,
   exportData: 0, importData: 0, pickPath: 1,
   getApiInfo: 0, planIntent: 2, search: 2, listLocalModels: 0,

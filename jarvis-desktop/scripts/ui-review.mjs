@@ -52,8 +52,8 @@ export function serveDist() {
 export const FIXTURE_SRC = fs.readFileSync(path.join(root, 'tests', 'fixtures', 'fixture-bridge.js'), 'utf8');
 
 /** Opens a page with an isolated profile, the given fixture config (or the preview bridge) and preferences. */
-export async function openPage(browser, origin, { width, height, theme, fixture, prefs = {}, hash = '#/home', reducedMotion = false, scale = 1 }) {
-  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: scale, colorScheme: theme === 'dark' ? 'dark' : 'light', reducedMotion: reducedMotion ? 'reduce' : 'no-preference' });
+export async function openPage(browser, origin, { width, height, theme, fixture, prefs = {}, hash = '#/home', reducedMotion = false, scale = 1, video }) {
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: scale, colorScheme: theme === 'dark' ? 'dark' : 'light', reducedMotion: reducedMotion ? 'reduce' : 'no-preference', ...(video ? { recordVideo: { dir: video, size: { width, height } } } : {}) });
   const external = [];
   context.on('request', (r) => {
     const u = r.url();

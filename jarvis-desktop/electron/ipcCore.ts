@@ -177,6 +177,7 @@ export const ARG_SPECS: Record<MethodName, readonly ArgSpec[]> = {
   cloudProviderStatus: [],
   setProviderKey: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}, {kind: 'string', min: 1, max: 4096}],
   clearProviderKey: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}],
+  cloudModels: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}],
   // The renderer may only propose. `approved` must be a real boolean; the native confirmation still decides.
   previewAction: [OBJ], executeAction: [ID, {kind: 'boolean'}],
   speak: [{kind: 'string', max: LIMITS.speakChars}],
