@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { CompanionOrb } from '../src/components/CompanionOrb';
+import { addFlow, type FlowState } from './flow';
 import { useAppearance } from '../src/ui/appearance-context';
 import { FORMS, TINT_PRESETS, type CompanionState } from '../src/ui/appearance';
 import { APPS, ABILITIES, CLIPBOARD_DEMO, INITIAL_TASKS, PERSONALITIES, REGION_REQUEST, REQUESTS, SIGNUPS, VOICE_LINE, type MockTask, type Scripted } from './script';
@@ -16,8 +17,12 @@ import { APPS, ABILITIES, CLIPBOARD_DEMO, INITIAL_TASKS, PERSONALITIES, REGION_R
 type Surface = 'rest' | 'command' | 'listening' | 'acting' | 'answer' | 'utilities' | 'customize' | 'hub';
 type Anchor = 'corner' | 'top' | 'right';
 type Rect = { x: number; y: number; w: number; h: number };
-type Answer = { title: string; text: string; basis: string; region?: Rect };
-type Plan = { req: Extract<Scripted, { kind: 'act' }>; phase: 'review' | 'saving' | 'saved' | 'undone' };
+type Answer = { title: string; text: string; basis: string; region?: Rect; tone?: 'error' };
+type Plan = { req: Extract<Scripted, { kind: 'act' }>; phase: 'review' | 'saving' | 'saved' | 'undone' | 'failed' };
+export type Expression = 'flow' | 'ascii' | 'core';
+type Wallpaper = 'dark' | 'light' | 'busy';
+/** The perimeter light: idle has none; hover and focus are CSS; the rest come from the island's real (here: scripted) state. */
+type Edge = 'idle' | 'listening' | 'working' | 'done' | 'error';
 type ListenPhase = 'hearing' | 'transcribing';
 
 const SURFACE_NAME: Record<Surface, string> = {
@@ -37,6 +42,11 @@ const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, reduced() ? 
 export function Prototype() {
   const [surface, setSurface] = useState<Surface>('rest');
   const [anchor, setAnchor] = useState<Anchor>('corner');
+  const [wall, setWall] = useState<Wallpaper>('dark');
+  const [expression, setExpression] = useState<Expression>('flow');
+  const [vapor, setVapor] = useState(false);
+  const [edgeLight, setEdgeLight] = useState<'on' | 'subtle' | 'off'>('on');
+  const [doneFlash, setDoneFlash] = useState(0);
   const [motion, setMotion] = useState<'full' | 'reduced'>(() => (document.documentElement.dataset.motion === 'reduced' ? 'reduced' : 'full'));
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -106,7 +116,7 @@ export function Prototype() {
 
   const runRequest = async (req: Scripted) => {
     if (req.kind === 'answer') {
-      setAnswer({ title: req.title, text: req.text, basis: req.basis });
+      setAnswer({ title: req.title, text: req.text, basis: req.basis, tone: req.tone });
       open('answer');
     } else {
       setPlan({ req, phase: 'review' });
@@ -117,7 +127,11 @@ export function Prototype() {
   const confirmPlan = async () => {
     if (!plan) return;
     setPlan({ ...plan, phase: 'saving' });
-    await wait(650);
+    await wait(plan.req.failure ? 1100 : 650);
+    if (plan.req.failure) {
+      setPlan((p) => (p ? { ...p, phase: 'failed' } : p));
+      return;
+    }
     setTasks((t) => (t.some((x) => x.id === plan.req.task.id) ? t : [...t, plan.req.task]));
     setPlan((p) => (p ? { ...p, phase: 'saved' } : p));
   };
@@ -187,17 +201,30 @@ export function Prototype() {
       return undefined;
     }
     let raf = 0;
+    let lastSet = 0;
     const t0 = performance.now();
     const tick = (t: number) => {
+      raf = requestAnimationFrame(tick);
+      // About 15 updates a second is enough for the level; React does not re-render on every frame.
+      if (t - lastSet < 66) return;
+      lastSet = t;
       const s = (t - t0) / 1000;
       // Simulated speech envelope: syllable-rate bumps on a slow phrase contour. Labelled as simulated in the surface.
       const v = Math.max(0, 0.35 + 0.3 * Math.sin(s * 9.1) * Math.sin(s * 2.3) + 0.15 * Math.sin(s * 17.3));
       setLevel(Math.min(1, v));
-      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [surface, listen]);
+
+  // Completion settles into one brief trace around the island, then the light goes quiet again.
+  const doneKey = (surface === 'answer' && answer?.tone !== 'error' ? `a:${answer?.text}` : '') + (surface === 'acting' && plan?.phase === 'saved' ? `p:${plan.req.id}` : '');
+  useEffect(() => {
+    if (!doneKey) return undefined;
+    setDoneFlash((n) => n + 1);
+    const id = window.setTimeout(() => setDoneFlash(0), reduced() ? 700 : 900);
+    return () => window.clearTimeout(id);
+  }, [doneKey]);
 
   /** The guided journey for reviewers: every state in order, with captions. Any key or click stops it. */
   const play = async () => {
@@ -254,7 +281,10 @@ export function Prototype() {
     }
   };
 
-  const orbState: CompanionState = surface === 'listening' ? (listen === 'hearing' ? 'listening' : 'transcribing') : surface === 'acting' && plan?.phase === 'saving' ? 'thinking' : 'idle';
+  const orbState: CompanionState = surface === 'listening' ? (listen === 'hearing' ? 'listening' : 'transcribing') : surface === 'acting' && plan?.phase === 'saving' ? 'thinking' : (surface === 'answer' && answer?.tone === 'error') || (surface === 'acting' && plan?.phase === 'failed') ? 'alert' : 'idle';
+  const failed = (surface === 'answer' && answer?.tone === 'error') || (surface === 'acting' && plan?.phase === 'failed');
+  const working = (surface === 'listening' && listen === 'transcribing') || (surface === 'acting' && plan?.phase === 'saving');
+  const edge: Edge = failed ? 'error' : working ? 'working' : surface === 'listening' ? 'listening' : doneFlash ? 'done' : 'idle';
 
   return (
     <div className="proto" onPointerDownCapture={stopTour}>
@@ -265,6 +295,8 @@ export function Prototype() {
         playing={caption !== null}
         onAnchor={setAnchor}
         onMotion={setMotion}
+        wall={wall}
+        onWall={setWall}
         onPlay={() => void play()}
         onJump={(s) => {
           tour.current++;
@@ -276,7 +308,7 @@ export function Prototype() {
           else open(s);
         }}
       />
-      <div className="desk" ref={desktopRef} data-anchor={anchor}>
+      <div className="desk" ref={desktopRef} data-anchor={anchor} data-wall={wall} data-vapor={vapor && surface !== 'rest' && surface !== 'hub' ? 'on' : undefined}>
         <MockDesktop focusedApp={focusedApp} onFocusApp={setFocusedApp} region={region} signups={SIGNUPS} />
         {selecting && (
           <RegionOverlay
@@ -296,6 +328,10 @@ export function Prototype() {
           anchor={anchor}
           orbState={orbState}
           level={surface === 'listening' && listen === 'hearing' ? level : null}
+          edge={edge}
+          edgeLight={edgeLight}
+          doneFlash={doneFlash}
+          expression={expression}
           desk={desktopRef}
           onOpen={() => open('command')}
           label={`Companion prototype, ${SURFACE_NAME[surface]}`}
@@ -326,7 +362,7 @@ export function Prototype() {
           {surface === 'acting' && plan && <ActPanel plan={plan} onConfirm={() => void confirmPlan()} onCancel={() => { setPlan({ ...plan, phase: 'undone' }); setSurface('command'); setNote('Cancelled. Nothing was changed.'); }} onUndo={undoPlan} onDone={collapse} onTasks={() => open('utilities')} />}
           {surface === 'answer' && answer && <AnswerPanel answer={answer} onHub={() => open('hub')} onDone={collapse} onFollow={() => open('command')} />}
           {surface === 'utilities' && <UtilitiesPanel tasks={tasks} setTasks={setTasks} onBack={() => open('command')} onClose={collapse} onLaunch={(id) => { setFocusedApp(id); lastFocus.current = desktopRef.current?.querySelector<HTMLElement>(`.mock-window[data-app="${id}"] [data-focus]`) ?? null; collapse(); }} />}
-          {surface === 'customize' && <CustomizePanel anchor={anchor} onAnchor={setAnchor} onBack={() => open('command')} onClose={collapse} />}
+          {surface === 'customize' && <CustomizePanel anchor={anchor} onAnchor={setAnchor} onBack={() => open('command')} onClose={collapse} expression={expression} onExpression={setExpression} vapor={vapor} onVapor={setVapor} edgeLight={edgeLight} onEdgeLight={setEdgeLight} />}
           {surface === 'hub' && <HubPanel onCollapse={collapse} />}
         </Island>
         {caption && (
@@ -355,7 +391,7 @@ function sheetRegion(desk: HTMLElement | null): Rect | null {
  * One element. Its size follows the current surface's content (measured), and CSS springs the change, so the island
  * grows from the edge it is docked to and shrinks back to the same place. The core never remounts.
  */
-function Island({ surface, anchor, orbState, level, desk, onOpen, label, children }: { surface: Surface; anchor: Anchor; orbState: CompanionState; level: number | null; desk: React.RefObject<HTMLDivElement | null>; onOpen: () => void; label: string; children: ReactNode }) {
+function Island({ surface, anchor, orbState, level, edge, edgeLight, doneFlash, expression, desk, onOpen, label, children }: { surface: Surface; anchor: Anchor; orbState: CompanionState; level: number | null; edge: Edge; edgeLight: 'on' | 'subtle' | 'off'; doneFlash: number; expression: Expression; desk: React.RefObject<HTMLDivElement | null>; onOpen: () => void; label: string; children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 176, h: 52 });
   useLayoutEffect(() => {
@@ -375,9 +411,10 @@ function Island({ surface, anchor, orbState, level, desk, onOpen, label, childre
   }, [surface, anchor, desk]);
   const rest = surface === 'rest';
   return (
-    <section className="island" data-surface={surface} data-anchor={anchor} style={{ width: size.w, height: size.h } as CSSProperties} aria-label={label}>
+    <section className="island" data-surface={surface} data-anchor={anchor} data-edge={edge} data-edge-light={edgeLight} style={{ width: size.w, height: size.h, '--lvl': level ?? 0 } as CSSProperties} aria-label={label}>
+      <span className="edge" aria-hidden key={edge === 'done' ? `done-${doneFlash}` : edge} />
       <button type="button" className="island-core" onClick={rest ? onOpen : undefined} tabIndex={rest ? 0 : -1} aria-label={rest ? 'Open the companion (Ctrl+Space)' : undefined} aria-hidden={rest ? undefined : true}>
-        <CompanionOrb size={rest ? 34 : 44} state={orbState} level={level} decorative showWhenHidden />
+        <CoreView expression={expression} size={rest ? 34 : 44} state={orbState} level={level} />
       </button>
       <div className="island-panel" data-s={surface} key={surface} ref={panelRef}>
         {children}
@@ -387,6 +424,32 @@ function Island({ surface, anchor, orbState, level, desk, onOpen, label, childre
       </span>
     </section>
   );
+}
+
+const FLOW_STATE: Record<CompanionState, FlowState> = { idle: 'idle', listening: 'listening', transcribing: 'working', thinking: 'working', speaking: 'listening', alert: 'error' };
+
+/**
+ * The companion's core in the chosen expression: the prototype's flow field, its ASCII skin, or the app's shared
+ * renderer. All three take the same state and level, so the island looks alive only when something is happening.
+ */
+export function CoreView({ expression, size, state, level }: { expression: Expression; size: number; state: CompanionState; level: number | null }) {
+  const [appearance] = useAppearance();
+  const ref = useRef<HTMLCanvasElement>(null);
+  const live = useRef({ state, level, hue: appearance.tint, skin: expression });
+  live.current = { state, level, hue: appearance.tint, skin: expression };
+  const handle = useRef<ReturnType<typeof addFlow> | null>(null);
+  useEffect(() => {
+    if (expression === 'core' || !ref.current) return undefined;
+    const h = addFlow(ref.current, size, () => ({ skin: live.current.skin === 'ascii' ? 'ascii' : 'flow', state: FLOW_STATE[live.current.state], level: live.current.level ?? 0, hue: live.current.hue, reduced: document.documentElement.dataset.motion === 'reduced' }));
+    handle.current = h;
+    return () => {
+      h.remove();
+      handle.current = null;
+    };
+  }, [expression, size]);
+  useEffect(() => handle.current?.invalidate(), [state, level, appearance.tint]);
+  if (expression === 'core') return <CompanionOrb size={size} state={state} level={level} decorative showWhenHidden />;
+  return <canvas ref={ref} className={`flow-core flow-${expression}`} style={{ width: size, height: size }} aria-hidden />;
 }
 
 function RestPill({ returnedTo }: { returnedTo: string | null }) {
@@ -573,7 +636,7 @@ function ActPanel({ plan, onConfirm, onCancel, onUndo, onDone, onTasks }: { plan
   const { req } = plan;
   return (
     <div className="act">
-      <PanelHead title={plan.phase === 'saved' ? 'Done' : plan.phase === 'undone' ? 'Undone' : 'Plan'} meta={<Scripted />} />
+      <PanelHead title={plan.phase === 'saved' ? 'Done' : plan.phase === 'undone' ? 'Undone' : plan.phase === 'failed' ? 'Did not work as planned' : plan.phase === 'saving' ? 'Working' : 'Plan'} meta={<Scripted />} />
       <p className="act-ask">“{req.prompt}”</p>
       <ol className="steps">
         <li className="is-done">Understood the request</li>
@@ -589,7 +652,9 @@ function ActPanel({ plan, onConfirm, onCancel, onUndo, onDone, onTasks }: { plan
           </dl>
           <span className="risk">{req.risk}</span>
         </li>
-        <li className={plan.phase === 'saved' ? 'is-done' : plan.phase === 'saving' ? 'is-now' : ''}>{plan.phase === 'saved' ? 'Saved to the list' : plan.phase === 'undone' ? 'Removed again' : 'Save'}</li>
+        <li className={plan.phase === 'saved' ? 'is-done' : plan.phase === 'saving' ? 'is-now' : plan.phase === 'failed' ? 'is-failed' : ''}>
+          {req.failure ? (plan.phase === 'failed' ? 'Check afterwards: not as planned' : 'Do it, then check the result') : plan.phase === 'saved' ? 'Saved to the list' : plan.phase === 'undone' ? 'Removed again' : 'Save'}
+        </li>
       </ol>
       {plan.phase === 'review' || plan.phase === 'saving' ? (
         <PanelFoot>
@@ -598,16 +663,18 @@ function ActPanel({ plan, onConfirm, onCancel, onUndo, onDone, onTasks }: { plan
             Cancel
           </button>
           <button type="button" className="btn btn-primary" onClick={onConfirm} disabled={plan.phase === 'saving'}>
-            {plan.phase === 'saving' ? 'Adding…' : 'Add task'}
+            {plan.phase === 'saving' ? 'Working…' : req.failure ? 'Move window' : 'Add task'}
           </button>
         </PanelFoot>
       ) : (
         <div className="receipt">
-          <p className="receipt-text">{plan.phase === 'saved' ? 'Added “Call the bank”, due tomorrow 10:00. Only the prototype’s mock list changed.' : 'The task was removed. Your list is as it was.'}</p>
+          <p className={`receipt-text${plan.phase === 'failed' ? ' is-error' : ''}`} role={plan.phase === 'failed' ? 'alert' : undefined}>
+            {plan.phase === 'failed' ? req.failure : plan.phase === 'saved' ? 'Added “Call the bank”, due tomorrow 10:00. Only the prototype’s mock list changed.' : 'Undone. Your list is as it was.'}
+          </p>
           <PanelFoot>
-            {plan.phase === 'saved' && (
+            {(plan.phase === 'saved' || plan.phase === 'failed') && (
               <button type="button" className="btn" onClick={onUndo}>
-                Undo
+                {plan.phase === 'failed' ? 'Put it back' : 'Undo'}
               </button>
             )}
             <button type="button" className="btn" onClick={onTasks}>
@@ -628,8 +695,8 @@ function AnswerPanel({ answer, onHub, onDone, onFollow }: { answer: Answer; onHu
   const [copied, setCopied] = useState(false);
   useEffect(() => doneRef.current?.focus(), []);
   return (
-    <div className="ans">
-      <PanelHead title={answer.title} meta={<Scripted>Scripted answer · no model was called</Scripted>} />
+    <div className={`ans${answer.tone === 'error' ? ' is-error' : ''}`}>
+      <PanelHead title={answer.title} meta={<Scripted>{answer.tone === 'error' ? 'Scripted · shows an unavailable ability' : 'Scripted answer · no model was called'}</Scripted>} />
       <p className="ans-text">{answer.text}</p>
       <p className="ans-basis">
         <span aria-hidden>↳</span> Based on: {answer.basis}
@@ -768,7 +835,7 @@ function FocusTile() {
 
 type CTab = 'appearance' | 'personality' | 'voice' | 'abilities' | 'placement';
 
-function CustomizePanel({ anchor, onAnchor, onBack, onClose }: { anchor: Anchor; onAnchor: (a: Anchor) => void; onBack: () => void; onClose: () => void }) {
+function CustomizePanel({ anchor, onAnchor, onBack, onClose, expression, onExpression, vapor, onVapor, edgeLight, onEdgeLight }: { anchor: Anchor; onAnchor: (a: Anchor) => void; onBack: () => void; onClose: () => void; expression: Expression; onExpression: (e: Expression) => void; vapor: boolean; onVapor: (v: boolean) => void; edgeLight: 'on' | 'subtle' | 'off'; onEdgeLight: (v: 'on' | 'subtle' | 'off') => void }) {
   const [tab, setTab] = useState<CTab>('appearance');
   const [appearance, setAppearance] = useAppearance();
   const [persona, setPersona] = useState<string>('steady');
@@ -789,8 +856,8 @@ function CustomizePanel({ anchor, onAnchor, onBack, onClose }: { anchor: Anchor;
       </PanelHead>
       <div className="cust-body">
         <div className="cust-stage">
-          <CompanionOrb size={150} state="idle" level={null} decorative showWhenHidden />
-          <p className="p-meta">The app’s real renderer, from your saved appearance.</p>
+          <CoreView expression={expression} size={150} state="idle" level={null} />
+          <p className="p-meta">{expression === 'core' ? 'The app’s shared renderer, from your saved appearance.' : 'Prototype flow field, coloured by your saved inner light.'}</p>
         </div>
         <div className="cust-main">
           <div className="seg" role="tablist" aria-label="Customise">
@@ -803,6 +870,39 @@ function CustomizePanel({ anchor, onAnchor, onBack, onClose }: { anchor: Anchor;
           <div className="cust-tab" role="tabpanel">
             {tab === 'appearance' && (
               <>
+                <div className="seg" role="radiogroup" aria-label="Expression">
+                  {(
+                    [
+                      ['flow', 'Flow core'],
+                      ['ascii', 'ASCII'],
+                      ['core', 'Arc core (app renderer)'],
+                    ] as const
+                  ).map(([id, name]) => (
+                    <button key={id} type="button" role="radio" aria-checked={expression === id} className={expression === id ? 'on' : undefined} onClick={() => onExpression(id)}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+                <div className="g-row">
+                  <span>Edge light</span>
+                  <div className="seg seg-sm" role="radiogroup" aria-label="Edge light">
+                    {(
+                      [
+                        ['on', 'On'],
+                        ['subtle', 'Subtle'],
+                        ['off', 'Off'],
+                      ] as const
+                    ).map(([id, name]) => (
+                      <button key={id} type="button" role="radio" aria-checked={edgeLight === id} className={edgeLight === id ? 'on' : undefined} onClick={() => onEdgeLight(id)}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="mini-switch">
+                  <input type="checkbox" checked={vapor} onChange={(e) => onVapor(e.target.checked)} /> Vapor grid behind the open island
+                </label>
+                <p className="p-meta">Arc core forms and inner light:</p>
                 <div className="forms">
                   {FORMS.filter((f) => f.id !== 'character').map((f) => (
                     <button key={f.id} type="button" className={`form-pick${appearance.form === f.id ? ' on' : ''}`} aria-pressed={appearance.form === f.id} onClick={() => setAppearance({ ...appearance, form: f.id, tint: appearance.form === f.id ? appearance.tint : f.defaultTint })}>
@@ -1099,7 +1199,7 @@ function MockDesktop({ focusedApp, onFocusApp, region, signups }: { focusedApp: 
 
 /* ---------- Guide (outside the mock desktop) ---------- */
 
-function Guide({ surface, anchor, motion, playing, onAnchor, onMotion, onPlay, onJump }: { surface: Surface; anchor: Anchor; motion: 'full' | 'reduced'; playing: boolean; onAnchor: (a: Anchor) => void; onMotion: (m: 'full' | 'reduced') => void; onPlay: () => void; onJump: (s: Surface) => void }) {
+function Guide({ surface, anchor, motion, playing, onAnchor, onMotion, onPlay, onJump, wall, onWall }: { surface: Surface; anchor: Anchor; motion: 'full' | 'reduced'; playing: boolean; onAnchor: (a: Anchor) => void; onMotion: (m: 'full' | 'reduced') => void; onPlay: () => void; onJump: (s: Surface) => void; wall: Wallpaper; onWall: (w: Wallpaper) => void }) {
   const order: Surface[] = ['rest', 'command', 'listening', 'acting', 'answer', 'utilities', 'customize', 'hub'];
   return (
     <aside className="guide" aria-label="Prototype guide">
@@ -1140,6 +1240,22 @@ function Guide({ surface, anchor, motion, playing, onAnchor, onMotion, onPlay, o
         </div>
       </div>
       <div className="g-row">
+        <span>Desktop</span>
+        <div className="seg seg-sm" role="radiogroup" aria-label="Mock desktop">
+          {(
+            [
+              ['dark', 'Dark'],
+              ['light', 'Light'],
+              ['busy', 'Busy'],
+            ] as const
+          ).map(([id, name]) => (
+            <button key={id} type="button" role="radio" aria-checked={wall === id} className={wall === id ? 'on' : undefined} onClick={() => onWall(id)}>
+              {name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="g-row">
         <span>Motion</span>
         <div className="seg seg-sm" role="radiogroup" aria-label="Motion">
           {(
@@ -1154,7 +1270,7 @@ function Guide({ surface, anchor, motion, playing, onAnchor, onMotion, onPlay, o
           ))}
         </div>
       </div>
-      <details className="truth" open>
+      <details className="truth">
         <summary>What is real here</summary>
         <ul>
           <li>The core is the app’s shared renderer and saved appearance.</li>

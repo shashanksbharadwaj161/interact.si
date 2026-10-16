@@ -25,8 +25,8 @@ export const INITIAL_TASKS: MockTask[] = [
 ];
 
 export type Scripted =
-  | { id: string; kind: 'answer'; label: string; prompt: string; title: string; text: string; basis: string }
-  | { id: string; kind: 'act'; label: string; prompt: string; tool: string; summary: string; fields: [string, string][]; risk: string; task: MockTask };
+  | { id: string; kind: 'answer'; label: string; prompt: string; title: string; text: string; basis: string; tone?: 'error' }
+  | { id: string; kind: 'act'; label: string; prompt: string; tool: string; summary: string; fields: [string, string][]; risk: string; task: MockTask; failure?: string };
 
 export const REQUESTS: Scripted[] = [
   {
@@ -52,6 +52,32 @@ export const REQUESTS: Scripted[] = [
     ],
     risk: 'Changes saved work. Shown first; you confirm.',
     task: { id: 't4', title: 'Call the bank', due: 'Tomorrow 10:00', tone: 'later', done: false, added: true },
+  },
+  {
+    id: 'move',
+    kind: 'act',
+    label: 'Put Terminal next to the Sheet (shows a failure)',
+    prompt: 'Put Terminal next to the Sheet',
+    tool: 'Move a window',
+    summary: 'Move the Terminal window beside Sheet on this display.',
+    fields: [
+      ['Window', 'Terminal'],
+      ['To', 'Right half of the display, beside Sheet'],
+      ['Undo', 'Moves it back'],
+    ],
+    risk: 'Changes window positions only. Shown first; you confirm.',
+    task: { id: 'none', title: '', due: '', tone: 'later', done: false },
+    failure: 'Terminal moved, but the check afterwards found it behind Sheet, not beside it. The companion reports the result it saw, not the one it hoped for. Nothing else was changed.',
+  },
+  {
+    id: 'mail',
+    kind: 'answer',
+    label: 'Email this draft to Priya (not connected)',
+    prompt: 'Email this draft to Priya',
+    title: 'Email is not connected',
+    text: 'Sending mail needs your own Google sign-in with send permission, and that connection is not built yet. Nothing was sent. You can copy the draft, or open it in your mail app yourself.',
+    basis: 'Abilities: Gmail · not connected',
+    tone: 'error',
   },
 ];
 
