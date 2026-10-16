@@ -9,7 +9,7 @@
 //   expires after five minutes. The renderer receives a small preview, never a path.
 // - Changing saved data goes through a trusted native confirmation owned by the island window (Cancel is the default);
 //   it fails closed when the island is not visible and focused.
-import {BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, screen, type IpcMainInvokeEvent, type NativeImage} from 'electron';
+import {BrowserWindow, desktopCapturer, dialog, globalShortcut, ipcMain, powerMonitor, screen, type IpcMainInvokeEvent, type NativeImage} from 'electron';
 import {randomUUID} from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -17,7 +17,7 @@ import * as path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import type {Backend, CompanionReadiness} from './backend';
 import type {AgentEvent} from './services/agent';
-import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, companionChannel, cropForSelection, isTrustedCompanionUrl, parseLayout, parseSelection, placeIsland, sendSize, type Anchor, type CompanionMethod, type Layout} from './companionCore';
+import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
 import {createTrustedConfirm, safeErrorMessage, validateArgsAgainst} from './ipcCore';
 
 export type CompanionDeps = {
@@ -31,15 +31,26 @@ export type CompanionDeps = {
 };
 
 export type MaterialState = {requested: 'none' | 'acrylic'; applied: boolean; note: string};
-export type CompanionStatus = {readiness: CompanionReadiness; anchor: Anchor; shortcut: string | null; material: MaterialState; platform: string};
+export type Appearance = 'pet' | 'legacy-orb';
+export type CompanionStatus = {readiness: CompanionReadiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock};
 
 const SHORTCUTS = ['Control+Shift+Space', 'Control+Alt+Space'] as const;
 const REGION_TTL_MS = 5 * 60 * 1000;
-const REST: Layout = {width: 196, height: 52, anchor: 'corner'};
+const DRAG_TICK_MS = 16;
+const DRAG_VELOCITY_MS = 66;
+const DRAG_MAX_MS = 20_000;
+/** A press that moves less than this is a click (opens the companion), not a drag. */
+const DRAG_CLICK_PX = 4;
+const GAZE_TICK_MS = 100;
+const GAZE_STALE_MS = 8000;
+/** Click-through with forwarded mouse moves exists only on Windows and macOS. */
+const CLICK_THROUGH = process.platform === 'win32' || process.platform === 'darwin';
+/** Non-activating windows (setFocusable) exist only on Windows and macOS. */
+const NO_ACTIVATE = process.platform === 'win32' || process.platform === 'darwin';
 
 type Region = {png: string; width: number; height: number; at: number};
 type Pending = {full: NativeImage; display: Electron.Display};
-type Prefs = {anchor: Anchor; material: 'none' | 'acrylic'};
+type Prefs = {point: Point | null; displayId: number | null; dock: Dock; size: number; appearance: Appearance; material: 'none' | 'acrylic'};
 
 /** Windows 11 22H2 (build 22621) and later document background materials; earlier builds get the solid look. */
 function materialSupported(): boolean {
@@ -53,11 +64,22 @@ export function createCompanion(deps: CompanionDeps) {
   const trusted = (url: string) => isTrustedCompanionUrl(url, fileUrl, deps.devOrigin);
   const prefsFile = path.join(deps.userData, 'companion.json');
   const prefs: Prefs = (() => {
+    const base: Prefs = {point: null, displayId: null, dock: 'bottom', size: PET_SIZE.default, appearance: 'pet', material: 'none'};
     try {
-      const raw = JSON.parse(fs.readFileSync(prefsFile, 'utf8')) as Partial<Prefs>;
-      return {anchor: raw.anchor === 'top' || raw.anchor === 'right' ? raw.anchor : 'corner', material: raw.material === 'acrylic' ? 'acrylic' : 'none'};
+      const raw = JSON.parse(fs.readFileSync(prefsFile, 'utf8')) as Record<string, unknown>;
+      const pt = raw.point as Record<string, unknown> | null | undefined;
+      const point = pt && typeof pt.x === 'number' && typeof pt.y === 'number' && Number.isFinite(pt.x) && Number.isFinite(pt.y) ? {x: pt.x, y: pt.y} : null;
+      const docks: Dock[] = ['free', 'bottom', 'top', 'left', 'right'];
+      return {
+        point,
+        displayId: typeof raw.displayId === 'number' ? raw.displayId : null,
+        dock: docks.includes(raw.dock as Dock) ? (raw.dock as Dock) : 'bottom',
+        size: typeof raw.size === 'number' && Number.isFinite(raw.size) ? clampSize(raw.size) : PET_SIZE.default,
+        appearance: raw.appearance === 'legacy-orb' ? 'legacy-orb' : 'pet',
+        material: raw.material === 'acrylic' ? 'acrylic' : 'none',
+      };
     } catch {
-      return {anchor: 'corner', material: 'none'};
+      return base;
     }
   })();
   const savePrefs = () => fs.promises.writeFile(prefsFile, JSON.stringify(prefs), 'utf8').catch(() => undefined);
@@ -66,9 +88,17 @@ export function createCompanion(deps: CompanionDeps) {
   let overlay: BrowserWindow | null = null;
   let pending: Pending | null = null;
   let run: AbortController | null = null;
-  let layout: Layout = {...REST, anchor: prefs.anchor};
+  let bubble: {width: number; height: number} | null = null;
+  let placement: PetPlacement | null = null;
+  let point: Point | null = null;
   let shortcut: string | null = null;
   let material: MaterialState = {requested: prefs.material, applied: false, note: 'Solid smoked surface.'};
+  let drag: {offset: Point; start: Point; moved: boolean; timer: ReturnType<typeof setInterval>; since: number; vAt: number; vFrom: Point; lastVx: number | null} | null = null;
+  let gazeWanted = false;
+  let gazeLocked = false;
+  let gazeTimer: ReturnType<typeof setInterval> | null = null;
+  let gaze: {bucket: number | null; last: Point | null; movedAt: number} = {bucket: null, last: null, movedAt: 0};
+  let interactive = !CLICK_THROUGH;
   const regions = new Map<string, Region>();
   const undoable = new Set<string>();
 
@@ -82,15 +112,122 @@ export function createCompanion(deps: CompanionDeps) {
     if (island && !island.isDestroyed()) island.webContents.send(COMPANION_EVENT_CHANNEL, e);
   };
 
-  const workArea = () => {
-    const at = island && !island.isDestroyed() ? island.getBounds() : null;
-    const d = at ? screen.getDisplayMatching(at) : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-    return d.workArea;
-  };
+  const alive = () => !!island && !island.isDestroyed();
+  const displayFor = (p: Point) => screen.getDisplayNearestPoint({x: Math.round(p.x), y: Math.round(p.y)});
+  /** The pet's ground point: saved, restored onto the nearest display, or docked bottom-right of the primary display. */
+  function currentPoint(): Point {
+    if (point) return point;
+    const saved = prefs.point;
+    if (saved) {
+      const d = screen.getAllDisplays().find((x) => x.id === prefs.displayId) ?? displayFor(saved);
+      point = clampPetPoint(saved, prefs.size, d.workArea);
+    } else {
+      point = dockPoint('bottom-right', prefs.size, screen.getPrimaryDisplay().workArea).point;
+    }
+    return point;
+  }
+  function remember(dock: Dock) {
+    const p = currentPoint();
+    prefs.point = p;
+    prefs.displayId = displayFor(p).id;
+    prefs.dock = dock;
+    void savePrefs();
+  }
+  /** Lays the window out around the pet and tells the page where the pet and the bubble are inside it. */
   const place = () => {
-    if (!island || island.isDestroyed()) return;
-    island.setBounds(placeIsland(workArea(), layout), false);
+    if (!alive()) return;
+    const p = currentPoint();
+    const work = displayFor(p).workArea;
+    point = clampPetPoint(p, prefs.size, work);
+    placement = placePet(point, prefs.size, bubble, work);
+    const b = island!.getBounds();
+    const w = placement.window;
+    if (b.x !== w.x || b.y !== w.y || b.width !== w.width || b.height !== w.height) island!.setBounds(w, false);
+    send({type: 'placement', ...placement, size: prefs.size, dock: prefs.dock});
   };
+  function setInteractive(on: boolean) {
+    if (!CLICK_THROUGH || !alive() || interactive === on) return;
+    interactive = on;
+    island!.setIgnoreMouseEvents(!on, {forward: true});
+  }
+  /** At rest the window never takes the keyboard: hovering or dragging the pet leaves focus where it was. */
+  function setRestFocus(rest: boolean) {
+    if (!NO_ACTIVATE || !alive()) return;
+    island!.setFocusable(!rest);
+  }
+  function invoke() {
+    if (!alive()) return;
+    setRestFocus(false);
+    if (!island!.isVisible()) island!.showInactive();
+    island!.show();
+    island!.focus();
+    send({type: 'invoke'});
+  }
+
+  function dragStart() {
+    if (!alive() || drag || overlay) return false;
+    const c = screen.getCursorScreenPoint();
+    const p = currentPoint();
+    const timer = setInterval(dragTick, DRAG_TICK_MS);
+    drag = {offset: {x: c.x - p.x, y: c.y - p.y}, start: c, moved: false, timer, since: Date.now(), vAt: Date.now(), vFrom: p, lastVx: null};
+    setInteractive(true);
+    return true;
+  }
+  function dragTick() {
+    if (!drag || !alive()) return;
+    if (Date.now() - drag.since > DRAG_MAX_MS) { dragEnd(); return; }
+    const c = screen.getCursorScreenPoint();
+    if (!drag.moved && Math.hypot(c.x - drag.start.x, c.y - drag.start.y) < DRAG_CLICK_PX) return;
+    drag.moved = true;
+    const target = {x: c.x - drag.offset.x, y: c.y - drag.offset.y};
+    point = clampPetPoint(target, prefs.size, displayFor(c).workArea);
+    place();
+    const now = Date.now();
+    if (now - drag.vAt >= DRAG_VELOCITY_MS) {
+      const vx = Math.round(((point.x - drag.vFrom.x) * 1000) / (now - drag.vAt));
+      drag.vAt = now;
+      drag.vFrom = point;
+      if (vx !== drag.lastVx) { drag.lastVx = vx; send({type: 'drag', vx}); }
+    }
+  }
+  function dragEnd(): {moved: boolean} {
+    if (!drag) return {moved: false};
+    clearInterval(drag.timer);
+    const moved = drag.moved;
+    drag = null;
+    send({type: 'drag', vx: null});
+    if (moved) {
+      const p = currentPoint();
+      const snapped = snapDock(p, prefs.size, displayFor(p).workArea);
+      point = snapped.point;
+      remember(snapped.dock);
+      place();
+    }
+    return {moved};
+  }
+
+  /* Local gaze: the cursor is read here and reduced to one of 16 look directions; positions never leave this process. */
+  function gazeTick() {
+    if (!alive() || !placement || drag) return;
+    const c = screen.getCursorScreenPoint();
+    const now = Date.now();
+    if (!gaze.last || gaze.last.x !== c.x || gaze.last.y !== c.y) { gaze.last = c; gaze.movedAt = now; }
+    const w = placement.window;
+    const pet = {x: w.x + placement.pet.x, y: w.y + placement.pet.y, width: placement.pet.width, height: placement.pet.height};
+    const bucket = now - gaze.movedAt > GAZE_STALE_MS ? null : gazeBucket(c, pet);
+    if (bucket !== gaze.bucket) { gaze.bucket = bucket; send({type: 'gaze', index: bucket}); }
+  }
+  function updateGaze() {
+    const on = gazeWanted && !gazeLocked && alive() && island!.isVisible();
+    if (on && !gazeTimer) gazeTimer = setInterval(gazeTick, GAZE_TICK_MS);
+    if (!on && gazeTimer) {
+      clearInterval(gazeTimer);
+      gazeTimer = null;
+      if (gaze.bucket !== null) { gaze.bucket = null; send({type: 'gaze', index: null}); }
+    }
+  }
+  const onLock = () => { gazeLocked = true; updateGaze(); };
+  const onUnlock = () => { gazeLocked = false; updateGaze(); };
 
   function applyMaterial(want: 'none' | 'acrylic') {
     prefs.material = want;
@@ -115,9 +252,9 @@ export function createCompanion(deps: CompanionDeps) {
 
   function createIsland() {
     const win = new BrowserWindow({
-      width: REST.width, height: REST.height, show: false, frame: false, transparent: true, backgroundColor: '#00000000',
+      width: 160, height: 160, show: false, frame: false, transparent: true, backgroundColor: '#00000000',
       resizable: false, minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, hasShadow: false,
-      alwaysOnTop: true, title: 'Desktop Companion',
+      alwaysOnTop: true, focusable: !NO_ACTIVATE, title: 'Desktop Companion',
       webPreferences: {
         preload: deps.preloadPath, contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true,
         nodeIntegrationInWorker: false, nodeIntegrationInSubFrames: false, allowRunningInsecureContent: false, spellcheck: false,
@@ -129,11 +266,26 @@ export function createCompanion(deps: CompanionDeps) {
     win.setAlwaysOnTop(true, 'floating');
     win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
     win.webContents.on('will-navigate', (e, url) => { if (!trusted(url)) e.preventDefault(); });
-    win.on('closed', () => { if (island === win) island = null; run?.abort(); });
-    // Rest: shown without taking focus, so the app the person is using keeps the keyboard.
-    win.once('ready-to-show', () => { place(); win.showInactive(); applyMaterial(prefs.material); });
+    win.on('closed', () => { if (island === win) island = null; run?.abort(); if (drag) dragEnd(); updateGaze(); });
+    win.on('show', updateGaze);
+    win.on('hide', updateGaze);
+    // Rest: shown without taking focus, so the app the person is using keeps the keyboard; transparent parts let clicks
+    // through to the desktop until the pointer is over the pet or the bubble.
+    win.once('ready-to-show', () => {
+      interactive = !CLICK_THROUGH;
+      if (CLICK_THROUGH) win.setIgnoreMouseEvents(true, {forward: true});
+      place();
+      win.showInactive();
+      applyMaterial(prefs.material);
+    });
     if (deps.devOrigin) void win.loadURL(`${deps.devOrigin}/companion.html`);
     else void win.loadFile(path.join(deps.distDir, 'companion.html'));
+  }
+
+  /** After the region picker closes, the open command surface gets the keyboard back (the person was typing in it). */
+  function refocus() {
+    if (!alive()) return;
+    if (bubble) { setRestFocus(false); island!.show(); island!.focus(); } else island!.showInactive();
   }
 
   function closeOverlay() {
@@ -181,7 +333,7 @@ export function createCompanion(deps: CompanionDeps) {
       if (overlay === ov) {
         overlay = null;
         pending = null;
-        island?.showInactive();
+        refocus();
         send({type: 'region-cancelled'});
       }
     });
@@ -217,7 +369,7 @@ export function createCompanion(deps: CompanionDeps) {
     overlay = null;
     pending = null;
     ov?.destroy();
-    if (island && !island.isDestroyed()) { island.show(); island.focus(); }
+    if (alive()) { setRestFocus(false); island!.show(); island!.focus(); }
     send({type: 'region', token, preview, width: out.width, height: out.height, sourceScale: display.scaleFactor});
     deps.record(`Screen region selected for the companion (${out.width}×${out.height} px; kept in memory for up to 5 minutes, sent only if you ask)`);
     return {ok: true as const};
@@ -251,7 +403,7 @@ export function createCompanion(deps: CompanionDeps) {
   }
 
   const handlers: Record<CompanionMethod, (...args: never[]) => Promise<unknown> | unknown> = {
-    companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), anchor: layout.anchor, shortcut, material, platform: process.platform}),
+    companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock}),
     companionAsk: (text: string, token?: string) => ask(text, token),
     companionCancel: () => { run?.abort(); return true; },
     companionUndo: async (id: string) => {
@@ -260,16 +412,41 @@ export function createCompanion(deps: CompanionDeps) {
       return deps.backend.companion.undo({kind: 'task', id, label: ''});
     },
     companionLayout: (raw: unknown) => {
-      const l = parseLayout(raw);
+      const l = parseBubbleLayout(raw);
       if (!l) throw new Error('Invalid layout');
-      const release = (raw as {release?: unknown}).release === true;
-      if (l.anchor !== prefs.anchor) { prefs.anchor = l.anchor; void savePrefs(); }
-      layout = l;
+      bubble = l.bubble;
       place();
-      // Collapsing gives the keyboard back: Windows activates the window the person was using before.
-      if (release && island && !island.isDestroyed() && island.isFocused()) island.blur();
+      // Closing the bubble gives the keyboard back: Windows activates the window the person was using before.
+      if (!bubble && alive()) {
+        if (island!.isFocused()) island!.blur();
+        setRestFocus(true);
+      }
       return true;
     },
+    companionDrag: (phase: 'start' | 'end') => {
+      if (phase === 'start') return {started: dragStart()};
+      const r = dragEnd();
+      // A press without movement is a click on the pet: open the companion (the person chose to give it the keyboard).
+      if (!r.moved) invoke();
+      return r;
+    },
+    companionHit: (over: boolean) => { if (!drag) setInteractive(over); return true; },
+    companionResize: (op: ResizeOp) => {
+      prefs.size = resizePet(prefs.size, op);
+      remember(prefs.dock);
+      place();
+      return prefs.size;
+    },
+    companionDock: (target: DockTarget) => {
+      const work = displayFor(currentPoint()).workArea;
+      const d = dockPoint(target, prefs.size, work);
+      point = d.point;
+      remember(d.dock);
+      place();
+      return d.dock;
+    },
+    companionGaze: (on: boolean) => { gazeWanted = on; updateGaze(); return true; },
+    companionSetAppearance: (a: Appearance) => { prefs.appearance = a; void savePrefs(); return a; },
     companionOpenHub: (view: string, item?: string) => {
       if (item !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(item)) throw new Error('Invalid item');
       deps.openHub(view, item);
@@ -280,7 +457,7 @@ export function createCompanion(deps: CompanionDeps) {
     regionDiscard: (token: string) => regions.delete(token),
     overlayImage: () => overlayImage(),
     overlaySubmit: (raw: unknown) => overlaySubmit(raw),
-    overlayCancel: () => { closeOverlay(); island?.showInactive(); send({type: 'region-cancelled'}); return true; },
+    overlayCancel: () => { closeOverlay(); refocus(); send({type: 'region-cancelled'}); return true; },
   };
 
   for (const method of COMPANION_METHODS) {
@@ -301,10 +478,9 @@ export function createCompanion(deps: CompanionDeps) {
   }
 
   function toggle() {
-    if (!island || island.isDestroyed()) { createIsland(); return; }
-    if (!island.isVisible()) island.showInactive();
-    if (island.isFocused()) send({type: 'collapse'});
-    else { island.show(); island.focus(); send({type: 'invoke'}); }
+    if (!alive()) { createIsland(); return; }
+    if (island!.isFocused()) send({type: 'collapse'});
+    else invoke();
   }
 
   function registerShortcut(): string | null {
@@ -316,6 +492,11 @@ export function createCompanion(deps: CompanionDeps) {
 
   function dispose() {
     run?.abort();
+    if (drag) { clearInterval(drag.timer); drag = null; }
+    gazeWanted = false;
+    if (gazeTimer) { clearInterval(gazeTimer); gazeTimer = null; }
+    powerMonitor.removeListener('lock-screen', onLock);
+    powerMonitor.removeListener('unlock-screen', onUnlock);
     closeOverlay();
     regions.clear();
     if (shortcut) globalShortcut.unregister(shortcut);
@@ -334,6 +515,8 @@ export function createCompanion(deps: CompanionDeps) {
     if (!shortcut) deps.record(`The companion shortcut could not be registered (${SHORTCUTS.join(', ')} are in use). Use the tray menu instead.`);
     screen.on('display-metrics-changed', place);
     screen.on('display-removed', place);
+    powerMonitor.on('lock-screen', onLock);
+    powerMonitor.on('unlock-screen', onUnlock);
   } catch (e) {
     try { dispose(); } catch { /* best effort */ }
     throw e;
@@ -341,7 +524,7 @@ export function createCompanion(deps: CompanionDeps) {
 
   return {
     toggle,
-    show: () => { if (!island || island.isDestroyed()) createIsland(); else island.showInactive(); },
+    show: () => { if (!alive()) createIsland(); else island!.showInactive(); },
     hide: () => island?.hide(),
     isVisible: () => !!island && !island.isDestroyed() && island.isVisible(),
     dispose,

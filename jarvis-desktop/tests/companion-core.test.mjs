@@ -76,47 +76,130 @@ test('companion arguments are checked before any handler runs', () => {
   assert.equal(check('companionOpenHub', ['notes', 'n_123']), null);
   assert.ok(check('companionSetMaterial', ['mica']));
   assert.ok(check('companionLayout', ['wide']));
+  assert.equal(check('companionDrag', ['start']), null);
+  assert.ok(check('companionDrag', ['move']), 'the page cannot send a position or a move step');
+  assert.ok(check('companionDrag', [{x: 1, y: 2}]));
+  assert.ok(check('companionHit', ['yes']));
+  assert.equal(check('companionHit', [true]), null);
+  assert.ok(check('companionResize', [200]), 'sizes are presets or steps, not numbers');
+  assert.ok(check('companionDock', ['center']));
+  assert.ok(check('companionGaze', [1]));
+  assert.ok(check('companionSetAppearance', ['orb']));
 });
 
-test('layout requests are validated and clamped, never trusted as given', () => {
-  assert.deepEqual(m.parseLayout({width: 440, height: 300, anchor: 'corner'}), {width: 440, height: 300, anchor: 'corner'});
-  assert.deepEqual(m.parseLayout({width: 99999, height: 1, anchor: 'top', release: true}), {width: m.LAYOUT_LIMITS.maxW, height: m.LAYOUT_LIMITS.minH, anchor: 'top'});
-  assert.equal(m.parseLayout({width: 400, height: 300, anchor: 'left'}), null);
-  assert.equal(m.parseLayout({width: Number.NaN, height: 300, anchor: 'corner'}), null);
-  assert.equal(m.parseLayout({width: 400, height: 300, anchor: 'corner', x: 0}), null, 'no position from the page');
-  assert.equal(m.parseLayout({width: 400, height: 300, anchor: 'corner', release: 'yes'}), null);
-  assert.equal(m.parseLayout([400, 300]), null);
+test('the page asks only for a bubble size, which is clamped; never a position', () => {
+  assert.deepEqual(m.parseBubbleLayout({bubble: {width: 440, height: 300}}), {bubble: {width: 440, height: 300}});
+  assert.deepEqual(m.parseBubbleLayout({bubble: null}), {bubble: null});
+  assert.deepEqual(m.parseBubbleLayout({bubble: {width: 99999, height: 1}}), {bubble: {width: m.BUBBLE_LIMITS.maxW, height: m.BUBBLE_LIMITS.minH}});
+  assert.equal(m.parseBubbleLayout({bubble: {width: 400, height: 300, x: 0}}), null, 'no position from the page');
+  assert.equal(m.parseBubbleLayout({bubble: {width: 400, height: 300}, x: 5}), null);
+  assert.equal(m.parseBubbleLayout({bubble: {width: Number.NaN, height: 300}}), null);
+  assert.equal(m.parseBubbleLayout({}), null);
+  assert.equal(m.parseBubbleLayout([400, 300]), null);
 });
 
-test('the island docks inside the work area on any display, including ones left of or above the primary', () => {
-  const M = m.LAYOUT_MARGIN;
-  const inside = (r, w) => r.x >= w.x && r.y >= w.y && r.x + r.width <= w.x + w.width && r.y + r.height <= w.y + w.height;
-  const works = [
-    {x: 0, y: 0, width: 1280, height: 680},
-    {x: -1920, y: 0, width: 1920, height: 1040},
-    {x: 2560, y: -300, width: 1536, height: 824},
-    {x: 0, y: 0, width: 300, height: 200},
-  ];
-  for (const work of works) {
-    for (const anchor of ['corner', 'top', 'right']) {
-      for (const size of [{width: 196, height: 52}, {width: 440, height: 420}, {width: 820, height: 680}]) {
-        const r = m.placeIsland(work, {...size, anchor});
-        assert.ok(inside(r, work), `${anchor} ${JSON.stringify(size)} on ${JSON.stringify(work)} → ${JSON.stringify(r)}`);
+const inside = (r, w) => r.x >= w.x && r.y >= w.y && r.x + r.width <= w.x + w.width && r.y + r.height <= w.y + w.height;
+const globalRect = (pl, r) => ({x: pl.window.x + r.x, y: pl.window.y + r.y, width: r.width, height: r.height});
+const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+const WORKS = [
+  {x: 0, y: 0, width: 1280, height: 680},
+  {x: -1920, y: 0, width: 1920, height: 1040},
+  {x: 2560, y: -300, width: 1536, height: 824},
+  {x: 0, y: 0, width: 520, height: 400},
+];
+
+test('the pet stands on its ground point, keeps the cell aspect and stays inside the work area', () => {
+  assert.deepEqual(m.petBox({x: 100, y: 500}, 96), {x: 56, y: 404, width: 89, height: 96});
+  assert.equal(m.petWidth(128), Math.round(128 * 192 / 208));
+  for (const work of WORKS) {
+    for (const p of [{x: -99999, y: -99999}, {x: 99999, y: 99999}, {x: work.x + 10, y: work.y + 10}]) {
+      for (const size of [64, 96, 128]) assert.ok(inside(m.petBox(m.clampPetPoint(p, size, work), size), work));
+    }
+  }
+  assert.equal(m.clampSize(10), 64);
+  assert.equal(m.clampSize(500), 128);
+  assert.equal(m.resizePet(96, 'grow'), 104);
+  assert.equal(m.resizePet(128, 'grow'), 128);
+  assert.equal(m.resizePet(64, 'shrink'), 64);
+  assert.equal(m.resizePet(100, 'S'), 64);
+  assert.equal(m.resizePet(64, 'L'), 128);
+});
+
+test('docking: presets land inside the work area, and a drag near an edge snaps to it (bottom wins)', () => {
+  for (const work of WORKS) {
+    for (const t of ['bottom-left', 'bottom-right', 'left', 'right', 'top']) {
+      for (const size of [64, 96, 128]) {
+        const d = m.dockPoint(t, size, work);
+        assert.ok(inside(m.petBox(d.point, size), work), `${t} ${size} ${JSON.stringify(work)}`);
       }
     }
   }
-  // The window never leaves the work area, so the island body sits max(inset, margin) from the docked edges.
-  const work = works[0];
-  const gap = Math.max(12, M);
-  const c = m.placeIsland(work, {width: 196, height: 52, anchor: 'corner'});
-  assert.deepEqual(c, {x: 1280 - 196 - M - gap, y: 680 - 52 - M - gap, width: 196 + 2 * M, height: 52 + 2 * M});
-  // Growing keeps the docked corner fixed.
-  const g = m.placeIsland(work, {width: 440, height: 420, anchor: 'corner'});
-  assert.equal(g.x + g.width - M, work.width - gap);
-  assert.equal(g.y + g.height - M, work.height - gap);
-  const t = m.placeIsland(work, {width: 440, height: 300, anchor: 'top'});
-  assert.equal(t.y + M, gap);
-  assert.equal(t.x + t.width / 2, 640);
+  const work = WORKS[0];
+  const br = m.dockPoint('bottom-right', 96, work);
+  assert.equal(br.dock, 'bottom');
+  assert.equal(br.point.y, work.height - m.DOCK_INSET);
+  assert.equal(m.petBox(br.point, 96).x + m.petWidth(96), work.width - m.DOCK_INSET);
+  // Dropped 20 px above the taskbar: snaps onto it.
+  const s1 = m.snapDock({x: 600, y: work.height - 20}, 96, work);
+  assert.deepEqual([s1.dock, s1.point.y], ['bottom', work.height - m.DOCK_INSET]);
+  // Bottom-left corner: bottom wins the tie.
+  assert.equal(m.snapDock({x: 40, y: work.height - 5}, 96, work).dock, 'bottom');
+  // Near the left edge only.
+  const s2 = m.snapDock({x: 70, y: 300}, 96, work);
+  assert.equal(s2.dock, 'left');
+  assert.equal(m.petBox(s2.point, 96).x, m.DOCK_INSET);
+  // In the middle: stays where dropped.
+  assert.deepEqual(m.snapDock({x: 640, y: 400}, 96, work), {point: {x: 640, y: 400}, dock: 'free'});
+});
+
+test('the bubble sits beside the pet facing the middle of the screen, never covers it, and the pet never moves for it', () => {
+  for (const work of WORKS) {
+    for (const t of ['bottom-left', 'bottom-right', 'left', 'right', 'top']) {
+      for (const bubble of [null, {width: 200, height: 52}, {width: 440, height: 420}, {width: 520, height: 620}]) {
+        const {point} = m.dockPoint(t, 96, work);
+        const pl = m.placePet(point, 96, bubble, work);
+        const pet = globalRect(pl, pl.pet);
+        assert.deepEqual(pet, m.petBox(point, 96), 'the pet stays on its ground point');
+        assert.ok(inside(pl.window, work), `window inside: ${t} ${JSON.stringify(bubble)} ${JSON.stringify(work)}`);
+        assert.ok(inside(pet, pl.window));
+        if (bubble) {
+          const b = globalRect(pl, pl.bubble);
+          assert.ok(inside(b, work) && inside(b, pl.window));
+          // When the screen can hold both side by side or stacked, the bubble never covers the pet.
+          const room = bubble.width + m.petWidth(96) + 8 <= work.width || bubble.height + 96 + 8 <= work.height;
+          if (room) assert.ok(!overlaps(b, pet), `bubble does not cover the pet: ${t} ${JSON.stringify(bubble)} ${JSON.stringify(work)}`);
+          else assert.ok(b.height < bubble.height || !overlaps(b, pet), 'too small for both: the bubble is cut, not laid over the pet');
+        } else {
+          assert.equal(pl.bubble, null);
+        }
+      }
+    }
+  }
+  const work = WORKS[0];
+  const right = m.placePet(m.dockPoint('bottom-right', 96, work).point, 96, {width: 440, height: 300}, work);
+  assert.equal(right.side, 'left', 'pet at the right edge: bubble opens towards the middle');
+  const left = m.placePet(m.dockPoint('bottom-left', 96, work).point, 96, {width: 440, height: 300}, work);
+  assert.equal(left.side, 'right');
+  const narrow = m.placePet(m.dockPoint('bottom-right', 96, WORKS[3]).point, 96, {width: 520, height: 200}, WORKS[3]);
+  assert.equal(narrow.side, 'above', 'no room beside: above');
+  const top = m.placePet(m.dockPoint('top', 96, {x: 0, y: 0, width: 520, height: 680}).point, 96, {width: 520, height: 200}, {x: 0, y: 0, width: 520, height: 680});
+  assert.equal(top.side, 'below', 'docked at the top with no room beside: below');
+  // Rest window is just the pet plus the shadow margin.
+  const rest = m.placePet({x: 640, y: 400}, 96, null, work);
+  assert.deepEqual([rest.window.width, rest.window.height], [m.petWidth(96) + 2 * m.LAYOUT_MARGIN, 96 + 2 * m.LAYOUT_MARGIN]);
+});
+
+test('gaze is one of 16 clockwise look directions from the head, null inside the pet', () => {
+  const pet = {x: 100, y: 100, width: 89, height: 96};
+  const hx = 100 + 89 / 2, hy = 100 + 96 * 0.35;
+  assert.equal(m.gazeBucket({x: hx, y: hy - 300}, pet), 0, 'up');
+  assert.equal(m.gazeBucket({x: hx + 300, y: hy}, pet), 4, 'screen-right is 090');
+  assert.equal(m.gazeBucket({x: hx, y: hy + 300}, pet), 8, 'down is 180');
+  assert.equal(m.gazeBucket({x: hx - 300, y: hy}, pet), 12, 'screen-left is 270');
+  assert.equal(m.gazeBucket({x: hx + 300, y: hy - 300}, pet), 2, 'up-right is 045');
+  assert.equal(m.gazeBucket({x: hx - 300, y: hy - 300}, pet), 14, 'up-left is 315');
+  assert.equal(m.gazeBucket({x: hx - 10, y: hy - 300}, pet), 0, 'slightly left of up rounds to 000, not 337.5');
+  assert.equal(m.gazeBucket({x: 120, y: 150}, pet), null, 'inside the pet: deadzone');
 });
 
 test('selections are clipped to the display and tiny ones are refused', () => {

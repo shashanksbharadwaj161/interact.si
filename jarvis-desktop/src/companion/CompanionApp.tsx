@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode} from 'react';
 import {CompanionOrb} from '../components/CompanionOrb';
 import type {CompanionState} from '../ui/appearance';
-import {companionApi, type AgentEvent, type Anchor, type CompanionPush, type CompanionStatus, type RegionEvent} from './api';
+import {companionApi, type AgentEvent, type CompanionPush, type CompanionStatus, type RegionEvent} from './api';
 
 /*
  * The desktop companion island (production). One element docked to a screen edge that opens into a command surface,
@@ -37,7 +37,7 @@ export function CompanionApp() {
   const runRef = useRef<string | null>(null);
   const starting = useRef(false);
   const early = useRef<Extract<CompanionPush, {runId: string}>[]>([]);
-  const anchor: Anchor = status?.anchor ?? 'corner';
+  const anchor = 'corner';
 
   const refresh = useCallback(() => {
     void api?.state().then(setStatus).catch(() => undefined);
@@ -203,7 +203,7 @@ function useDoneFlash(key: number): boolean {
  * window is enlarged first and the island springs open inside it; shrinking, the island closes first and the window
  * follows after the transition, so the edge light and shadow are never clipped.
  */
-function Island({surface, anchor, edge, doneKey, onOpen, label, core, children}: {surface: Surface; anchor: Anchor; edge: Edge; doneKey: number; onOpen: () => void; label: string; core: ReactNode; children: ReactNode}) {
+function Island({surface, anchor, edge, doneKey, onOpen, label, core, children}: {surface: Surface; anchor: string; edge: Edge; doneKey: number; onOpen: () => void; label: string; core: ReactNode; children: ReactNode}) {
   const api = companionApi();
   const panel = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState(REST_SIZE);
@@ -224,10 +224,10 @@ function Island({surface, anchor, edge, doneKey, onOpen, label, core, children}:
     const release = surface === 'rest';
     const grows = size.width > prev.width || size.height > prev.height;
     if (grows || reducedMotion()) {
-      void api.layout({...size, anchor, release});
+      void api.layout({bubble: release ? null : size});
       return undefined;
     }
-    const id = window.setTimeout(() => void api.layout({...size, anchor, release}), COLLAPSE_MS);
+    const id = window.setTimeout(() => void api.layout({bubble: release ? null : size}), COLLAPSE_MS);
     return () => window.clearTimeout(id);
   }, [api, size, anchor, surface]);
   const rest = surface === 'rest';
