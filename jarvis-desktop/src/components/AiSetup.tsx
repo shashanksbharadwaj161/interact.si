@@ -282,6 +282,11 @@ export function AiSetup({ onDone, onSkip }: { onDone: (r: AiSetupResult) => void
             {provider === 'anthropic' ? ' You can create one in the Anthropic Console under API keys.' : ''}
           </p>
           {st?.keyChannel === 'unavailable' && <Notice tone="warn">{st.reason ?? 'Keys for this provider cannot be saved in this build.'}</Notice>}
+          {isPreview && (
+            <Notice title="Key entry is off in the browser preview">
+              This page is running in a browser, not the desktop app. A key can only be saved in the desktop app, where Windows protection keeps it out of this window's storage. Nothing typed here is stored or sent, and no model list or test request is possible from the preview.
+            </Notice>
+          )}
           <form
             className="row wrap align-end"
             onSubmit={(e) => {

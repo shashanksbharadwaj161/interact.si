@@ -154,5 +154,5 @@ test('profiles: Settings wires the Personal profiles section, search entry, save
   // The active marker only moves after a successful save.
   const sw = s.slice(s.indexOf('const switchTo'), s.indexOf('const doRename'));
   assert.ok(sw.indexOf('if (failure)') < sw.indexOf('setActiveProfile'));
-  assert.match(sw, /return;\n\s*\}\n\s*commit\(\(s\) => setActiveProfile/);
+  assert.match(sw, /return;\r?\n\s*\}\r?\n\s*commit\(\(s\) => setActiveProfile/);
 });

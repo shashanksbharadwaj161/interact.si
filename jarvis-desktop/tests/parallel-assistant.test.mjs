@@ -343,7 +343,7 @@ const src = readFileSync(path.join(root, 'src/components/Assistant.tsx'), 'utf8'
 test('wiring: one synchronous send lock, a stream sequence guard, Esc to stop and a stop watchdog are in place', () => {
   assert.match(src, /const sendLock = useRef\(false\)/);
   assert.match(src, /if \(!text \|\| sendLock\.current \|\| pending !== null \|\| live !== null \|\| settling/, 'a second send in the same tick is refused before any state update lands');
-  assert.match(src, /sendLock\.current = true;\n/);
+  assert.match(src, /sendLock\.current = true;\r?\n/);
   assert.equal((src.match(/sendLock\.current = false/g) ?? []).length >= 3, true, 'the lock is released on every exit path (error, finally, finish)');
   assert.match(src, /seq !== streamSeq\.current/, 'late events and late finishes from an older stream are dropped');
   assert.match(src, /e\.key === 'Escape' && liveRef\.current/);

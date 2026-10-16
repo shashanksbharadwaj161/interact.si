@@ -701,3 +701,29 @@
     padding-inline: var(--s4);
   }
 }
+
+/* The conversation fills the window: the view gets a definite height so the log scrolls and the composer stays in view. */
+.view:has(> .assistant) {
+  height: 100%;
+}
+
+/* Short windows (1280×720 and below): a smaller empty state so the composer is never pushed out of sight. */
+@media (max-height: 760px) {
+  .assist-head {
+    padding-top: var(--s4);
+    padding-bottom: var(--s2);
+  }
+
+  .chat-empty {
+    gap: var(--s2);
+    padding: var(--s2) 0;
+  }
+
+  .chat-empty .core-frame {
+    display: none;
+  }
+
+  .chat-empty h2 {
+    font-size: 24px;
+  }
+}
