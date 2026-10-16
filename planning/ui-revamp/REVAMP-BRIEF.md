@@ -1,5 +1,7 @@
 # Full product UI/UX revamp
 
+**Latest owner revision:** Read `CYBERPUNK-DIRECTION.md` first. It supersedes the Porcelain/Ink visual direction and the local-model/offline-AI onboarding below. Current target: cinematic cyberpunk, distinctive typography and rich motion throughout; Claude API primary, no local-model setup in the normal product flow. Keep the route, data, workflow and security requirements below unless explicitly superseded.
+
 16 October 2026. Latest user instruction supersedes the old stopped-development handoff for this specific work. Implement in `jarvis-desktop/` in this repository, using Claude Code's existing session. Keep the paid API Control Room and historical loops stopped. No purchases, payment changes, API worker launches, or additional usage-credit activation. Do not edit the old worker snapshots.
 
 ## The problem and the requested result
