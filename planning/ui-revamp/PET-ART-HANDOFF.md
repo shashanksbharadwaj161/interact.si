@@ -19,6 +19,21 @@
 - **The app shows an explicit missing-art state.** No drawn stand-in is used.
 - **The three concept directions are briefs.** They are written as prompts for an image model, in `PET-CONCEPTS.md`.
 
+## Exact paths and files Codex should write
+
+| What | Path (repository root `interact.si/`) |
+|---|---|
+| Base variants, raw and unedited | `planning/ui-revamp/pet-art/direction-a/base/variant-1.png`, and so on; the same layout for `direction-b`, `direction-c` |
+| Prompt and job record | `planning/ui-revamp/pet-art/<direction>/base/prompt.txt`, `job.json` |
+| Read test | `planning/ui-revamp/pet-art/<direction>/base/read-test.png` |
+| (after owner pick) all production artefacts | `planning/ui-revamp/pet-art/<id>/{rows,frames,qa,previews,final}/` |
+| Final pack for the app | `jarvis-desktop/assets/pets/<id>/pet.json` and `jarvis-desktop/assets/pets/<id>/spritesheet.webp` (or `.png`) |
+| Bundled scripts (if added to the repo) | `tools/create-pet/scripts/*.py` with the bundle's licence, unchanged |
+
+`job.json` fields: `{"tool": "...", "model": "...", "size": "WxH", "seed": null, "chromaKey": "#FF00FF", "date": "YYYY-MM-DD", "promptFile": "prompt.txt", "direction": "A"}`.
+
+The `pet.json` template is in `PET-RENDERER-PLAN.md` §2. The app's parser rejects unknown keys, so copy the template exactly.
+
 ## (b) What we need from Codex, in this order
 
 ### Step 1: canonical bases only, for owner review
