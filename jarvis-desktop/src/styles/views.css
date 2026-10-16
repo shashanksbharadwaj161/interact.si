@@ -787,3 +787,46 @@
     flex-wrap: wrap;
   }
 }
+
+/* Task rows carry a due badge, reminder snoozes and actions; the title keeps at least 200px and the controls wrap below. */
+.task-row {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.task-row .task-title {
+  flex: 1 1 200px;
+}
+
+/* Settings search: the clear button sits inside the field, which keeps one readable width. */
+.settings-search .search-wide {
+  max-width: 440px;
+}
+
+/* Usage summary: label above a mono value, laid out as a row of readouts. */
+.usage-kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--s3) var(--s5);
+}
+
+.usage-kv > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--s3);
+  border-left: 1px solid var(--line-strong);
+}
+
+.usage-kv dt {
+  color: var(--muted);
+  font: 600 11.5px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.usage-kv dd {
+  color: var(--ink);
+  font: 500 20px / 1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

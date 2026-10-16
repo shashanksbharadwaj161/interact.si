@@ -347,6 +347,24 @@
   border-bottom: 1px solid var(--line);
 }
 
+.area-solo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  min-height: 45px;
+  padding-bottom: 12px;
+  padding-top: 18px;
+}
+
+.area-solo .hud {
+  color: var(--energy);
+}
+
+.area-blurb {
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+
 .area-tabs .tab {
   padding: 10px 12px 12px;
   text-transform: uppercase;

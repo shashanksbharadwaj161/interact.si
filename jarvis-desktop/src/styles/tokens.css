@@ -109,6 +109,7 @@
   --surface-2: #131c27;
   --elevated: #17212d;
   --sunken: #060910;
+  --field: #060910;
   --hover: #1a2532;
   --line: #1d2a38;
   --line-strong: #2a3b4e;
@@ -167,6 +168,7 @@
   --surface-2: #eef3f6;
   --elevated: #ffffff;
   --sunken: #d9e0e6;
+  --field: #f8fafb;
   --hover: #e2e9ee;
   --line: #ccd6de;
   --line-strong: #b4c2cd;

@@ -235,7 +235,7 @@ textarea.input {
   min-height: 40px;
   padding: 8px 12px;
   color: var(--ink);
-  background: var(--sunken);
+  background: var(--field);
   border: 1px solid var(--field-line);
   border-radius: var(--r-ctl) 0 var(--r-ctl) var(--r-ctl);
   font: inherit;
@@ -382,4 +382,29 @@ pre {
 
 details > summary {
   cursor: pointer;
+}
+
+/* The native file picker button, in the same cut style as the app's buttons. */
+input[type="file"] {
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--t-small);
+}
+
+input[type="file"]::file-selector-button {
+  margin-right: var(--s3);
+  padding: 6px 14px;
+  color: var(--ink);
+  background: var(--elevated);
+  border: 1px solid var(--line-strong);
+  font: 600 var(--t-meta) var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+
+input[type="file"]::file-selector-button:hover {
+  color: var(--energy);
+  border-color: var(--energy-line);
 }

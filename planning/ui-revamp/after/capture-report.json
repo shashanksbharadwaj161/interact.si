@@ -1,0 +1,746 @@
+[
+  {
+    "file": "onboarding-welcome-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "onboarding-welcome-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "onboarding-welcome-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "onboarding-welcome-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "onboarding-welcome-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "onboarding-welcome-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-empty-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-empty-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-empty-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-empty-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-populated-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-populated-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-populated-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-populated-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-populated-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-populated-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-ai-blocked-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-ai-blocked-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-ai-blocked-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-ai-blocked-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-ai-blocked-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "today-ai-blocked-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-empty-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-empty-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-empty-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-empty-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-blocked-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-blocked-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-blocked-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-blocked-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-blocked-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-blocked-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "studio-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "studio-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "studio-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "studio-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "studio-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "studio-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "check-failed-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "check-failed-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "check-failed-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "check-failed-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "check-failed-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "check-failed-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "preview-bridge-today-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "preview-bridge-today-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "preview-bridge-today-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "preview-bridge-today-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "preview-bridge-today-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "preview-bridge-today-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-connected-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-connected-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-connected-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-connected-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-connected-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "settings-ai-connected-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-setup-dialog-1280x720-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-setup-dialog-1280x720-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-setup-dialog-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-setup-dialog-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-setup-dialog-1440x900-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "assistant-setup-dialog-1440x900-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-companion-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-companion-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-capsules-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-capsules-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-notes-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-notes-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-tasks-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-tasks-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-computer-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-computer-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-status-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-status-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-lab-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-lab-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-developer-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-developer-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-search-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-search-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-motion-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-motion-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-avatar-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-avatar-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-routines-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-routines-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-clipboard-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-clipboard-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-calendar-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-calendar-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-models-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-models-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-integrations-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-integrations-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-usage-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-usage-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-memory-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-memory-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-writing-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-writing-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-guide-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-guide-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-notes-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-notes-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-tasks-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-tasks-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-capsules-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-capsules-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-routines-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-routines-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-clipboard-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-clipboard-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-calendar-empty-1366x768-light.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  },
+  {
+    "file": "route-calendar-empty-1366x768-dark.jpg",
+    "errors": [],
+    "external": [],
+    "overflowX": false
+  }
+]

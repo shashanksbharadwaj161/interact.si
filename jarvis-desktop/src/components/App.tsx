@@ -489,7 +489,15 @@ function RailLink({ area, view, go }: { area: AreaDef; view: ViewId; go: Go }) {
 /** Contextual screens of the current area. Advanced screens sit after a quiet divider. */
 function AreaTabs({ area, view, go }: { area: AreaDef; view: ViewId; go: Go }) {
   const [ref, box] = useIndicator<HTMLElement>('.tab[aria-current="page"]', `${area.id}:${view}`);
-  if (area.views.length < 2) return null;
+  // A single-screen area keeps the same band, with its name and what it is for, so every page starts at the same height.
+  if (area.views.length < 2) {
+    return (
+      <div className="area-tabs area-solo">
+        <span className="hud">{area.label}</span>
+        <span className="area-blurb">{area.blurb}</span>
+      </div>
+    );
+  }
   const defs = area.views.map(viewById);
   const main = defs.filter((v) => !v.advanced);
   const advanced = defs.filter((v) => v.advanced);

@@ -4,7 +4,7 @@
 // they do not prove motion, native Windows behaviour or the installed app.
 //
 // Usage: npm run build (or npx vite build) first, then
-//   node scripts/ui-review.mjs --out=../planning/ui-revamp/after [--only=today,assistant] [--sizes=1280x720,1440x900]
+//   node scripts/ui-review.mjs --out=../planning/ui-revamp/after [--only=today-empty,studio] [--sizes=1280x720,1440x900] [--format=png]
 // Playwright is resolved from PLAYWRIGHT_MODULE, then the local package, then a global install.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -102,7 +102,16 @@ const SCENARIOS = [
   { name: 'studio', hash: '#/companion', fixture: { seed: 'populated' } },
   { name: 'check-failed', hash: '#/home', fixture: { seed: 'populated', systemError: 'System information is unavailable.' } },
   { name: 'preview-bridge-today', hash: '#/home', fixture: null },
+  { name: 'settings-ai', hash: '#/settings?q=claude', fixture: { seed: 'populated', chat: 'unavailable' } },
+  { name: 'settings-ai-connected', hash: '#/settings?q=claude', fixture: { seed: 'populated' } },
+  { name: 'assistant-setup-dialog', hash: '#/assistant?setup=1', fixture: { seed: 'populated', chat: 'unavailable' } },
 ];
+
+// Every other route, populated, at one laptop size: composition evidence that the whole app shares the system.
+const ROUTE_IDS = ['companion', 'capsules', 'notes', 'tasks', 'computer', 'status', 'lab', 'developer', 'search', 'motion', 'avatar', 'routines', 'clipboard', 'calendar', 'models', 'integrations', 'usage', 'memory', 'writing', 'guide'];
+for (const id of ROUTE_IDS) SCENARIOS.push({ name: `route-${id}`, hash: `#/${id}`, fixture: { seed: 'populated' }, sizes: [[1366, 768]] });
+for (const id of ['notes', 'tasks', 'capsules', 'routines', 'clipboard', 'calendar']) SCENARIOS.push({ name: `route-${id}-empty`, hash: `#/${id}`, fixture: { seed: 'empty' }, sizes: [[1366, 768]] });
+const format = arg('format', 'jpeg');
 
 async function main() {
   const { chromium } = await loadPlaywright();
@@ -112,14 +121,14 @@ async function main() {
   const report = [];
   try {
     for (const sc of SCENARIOS.filter((s) => !only.length || only.includes(s.name))) {
-      for (const [width, height] of sizes) {
+      for (const [width, height] of sc.sizes ?? sizes) {
         for (const theme of themes) {
           const { context, page, errors, external } = await openPage(browser, origin, { width, height, theme, fixture: sc.fixture, prefs: { 'appearance.theme': theme, ...(sc.prefs ?? {}) }, hash: sc.hash });
           if (sc.act) await sc.act(page);
           await page.waitForTimeout(500);
           const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
-          const file = `${sc.name}-${width}x${height}-${theme}.png`;
-          await page.screenshot({ path: path.join(out, file) });
+          const file = `${sc.name}-${width}x${height}-${theme}.${format === 'png' ? 'png' : 'jpg'}`;
+          await page.screenshot({ path: path.join(out, file), ...(format === 'png' ? {} : { type: 'jpeg', quality: 80 }) });
           report.push({ file, errors, external, overflowX });
           await context.close();
         }
