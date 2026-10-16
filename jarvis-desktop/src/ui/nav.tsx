@@ -50,11 +50,11 @@ const CompanionIcon = Phosphor.Circle as NavIcon;
 export const AREAS: AreaDef[] = [
   { id: 'today', label: 'Today', icon: House, blurb: 'Start something or pick up where you left off.', views: ['home'] },
   { id: 'assistant', label: 'Assistant', icon: ChatCircleDots, blurb: 'Ask, talk and review actions on this computer.', views: ['assistant', 'computer'] },
-  { id: 'workspace', label: 'Workspace', icon: WorkspaceIcon, blurb: 'Notes, writing, tasks, calendar, setups and clipboard.', views: ['notes', 'writing', 'tasks', 'calendar', 'capsules', 'clipboard'] },
+  { id: 'workspace', label: 'Workspace', icon: WorkspaceIcon, blurb: 'Notes, writing, tasks, calendar, capsules and clipboard.', views: ['notes', 'writing', 'tasks', 'calendar', 'capsules', 'clipboard'] },
   { id: 'memory', label: 'Memory', icon: ArchiveIcon, blurb: 'Search everything saved here and choose what is remembered.', views: ['search', 'memory'] },
   { id: 'automations', label: 'Automations', icon: AutomationsIcon, blurb: 'Routines you run by hand or on a schedule.', views: ['routines'] },
   { id: 'studio', label: 'Studio', icon: StudioIcon, blurb: 'Choose how your companion looks and moves.', views: ['companion', 'avatar', 'motion'] },
-  { id: 'settings', label: 'Settings', icon: GearSix, blurb: 'Preferences, AI, connections, help and diagnostics.', views: ['settings', 'integrations', 'models', 'usage', 'guide', 'status', 'developer', 'lab'], footer: true },
+  { id: 'settings', label: 'Settings', icon: GearSix, blurb: 'Preferences, AI, connections, help and diagnostics.', views: ['settings', 'integrations', 'usage', 'guide', 'status', 'models', 'developer', 'lab'], footer: true },
 ];
 
 const AREA_OF = new Map<ViewId, AreaDef>(AREAS.flatMap((a) => a.views.map((v) => [v, a] as const)));
@@ -71,9 +71,9 @@ const view = (v: Base): ViewDef => {
  */
 export const VIEWS: ViewDef[] = [
   view({ id: 'home', label: 'Today', icon: House, blurb: 'Start something useful or continue recent work.' }),
-  view({ id: 'assistant', label: 'Assistant', icon: ChatCircleDots, blurb: 'Chat with your local or cloud model, or speak to it.' }),
+  view({ id: 'assistant', label: 'Assistant', icon: ChatCircleDots, blurb: 'Chat with Claude through your own key, or speak to it.' }),
   view({ id: 'companion', label: 'Companion', icon: CompanionIcon, blurb: 'Choose the companion shown across the app.' }),
-  view({ id: 'capsules', label: 'Setups', icon: Cube, blurb: 'Files, folders, apps and links you open together.' }),
+  view({ id: 'capsules', label: 'Capsules', icon: Cube, blurb: 'Files, folders, apps and links you open together.' }),
   view({ id: 'notes', label: 'Notes', icon: Note, blurb: 'Notes with tags, kept on this computer.' }),
   view({ id: 'tasks', label: 'Tasks', icon: CheckSquare, blurb: 'To-dos with due dates and a focus timer.' }),
   view({ id: 'computer', label: 'Desktop actions', icon: Desktop, blurb: 'Preview an action on this computer, then approve it.' }),
@@ -81,13 +81,13 @@ export const VIEWS: ViewDef[] = [
   view({ id: 'settings', label: 'Settings', icon: GearSix, blurb: 'Appearance, AI, privacy, data and startup.' }),
   view({ id: 'lab', label: 'Roadmap', icon: Flask, blurb: 'Which planned features are built, partial or not started.', advanced: true }),
   view({ id: 'developer', label: 'Developer', icon: Code, blurb: 'Diagnostics, logs and the shortcut reference.', advanced: true }),
-  view({ id: 'search', label: 'Search', icon: SearchIcon, blurb: 'Find anything saved: notes, tasks, setups and chat.', shortcut: 'Ctrl+K' }),
+  view({ id: 'search', label: 'Search', icon: SearchIcon, blurb: 'Find anything saved: notes, tasks, capsules and chat.', shortcut: 'Ctrl+K' }),
   view({ id: 'motion', label: 'Motion studio', icon: MotionIcon, blurb: 'Original wave, particle and 3D scenes with presets.' }),
   view({ id: 'avatar', label: 'Character editor', icon: AvatarIcon, blurb: 'Edit the classic character pack: shape, expressions and timelines.' }),
   view({ id: 'routines', label: 'Automations', icon: RoutinesIcon, blurb: 'Saved steps you review and run by hand or on a schedule.' }),
   view({ id: 'clipboard', label: 'Clipboard', icon: ClipboardIcon, blurb: 'Opt-in history of copied text, kept on this computer.' }),
   view({ id: 'calendar', label: 'Calendar', icon: CalendarIcon, blurb: 'Events imported from a local .ics file.' }),
-  view({ id: 'models', label: 'Local models', icon: ModelsIcon, blurb: 'Models installed in Ollama on this computer.' }),
+  view({ id: 'models', label: 'Local models', icon: ModelsIcon, blurb: 'Legacy: models in a local server from earlier versions.', advanced: true }),
   view({ id: 'integrations', label: 'Connections', icon: IntegrationsIcon, blurb: 'AI providers, accounts and devices you connect yourself.' }),
   view({ id: 'usage', label: 'Usage', icon: UsageIcon, blurb: 'Tokens and estimated spend recorded on this computer.' }),
   view({ id: 'memory', label: 'Memory', icon: MemoryIcon, blurb: 'Projects, checkpoints, the shelf and opt-in history.' }),

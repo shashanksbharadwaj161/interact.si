@@ -40,14 +40,14 @@ const FAMILY_BY_ID: Record<string, ProviderFamily> = {
 
 export const FAMILY_INFO: Record<ProviderFamily, { label: string; note: string; app?: { exe: string; label: string } }> = {
   claude: { label: 'Claude', note: 'Chat inside this app uses your own Anthropic API key. A Claude.ai plan is a separate website login.' },
-  chatgpt: { label: 'ChatGPT', note: 'Only a connection check with your own OpenAI API key exists; chat through OpenAI is not built. ChatGPT itself is a website.' },
+  chatgpt: { label: 'ChatGPT', note: 'Chat through OpenAI works with your own OpenAI API key, chosen in Settings › AI. A ChatGPT Plus or Pro subscription is not an API key, and ChatGPT itself is a website.' },
   spotify: { label: 'Spotify', note: 'Opening a link or starting the Spotify app is not an account connection. Playback control needs a Spotify sign-in that does not exist yet.', app: { exe: 'Spotify.exe', label: 'Start the Spotify app' } },
   browser: { label: 'Browser', note: 'Links open in your default browser after approval. Tabs, history and pages are never read.' },
-  local: { label: 'Local model', note: 'Runs on this computer through Ollama. Works offline; nothing leaves the device.' },
+  local: { label: 'Legacy local model', note: 'Only for setups from earlier versions that answer through a local Ollama server. Claude does not need it. Nothing leaves the device.' },
   other: { label: 'Other', note: 'Roadmap connectors, feeds and local tools.' },
 };
 
-export const FAMILY_ORDER: readonly ProviderFamily[] = ['local', 'claude', 'chatgpt', 'spotify', 'browser', 'other'];
+export const FAMILY_ORDER: readonly ProviderFamily[] = ['claude', 'chatgpt', 'spotify', 'browser', 'local', 'other'];
 
 export function familyOf(d: IntegrationDefinition): ProviderFamily {
   return FAMILY_BY_ID[d.id] ?? 'other';
@@ -149,7 +149,7 @@ export function IntegrationsPanel({ mode, bridge, previewAction, executeAction, 
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Connections" title="Integrations" subtitle="Optional providers and shortcuts. Each item says whether it is a real API connection, a website you open, or not available yet." />
+      <PageHeader eyebrow="Connections" title="Connections" subtitle="AI providers and shortcuts you connect yourself. Each item says whether it is a real API connection, a website you open, or not available yet." />
 
       <Notice title="Websites are not integrations">
         Opening Claude, ChatGPT or Spotify only hands a link to your browser after you approve it. There is no OAuth or account sign-in: the app does not read the page or control playback. API connections use a developer key you own (a subscription is not a key), stay off until you turn them on, and run only in online mode after a confirmation that lists what leaves this computer.

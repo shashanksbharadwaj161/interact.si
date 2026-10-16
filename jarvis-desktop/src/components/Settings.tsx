@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { ArrowCounterClockwise, DownloadSimple, Export, FloppyDisk, Key, MagnifyingGlass, Trash, UploadSimple, WifiHigh, WifiSlash, X } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, Plugs, DownloadSimple, Export, FloppyDisk, Key, MagnifyingGlass, Trash, UploadSimple, WifiHigh, WifiSlash, X } from '@phosphor-icons/react';
 import type { CloudProvider, CloudProviderStatus, Mode, Settings as SettingsT } from '../shared/contracts';
 import { CLOUD_PROVIDERS, DEFAULT_CLOUD_PROVIDER, cloudProviderInfo, effectiveCloudModel, isCloudProvider } from '../shared/contracts';
 import '../styles/cloud-providers.css';
 import { PathListEditor } from './shared';
-import { ModelReadinessNotice, cloudModelError, localEndpointError, localModelError, modelReadiness, useModelCheck, type ModelReadiness } from './Onboarding';
-import { ConfirmDialog } from '../ui/Dialog';
+import { ModelReadinessNotice, cloudModelError, legacyLocalReadiness, localEndpointError, localModelError, modelReadiness, useModelCheck, type ModelReadiness } from './Onboarding';
+import { AiSetup } from './AiSetup';
+import { ConfirmDialog, Dialog } from '../ui/Dialog';
+import { THEME_CHOICES, normalizeThemeChoice, type ThemeChoice } from '../ui/theme';
 import { Badge, Button, Field, Notice, PageHeader, Panel, Segmented, Switch } from '../ui/primitives';
 import { readPref, usePref, writePref } from '../ui/prefs';
 import { LICENSE_OFFLINE_NOTE, LICENSE_PREF_KEY, LICENSE_TRUSTED_KEYS_PREF_KEY, describeLicense, evaluateLicense, normalizeTrustedKeys, parseLicense, verifyLicenseSignature, type LicenseEvaluation, type LicenseParseResult, type LicenseVerifyResult } from '../ui/license-file';
@@ -70,7 +72,7 @@ export const normalizeDisplayName = (v: unknown): string => (typeof v === 'strin
 export type SettingsTab = 'general' | 'models' | 'access' | 'data' | 'accessibility';
 export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: 'general', label: 'General' },
-  { id: 'models', label: 'Mode & models' },
+  { id: 'models', label: 'AI' },
   { id: 'access', label: 'Access' },
   { id: 'data', label: 'Data' },
   { id: 'accessibility', label: 'Accessibility' },
@@ -79,7 +81,7 @@ export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
 /** One line under each group heading, so the grouping explains itself. */
 export const SETTINGS_TAB_BLURBS: Record<SettingsTab, string> = {
   general: 'How the app looks and greets you. Appearance and notifications apply at once; startup and voice need Save.',
-  models: 'Where chat runs, which model it uses and whether a key is saved. Mode and model fields need Save.',
+  models: 'Claude through your own Anthropic key, whether AI requests are on, and which model answers. Mode and model fields need Save.',
   access: 'The folders and apps this assistant may use. Adding one asks for Windows confirmation when you Save.',
   data: 'How long history is kept, plus backup and restore.',
   accessibility: 'Motion, text size and keyboard help. These apply at once.',
@@ -89,17 +91,18 @@ export type SettingsEntry = { id: string; tab: SettingsTab; title: string; keywo
 
 /** Every panel on the Settings screen with the words people use for it. Searching matches title and keywords. */
 export const SETTINGS_INDEX: SettingsEntry[] = [
-  { id: 'appearance', tab: 'general', title: 'Appearance', keywords: ['theme', 'dark', 'light', 'graphite', 'nebula', 'paper', 'colour', 'color', 'look'] },
+  { id: 'appearance', tab: 'general', title: 'Appearance', keywords: ['theme', 'dark', 'light', 'obsidian', 'chrome', 'system', 'graphite', 'nebula', 'paper', 'colour', 'color', 'look'] },
   { id: 'profile', tab: 'general', title: 'Profile', keywords: ['name', 'display name', 'greeting', 'who', 'personal'] },
   { id: 'personal-profiles', tab: 'general', title: 'Personal profiles', keywords: ['profile', 'profiles', 'switch profile', 'preset', 'named', 'personal', 'save current'] },
   { id: 'startup', tab: 'general', title: 'Startup', keywords: ['tray', 'system tray', 'minimised', 'minimized', 'boot', 'launch', 'start'] },
   { id: 'notifications', tab: 'general', title: 'Notifications', keywords: ['toast', 'message', 'popup', 'quiet', 'alerts', 'sound'] },
   { id: 'voice', tab: 'general', title: 'Voice', keywords: ['speech', 'speak', 'tts', 'voice name', 'narrator'] },
+  { id: 'connect', tab: 'models', title: 'Connect Claude', keywords: ['claude', 'anthropic', 'connect', 'setup', 'set up', 'api key', 'key', 'test', 'model list', 'models', 'byok'] },
   { id: 'status', tab: 'models', title: 'Connection status', keywords: ['summary', 'overview', 'route', 'local', 'cloud', 'key saved', 'unsaved', 'state', 'health'] },
   { id: 'mode', tab: 'models', title: 'Mode', keywords: ['offline', 'online', 'cloud', 'privacy', 'internet'] },
-  { id: 'readiness', tab: 'models', title: 'Model readiness', keywords: ['ready', 'check', 'ollama', 'running', 'status'] },
-  { id: 'local-model', tab: 'models', title: 'Local model', keywords: ['ollama', 'endpoint', 'localhost', '127.0.0.1', 'port', 'llama', 'model name'] },
-  { id: 'cloud-model', tab: 'models', title: 'Cloud model', keywords: ['api key', 'key', 'token', 'provider', 'claude', 'anthropic', 'secret', 'openai', 'openrouter', 'gpt'] },
+  { id: 'readiness', tab: 'models', title: 'AI readiness', keywords: ['ready', 'check', 'model readiness', 'running', 'status'] },
+  { id: 'local-model', tab: 'models', title: 'Legacy local model', keywords: ['legacy', 'advanced', 'earlier version', 'ollama', 'endpoint', 'localhost', '127.0.0.1', 'port', 'llama', 'model name'] },
+  { id: 'cloud-model', tab: 'models', title: 'Providers and keys', keywords: ['cloud model', 'model name', 'api key', 'key', 'token', 'provider', 'claude', 'anthropic', 'secret', 'openai', 'openrouter', 'gpt'] },
   { id: 'folders', tab: 'access', title: 'Allowed folders', keywords: ['files', 'directory', 'path', 'permission', 'scope', 'roots'] },
   { id: 'apps', tab: 'access', title: 'Approved apps', keywords: ['launch', 'program', 'exe', 'application', 'permission'] },
   { id: 'retention', tab: 'data', title: 'Retention', keywords: ['history', 'days', 'keep', 'delete', 'clear chat', 'conversation', 'privacy'] },
@@ -181,7 +184,7 @@ export type StatusRow = { id: string; label: string; value: string; tone: 'ok' |
 
 /**
  * An honest summary of what chat will do. It describes the saved settings (what the app actually uses) and says
- * so when the draft differs. Nothing here contacts a provider; cloud reachability is only known when you send.
+ * so when the draft differs. Nothing here contacts a provider; whether it answers is known when you test or send.
  */
 export function connectionStatus(input: { savedMode: Mode; draftMode: Mode; local: ModelReadiness; cloud: ModelReadiness; cloudConfigured: boolean | null }): StatusRow[] {
   const { savedMode, draftMode, local, cloud, cloudConfigured } = input;
@@ -193,12 +196,11 @@ export function connectionStatus(input: { savedMode: Mode; draftMode: Mode; loca
       label: 'Chat route',
       value: online ? 'Online (cloud)' : 'Offline (this computer)',
       tone: online ? 'warn' : 'ok',
-      note: online ? 'Each message you send goes to the cloud provider. There is no automatic fallback to the local model.' : 'Messages stay on this computer. There is no automatic fallback to the cloud.',
+      note: online ? 'Each message you send goes to the AI provider with your key. There is no automatic fallback to the local model.' : 'AI requests are off; nothing is sent anywhere. There is no automatic fallback to the cloud.',
     },
   ];
   if (draftMode !== savedMode) rows.push({ id: 'pending-mode', label: 'Unsaved mode change', value: draftMode === 'online' ? 'Online' : 'Offline', tone: 'warn', note: 'Chat keeps using the saved mode until you press Save changes.' });
-  rows.push({ id: 'local', label: 'Local model', value: local.level === 'ready' ? 'Ready' : local.level === 'blocked' ? 'Not available' : 'Unknown', tone: level(local.level), note: `${local.title}. ${local.detail}` });
-  rows.push({ id: 'cloud', label: 'Cloud model', value: cloud.level === 'ready' ? 'Set up' : cloud.level === 'blocked' ? 'Not set up' : 'Unknown', tone: level(cloud.level), note: `${cloud.title}. ${cloud.detail}` });
+  rows.push({ id: 'cloud', label: 'AI provider', value: cloud.level === 'ready' ? 'Set up' : cloud.level === 'blocked' ? 'Not set up' : 'Unknown', tone: level(cloud.level), note: `${cloud.title}. ${cloud.detail}` });
   rows.push({
     id: 'key',
     label: 'API key',
@@ -206,6 +208,8 @@ export function connectionStatus(input: { savedMode: Mode; draftMode: Mode; loca
     tone: cloudConfigured ? 'ok' : cloudConfigured === null ? 'muted' : 'warn',
     note: cloudConfigured ? 'Stored with Windows protection. The key itself is never shown or kept in this window.' : cloudConfigured === null ? 'The saved-key check did not answer. Use Check again.' : 'No key is stored, so online chat cannot send.',
   });
+  // A local model from an earlier version is listed only when it really answers; otherwise it is not part of the product.
+  if (local.level === 'ready') rows.push({ id: 'local', label: 'Legacy local model', value: 'Ready', tone: level(local.level), note: `${local.title}. ${local.detail}` });
   return rows;
 }
 
@@ -866,6 +870,9 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
   const [textSize, setTextSize] = useShellPref<'normal' | 'large'>(SHELL_PREF.textSize, 'normal');
   const [motionOnBattery, setMotionOnBattery] = useShellPref<boolean>(SHELL_PREF.motionOnBattery, false);
   const [quietToasts, setQuietToasts] = useShellPref<boolean>(SHELL_PREF.quietToasts, false);
+  const [themeRaw, setThemeRaw] = useShellPref<string | null>(SHELL_PREF.theme, null);
+  const theme = normalizeThemeChoice(themeRaw, settings.theme);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState(displayName);
   const batterySupported = typeof (navigator as Navigator & { getBattery?: unknown }).getBattery === 'function';
 
@@ -901,10 +908,11 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
   // The main process probes the saved settings, so readiness always describes what is saved, not the unsaved draft.
   const readiness = modelReadiness({ settings, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
   const caps = system?.capabilities ?? null;
+  const legacyLocal = legacyLocalReadiness({ settings, capabilities: caps, systemError });
   const status = connectionStatus({
     savedMode: settings.mode,
     draftMode: draft.mode,
-    local: modelReadiness({ settings: { ...settings, mode: 'offline' }, capabilities: caps, systemError, cloudConfigured }),
+    local: legacyLocal,
     cloud: modelReadiness({ settings: { ...settings, mode: 'online' }, capabilities: caps, systemError, cloudConfigured }),
     cloudConfigured,
   });
@@ -1142,17 +1150,13 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
 
       <div role={searching ? 'region' : 'tabpanel'} id={searching ? 'settings-results' : `panel-${tab}`} aria-labelledby={searching ? undefined : `tab-${tab}`} aria-label={searching ? 'Matching settings' : undefined} className="stack tab-body">
         <SettingsSection ctx={sectionCtx} id="appearance" panelTab="general" title="Appearance" eyebrow="Applies immediately">
-          <Field label="Theme">
+          <Field label="Theme" hint="Saved in this window’s preferences. Changing it sends nothing anywhere.">
             {() => (
-              <Segmented<SettingsT['theme']>
+              <Segmented<ThemeChoice>
                 label="Theme"
-                value={settings.theme}
-                onChange={(v) => void mutate(() => api.saveSettings({ theme: v }))}
-                options={[
-                  { value: 'graphite', label: 'Graphite', hint: 'Dark graphite with cool blue and amber accents' },
-                  { value: 'nebula', label: 'Nebula', hint: 'Deep indigo' },
-                  { value: 'paper', label: 'Paper', hint: 'Light theme' },
-                ]}
+                value={theme}
+                onChange={(v) => setThemeRaw(v)}
+                options={THEME_CHOICES.map((c) => ({ value: c.value, label: c.label, hint: c.value === 'dark' ? 'Obsidian: the dark, principal look' : c.value === 'light' ? 'Chrome: a lighter variant with the same contrast rules' : 'Follow the Windows light or dark setting' }))}
               />
             )}
           </Field>
@@ -1196,6 +1200,23 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
           </Field>
         </SettingsSection>
 
+        <SettingsSection ctx={sectionCtx} id="connect" panelTab="models" title="Connect Claude" eyebrow="Guided setup">
+          <div className="connect-row">
+            <span className="connect-mark" aria-hidden><Plugs size={22} /></span>
+            <div className="grow">
+              <p>
+                {readiness.route === 'cloud' && readiness.level === 'ready'
+                  ? `Connected: ${cloudProviderInfo(activeProvider).name}, model “${settings.cloudModel}”.`
+                  : 'Save your own Anthropic API key in Windows protection, turn on AI requests, choose a model the API lists for your key and send one test message.'}
+              </p>
+              <p className="field-hint">A Claude.ai or ChatGPT subscription is not an API key. Each step says what it sends before anything leaves this computer.</p>
+            </div>
+            <Button variant={readiness.level === 'ready' && readiness.route === 'cloud' ? 'ghost' : 'primary'} onClick={() => setSetupOpen(true)}>
+              {readiness.level === 'ready' && readiness.route === 'cloud' ? 'Change or test' : 'Connect Claude'}
+            </Button>
+          </div>
+        </SettingsSection>
+
         <SettingsSection ctx={sectionCtx} id="status" panelTab="models" title="Connection status" eyebrow="What is saved and in use">
           <dl className="kv-list">
             {status.map((r) => (
@@ -1207,7 +1228,7 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
               </div>
             ))}
           </dl>
-          <p className="field-hint">This summary reads what is saved. Nothing is sent to a provider to produce it; the cloud provider is only contacted when you send a message in online mode.</p>
+          <p className="field-hint">This summary reads what is saved. Nothing is sent to a provider to produce it; the provider is contacted only when you list models, send a test or send a message in online mode.</p>
         </SettingsSection>
 
         <SettingsSection ctx={sectionCtx} id="mode" panelTab="models" title="Mode" eyebrow="Needs Save">
@@ -1221,32 +1242,33 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
             ]}
           />
           {online ? (
-            <Notice tone="warn" title="Online sends your messages to a cloud provider">
-              Chat uses the cloud model below with your own API key. With no saved key, chat shows an error and sends nothing. If a cloud request fails, the failure is shown, but the request may already have reached the provider. There is no automatic fallback to the local model or any other provider.
+            <Notice tone="warn" title="Online sends your messages to your AI provider">
+              Chat uses the model below with your own API key. With no saved key, chat shows an error and sends nothing. If a cloud request fails, the failure is shown, but the request may already have reached the provider. There is no automatic fallback to the local model or any other provider.
             </Notice>
           ) : (
-            <Notice title="Offline keeps chat on this computer">Chat uses only the local endpoint below. If it is not running you get an error; it never falls back to the cloud.</Notice>
+            <Notice title="AI requests are off">Notes, tasks, search and files keep working on this computer. Chat cannot answer until you connect Claude, unless a legacy local model from an earlier version still answers. Nothing falls back to the cloud.</Notice>
           )}
         </SettingsSection>
 
-        <SettingsSection ctx={sectionCtx} id="readiness" panelTab="models" title="Model readiness" eyebrow="Live check of saved settings">
+        <SettingsSection ctx={sectionCtx} id="readiness" panelTab="models" title="AI readiness" eyebrow="Live check of saved settings">
           <ModelReadinessNotice readiness={readiness} checking={check.checking} onRecheck={() => void check.recheck()} />
           {dirty && <p className="field-hint">This check uses your saved settings. Save your changes to check the new ones.</p>}
         </SettingsSection>
 
-        <SettingsSection ctx={sectionCtx} id="local-model" panelTab="models" title="Local model" eyebrow="Offline route">
-          <p className="field-hint">Desktop Companion does not include a model. Offline chat needs Ollama running on this computer. Install it, start it, then install a model once with “ollama pull” followed by the model name.</p>
+        <SettingsSection ctx={sectionCtx} id="local-model" panelTab="models" title="Legacy local model" eyebrow="Advanced · earlier versions">
+          <p className="field-hint">Only for setups from earlier versions that answered through a local Ollama server. Claude does not need this. It is used only while AI requests are off, and it never downloads anything.</p>
+          <ModelReadinessNotice readiness={legacyLocal} />
           <div className="grid2">
             <Field label="Endpoint" error={endpointError} hint="Must start with http:// and point at this computer (127.0.0.1, localhost or [::1]).">
               {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.localEndpoint} maxLength={200} spellCheck={false} onChange={(e) => set('localEndpoint', e.target.value)} />}
             </Field>
-            <Field label="Model name" error={modelError} hint="The name Ollama knows the model by, for example llama3.2:3b.">
+            <Field label="Model name" error={modelError} hint="The name the local server knows the model by.">
               {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.localModel} maxLength={120} spellCheck={false} onChange={(e) => set('localModel', e.target.value)} />}
             </Field>
           </div>
         </SettingsSection>
 
-        <SettingsSection ctx={sectionCtx} id="cloud-model" panelTab="models" title="Cloud model" eyebrow="Online route">
+        <SettingsSection ctx={sectionCtx} id="cloud-model" panelTab="models" title="Providers and keys" eyebrow="Manual setup">
           <CloudProvidersPanel api={api} provider={activeProvider} cloudModel={settings.cloudModel} onSelect={chooseProvider} notify={toast} isPreview={isPreview} onKeysChanged={() => { void refreshCloud(); void refreshSystem(); }} />
           <Field label="Model name" error={cloudError} hint="Used only in online mode.">
             {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.cloudModel} maxLength={120} spellCheck={false} onChange={(e) => set('cloudModel', e.target.value)} />}
@@ -1360,6 +1382,17 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
         </div>
       )}
 
+      <Dialog open={setupOpen} onClose={() => setSetupOpen(false)} title="Connect AI" description="Claude through your own Anthropic API key. Notes, tasks and search keep working either way." size="md">
+        {setupOpen && (
+          <AiSetup
+            onDone={() => {
+              setSetupOpen(false);
+              void refreshCloud();
+              void refreshSystem();
+            }}
+          />
+        )}
+      </Dialog>
       <ConfirmDialog open={confirmOnline} title="Switch to online mode?" confirmLabel="Save and go online" busy={saving} onCancel={() => setConfirmOnline(false)} onConfirm={() => void doSave()}>
         <p>Your chat messages will be sent to the cloud model “{draft.cloudModel || 'not set'}” using your API key. Windows will ask you to confirm this too. Offline mode stays available and there is no automatic switching between the two.</p>
       </ConfirmDialog>

@@ -7,7 +7,7 @@ import type { ProductivityState } from '../../electron/services/store';
 import { cx, truncate } from '../ui/util';
 
 /**
- * Ctrl+K quick search. Typing searches saved notes, tasks, setups and checkpoints first (the same local search as the
+ * Ctrl+K quick search. Typing searches saved notes, tasks, capsules and checkpoints first (the same local search as the
  * Search screen, chat is left out unless you open full search), then lists matching screens and a few real actions.
  * Nothing is sent anywhere; choosing a result only navigates.
  */
@@ -115,7 +115,7 @@ export function CommandPalette({ open, onClose, onGo, state, productivity }: { o
               aria-controls="palette-list"
               aria-activedescendant={items[active] ? `palette-${items[active].key}` : undefined}
               aria-label="Search saved items and screens"
-              placeholder="Search notes, tasks, setups or screens"
+              placeholder="Search notes, tasks, capsules or screens"
               value={query}
               maxLength={200}
               onChange={(e) => setQuery(e.target.value)}

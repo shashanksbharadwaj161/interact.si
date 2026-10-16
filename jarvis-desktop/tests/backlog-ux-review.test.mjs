@@ -231,9 +231,10 @@ test('a closed Dialog renders no body or card, so its content is not in the acce
 
 test('Avatar is a named image whose label carries its live state', () => {
   const m = markup.avatar('listening');
-  const [el] = openTags(m, 'div');
-  assert.equal(attr(el, 'role'), 'img');
-  assert.equal(attr(el, 'aria-label'), 'Companion, listening');
+  // The avatar draws through the shared companion renderer: one named image element whose label says the state.
+  const el = openTags(m, 'span').find((t) => attr(t, 'role') === 'img');
+  assert.ok(el, 'the companion is a role="img" element');
+  assert.equal(attr(el, 'aria-label'), 'Companion: Listening');
   assert.equal(attr(el, 'data-state'), 'listening');
 });
 

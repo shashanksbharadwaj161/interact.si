@@ -132,25 +132,25 @@ const TOPICS: Record<GuideTopicId, TopicDef> = {
     summary: 'See replies appear as they are written, and stop a reply at any time.',
     links: [
       { label: 'Open Assistant', target: { view: 'assistant' } },
-      { label: 'Model readiness', target: { view: 'settings', params: { q: 'readiness' } } },
+      { label: 'Connect Claude', target: { view: 'settings', params: { q: 'claude' } } },
     ],
     tour: [
       { title: 'Send a message', body: 'Replies stream in as the model writes them. Only one reply streams at a time.' },
       { title: 'Stop when you like', body: 'Choose Stop to end a reply. Any partial text is kept once and marked incomplete.' },
-      { title: 'Where it runs', body: 'Offline mode streams from the local model on this computer. Online mode streams from the cloud model with your own key. A failure shows an error; it never switches route on its own.' },
+      { title: 'Where it runs', body: 'Online mode streams from Claude (or the provider you chose) with your own key. In offline mode AI requests are off. A failure shows an error; it never switches route on its own.' },
     ],
   },
   'local-models': {
     id: 'local-models',
-    title: 'Local models',
-    summary: 'Run chat on this computer with Ollama so messages never leave it.',
+    title: 'Legacy local model',
+    summary: 'Only for setups from earlier versions that answer through a local Ollama server. Claude does not need it.',
     links: [
-      { label: 'Open Models', target: { view: 'models' } },
-      { label: 'Local model settings', target: { view: 'settings', params: { q: 'local model' } } },
+      { label: 'Open Local models', target: { view: 'models' } },
+      { label: 'Legacy local model settings', target: { view: 'settings', params: { q: 'legacy' } } },
     ],
     tour: [
-      { title: 'Install and start Ollama', body: 'Ollama is a separate program you install yourself. This app talks to it only on this computer (localhost).' },
-      { title: 'Choose a model', body: 'Models opens a list of what Ollama already has. Downloads only start when you choose one there and confirm; this guide never downloads anything.' },
+      { title: 'Only if you used it before', body: 'Earlier versions could answer through Ollama, a separate program on this computer. If you never set it up, skip this topic.' },
+      { title: 'Choose a model', body: 'Local models lists what Ollama already has. Downloads only start when you choose one there and confirm; this guide never downloads anything.' },
       { title: 'Check again', body: 'After starting Ollama or adding a model, choose Re-check here or in Settings to update the status.' },
     ],
   },
@@ -164,8 +164,8 @@ const TOPICS: Record<GuideTopicId, TopicDef> = {
       { label: 'Retention', target: { view: 'settings', params: { q: 'retention' } } },
     ],
     tour: [
-      { title: 'Offline by default', body: 'In offline mode chat uses only the local model. Notes, tasks, capsules and this checklist are always stored on this computer.' },
-      { title: 'Online is your choice', body: 'Online mode sends your messages to the cloud provider you set up, using your own API key, only when you send them.' },
+      { title: 'Offline by default', body: 'In offline mode AI requests are off and nothing is sent anywhere. Notes, tasks, capsules and this checklist are always stored on this computer.' },
+      { title: 'Online is your choice', body: 'Online mode sends your messages to Claude, or the provider you set up, using your own API key, only when you send them.' },
       { title: 'Access you grant', body: 'The app can only open folders and apps you list in Settings › Access, and desktop actions always ask first.' },
       { title: 'History you keep', body: 'Retention controls how long chat and activity history is kept. You can export or clear it in Settings › Data.' },
     ],
@@ -268,15 +268,15 @@ function routeReadiness(input: GuidanceInput, freshness: Freshness): { ok: boole
   const s = input.settings;
   if (!s) return { ok: false, status: 'unknown', reason: 'Settings have not loaded yet.', route: 'unknown' };
   if (s.mode === 'online') {
-    if (!s.cloudModel.trim()) return { ok: false, status: 'blocked', reason: 'Online mode has no cloud model name. Add one in Settings › Models.', route: 'Cloud API (online)' };
-    if (input.cloudKeyConfigured === false) return { ok: false, status: 'blocked', reason: 'Online mode has no saved API key, so chat sends nothing. Save your key in Settings › Models.', route: 'Cloud API (online)' };
+    if (!s.cloudModel.trim()) return { ok: false, status: 'blocked', reason: 'Online mode has no model chosen. Choose one in Settings › AI.', route: 'Cloud API (online)' };
+    if (input.cloudKeyConfigured === false) return { ok: false, status: 'blocked', reason: 'Online mode has no saved API key, so chat sends nothing. Save your key in Settings › AI.', route: 'Cloud API (online)' };
     if (input.cloudKeyConfigured === null) return { ok: false, status: 'unknown', reason: 'Whether an API key is saved is not known yet. Choose Re-check.', route: 'Cloud API (online)' };
     return { ok: true, status: 'todo', reason: `Online mode is set up with “${s.cloudModel}”. Whether the provider answers is only known when you send a message.`, route: 'Cloud API (online)' };
   }
   const llm = capability(input, freshness, 'local-llm', 'The local model');
-  if (llm.state === 'unknown') return { ok: false, status: 'unknown', reason: llm.reason, route: 'Local model (offline)' };
-  if (llm.state === 'unavailable') return { ok: false, status: 'blocked', reason: `The local model is not ready: ${llm.reason}`, route: 'Local model (offline)' };
-  return { ok: true, status: 'todo', reason: 'The local model is ready. Send a message in the Assistant to see a reply stream in.', route: 'Local model (offline)' };
+  if (llm.state === 'unknown') return { ok: false, status: 'unknown', reason: llm.reason, route: 'AI off (offline)' };
+  if (llm.state === 'unavailable') return { ok: false, status: 'blocked', reason: 'AI is not connected. Connect Claude in Settings › AI, then send a message in the Assistant to see a reply stream in.', route: 'AI off (offline)' };
+  return { ok: true, status: 'todo', reason: 'The legacy local model is answering. Send a message in the Assistant to see a reply stream in.', route: 'Legacy local model (offline)' };
 }
 
 const yesNo = (v: boolean | null | undefined, yes: string, no: string) => (v === true ? yes : v === false ? no : 'Unknown');
@@ -310,15 +310,15 @@ function baseFor(id: GuideTopicId, input: GuidanceInput, freshness: Freshness): 
       const llm = capability(input, freshness, 'local-llm', 'The local model');
       const facts = input.settings ? [{ label: 'Model name', value: input.settings.localModel || 'Not set' }] : [];
       if (llm.state === 'unknown') return { status: 'unknown', reason: llm.reason, facts };
-      // Ollama is user-installable, so a missing local model is something you can fix, not a missing feature.
-      if (llm.state === 'unavailable') return { status: 'blocked', reason: `${llm.reason} Nothing is downloaded automatically; use Models when you are ready.`, facts };
+      // Not part of a new setup: a local model that is not answering is reported, not presented as a step to finish.
+      if (llm.state === 'unavailable') return { status: 'unavailable', reason: `Not answering (${llm.reason.replace(/[.\s]+$/, '')}). Only needed for setups from earlier versions; Claude does not need it. Nothing is downloaded automatically.`, facts };
       return { status: 'done', reason: llm.reason, facts };
     }
     case 'privacy': {
       const s = input.settings;
       if (!s) return { status: 'unknown', reason: 'Settings have not loaded yet.', facts: [] };
       const facts: GuideFact[] = [
-        { label: 'Mode', value: s.mode === 'online' ? 'Online: chat uses your cloud API key' : 'Offline: chat stays on this computer' },
+        { label: 'Mode', value: s.mode === 'online' ? 'Online: chat uses your own API key' : 'Offline: chat stays on this computer' },
         { label: 'Cloud API key', value: yesNo(input.cloudKeyConfigured, 'Saved (protected by Windows)', 'Not saved') },
         { label: 'Allowed folders', value: String(s.allowedRoots.length) },
         { label: 'Approved apps', value: String(s.approvedApps.length) },
@@ -572,13 +572,13 @@ export const ROUTE_EXPLAINER: readonly { id: 'on-device' | 'local-model' | 'clou
     body: 'Notes, tasks, capsules, settings and this checklist are stored in the app’s own data folder. They work with no internet and no model.',
   },
   {
-    id: 'local-model',
-    title: 'Local model (offline mode)',
-    body: 'Chat goes to Ollama running on this computer at a localhost address. Messages do not leave the computer. If Ollama is not running, chat shows an error.',
+    id: 'cloud-api',
+    title: 'Claude and other providers (online mode, your key)',
+    body: 'Chat goes to Claude, or the provider you chose, with the API key you saved, and only when you send a message. Your provider may charge for it. If the key is missing or the call fails, chat shows an error; it never falls back silently.',
   },
   {
-    id: 'cloud-api',
-    title: 'Cloud API (online mode, your key)',
-    body: 'Chat goes to the cloud provider with the API key you saved, and only when you send a message. Your provider may charge for it. If the key is missing or the call fails, chat shows an error; it never falls back silently.',
+    id: 'local-model',
+    title: 'Legacy local model (offline mode)',
+    body: 'Only for setups from earlier versions: chat goes to Ollama running on this computer at a localhost address, and messages do not leave the computer. If it is not running, chat shows an error.',
   },
 ];

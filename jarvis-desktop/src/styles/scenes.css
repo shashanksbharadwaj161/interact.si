@@ -261,3 +261,66 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- Ambient backdrop motion ----------
+   One slow, low-amplitude drift of a soft light field behind the scene wash. Transform and opacity only,
+   so it composites on the GPU and never triggers layout. Cycle: 48 s, ease-in-out, 14 px travel,
+   peak opacity 0.55. Off under reduced motion, paused while the window is hidden. */
+
+.scene-drift {
+  inset: -12%;
+  opacity: 0;
+  background: radial-gradient(ellipse 42% 38% at 30% 30%, color-mix(in oklab, var(--energy) 14%, transparent), transparent 70%), radial-gradient(ellipse 36% 34% at 72% 68%, color-mix(in oklab, var(--violet) 12%, transparent), transparent 70%);
+  will-change: transform, opacity;
+}
+
+.scene[data-ambient='on'] .scene-drift {
+  animation: scene-drift 48s ease-in-out infinite;
+}
+
+.scene[data-ambient='paused'] .scene-drift {
+  animation: scene-drift 48s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.scene[data-ambient='off'] .scene-drift {
+  animation: none;
+  opacity: 0.3;
+  transform: none;
+  will-change: auto;
+}
+
+.scene-thumb .scene-drift {
+  display: none;
+}
+
+@keyframes scene-drift {
+  0% {
+    opacity: 0.3;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: translate3d(14px, -10px, 0) scale(1.04);
+  }
+  100% {
+    opacity: 0.3;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-drift {
+    animation: none !important;
+    opacity: 0.3;
+    transform: none;
+    will-change: auto;
+  }
+}
+
+:root[data-motion='reduced'] .scene-drift {
+  animation: none !important;
+  opacity: 0.3;
+  transform: none;
+  will-change: auto;
+}

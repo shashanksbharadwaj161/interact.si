@@ -87,9 +87,11 @@ test('every view has a unique id, a group, a blurb and an icon, and the new view
     assert.equal(typeof v.icon, 'function', `${v.id} icon`);
   }
   const groups = nav.navGroups();
-  assert.deepEqual(groups.map((g) => g.name), ['Cockpit', 'Work', 'System']);
-  assert.ok(groups[1].views.some((v) => v.id === 'search'), 'memory search sits with Work');
-  assert.ok(groups[0].views.some((v) => v.id === 'motion'), 'motion studio sits with Cockpit');
+  assert.deepEqual(groups.map((g) => g.name), ['Today', 'Assistant', 'Workspace', 'Memory', 'Automations', 'Studio', 'Settings'], 'six primary areas plus the Settings footer');
+  const area = (name) => groups.find((g) => g.name === name);
+  assert.ok(area('Memory').views.some((v) => v.id === 'search'), 'search sits with Memory');
+  assert.ok(area('Studio').views.some((v) => v.id === 'motion'), 'motion studio sits with Studio');
+  assert.ok(area('Settings').views.some((v) => v.id === 'models'), 'the legacy local models screen sits under Settings');
   assert.equal(groups.flatMap((g) => g.views).length, nav.VIEWS.length, 'grouping shows every view once');
 });
 
@@ -190,40 +192,7 @@ test('help lists every view, every shortcut and the keys the shell actually hand
   assert.doesNotMatch(html, /Alt\+11/);
 });
 
-/* ---------- Home widgets ---------- */
-
-test('home layout normalisation drops unknown ids, removes duplicates and appends missing widgets', () => {
-  const ids = home.WIDGETS.map((w) => w.id);
-  assert.equal(new Set(ids).size, ids.length);
-  assert.deepEqual(home.normalizeLayout(undefined), home.DEFAULT_LAYOUT);
-  assert.deepEqual(home.normalizeLayout('junk'), home.DEFAULT_LAYOUT);
-  const l = home.normalizeLayout({ order: ['notes', 'bogus', 'notes', 'due'], hidden: ['activity', 'nope', 'activity'] });
-  assert.deepEqual(l.order.slice(0, 2), ['notes', 'due']);
-  assert.equal(l.order.length, ids.length);
-  assert.deepEqual([...l.order].sort(), [...ids].sort());
-  assert.deepEqual(l.hidden, ['activity']);
-});
-
-test('moving widgets respects the edges and keeps hidden widgets in place', () => {
-  const base = home.normalizeLayout({ order: ['totals', 'due', 'notes', 'capsules'], hidden: ['due'] });
-  assert.equal(home.moveWidget(base, 'totals', -1), base, 'first visible cannot move earlier');
-  const moved = home.moveWidget(base, 'totals', 1);
-  assert.deepEqual(moved.order.slice(0, 3), ['notes', 'due', 'totals'], 'swaps with the next visible widget, hidden one stays');
-  assert.deepEqual(moved.hidden, ['due']);
-  assert.equal(home.moveWidget(base, 'due', 1), base, 'hidden widgets do not move');
-  const last = base.order.filter((w) => !base.hidden.includes(w)).at(-1);
-  assert.equal(home.moveWidget(base, last, 1), base, 'last visible cannot move later');
-});
-
-test('hiding and showing widgets is idempotent and the default check is exact', () => {
-  assert.ok(home.layoutIsDefault(home.DEFAULT_LAYOUT));
-  const hidden = home.setWidgetHidden(home.DEFAULT_LAYOUT, 'activity', true);
-  assert.deepEqual(hidden.hidden, ['activity']);
-  assert.deepEqual(home.setWidgetHidden(hidden, 'activity', true).hidden, ['activity']);
-  assert.ok(!home.layoutIsDefault(hidden));
-  assert.deepEqual(home.setWidgetHidden(hidden, 'activity', false), home.DEFAULT_LAYOUT);
-  assert.ok(!home.layoutIsDefault(home.moveWidget(home.DEFAULT_LAYOUT, 'totals', 1)));
-});
+/* ---------- Today ---------- */
 
 test('the greeting follows the hour and only names a person when a name is set', () => {
   assert.equal(home.greeting(3, ''), 'Good night.');
@@ -292,13 +261,17 @@ test('the shell wires the shared modules and keeps the compact sidebar and banne
   assert.match(appSrc, /reducedMotion=\{motion\.reduced\}/, 'motion studio follows the shell motion state');
   const shell = await read('src/styles/shell.css');
   assert.match(shell, /\[data-text="large"\]/);
-  assert.match(shell, /\.scene-layer \{[^}]*animation:[^}]*\}/s, 'scene cross-fade is a CSS animation the reduced-motion rules remove');
+  assert.match(shell, /\.view \{[^}]*animation:[^}]*\}/s, 'the screen transition is a CSS animation the reduced-motion rules remove');
+  const a11y = await read('src/styles/accessibility.css');
+  assert.match(a11y, /:root\[data-motion='reduced'\] \*[^{]*\{[^}]*animation-duration: 0\.01ms !important/s);
 });
 
-test('onboarding can check a draft model before finishing and still blocks bad settings', async () => {
-  const src = await read('src/components/Onboarding.tsx');
-  assert.match(src, /Save and check now/);
-  assert.match(src, /saveSettings\(\{ localEndpoint: draft\.localEndpoint\.trim\(\), localModel: draft\.localModel\.trim\(\) \}\)/, 'the check saves only the model fields, never onboarded');
-  assert.match(src, /const canNext = step !== 2 \|\| !\(endpointError \|\| modelError \|\| cloudError\)/);
-  assert.match(src, /Ready to answer/);
+test('AI setup checks a real model list and a real streamed test before calling anything connected', async () => {
+  const src = await read('src/components/AiSetup.tsx');
+  assert.match(src, /await api\.cloudModels\(provider\)/, 'models come from the provider list for this key, not a built-in guess');
+  assert.match(src, /api\.chatStreamStart!\(TEST_PROMPT\)/, 'the test is a real streamed request');
+  assert.match(src, /chatStreamCancel/, 'the test can be stopped');
+  assert.match(src, /cloudModelError\(/, 'a custom model id is validated like the backend does');
+  const onboarding = await read('src/components/Onboarding.tsx');
+  assert.doesNotMatch(onboarding, /saveSettings\(\{[^}]*onboarded: true[^}]*(cloudModel|localModel)/, 'finishing first run never saves model fields');
 });

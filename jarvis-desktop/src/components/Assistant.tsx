@@ -768,6 +768,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const [elapsedMs, setElapsedMs] = useState(0);
   const [drawer, setDrawer] = useState<DrawerTab | null>(null);
   const [setupOpen, setSetupOpen] = useState(Boolean(initialSetup));
+  /** The microphone panel beside Talk (consent and why Talk is off). Closed by default; Talk's tooltip carries the same reason. */
+  const [micPanel, setMicPanel] = useState(false);
   const [voiceNote, setVoiceNote] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null);
   /** The latest voice transcript awaiting the "Clean up dictation" choice. `n` re-keys the step for each new transcript. */
   const [dictation, setDictation] = useState<{ n: number; text: string } | null>(null);
@@ -1062,7 +1064,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     if (phaseRef.current !== 'idle') return;
     if (!sttReady) {setVoiceNote({tone:'warn', text:sttReason});return;}
     if (!support.supported) {setVoiceNote({tone:'warn', text:support.reason ?? 'Microphone capture is not available in this window.'});return;}
-    if (!consent.granted()) {setVoiceNote({tone:'warn', text:'Turn on "Allow the microphone" below first. Nothing was recorded.'});return;}
+    if (!consent.granted()) {setVoiceNote({tone:'warn', text:'Turn on "Allow the microphone" in the microphone panel first. Nothing was recorded.'});return;}
     pendingStop.current = false;
     setVoiceNote(null);
     setPhaseBoth('starting');
@@ -1201,7 +1203,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     return () => window.clearInterval(id);
   }, [phase]);
 
-  const micBlocked = !support.supported ? support.reason ?? 'Microphone capture is not available in this window.' : !micAllowed ? 'Allow the microphone first. Nothing is recorded until you do.' : null;
+  const micBlocked = !support.supported ? support.reason ?? 'Microphone capture is not available in this window.' : !micAllowed ? 'Turn on "Allow the microphone" in the microphone panel first. Nothing is recorded until you do.' : null;
   const blocker = sendBlocker({ mode, text: input, locked: sendLock.current, pending: pending !== null, live: live !== null, settling, transcribing: phase === 'transcribing', configured, routeReason, plannerReady, stepBusy: stepBusy !== null });
   const recLabel = phase === 'recording' ? 'Recording, release or tap to stop' : phase === 'starting' ? 'Starting microphone…' : phase === 'transcribing' ? 'Transcribing…' : 'Hold to talk';
   const noDot = (t: string) => t.replace(/[.\s]+$/, '');
@@ -1211,7 +1213,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const suggestions = online || configured ? ['Help me plan the rest of my day', 'Draft a short, friendly reply to an email', 'Explain a concept in plain words'] : [];
   const tabs: { value: DrawerTab; label: string }[] = [
     { value: 'history', label: 'History' },
-    { value: 'voice', label: 'Voice' },
+    { value: 'voice', label: 'Read aloud' },
     { value: 'context', label: 'Context' },
     { value: 'actions', label: 'Actions' },
   ];
@@ -1231,14 +1233,14 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
             </summary>
             <div className="route-panel" role="group" aria-label="Where this message goes">
               <Notice tone={configured ? 'info' : 'warn'} title={configured ? 'Available' : 'Unavailable'}>
-                {configured ? (route?.reason || (online ? `Messages go to ${routeName} with your key.` : 'The local model answered its last check.')) : routeReason}
+                {configured ? (route?.reason || (online ? `Messages go to ${routeName} with your key.` : 'The local model answered its last check.')) : `Sending is off: ${rs.blocker ?? routeReason}`}
               </Notice>
               <p className="field-hint" id="route-privacy">{mode === 'command' ? 'A desktop action is planned on this computer. It is not sent to a chat model, and nothing runs until you approve it in the Windows confirmation.' : !online && !legacyLocal ? 'AI requests are off. Nothing you type here is sent anywhere until you connect Claude.' : rs.privacy}</p>
+              {rs.key && <p className="field-hint">{rs.key}</p>}
               <dl className="kv-list">
                 <div className="kv"><dt>AI requests</dt><dd>{online ? `Online: sent to ${providerName} (${rs.where}) when you press Send` : 'Off: nothing is sent anywhere'}</dd></div>
                 {online && <div className="kv"><dt>Model</dt><dd className="mono">{rs.model}</dd></div>}
-                {!online && settings.localModel.trim() && <div className="kv"><dt>Legacy local model</dt><dd>{legacyLocal ? `Answering: ${settings.localModel}` : `Not answering: ${noDot(unavailable(route?.reason))}`}</dd></div>}
-                {rs.key && <div className="kv"><dt>Key</dt><dd>{rs.key}</dd></div>}
+                {legacyLocal && <div className="kv"><dt>Legacy local model</dt><dd>{`Answering: ${settings.localModel} at ${settings.localEndpoint}`}</dd></div>}
                 <div className="kv"><dt>Live replies</dt><dd>{streaming ? (streaming.available ? 'Streamed as they are written' : `Arrive complete${streaming.reason ? `: ${noDot(streaming.reason)}` : ''}`) : 'Not reported yet'}</dd></div>
                 <div className="kv"><dt>Stop a reply</dt><dd>{cancelFeat ? (cancelFeat.available ? 'Available' : `Not available${cancelFeat.reason ? `: ${noDot(cancelFeat.reason)}` : ''}`) : 'Not reported yet'}</dd></div>
                 <div className="kv"><dt>Voice input</dt><dd>{sttReady ? 'Available' : `Unavailable: ${noDot(sttReason)}`}</dd></div>
@@ -1462,6 +1464,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                   { value: 'command', label: 'Desktop action', icon: Lightning, hint: 'Plan one desktop action; you preview and approve before anything runs' },
                 ]}
               />
+              <div className="voice-dock">
               <div className={cx('voice', phase !== 'idle' && `voice-${phase}`)}>
                 <button
                   type="button"
@@ -1503,9 +1506,26 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                     <Button size="sm" variant="quiet" onClick={cancelRec}>Cancel</Button>
                   </>
                 )}
-                {phase === 'idle' && sttReady && !micAllowed && support.supported && (
-                  <button type="button" className="linkbtn voice-allow" onClick={() => setDrawer('voice')}>Allow microphone</button>
-                )}
+              </div>
+              {phase === 'idle' && (
+                <details className="voice-pop" open={micPanel} onToggle={(e) => setMicPanel(e.currentTarget.open)}>
+                  <summary className={cx('voice-pop-toggle', (!micAllowed || !sttReady || !support.supported) && 'is-off')}>
+                    {!sttReady || !support.supported ? 'Why is Talk off?' : micAllowed ? 'Microphone' : 'Allow microphone'}
+                  </summary>
+                  <div className="voice-pop-panel" role="group" aria-label="Microphone">
+                    {!sttReady && <Notice tone="warn" title="Speech recognition unavailable">{sttReason}</Notice>}
+                    {!support.supported && <Notice tone="warn" title="Microphone unavailable">{support.reason}</Notice>}
+                    <Switch
+                      label="Allow the microphone in Desktop Companion"
+                      description={micAllowed ? 'On: the microphone opens only while you hold or tap the talk button and is released as soon as you stop or cancel. Turning this off cancels any recording.' : 'Off: the talk button stays disabled and this window never opens the microphone. This is separate from the Windows microphone permission.'}
+                      checked={micAllowed}
+                      disabled={!support.supported}
+                      onChange={setMicAllowed}
+                    />
+                    <p className="field-hint">Records up to {MAX_CLIP_MS / 1000} s from the default microphone and turns it into text on this computer. The text goes into the message box for you to review; nothing is sent automatically.</p>
+                  </div>
+                </details>
+              )}
               </div>
               {mode === 'chat' && blocker && input.trim() && <span className="sub composer-why" id="send-blocker">{blocker}</span>}
               <span className="counter" aria-hidden={input.length < 3500}>
@@ -1536,19 +1556,6 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
             {drawer === 'history' && <ConversationHistory chat={state.chat} busy={replyBusy} />}
             {drawer === 'voice' && (
               <div className="stack">
-                <section className="section" aria-label="Talk">
-                  <h2>Talk</h2>
-                  {!sttReady && <Notice tone="warn" title="Speech recognition unavailable">{sttReason}</Notice>}
-                  {!support.supported && <Notice tone="warn" title="Microphone unavailable">{support.reason}</Notice>}
-                  <Switch
-                    label="Allow the microphone in Desktop Companion"
-                    description={micAllowed ? 'On: the microphone opens only while you hold or tap Talk, and closes as soon as you stop or cancel. Turning this off cancels any recording.' : 'Off: Talk stays disabled and this window never opens the microphone. This is separate from the Windows microphone permission.'}
-                    checked={micAllowed}
-                    disabled={!support.supported}
-                    onChange={setMicAllowed}
-                  />
-                  <p className="field-hint">Records up to {MAX_CLIP_MS / 1000} s from the default microphone and turns it into text on this computer. The text goes into the message box for you to review; nothing is sent automatically.</p>
-                </section>
                 <section className="section" aria-label="Read aloud">
                   <h2>Read aloud</h2>
                   {!ttsReady && <Notice tone="warn" title="Read aloud unavailable">{ttsReason}</Notice>}
@@ -1598,7 +1605,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
       </Dialog>
 
       <ConfirmDialog open={confirmClear} title="Clear the conversation?" confirmLabel="Clear" danger busy={clearing} onCancel={() => setConfirmClear(false)} onConfirm={() => void doClear()}>
-        <p>All {state.chat.length} saved messages are deleted from this computer. Notes, tasks and setups are not affected.</p>
+        <p>All {state.chat.length} saved messages are deleted from this computer. Notes, tasks and capsules are not affected.</p>
       </ConfirmDialog>
     </div>
   );

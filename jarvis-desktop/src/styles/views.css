@@ -534,74 +534,6 @@
   justify-content: flex-end;
 }
 
-/* Home widgets: a single ordered list laid out in two columns; full widgets span both. */
-.home-widgets {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-auto-flow: dense;
-  gap: 16px;
-  align-items: start;
-}
-
-/* Dashboard summary cards: exact 12-column placement when wide, two-up when medium, one column when narrow.
-   Container queries follow the panel width, so a collapsed sidebar or a narrow window both reflow. */
-.dash-wrap {
-  container-type: inline-size;
-}
-
-.dash-grid {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: minmax(56px, auto);
-  gap: 12px;
-}
-
-.dash-card {
-  grid-column: var(--dash-col, 1 / -1);
-  grid-row: var(--dash-row, auto);
-  min-width: 0;
-}
-
-@container (max-width: 760px) {
-  .dash-card {
-    grid-column: var(--dash-mid, 1 / -1);
-    grid-row: var(--dash-rows, auto);
-  }
-}
-
-@container (max-width: 480px) {
-  .dash-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .dash-card {
-    grid-column: 1 / -1;
-  }
-}
-
-.widget {
-  position: relative;
-  min-width: 0;
-}
-
-.widget-full {
-  grid-column: 1 / -1;
-}
-
-.widget.is-arranging {
-  padding: 8px;
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--sunken);
-}
-
-.widget-tools {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 2px 8px;
-}
-
 .widget-name {
   margin-right: auto;
   font: 600 11px var(--font-mono);
@@ -823,8 +755,35 @@
   transform: none;
 }
 
-@media (max-width: 1000px) {
-  .home-widgets {
-    grid-template-columns: minmax(0, 1fr);
+/* Settings · AI: the guided Claude setup sits first, as one row with a cut mark and a single action. */
+.connect-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.connect-row p {
+  max-width: 64ch;
+}
+
+.connect-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  color: var(--energy);
+  background: var(--energy-soft);
+  border: 1px solid var(--energy-line);
+  transform: rotate(45deg) scale(0.86);
+}
+
+.connect-mark > svg {
+  transform: rotate(-45deg);
+}
+
+@media (max-width: 760px) {
+  .connect-row {
+    flex-wrap: wrap;
   }
 }

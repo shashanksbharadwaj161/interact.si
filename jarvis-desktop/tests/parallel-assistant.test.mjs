@@ -7,11 +7,11 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
+import { phosphorIconNames } from './helpers/icon-stub.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ICONS = ['ArrowClockwise', 'CaretLeft', 'Broom', 'ChatCircleDots', 'Lightning', 'MagnifyingGlass', 'Microphone', 'PaperPlaneRight', 'ShieldCheck', 'SpeakerHigh', 'Stop',
-  'ArrowCounterClockwise', 'Copy', 'DownloadSimple', 'FloppyDisk', 'Pause', 'Play', 'Plus', 'Trash', 'UploadSimple', 'Info', 'Warning', 'WarningCircle',
-  'Check', 'CaretDown', 'X', 'CircleNotch', 'MagnifyingGlassPlus', 'Eye', 'EyeSlash', 'CaretRight', 'ArrowSquareOut', 'Question'];
+// Icons render as nothing; the names come from the real phosphor imports in src/.
+const ICONS = await phosphorIconNames(root);
 const STORE_STUB = `
   export function useReady() { return globalThis.__fakeStore(); }
   export function useOptionalStore() { return null; }
@@ -320,7 +320,7 @@ test('Assistant: a failed reply shows a typed note and an explicit Retry that sa
   assert.match(html, /<button[^>]*>[^<]*(?:<[^>]*>)*Retry/);
   assert.equal(providerCalls, 0, 'rendering never sends');
   const down = render({ chat, routeOk: false, reason: 'Ollama is not running' });
-  assert.match(down, /Unavailable: Ollama is not running/);
+  assert.match(down, /Unavailable: AI is not connected\. Connect Claude/, 'offline without an answering legacy model says what to do, not why a local model failed');
   assert.match(down, /<button[^>]*disabled[^>]*>[^<]*(?:<[^>]*>)*Retry/, 'Retry is disabled while the route is unavailable');
 });
 

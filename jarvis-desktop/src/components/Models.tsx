@@ -234,9 +234,9 @@ export function ModelsView(p: ModelsViewProps) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Local AI"
-        title="Models"
-        subtitle="Everything here talks to Ollama on this computer. Nothing is downloaded unless you start a download in online mode."
+        eyebrow="Advanced"
+        title="Local models"
+        subtitle="Legacy: for setups from earlier versions that answer through a local Ollama server. Claude does not need anything here. Nothing is downloaded unless you start a download in online mode."
         actions={<Button icon={ArrowClockwise} busy={p.loading} disabled={p.preview} onClick={p.onRefresh}>Refresh</Button>}
       />
       {p.preview && <Notice tone="warn" title="Browser preview">There is no backend here, so nothing about local models can be read or changed. Open the Electron app.</Notice>}

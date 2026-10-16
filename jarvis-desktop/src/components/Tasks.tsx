@@ -295,7 +295,7 @@ export function Tasks() {
 
   return (
     <div className="page page-wide">
-      <PageHeader eyebrow="Work" title="Tasks & focus" subtitle={total ? `${doneCount} of ${total} done.` : 'A checklist with due dates, plus a focus timer.'} />
+      <PageHeader eyebrow="Work" title="Tasks" subtitle={total ? `${doneCount} of ${total} done.` : 'A checklist with due dates, plus a focus timer.'} />
 
       <div className="tasks-grid">
         <div className="stack">

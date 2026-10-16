@@ -82,17 +82,42 @@ export function modelReadiness(input: ReadinessInput): ModelReadiness {
   const { settings, capabilities, systemError, cloudConfigured } = input;
   if (settings.mode === 'online') {
     if (!settings.cloudModel.trim()) return { route: 'cloud', level: 'blocked', title: 'No model is chosen', detail: 'Choose a model in Connect AI before chatting. Nothing is sent until then.' };
+    const modelError = cloudModelError(settings.cloudModel);
+    if (modelError) return { route: 'cloud', level: 'blocked', title: 'The model name is not valid', detail: `${modelError} Choose a model from the list in Connect AI.` };
     if (cloudConfigured === false) {
-      return { route: 'cloud', level: 'blocked', title: 'No API key is saved', detail: 'Chat shows an error and sends nothing until you save your key in Connect AI. It never switches to another provider.' };
+      return { route: 'cloud', level: 'blocked', title: 'No API key is saved', detail: 'Chat shows an error and sends nothing until you save your key in Connect AI. It never switches to another provider or to a local model.' };
     }
     if (cloudConfigured === null) return { route: 'cloud', level: 'unknown', title: 'Key status unknown', detail: 'The saved-key check did not answer. Check again, or open Connect AI.' };
     return { route: 'cloud', level: 'ready', title: 'AI is connected', detail: `Messages go to “${settings.cloudModel}” with your saved key when you send them. Whether the provider answers is shown in the conversation.` };
   }
-  const local = capabilities?.find((c) => c.id === 'local-llm');
-  if (!systemError && local?.available && settings.localModel.trim()) {
+  // Offline: AI is off unless an earlier local-model setup proves it still answers. Until the check answers we do not know.
+  if (systemError) return { route: 'cloud', level: 'unknown', title: 'AI status unknown', detail: `${systemError} Notes, tasks and search still work on this computer.` };
+  if (capabilities === null) return { route: 'cloud', level: 'unknown', title: 'Checking AI', detail: 'The capability check has not answered yet. Notes, tasks and search work on this computer meanwhile.' };
+  const local = capabilities.find((c) => c.id === 'local-llm');
+  const legacyValid = !localEndpointError(settings.localEndpoint) && !localModelError(settings.localModel);
+  if (local?.available && legacyValid) {
     return { route: 'local', level: 'ready', title: 'Legacy local model is answering', detail: `Replies come from “${settings.localModel}” on this computer, set up in an earlier version. Connect Claude for the full assistant.` };
   }
   return { route: 'cloud', level: 'blocked', title: 'AI is not connected', detail: 'Connect Claude with your own Anthropic API key to chat. Notes, tasks and search work on this computer without it.' };
+}
+
+const OLLAMA_HINT = 'This legacy route needs Ollama running on this computer with the model installed (“ollama pull” followed by the model name). Claude does not need it.';
+
+/**
+ * Readiness of the legacy local-model route alone, for the Advanced section in Settings where an earlier setup is
+ * managed. It comes from the live local-llm check, never from filled-in fields. Normal flows use modelReadiness.
+ */
+export function legacyLocalReadiness(input: Omit<ReadinessInput, 'cloudConfigured'>): ModelReadiness {
+  const { settings, capabilities, systemError } = input;
+  if (localEndpointError(settings.localEndpoint) || localModelError(settings.localModel)) {
+    return { route: 'local', level: 'blocked', title: 'The local model settings are incomplete', detail: 'Fix the endpoint and model name in the legacy local model section.' };
+  }
+  if (systemError) return { route: 'local', level: 'unknown', title: 'The local model could not be checked', detail: systemError };
+  const cap = capabilities?.find((c) => c.id === 'local-llm');
+  if (!cap) return { route: 'local', level: 'unknown', title: 'Local model not checked yet', detail: 'Waiting for the check to finish.' };
+  if (cap.available) return { route: 'local', level: 'ready', title: 'Local model is ready', detail: `“${settings.localModel}” answered on this computer. It is used only while AI requests are off.` };
+  const reason = cap.reason ?? 'The local model server did not respond.';
+  return { route: 'local', level: 'blocked', title: 'Local model is not available', detail: /ollama pull/i.test(reason) ? reason : `${reason.replace(/[.\s]+$/, '')}. ${OLLAMA_HINT}` };
 }
 
 /** The backend reports safe launch only through the desktop-control capability. Returns its reason, or null. */

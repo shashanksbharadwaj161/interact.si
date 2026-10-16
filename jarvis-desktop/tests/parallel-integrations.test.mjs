@@ -304,7 +304,7 @@ test('the family filter narrows cards and combines with the method filter', () =
 test('the panel renders the provider overview, family filter and a Spotify app-launch route without claiming a connection', () => {
   const html = renderToStaticMarkup(createElement(ui.IntegrationsPanel, { mode: 'offline', previewAction: async () => { throw new Error('not called'); }, executeAction: async () => ({}), notify: () => {} }));
   assert.match(html, /Providers at a glance/);
-  for (const label of ['Claude', 'ChatGPT', 'Spotify', 'Browser', 'Local model']) assert.match(html, new RegExp(`aria-label="${label} connection methods"`));
+  for (const label of ['Claude', 'ChatGPT', 'Spotify', 'Browser', 'Legacy local model']) assert.match(html, new RegExp(`aria-label="${label} connection methods"`));
   assert.match(html, /Start the Spotify app/);
   assert.match(html, /does not sign in or connect an account/);
   assert.match(html, /App launch/);
