@@ -1,5 +1,7 @@
 # Current task: full product UI/UX revamp
 
+**Newest research correction:** read `planning/ui-revamp/HITODAMA-DEEP-STUDY.md`. The user rejected the current review build. The key gap is the desktop companion/island interaction model, actual screen context and native AI action loop. Keep the cyberpunk/Claude-primary direction, preserve useful PR work, and prototype the compact experience before another broad page restyle. The study separates live observations, official video demonstrations, actual REA evidence and our source gaps.
+
 **Latest direction:** start with `planning/ui-revamp/CYBERPUNK-DIRECTION.md`. The user changed the target to an expressive cyberpunk/futuristic interface with distinctive fonts, highly interactive components and smooth motion throughout. Claude API is primary; omit local-model setup from normal first-run/Assistant paths. This supersedes the calm Porcelain/Ink and offline-AI-first parts of the earlier brief, not native security or privacy controls.
 
 The latest user instruction on 16 October 2026 authorizes Claude Code to implement the full UI/UX revamp in this repository. Start with `planning/ui-revamp/REVAMP-BRIEF.md`, then the product audit and reference review beside it. Work in `jarvis-desktop/`; do not restart the Control Room or paid API agent loops.
