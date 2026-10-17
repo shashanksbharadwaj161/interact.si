@@ -41,6 +41,16 @@ Codex's local companion already preserves shared surfaces, pixel hit testing and
 
 ## Still open
 
+| Core journey | Current local status | What remains to call it an installed-app success |
+|---|---|---|
+| Select screen content → explain | Region picker/crop/token and Claude vision/tool-loop code exist; geometry and mocked-provider cases tested | Real chosen-screen interaction and live provider answer on Windows; context disclosure/cancellation review |
+| Draft → type in the current app | Bound target, trusted confirmation, native input and accurate partial/unverified receipts exist; controller/helper guards tested | Controlled external-app typing/focus/revalidation journey on Windows; broader semantic UIA is not yet a companion tool |
+| Speak → review → insert | Shared voice input/phase/cancel/stop and draft review now integrated; 13 generated-audio UI checks pass | Real microphone/Windows recognizer quality and reviewed insertion into a supported external app |
+| Ask about saved information | Saved search/read tools and citation handling exist; actual notes editing/persistence plus mocked agent-tool cases tested | Live Claude grounding against those tools and owner usability review |
+| Invoke a saved routine | Existing hub routine engine is retained | A companion agent tool/tray integration with preview, approval, cancellation and receipt; currently assigned to Claude |
+
+These statuses distinguish implemented code and automated checks from a complete real-user journey. They are not an aggregate completion percentage.
+
 The larger computer-use/UIA/routine/utility-tray assignment is ongoing in Claude. It is not completed merely because the prompt was sent. Its next reviewed commits need integration and actual Windows journey checks. Live Claude vision/tool behavior, real dictation quality, real app input/focus, protected surfaces, mixed displays and desktop acrylic composition are not claimed verified by this pass. OAuth registrations and per-user integrations also require their own complete implementation/testing.
 
 The art is a real first animation pass, not the final high-resolution continuous character rig. Current v2 cells are 192×208 with their contract pose timings. Review the motion and iterate specific states/directions before recording approval.
