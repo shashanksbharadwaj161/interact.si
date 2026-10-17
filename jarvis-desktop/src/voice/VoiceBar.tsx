@@ -34,7 +34,7 @@ export function useListeningElapsed(snap: VoiceSnapshot): number {
 
 /**
  * Push to talk: press starts listening (and interrupts read-aloud), a second press stops and transcribes. Letting go
- * after a hold stops; a quick tap keeps listening until the next press. Esc cancels.
+ * after a hold stops; a quick tap keeps listening until the next press. Esc cancels, or stops read-aloud.
  */
 export function usePushToTalk(voice: VoiceSession, o: { holdMs?: number; onStart?: () => void } = {}) {
   const pressAt = useRef(0);
@@ -64,7 +64,11 @@ export function usePushToTalk(voice: VoiceSession, o: { holdMs?: number; onStart
     onPointerUp: release,
     onPointerCancel: cancel,
     onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key === 'Escape') cancel();
+      // Esc ends whatever the voice is doing: read-aloud stops, a recording or transcription is cancelled.
+      if (e.key === 'Escape') {
+        if (voice.getSnapshot().phase === 'speaking') void voice.stopSpeaking();
+        else cancel();
+      }
       if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
         e.preventDefault();
         press();
