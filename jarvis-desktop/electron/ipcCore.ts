@@ -90,6 +90,8 @@ export interface ConfirmWindowLike { isDestroyed(): boolean; isVisible(): boolea
 
 export interface MessageBoxOptions {
   type: 'warning'; title: string; message: string; detail: string; buttons: string[]; defaultId: number; cancelId: number; noLink: true;
+  /** Closes the dialog as if Cancel was chosen (the request it belongs to was stopped). */
+  signal?: AbortSignal;
 }
 
 export interface TrustedConfirmDeps<W extends ConfirmWindowLike> {
@@ -103,10 +105,10 @@ export interface TrustedConfirmDeps<W extends ConfirmWindowLike> {
  * Builds BackendEnv.confirm. The dialog is owned by the main window, defaults to Cancel and carries the full detail.
  * Fails closed: no visible, focused, ready, trusted window; a dialog already open; or any dialog error -> false.
  */
-export function createTrustedConfirm<W extends ConfirmWindowLike>(deps: TrustedConfirmDeps<W>): (summary: string, detail: string) => Promise<boolean> {
+export function createTrustedConfirm<W extends ConfirmWindowLike>(deps: TrustedConfirmDeps<W>): (summary: string, detail: string, signal?: AbortSignal) => Promise<boolean> {
   let open = false;
-  return async (summary, detail) => {
-    if (open || typeof summary !== 'string' || typeof detail !== 'string') return false;
+  return async (summary, detail, signal) => {
+    if (open || typeof summary !== 'string' || typeof detail !== 'string' || signal?.aborted) return false;
     const win = deps.getWindow();
     try {
       if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized() || !win.isFocused() || !deps.isTrusted(win)) return false;
@@ -115,9 +117,10 @@ export function createTrustedConfirm<W extends ConfirmWindowLike>(deps: TrustedC
     try {
       const r = await deps.showMessageBox(win, {
         type: 'warning', title: 'Desktop Companion', message: summary.slice(0, 300), detail,
-        buttons: ['Cancel', 'Continue'], defaultId: 0, cancelId: 0, noLink: true,
+        buttons: ['Cancel', 'Continue'], defaultId: 0, cancelId: 0, noLink: true, ...(signal ? {signal} : {}),
       });
-      return r.response === 1;
+      // A stop while the dialog was open closes it as Cancel; an answer that raced the stop does not count either.
+      return r.response === 1 && !signal?.aborted;
     } catch { return false; } finally { open = false; }
   };
 }

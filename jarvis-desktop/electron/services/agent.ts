@@ -18,9 +18,15 @@ export type UndoHandle = {kind: 'task'; id: string; label: string};
 export type ToolPhase = 'running' | 'awaiting-confirm' | 'done' | 'declined' | 'failed';
 export type AgentEvent =
   | {type: 'status'; phase: 'sending' | 'thinking'}
-  | {type: 'tool'; callId: string; tool: string; label: string; phase: ToolPhase; summary: string; verified?: boolean; undo?: UndoHandle}
+  /** `stage: 'verifying'` on a running step: the tool is reading back what it changed (additive, so older pages still work). */
+  | {type: 'tool'; callId: string; tool: string; label: string; phase: ToolPhase; summary: string; verified?: boolean; undo?: UndoHandle; stage?: 'verifying'}
   | {type: 'answer'; text: string; citations: Citation[]; steps: number}
-  | {type: 'error'; reason: 'setup' | 'cancelled' | 'refused' | 'truncated' | 'steps' | 'provider' | 'network'; message: string};
+  /**
+   * `kind` refines `reason` without changing it (older pages keep working): offline (online mode is off, nothing was
+   * sent; reason network), limit (provider rate limiting or overload, or this app's per-minute cap; reason provider or
+   * network), key (the provider rejected the key; reason setup).
+   */
+  | {type: 'error'; reason: 'setup' | 'cancelled' | 'refused' | 'truncated' | 'steps' | 'provider' | 'network'; message: string; kind?: FailureKind};
 
 export type ToolOutcome = {
   ok: boolean;
@@ -36,7 +42,9 @@ export type ToolOutcome = {
 };
 
 /** setPhase reports a confirmation opening ('awaiting-confirm') and work resuming after it ('running'). */
-export type ToolContext = {signal: AbortSignal; setPhase: (phase: Extract<ToolPhase, 'awaiting-confirm' | 'running'>, summary: string) => void};
+export type FailureKind = 'offline' | 'limit' | 'key';
+/** setPhase('running', …, 'verifying') marks the read-back of a change the tool just made. */
+export type ToolContext = {signal: AbortSignal; setPhase: (phase: Extract<ToolPhase, 'awaiting-confirm' | 'running'>, summary: string, stage?: 'verifying') => void};
 
 export interface AgentTool<I = unknown> {
   def: AnthropicToolDef;
@@ -74,6 +82,20 @@ export function extractCitations(text: string, found: readonly Citation[]): Cita
   return out;
 }
 
+/**
+ * Classifies a failed model call by the text this app's own modules wrote (cloud.ts HTTP errors, netGuard refusals), so
+ * offline mode, limits and an unreachable network read differently. The provider's own text stays a provider error.
+ */
+export function classifyFailure(raw: string): {reason: Extract<AgentEvent, {type: 'error'}>['reason']; kind?: FailureKind} {
+  if (/^Offline mode\b/i.test(raw)) return {reason: 'network', kind: 'offline'};
+  if (/request limit reached/i.test(raw)) return {reason: 'network', kind: 'limit'};
+  if (/HTTP 429|rate limit|overloaded/i.test(raw)) return {reason: 'provider', kind: 'limit'};
+  if (/rejected the API key/i.test(raw)) return {reason: 'setup', kind: 'key'};
+  // The app's own network guard (denied hosts) reads as a network stop; the provider's answers stay provider errors.
+  if (/network|blocked|denied|allow list/i.test(raw)) return {reason: 'network'};
+  return {reason: 'provider'};
+}
+
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}… (cut at ${n} characters)` : s);
 
 export async function runAgent(req: AgentRequest): Promise<void> {
@@ -102,9 +124,7 @@ export async function runAgent(req: AgentRequest): Promise<void> {
       // Transport failures (no connection, DNS, reset, timeout) say so; the provider's own answers keep their message.
       const transport = /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN|socket|timed? ?out|TimeoutError/i.test(raw) || (e instanceof Error && e.name === 'TimeoutError');
       if (transport) return emit({type: 'error', reason: 'network', message: 'Anthropic could not be reached. Check the connection and try again. Nothing was sent after this point.'});
-      // The app's own network guard (offline mode, denied hosts, its per-minute cap) reads as a network stop; the
-      // provider's answers, including its rate limiting, stay provider errors.
-      return emit({type: 'error', reason: /network|offline|blocked|denied|request limit reached/i.test(raw) ? 'network' : 'provider', message: raw});
+      return emit({type: 'error', ...classifyFailure(raw), message: raw});
     }
     if (res.inputTokens !== null && res.outputTokens !== null) req.onUsage?.(res.inputTokens, res.outputTokens);
     if (signal.aborted) return cancelled();
@@ -143,7 +163,7 @@ export async function runAgent(req: AgentRequest): Promise<void> {
       try {
         outcome = await tool.run(checked.value, {
           signal,
-          setPhase: (phase, summary) => emit({type: 'tool', callId: use.id, tool: use.name, label: tool.label, phase, summary}),
+          setPhase: (phase, summary, stage) => emit({type: 'tool', callId: use.id, tool: use.name, label: tool.label, phase, summary, ...(stage ? {stage} : {})}),
         });
       } catch (e) {
         outcome = {ok: false, phase: 'failed', content: 'The tool failed and nothing was changed.', summary: e instanceof Error ? e.message.slice(0, 200) : 'The tool failed.'};

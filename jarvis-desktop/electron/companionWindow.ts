@@ -454,7 +454,8 @@ export function createCompanion(deps: CompanionDeps) {
         island!.focus();
         await new Promise((r) => setTimeout(r, 60));
       }
-      return confirm(summary, detail);
+      // Stop in the island closes this dialog as Cancel: the request it belongs to is over.
+      return confirm(summary, detail, ctl.signal);
     };
     void deps.backend.companion.run({text, image, ...(sendTarget ? {target: sendTarget, targetCurrent} : {})}, {emit, confirm: runConfirm, signal: ctl.signal}).catch((e) => {
       emit({type: 'error', reason: 'provider', message: safeErrorMessage(e)});

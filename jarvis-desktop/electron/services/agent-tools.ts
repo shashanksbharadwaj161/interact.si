@@ -149,8 +149,10 @@ function createTask(deps: AgentToolDeps): AgentTool<{title: string; due?: string
       // A false answer is either Cancel or a confirmation that could not be shown (the island was not visible and
       // focused): both mean nothing is saved, and the wording does not claim which one it was.
       if (!ok) return {ok: true, phase: 'declined', content: 'Not confirmed: the person chose Cancel or the confirmation could not be shown. Nothing was saved.', summary: 'Not confirmed. Nothing was saved'};
+      ctx.setPhase('running', 'Saving the task');
       const before = new Set(deps.snapshot().tasks.map((t) => t.id));
       const after = await deps.saveTask({title, done: false, ...(due ? {due} : {})});
+      ctx.setPhase('running', 'Checking the task is in your list', 'verifying');
       // Verify against the saved list rather than trusting the call: the new task must be there with this title.
       const created = after.tasks.find((t) => !before.has(t.id) && t.title === title);
       if (!created) return {ok: false, phase: 'failed', content: 'The save returned, but the task is not in the list. Treat it as not saved.', summary: 'Saved, but the task could not be found afterwards', verified: false};
