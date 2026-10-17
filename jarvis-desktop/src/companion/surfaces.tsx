@@ -110,6 +110,13 @@ export function Command(p: {
   target?: TypingTarget | null;
   onClearTarget?: () => void;
   autoFocus?: boolean;
+  /** Live voice state (src/voice VoiceBar, compact) shown above the message field while listening or transcribing. */
+  voice?: ReactNode;
+  /** The Talk button (src/voice TalkButton), placed next to Ask. */
+  talk?: ReactNode;
+  /** Opens the utility tray. Shown as a labelled button; `utilitiesShortcut` is announced and handled by the caller. */
+  onUtilities?: () => void;
+  utilitiesShortcut?: string;
 }) {
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -120,6 +127,11 @@ export function Command(p: {
   return (
     <div className="cmd">
       <Head title="What can I do for you?" meta={ready ? `Claude · ${readiness.model}` : 'Claude is not connected yet'}>
+        {p.onUtilities && (
+          <button type="button" className="chipbtn" onClick={p.onUtilities} aria-keyshortcuts={p.utilitiesShortcut} title={p.utilitiesShortcut ? `Tasks, notes, routines and apps (${p.utilitiesShortcut})` : 'Tasks, notes, routines and apps'}>
+            Utilities
+          </button>
+        )}
         <button type="button" className="ibtn" onClick={p.onToggleOptions} aria-expanded={p.showOptions} aria-label="Position, size and look" title="Position, size and look">
           <span aria-hidden>⋯</span>
         </button>
@@ -139,6 +151,7 @@ export function Command(p: {
           </button>
         </div>
       )}
+      {p.voice}
       <form
         className="cmd-row"
         onSubmit={(e) => {
@@ -166,6 +179,7 @@ export function Command(p: {
           placeholder={p.region ? 'Ask about the area you picked' : 'Ask, or tell me what to do'}
           disabled={!ready}
         />
+        {p.talk}
         <button type="submit" className="btn btn-primary" disabled={!ready || !p.text.trim()}>
           Ask
         </button>
@@ -226,6 +240,7 @@ export function Command(p: {
 }
 
 const PHASE_WORD: Record<ToolStep['phase'], string> = {running: 'Working', 'awaiting-confirm': 'Needs your answer', done: 'Done', declined: 'Not done', failed: 'Did not work'};
+const stepWord = (s: ToolStep) => (s.phase === 'running' && s.stage === 'verifying' ? 'Checking' : PHASE_WORD[s.phase]);
 
 export function StepList({steps}: {steps: ToolStep[]}) {
   if (!steps.length) return null;
@@ -233,7 +248,7 @@ export function StepList({steps}: {steps: ToolStep[]}) {
     <ol className="steps">
       {steps.map((s) => (
         <li key={s.callId} className={`is-${s.phase}`}>
-          <span className="step-word">{PHASE_WORD[s.phase]}</span> {s.summary}
+          <span className="step-word">{stepWord(s)}</span> {s.summary}
           {s.phase === 'done' && s.verified && <span className="tag-ok">checked</span>}
         </li>
       ))}
@@ -257,6 +272,57 @@ export function Working({pending, steps, hasRun, onStop, autoFocus}: {pending: '
       <Foot>
         <span className="b-meta">Esc stops. Anything already confirmed stays done.</span>
         <button type="button" className="stop" ref={stop} onClick={onStop} disabled={!hasRun && !pending}>
+          Stop
+        </button>
+      </Foot>
+    </div>
+  );
+}
+
+/**
+ * The island's working view: the real named operation (sending, waiting for Claude's next step, a named tool, checking a
+ * result) from src/companion/island/state.ts workLine, the steps so far, and Stop. No percentages, no reasoning text.
+ */
+export function WorkView({line, steps, onStop, autoFocus}: {line: {title: string; detail: string}; steps: ToolStep[]; onStop: () => void; autoFocus?: boolean}) {
+  const stop = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (autoFocus !== false) stop.current?.focus();
+  }, [autoFocus]);
+  return (
+    <div className="work" aria-busy="true">
+      <Head title={line.title} meta={line.detail} />
+      <StepList steps={steps} />
+      <Foot>
+        <span className="b-meta">Esc or Stop ends the request. Anything already confirmed stays done.</span>
+        <button type="button" className="stop" ref={stop} onClick={onStop}>
+          Stop
+        </button>
+      </Foot>
+    </div>
+  );
+}
+
+/**
+ * While a Windows confirmation is open: what exactly is being asked, for which window. This panel cannot approve
+ * anything; only the native dialog can, and Cancel is its default. Stop ends the request and closes that dialog.
+ */
+export function ConfirmView({step, target, steps, onStop, autoFocus}: {step: ToolStep | null; target?: TypingTarget | null; steps: ToolStep[]; onStop: () => void; autoFocus?: boolean}) {
+  const stop = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (autoFocus !== false) stop.current?.focus();
+  }, [autoFocus]);
+  return (
+    <div className="work conf">
+      <Head title="Answer in the Windows confirmation" meta="Approve or cancel there. Cancel is the default; this panel cannot approve it." />
+      <div className="conf-what" role="status">
+        <span className="conf-label">{step?.label ?? 'A step'}</span>
+        <span>{step?.summary ?? 'Waiting for your answer.'}</span>
+        {target && <span className="b-meta">Window: {target.process.replace(/\.exe$/i, '')} · “{target.title || 'Untitled window'}”</span>}
+      </div>
+      <StepList steps={steps.filter((s) => s !== step && s.phase !== 'awaiting-confirm')} />
+      <Foot>
+        <span className="b-meta">Stop ends the request and closes the confirmation as Cancel.</span>
+        <button type="button" className="stop" ref={stop} onClick={onStop}>
           Stop
         </button>
       </Foot>
@@ -340,22 +406,39 @@ const FAILURE_TITLE: Record<Failure['reason'], string> = {
   network: 'Could not reach Claude',
 };
 
-export function ErrorView(p: {failure: Failure; steps: ToolStep[]; undone: Record<string, 'done' | 'failed'>; onUndo: (id: string) => void; onRetry: () => void; onSettings: () => void; onDone: () => void}) {
+const KIND_TITLE: Record<NonNullable<Failure['kind']>, string> = {
+  offline: 'Online mode is off',
+  limit: 'Claude is busy or rate limited',
+  key: 'Your API key was not accepted',
+};
+
+/** What went wrong, in plain words, with the request kept for Try again. Offline, limits and an unreachable network differ. */
+export function ErrorView(p: {failure: Failure; steps: ToolStep[]; undone: Record<string, 'done' | 'failed'>; onUndo: (id: string) => void; onRetry: () => void; onSettings: () => void; onDone: () => void; draft?: string | null; onBack?: () => void; autoFocus?: boolean}) {
+  const retry = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (p.autoFocus) retry.current?.focus();
+  }, [p.autoFocus]);
   return (
     <div className="ans is-error">
-      <Head title={FAILURE_TITLE[p.failure.reason]} />
+      <Head title={p.failure.kind ? KIND_TITLE[p.failure.kind] : FAILURE_TITLE[p.failure.reason]} />
       <p className="ans-text" role="alert">
         {p.failure.message}
       </p>
+      {p.draft && <p className="b-meta err-draft">Your request is kept: “{p.draft.length > 120 ? `${p.draft.slice(0, 120)}…` : p.draft}”</p>}
       <StepList steps={p.steps} />
       <Receipts steps={p.steps} undone={p.undone} onUndo={p.onUndo} />
       <Foot>
-        {p.failure.reason === 'setup' && (
+        {p.onBack && (
+          <button type="button" className="btn" onClick={p.onBack}>
+            Edit request
+          </button>
+        )}
+        {(p.failure.reason === 'setup' || p.failure.kind === 'offline' || p.failure.kind === 'key') && (
           <button type="button" className="btn" onClick={p.onSettings}>
             Open Settings
           </button>
         )}
-        <button type="button" className="btn" onClick={p.onRetry}>
+        <button type="button" className="btn" ref={retry} onClick={p.onRetry}>
           {p.failure.reason === 'cancelled' ? 'Ask again' : 'Try again'}
         </button>
         <button type="button" className="btn btn-primary" onClick={p.onDone}>
