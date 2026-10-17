@@ -838,6 +838,8 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
 
     speak: (text) => speech.speak(text),
     transcribe: (audio) => speech.transcribe(audio),
+    speechStop: async () => speech.cancel(),
+    transcribeCancel: async () => speech.cancelTranscribe(),
 
     async exportData() {
       const dest = await env.dialogs.saveExport(`jarvis-export-${stampForName((env.now ?? (() => new Date()))())}.json`);

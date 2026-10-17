@@ -4,11 +4,15 @@
  * real UI states (ready, unavailable, error, streaming) without Electron, a model, a key or the network.
  * It is never bundled with the app, never calls a provider and stores only booleans for keys (never the key text).
  *
- * Configure with window.__FIXTURE__ = { chat: 'ready' | 'unavailable', systemError: string | null, onboarded, seed: 'empty' | 'populated', stt, tts }.
+ * Configure with window.__FIXTURE__ = { chat: 'ready' | 'unavailable', systemError: string | null, onboarded, seed: 'empty' | 'populated', stt, tts, speech }.
+ * speech: 'scripted' answers transcribe/speak with labelled fixture results (never a recognizer or a voice) and records every
+ * voice call in window.__FIXTURE_VOICE__ so a journey can check that stop and cancel really reached the backend.
  */
 (function install() {
   const cfg = Object.assign({ chat: 'ready', systemError: null, onboarded: true, seed: 'empty', stt: false, tts: false, mode: 'offline', persist: true }, window.__FIXTURE__ || {});
   const KEY = 'fixture.backend.state';
+  const voice = { calls: [], transcriptions: 0, cancelled: new Set(), stopSpeaking: null };
+  window.__FIXTURE_VOICE__ = voice;
   const now = () => new Date().toISOString();
   let seq = 0;
   const id = (p) => `${p}_fx${Date.now().toString(36)}${(++seq).toString(36)}`;
@@ -129,8 +133,28 @@
     async clearProviderKey(provider) { keys[provider] = false; return { provider, configured: false }; },
     async previewAction(a) { return { id: id('p'), summary: `Fixture preview: ${a.type}`, requiresApproval: a.type !== 'list-windows', allowed: false, reason: 'Fixture backend cannot control a desktop.' }; },
     async executeAction() { throw new Error('Fixture backend cannot run desktop actions'); },
-    async speak() { return { ok: false, reason: 'Fixture backend has no speech engine' }; },
-    async transcribe() { return { text: '', reason: 'Fixture backend has no speech recognizer' }; },
+    async speak(text) {
+      if (cfg.speech !== 'scripted') return { ok: false, reason: 'Fixture backend has no speech engine' };
+      voice.calls.push(['speak', text.length]);
+      voice.stopSpeaking?.();
+      // No audio plays: the "speech" lasts a fixed time unless speechStop ends it first.
+      return new Promise((resolve) => {
+        const t = setTimeout(() => { voice.stopSpeaking = null; resolve({ ok: true }); }, cfg.speakMs ?? 6000);
+        voice.stopSpeaking = () => { clearTimeout(t); voice.stopSpeaking = null; resolve({ ok: false, reason: 'Speech was stopped' }); };
+      });
+    },
+    async transcribe(wav) {
+      if (cfg.speech !== 'scripted') return { text: '', reason: 'Fixture backend has no speech recognizer' };
+      const riff = wav.length > 44 && String.fromCharCode(...wav.slice(0, 4)) === 'RIFF' && String.fromCharCode(...wav.slice(8, 12)) === 'WAVE';
+      const ms = riff ? Math.round(((wav.length - 44) / 2 / 16000) * 1000) : 0;
+      voice.calls.push(['transcribe', wav.length, riff]);
+      const n = ++voice.transcriptions;
+      await new Promise((r) => setTimeout(r, cfg.transcribeMs ?? 1500));
+      if (voice.cancelled.has(n)) { voice.calls.push(['transcribe-discarded', n]); return { text: '', cancelled: true, reason: 'Transcription was cancelled' }; }
+      return riff ? { text: `[fixture transcript ${n}: a ${ms} ms WAV clip arrived; no recognizer ran]` } : { text: '', reason: 'Fixture backend received no WAV' };
+    },
+    async speechStop() { voice.calls.push(['speechStop']); const had = !!voice.stopSpeaking; voice.stopSpeaking?.(); return had; },
+    async transcribeCancel() { voice.calls.push(['transcribeCancel']); voice.cancelled.add(voice.transcriptions); return true; },
     async exportData() { return { path: null }; },
     async importData() { return save(); },
     async pickPath() { return null; },

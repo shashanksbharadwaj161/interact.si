@@ -20,6 +20,7 @@ This covers branch `claude/compassionate-hawking-m9x36g` in the Linux cloud sess
 | **Type into the app the person was using (journey 2b)** | `agent-tools.ts` `type_into_app`; `backend.ts` `typeIntoTarget`, `foregroundTarget`; `companionWindow.ts`; `ActionService.execute(…, {confirm})` | Four tests with a fake desktop. The flow:<br>1. Preview.<br>2. The companion's trusted confirmation shows the window, process, PID and full text.<br>3. Focus returns to exactly that window and it is re-checked.<br>4. The text is typed.<br><br>What is refused:<br>• Cancel, a window that changed owner, an elevated window, or failed focus types nothing.<br>• A remembered window is never this app, an elevated, minimized or background window.<br>• The window title is quoted to Claude as data.<br><br>How it is reported:<br>• The result is "typed, not read back", with no undo.<br><br>After the adversarial review (one more test):<br>• the preview is bound to the remembered PID and process, so a reused window handle is refused before any dialog;<br>• typing that stops part-way reports "Typing stopped after N of M characters";<br>• the step waits only while the dialog is open;<br>• a policy refusal is not logged as declined;<br>• removing the window or closing the bubble stops an in-flight request from typing. |
 | Pet core | `src/pet/contract.ts`, `manifest.ts`, `atlas-check.ts`, `clock.ts`, `adapter.ts` | `tests/pet-core.test.mjs` (31). After the review:<br>• a verified-change jump that happens mid-run waits until work ends, then plays in full, with review after it;<br>• a failure does not replay after a drag;<br>• no gaze while carried;<br>• reason texts claim only what the error code means. |
 | Pet renderer plumbing | `src/pet/registry.ts`, `loader.ts`, `PetSprite.tsx`, `PetSlot.tsx`, `MissingArt.tsx`, `styles/pet.css` | `tests/pet-renderer.test.mjs` (6) covers:<br>• registry pairing;<br>• the approval gate and its reasons;<br>• data-URL bytes against `atlasSha256`;<br>• the load check on real decoded pixels, with a real jump lift;<br>• no pack installed;<br>• no drawing in the missing-art code.<br><br>The board capture shows the renderer playing the **test pattern** through every adapter state. |
+| **Voice in the Assistant (hub)** | `src/voice/session.ts`, `useVoiceSession.ts`, `VoiceMeter.tsx`, `backends.ts`; `Assistant.tsx`; `styles/voice.css`; hub IPC `speechStop`, `transcribeCancel` | `tests/voice-session.test.mjs` (17) and `scripts/voice-journey.mjs` (13 steps, fake microphone, scripted fixture speech). See `VOICE.md`:<br>• explicit start;<br>• real listening, transcribing and speaking states;<br>• stop and cancel that reach the backend;<br>• release on navigation;<br>• honest unavailable reasons.<br><br>Windows recognition and playback are not run here. |
 | Bubble surfaces (candidate direction) | `src/companion/surfaces.tsx`, `src/styles/companion-bubble.css` (scoped `.cd`) | Rendered on the direction board. **Not wired** into the current `CompanionApp.tsx`; Codex owns that integration. |
 
 ## Partial
@@ -39,9 +40,10 @@ This covers branch `claude/compassionate-hawking-m9x36g` in the Linux cloud sess
   - No strips, cardinals or look rows exist, and no atlas.
   - The product shows "Character art not installed".
   - The create-pet bundled scripts are not available here. See `PET-ART-HANDOFF.md` for the exact files.
-- **Listening and speaking:**
-  - Voice is not built. The listening bubble on the board is a proposal.
-  - It needs separate art; no lip sync is simulated.
+- **Listening and speaking in the companion:**
+  - The hub Assistant has the full voice loop (see `VOICE.md`).
+  - The island has no voice IPC yet; that is the next slice.
+  - The listening bubble on the board is a proposal. It needs separate art, and no lip sync is simulated.
 - **Settings and hub:**
   - There is no Settings page for the companion's personality, anchor or material.
   - Hub routes have not been restyled. That waits for owner approval of `DIRECTION-BOARD.md`.

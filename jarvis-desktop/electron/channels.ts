@@ -25,6 +25,8 @@ export const METHODS = [
   'chatStreamStart', 'chatStreamRead', 'chatStreamCancel',
   // v2.4 approved documents: main-process dialog, token-held preview, save as note only after review.
   'documentsChoose', 'documentsSave', 'documentsDiscard',
+  // v2.5 voice controls: stop reading aloud and drop a transcription in flight. Both act only on this app's own speech.
+  'speechStop', 'transcribeCancel',
 ] as const;
 
 export type MethodName = (typeof METHODS)[number];
@@ -51,6 +53,7 @@ export const ARITY: Record<MethodName, number> = {
   calendarList: 0, calendarImportText: 1, calendarImportFile: 0, calendarExport: 0, calendarClear: 0,
   chatStreamStart: 1, chatStreamRead: 2, chatStreamCancel: 1,
   documentsChoose: 0, documentsSave: 2, documentsDiscard: 1,
+  speechStop: 0, transcribeCancel: 0,
 };
 
 export const channel = (m: string) => `jarvis:${m}`;

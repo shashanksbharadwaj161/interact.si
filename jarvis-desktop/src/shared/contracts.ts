@@ -106,7 +106,9 @@ export interface JarvisAPI {
  saveNote(note:Partial<Note>):Promise<AppState>;deleteNote(id:string):Promise<AppState>;saveTask(task:Partial<Task>):Promise<AppState>;deleteTask(id:string):Promise<AppState>;
  chat(text:string):Promise<ChatMessage>;clearChat():Promise<AppState>;setCloudKey(key:string):Promise<{configured:boolean}>;cloudKeyStatus():Promise<{configured:boolean}>;deleteCloudKey():Promise<void>;
  previewAction(action:AnyActionRequest):Promise<ActionPreview>;executeAction(previewId:string,approved:boolean):Promise<unknown>;
- speak(text:string):Promise<{ok:boolean;reason?:string}>;transcribe(audio:number[]):Promise<{text:string;reason?:string}>;
+ speak(text:string):Promise<{ok:boolean;reason?:string}>;transcribe(audio:number[]):Promise<{text:string;reason?:string;cancelled?:boolean}>;
+ /** v2.5 voice controls, optional. speechStop ends this app's read-aloud (true when something was playing). transcribeCancel makes a transcription in flight return no text; the Windows helper may still finish its own work, and the pending transcribe() call settles when it does. */
+ speechStop?():Promise<boolean>;transcribeCancel?():Promise<boolean>;
  exportData():Promise<{path:string|null}>;importData():Promise<AppState>;pickPath(kind:'file'|'folder'):Promise<string|null>;onActivity(handler:(activity:Activity)=>void):()=>void;
  /** v2, optional. Absent in the browser preview bridge; callers must check before use. */
  getApiInfo?():Promise<ApiInfo>;

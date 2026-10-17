@@ -202,6 +202,7 @@ export const ARG_SPECS: Record<MethodName, readonly ArgSpec[]> = {
   chatStreamStart: [{kind: 'string', max: LIMITS.chat}], chatStreamRead: [STREAM_ID, {kind: 'integer', min: 0, max: 1_000_000}], chatStreamCancel: [STREAM_ID],
   // Preview tokens are random UUIDs; ApprovedDocuments re-checks the exact format and that the token is still pending.
   documentsChoose: [], documentsSave: [STREAM_ID, OPTIONS], documentsDiscard: [STREAM_ID],
+  speechStop: [], transcribeCancel: [],
 };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
