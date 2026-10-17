@@ -17,6 +17,7 @@
     "prototype:build": "vite build --config vite.prototype.config.mjs",
     "companion:review": "electron scripts/companion-review.cjs",
     "board:review": "node scripts/board-review.mjs",
+    "companion:native-check": "electron scripts/companion-native-check.cjs",
     "pet:test-pattern": "python3 scripts/make-pet-test-pattern.py"
   },
   "dependencies": {
