@@ -69,14 +69,18 @@ export const RESTING_SIGNALS: PetSignals = Object.freeze({
   reducedMotion: false,
 });
 
+/** Each says no more than its code is known to mean; the bubble carries the exact message. */
 const FAILURE_REASONS: Readonly<Record<Exclude<PetFailure, 'cancelled'>, string>> = Object.freeze({
-  setup: 'Stopped: the AI provider is not set up yet',
-  refused: 'Stopped: the request was refused',
+  setup: 'Stopped: the request could not start',
+  refused: 'Stopped: Claude declined the request',
   truncated: 'Stopped: the reply was cut off at the length limit',
   steps: 'Stopped: the step limit was reached',
-  provider: 'Stopped: the AI provider returned an error',
-  network: 'Stopped: the network request failed',
+  provider: 'Stopped: Claude returned an error',
+  network: 'Stopped: Claude could not be reached',
 });
+
+/** A one-shot that arrived while work outranked it waits this long to be seen, then is dropped. */
+export const ONE_SHOT_WAIT_MS = 5000;
 
 type OneShot = { state: 'jumping' | 'waving'; since: number; until: number };
 type Timed = { since: number; until: number };
@@ -112,7 +116,22 @@ export function createPetAdapter(startAt = 0): PetAdapter {
   let baseKey: PetState | null = null;
   let baseSince = startAt;
   let oneShot: OneShot | null = null;
+  /** A one-shot that happened while a held state (work, waiting, failure, drag) outranked it. */
+  let pendingShot: { state: OneShot['state']; at: number } | null = null;
   let review: Timed | null = null;
+  /** When the current failure first appeared, so a drag in between does not replay the failure. */
+  let failSince: number | null = null;
+
+  const startShot = (state: OneShot['state'], now: number): void => {
+    if (oneShot && now < oneShot.until && ONE_SHOT_RANK[state] < ONE_SHOT_RANK[oneShot.state]) return;
+    oneShot = { state, since: now, until: now + rowDurationMs(state) };
+  };
+  /** Review never overlaps a one-shot: it starts after the one-shot ends. */
+  const afterShot = (r: Timed): Timed => {
+    if (!oneShot || oneShot.until <= r.since) return r;
+    const shift = oneShot.until - r.since;
+    return { since: r.since + shift, until: r.until + shift };
+  };
 
   const stateView = (state: PetState, reason: string, since: number, motion: { loop: boolean; plays: number; holdLast: boolean }, until: number | null): PetStateView => {
     const still = signals.reducedMotion;
@@ -141,6 +160,8 @@ export function createPetAdapter(startAt = 0): PetAdapter {
         gaze: finiteOrNull(s.gaze),
         reducedMotion: s.reducedMotion === true,
       });
+      if (next.failure === null || next.failure === 'cancelled') failSince = null;
+      else if (failSince === null) failSince = now;
       const key = baseRule(next)?.state ?? null;
       if (key !== baseKey) {
         baseKey = key;
@@ -148,21 +169,37 @@ export function createPetAdapter(startAt = 0): PetAdapter {
       }
       if (signals.surface === 'answer' && next.surface !== 'answer') review = null;
       signals = next;
+      // A one-shot held back by work plays as soon as nothing outranks it (if it is still fresh).
+      if (key === null && pendingShot) {
+        const p = pendingShot;
+        pendingShot = null;
+        if (now - p.at <= ONE_SHOT_WAIT_MS) {
+          startShot(p.state, now);
+          if (review) review = afterShot(review);
+        }
+      }
     },
 
     event(e, now) {
       if (e.kind === 'answer-shown') {
-        review = { since: now, until: now + REVIEW_PLAYS * rowDurationMs('review') };
+        review = afterShot({ since: now, until: now + REVIEW_PLAYS * rowDurationMs('review') });
         return;
       }
       const state = e.kind === 'verified-change' ? 'jumping' : 'waving';
-      if (oneShot && now < oneShot.until && ONE_SHOT_RANK[state] < ONE_SHOT_RANK[oneShot.state]) return;
-      oneShot = { state, since: now, until: now + rowDurationMs(state) };
+      if (baseRule(signals)) {
+        // Not visible now (work or waiting outranks it): hold it so it plays when it can be seen.
+        if (!pendingShot || ONE_SHOT_RANK[state] >= ONE_SHOT_RANK[pendingShot.state]) pendingShot = { state, at: now };
+        return;
+      }
+      startShot(state, now);
     },
 
     view(now) {
       const base = baseRule(signals);
-      if (base) return stateView(base.state, base.reason, baseSince, { loop: base.loop, plays: 1, holdLast: !base.loop }, null);
+      if (base) {
+        const since = base.state === 'failed' && failSince !== null ? failSince : baseSince;
+        return stateView(base.state, base.reason, since, { loop: base.loop, plays: 1, holdLast: !base.loop }, null);
+      }
 
       if (oneShot && now < oneShot.until) {
         const reason = oneShot.state === 'jumping' ? 'A change was verified' : 'Saying hello: you opened the companion';
@@ -171,7 +208,7 @@ export function createPetAdapter(startAt = 0): PetAdapter {
       if (review && signals.surface === 'answer' && now < review.until) {
         return stateView('review', 'Looking over the answer just shown', review.since, { loop: false, plays: REVIEW_PLAYS, holdLast: false }, review.until);
       }
-      if (signals.gaze !== null && !signals.reducedMotion && (signals.surface === 'rest' || signals.surface === 'command')) {
+      if (signals.gaze !== null && signals.dragVx === null && !signals.reducedMotion && (signals.surface === 'rest' || signals.surface === 'command')) {
         return Object.freeze({ kind: 'look', index: angleToLookIndex(signals.gaze), reason: 'Looking toward your pointer' });
       }
 

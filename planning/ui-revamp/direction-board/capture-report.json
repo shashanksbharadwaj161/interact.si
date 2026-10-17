@@ -41,7 +41,7 @@
     },
     {
       "state": "provider-error",
-      "shown": "failed Stopped: the AI provider returned an error"
+      "shown": "failed Stopped: Claude returned an error"
     },
     {
       "state": "cancelled",

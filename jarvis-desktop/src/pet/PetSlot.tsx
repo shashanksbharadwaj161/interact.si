@@ -1,10 +1,12 @@
-import { useEffect, useState, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { CompanionOrb } from '../components/CompanionOrb';
 import type { PetView } from './adapter';
 import { acquirePetPack, releasePetPack, type LoadMode, type PetLoad } from './loader';
 import { MissingArt } from './MissingArt';
 import { PetSprite, petBoxWidth, type PetHitTest } from './PetSprite';
 import '../styles/pet.css';
+
+export type SlotKind = 'pet' | 'legacy-orb' | 'loading' | 'missing' | 'invalid';
 
 /**
  * The one place the companion's identity is drawn. Exactly one of: the character from an approved pack (in review mode
@@ -21,34 +23,46 @@ export function PetSlot({ size, view, appearance = 'pet', mode = 'product', pack
   mode?: LoadMode;
   packId?: string;
   hitRef?: MutableRefObject<PetHitTest | null>;
-  /** What is showing, for callers that describe it elsewhere (status text, settings). */
-  onStatus?: (s: { kind: 'pet' | 'legacy-orb' | 'missing' | 'invalid'; name?: string; review?: string; reason?: string }) => void;
+  /** What is showing, for callers that describe it elsewhere (status text, settings). Called only when it changes. */
+  onStatus?: (s: { kind: SlotKind; name?: string; review?: string; reason?: string }) => void;
 }) {
   const [load, setLoad] = useState<PetLoad | null>(null);
   useEffect(() => {
     if (appearance !== 'pet') return undefined;
     let alive = true;
-    let acquired: string | null = null;
+    setLoad(null);
     void acquirePetPack(mode, packId).then((l) => {
-      if (l.status === 'ready') acquired = l.manifest.id;
       if (alive) setLoad(l);
-      else if (acquired) releasePetPack(acquired);
+      else if (l.status === 'ready') releasePetPack(l.manifest.id);
     });
     return () => {
       alive = false;
-      if (acquired) releasePetPack(acquired);
-      setLoad(null);
     };
   }, [appearance, mode, packId]);
-
-  const kind = appearance === 'legacy-orb' ? 'legacy-orb' : load?.status === 'ready' ? 'pet' : load?.status === 'invalid' ? 'invalid' : 'missing';
+  // Release a ready pack only after React has stopped rendering it (this cleanup runs after the commit that removes it).
   useEffect(() => {
-    if (!onStatus) return;
-    if (kind === 'pet' && load?.status === 'ready') onStatus({ kind, name: load.manifest.name, review: load.manifest.review.status });
-    else if (kind === 'invalid' && load?.status === 'invalid') onStatus({ kind, reason: load.errors.join(' ') });
-    else if (kind === 'missing') onStatus({ kind, reason: load?.status === 'missing' ? load.reason : undefined });
-    else onStatus({ kind });
-  }, [kind, load, onStatus]);
+    if (load?.status !== 'ready') return undefined;
+    const id = load.manifest.id;
+    return () => releasePetPack(id);
+  }, [load]);
+
+  const kind: SlotKind = appearance === 'legacy-orb' ? 'legacy-orb' : load === null ? 'loading' : load.status === 'ready' ? 'pet' : load.status === 'invalid' ? 'invalid' : 'missing';
+  const statusCb = useRef(onStatus);
+  statusCb.current = onStatus;
+  useEffect(() => {
+    const cb = statusCb.current;
+    if (!cb) return;
+    if (kind === 'pet' && load?.status === 'ready') cb({ kind, name: load.manifest.name, review: load.manifest.review.status });
+    else if (kind === 'invalid' && load?.status === 'invalid') cb({ kind, reason: load.errors.join(' ') });
+    else if (kind === 'missing' && load?.status === 'missing') cb({ kind, reason: load.reason });
+    else cb({ kind });
+  }, [kind, load]);
+
+  // The live region reports what the character is doing for the person's request; pointer- and drag-driven changes
+  // (gaze, being carried) are not announced.
+  const quiet = view.kind === 'look' || (view.kind === 'state' && (view.state === 'running-left' || view.state === 'running-right' || /carried/i.test(view.reason)));
+  const live = useRef('');
+  if (!quiet) live.current = view.reason;
 
   useEffect(() => {
     if (!hitRef || kind === 'pet') return undefined;
@@ -76,14 +90,16 @@ export function PetSlot({ size, view, appearance = 'pet', mode = 'product', pack
     );
   } else if (load?.status === 'invalid') {
     body = <MissingArt size={size} status="invalid" reason={load.errors[0] ?? 'The pack failed its load check.'} />;
+  } else if (load?.status === 'missing') {
+    body = <MissingArt size={size} reason={load.reason} />;
   } else {
-    body = <MissingArt size={size} reason={load?.status === 'missing' ? load.reason : 'Loading…'} />;
+    body = <div className="pet-loading" style={{ width: petBoxWidth(size), height: size }} role="img" aria-label="Loading the character" />;
   }
   return (
     <div className="pet-slot" data-kind={kind} style={{ width: petBoxWidth(size), height: size }}>
       {body}
       <span className="pet-sr" role="status" aria-live="polite">
-        {kind === 'pet' ? view.reason : ''}
+        {kind === 'pet' ? live.current : ''}
       </span>
     </div>
   );

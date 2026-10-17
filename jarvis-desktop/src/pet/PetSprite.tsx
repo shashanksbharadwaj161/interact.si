@@ -35,10 +35,12 @@ function sourceFor(view: PetView): { cellAt: (now: number) => Cell; src: FrameSo
     const col = view.frame ?? 0;
     return { cellAt: () => ({ row, col }), src: null };
   }
+  // A view that ends by itself (one-shots, review) holds its last frame until the caller swaps in the next view,
+  // instead of flashing the row's first frame if that swap is late.
   const src: FrameSource =
     view.state === 'idle' && view.loop
       ? idleWithRests(Math.random, { startAt: view.since })
-      : new Animator().play(PET_ROWS[view.state], { loop: view.loop, holdLast: view.holdLast, startAt: view.since, repeat: view.plays || 1 });
+      : new Animator().play(PET_ROWS[view.state], { loop: view.loop, holdLast: view.holdLast || view.until !== null, startAt: view.since, repeat: view.plays || 1 });
   return { cellAt: (now) => ({ row, col: src.frameAt(now) }), src };
 }
 
@@ -59,24 +61,45 @@ export function PetSprite({ pet, view, size, hitRef, className, style }: { pet: 
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return undefined;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(size * dpr);
+    // The backing store follows the display's scale (capped at 2), including when the window moves to another monitor.
+    const fit = (): boolean => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.round(width * dpr);
+      const h = Math.round(size * dpr);
+      if (canvas.width === w && canvas.height === h) return false;
+      canvas.width = w;
+      canvas.height = h;
+      return true;
+    };
+    fit();
     shown.current = null;
     const { cellAt, src } = sourceFor(latest.current);
+    let broken = false;
     const draw = (now: number) => {
+      if (broken) return;
       const c = cellAt(now);
-      if (shown.current && shown.current.row === c.row && shown.current.col === c.col) return;
+      const resized = fit();
+      if (!resized && shown.current && shown.current.row === c.row && shown.current.col === c.col) return;
       shown.current = c;
       const r = cellRect(c.row, c.col);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = rendering === 'smooth';
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(pet.bitmap, r.x, r.y, r.w, r.h, 0, 0, canvas.width, canvas.height);
+      try {
+        ctx.drawImage(pet.bitmap, r.x, r.y, r.w, r.h, 0, 0, canvas.width, canvas.height);
+      } catch {
+        // The bitmap was released (the pack is being swapped): stop drawing rather than throw every frame.
+        broken = true;
+      }
     };
-    const sub: FrameSubscription = { nextChangeAt: (now) => (src ? src.nextChangeAt(now) : null), draw };
+    const sub: FrameSubscription = { nextChangeAt: (now) => (src && !broken ? src.nextChangeAt(now) : null), draw };
     const scheduler = sharedFrameScheduler();
     let off: (() => void) | null = scheduler.subscribe(sub);
+    const dprQuery = typeof matchMedia === 'function' ? matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`) : null;
+    const onDpr = () => {
+      if (off) off = scheduler.subscribe(sub);
+    };
+    dprQuery?.addEventListener('change', onDpr);
     let io: IntersectionObserver | undefined;
     if (typeof IntersectionObserver === 'function') {
       io = new IntersectionObserver((entries) => {
@@ -102,6 +125,7 @@ export function PetSprite({ pet, view, size, hitRef, className, style }: { pet: 
     return () => {
       off?.();
       io?.disconnect();
+      dprQuery?.removeEventListener('change', onDpr);
       if (hitRef) hitRef.current = null;
     };
   }, [pet, key, size, width, rendering, dx, dy, scale, hitRef]);

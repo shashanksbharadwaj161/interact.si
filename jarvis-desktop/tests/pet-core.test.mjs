@@ -544,7 +544,7 @@ test('priority: failure plays once then holds; cancel is idle; a decline is not 
   assert.equal(f.plays, 1);
   assert.equal(f.holdLast, true);
   assert.equal(f.until, null, 'held while the error shows');
-  assert.match(f.reason, /provider returned an error/);
+  assert.match(f.reason, /Claude returned an error/);
   for (const failure of ['setup', 'refused', 'truncated', 'steps', 'network']) {
     const v = viewOf({ failure, surface: 'error' });
     assert.equal(v.state, 'failed');
@@ -594,12 +594,39 @@ test('one-shots play once for exactly one pass, then expire', () => {
   assert.equal(a.view(2200).since, 2200, 'a new verified change restarts the jump');
   assert.equal(a.view(3040).state, 'idle');
 
+  // A verified change usually happens mid-run, while work outranks it: it is held and plays in full once visible.
   const busy = m.createPetAdapter();
   busy.signal(sig({ requestInFlight: true }), 0);
   busy.event({ kind: 'verified-change' }, 100);
   assert.equal(busy.view(200).state, 'running', 'work outranks one-shots');
-  busy.signal(sig({}), 1500);
-  assert.equal(busy.view(1500).state, 'idle', 'an expired one-shot is not replayed later');
+  busy.signal(sig({ surface: 'answer' }), 1500);
+  const shown = busy.view(1500);
+  assert.deepEqual([shown.state, shown.since, shown.until], ['jumping', 1500, 2340], 'the held jump plays from its first frame when work ends');
+  busy.event({ kind: 'answer-shown' }, 1500);
+  assert.equal(busy.view(2000).state, 'jumping', 'review waits for the jump');
+  const rev = busy.view(2340);
+  assert.deepEqual([rev.state, rev.since], ['review', 2340], 'review starts after the jump ends');
+  // Too stale to mean anything any more: dropped, not replayed.
+  const late = m.createPetAdapter();
+  late.signal(sig({ requestInFlight: true }), 0);
+  late.event({ kind: 'verified-change' }, 100);
+  late.signal(sig({}), 100 + m.ONE_SHOT_WAIT_MS + 1);
+  assert.equal(late.view(100 + m.ONE_SHOT_WAIT_MS + 2).state, 'idle', 'a one-shot held too long is dropped');
+});
+
+test('review findings: failure does not replay after a drag; no gaze while carried', () => {
+  const a = m.createPetAdapter();
+  a.signal(sig({ failure: 'network', surface: 'error' }), 0);
+  assert.equal(a.view(10).since, 0);
+  a.signal(sig({ failure: 'network', surface: 'error', dragVx: 200 }), 5000);
+  assert.equal(a.view(5100).state, 'running-right');
+  a.signal(sig({ failure: 'network', surface: 'error', dragVx: 0 }), 5400);
+  const v = a.view(5400);
+  assert.deepEqual([v.state, v.since], ['failed', 0], 'the failure keeps its original start: it stays on its last frame');
+  const carried = m.createPetAdapter();
+  carried.signal(sig({ gaze: 90, dragVx: 20 }), 0);
+  assert.equal(carried.view(10).kind, 'state', 'a slow carry does not look at where the pointer was');
+  assert.equal(carried.view(10).state, 'idle');
 });
 
 test('review plays twice after answer-shown on the answer surface, then falls through', () => {

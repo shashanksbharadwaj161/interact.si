@@ -9,7 +9,7 @@ import {CLOUD_PROVIDERS, cloudProviderInfo, effectiveCloudModel} from '../src/sh
 import {STREAM_LIMITS, StreamAborted, StreamIncomplete, StreamProtocolError, streamOllamaChat, type StreamLimits, type StreamResult} from './services/ollama';
 import {AGENT_MAX_TOKENS, CloudProviderError, createAnthropicMessage, modelListFailure, parseModelList, streamProviderChat} from './services/cloud';
 import {companionSystemPrompt, runAgent, type AgentEvent, type UndoHandle} from './services/agent';
-import {createAgentTools} from './services/agent-tools';
+import {createAgentTools, type TypeResult} from './services/agent-tools';
 import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
 import {parseModelPlan, planIntent as planRules, PLANNED_TYPES, type IntentWindow} from './services/intent';
@@ -114,7 +114,8 @@ export type CompanionReadiness = {ready: true; model: string} | {ready: false; r
 export interface CompanionService {
   readiness(): Promise<CompanionReadiness>;
   /** Runs one request. `confirm` is the trusted native confirmation owned by the companion window. */
-  run(input: {text: string; image?: {base64: string; width: number; height: number}; target?: CompanionTarget}, hooks: {emit: (e: AgentEvent) => void; confirm: (summary: string, detail: string) => Promise<boolean>; signal: AbortSignal}): Promise<void>;
+  /** `targetCurrent` says whether the person still has `target` attached (not removed, bubble not closed); typing checks it. */
+  run(input: {text: string; image?: {base64: string; width: number; height: number}; target?: CompanionTarget; targetCurrent?: () => boolean}, hooks: {emit: (e: AgentEvent) => void; confirm: (summary: string, detail: string) => Promise<boolean>; signal: AbortSignal}): Promise<void>;
   /** Reverses one change the companion just made (only what its receipt offered). */
   undo(handle: UndoHandle): Promise<boolean>;
   /**
@@ -1157,20 +1158,27 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     return {ready: true, model: effectiveCloudModel('anthropic', s.cloudModel)};
   };
   /**
-   * One type-text action on exactly the remembered window, through the action service: preview (window policy, text
-   * rules), the trusted confirmation showing the window and the full text, then focus and a re-check of that window's
-   * identity and policy before any keystroke. The preview must resolve to the same window, or nothing is typed.
+   * One type-text action on exactly the remembered window, through the action service: preview (the handle must still
+   * belong to the remembered process; window policy; text rules), the trusted confirmation showing the window and the
+   * full text, then focus and a re-check of that window's identity and policy before any keystroke. A preview the policy
+   * refuses is discarded, not logged as declined. Input that stops part-way reports how much reached the app.
    */
-  async function typeIntoTarget(target: CompanionTarget, text: string, confirm: (summary: string, detail: string) => Promise<boolean>): Promise<{typed: true; chars: number} | {typed: false; reason: string}> {
+  async function typeIntoTarget(target: CompanionTarget, text: string, confirm: (summary: string, detail: string) => Promise<boolean>, h: {onConfirm: (open: boolean) => void; current: () => boolean}): Promise<TypeResult> {
+    if (!h.current()) return {typed: false, stage: 'before', reason: 'You removed that window or closed the bubble, so nothing was typed'};
     let preview;
-    try { preview = await actions.preview({type: 'type-text', target: `hwnd:${target.hwnd}`, text}); } catch (e) { return {typed: false, reason: e instanceof Error ? e.message : 'The action could not be prepared'}; }
+    try { preview = await actions.preview({type: 'type-text', target: `hwnd:${target.hwnd}`, text}, {expect: {pid: target.pid, process: target.process}}); } catch (e) { return {typed: false, stage: 'before', reason: e instanceof Error ? e.message : 'The action could not be prepared'}; }
     if (!preview.allowed) {
-      await actions.execute(preview.id, false).catch(() => undefined);
-      return {typed: false, reason: preview.reason ?? 'Not allowed'};
+      actions.discard(preview.id);
+      return {typed: false, stage: 'before', reason: preview.reason ?? 'Not allowed'};
     }
-    const r = (await actions.execute(preview.id, true, {confirm}).catch((e: unknown) => ({executed: false, reason: e instanceof Error ? e.message : 'Failed'}))) as {executed: boolean; reason?: string; typed?: number};
-    if (!r.executed) return {typed: false, reason: r.reason ?? 'Not typed'};
-    return {typed: true, chars: typeof r.typed === 'number' ? r.typed : [...text].length};
+    const shown = async (summary: string, detail: string) => {
+      h.onConfirm(true);
+      try { return await confirm(summary, detail); } finally { h.onConfirm(false); }
+    };
+    const r = (await actions.execute(preview.id, true, {confirm: shown}).catch((e: unknown) => ({executed: false, reason: e instanceof Error ? e.message : 'Failed'}))) as {executed: boolean; reason?: string; typed?: number};
+    if (r.executed) return {typed: true, chars: typeof r.typed === 'number' ? r.typed : [...text].length};
+    if (typeof r.typed === 'number' && r.typed > 0) return {typed: false, stage: 'during', chars: r.typed, reason: r.reason ?? 'Typing stopped'};
+    return {typed: false, stage: 'before', reason: r.reason ?? 'Not typed'};
   }
 
   const companion: CompanionService = {
@@ -1186,7 +1194,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
         saveTask: (t) => api.saveTask(t),
         confirm: hooks.confirm,
         today: localDay,
-        ...(target ? {typing: {target, type: (text: string) => typeIntoTarget(target, text, hooks.confirm)}} : {}),
+        ...(target ? {typing: {target, type: (text: string, h: {onConfirm: (open: boolean) => void}) => typeIntoTarget(target, text, hooks.confirm, {...h, current: input.targetCurrent ?? (() => true)})}} : {}),
       });
       let steps = 0, inTok = 0, outTok = 0;
       await runAgent({

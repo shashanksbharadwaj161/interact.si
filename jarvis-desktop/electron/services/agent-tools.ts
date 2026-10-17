@@ -18,7 +18,11 @@ export type AgentToolDeps = {
    * The app window the person was using when they opened the companion, when they kept it attached. Without it there is
    * no typing tool. `type` previews and executes one type-text action on exactly that window (confirmation included).
    */
-  typing?: {target: {process: string; title: string}; type: (text: string) => Promise<{typed: true; chars: number} | {typed: false; reason: string}>};
+  typing?: {
+    target: {process: string; title: string};
+    /** `onConfirm(true)` just before the confirmation shows, `onConfirm(false)` once it is answered. */
+    type: (text: string, hooks: {onConfirm: (open: boolean) => void}) => Promise<TypeResult>;
+  };
 };
 
 const isPlainText = (s: string) => !/[\u0000-\u0008\u000b-\u001f\u007f]/.test(s);
@@ -165,6 +169,9 @@ function createTask(deps: AgentToolDeps): AgentTool<{title: string; due?: string
 
 export const MAX_TYPED_CHARS = 2000;
 
+/** `stage: 'during'` means some characters reached the app before input stopped. */
+export type TypeResult = {typed: true; chars: number} | {typed: false; stage: 'before' | 'during'; chars?: number; reason: string};
+
 function typeIntoApp(deps: AgentToolDeps & {typing: NonNullable<AgentToolDeps['typing']>}): AgentTool<{text: string}> {
   const app = deps.typing.target.process.replace(/\.exe$/i, '');
   return {
@@ -184,10 +191,23 @@ function typeIntoApp(deps: AgentToolDeps & {typing: NonNullable<AgentToolDeps['t
       return {ok: true, value: {text: t}};
     },
     async run({text}, ctx): Promise<ToolOutcome> {
-      ctx.setPhase('awaiting-confirm', `Waiting for your answer in the Windows confirmation (typing into ${app})`);
       if (ctx.signal.aborted) return {ok: false, phase: 'failed', content: 'Stopped before typing. Nothing was typed.', summary: 'Stopped before typing'};
-      const r = await deps.typing.type(text);
+      // The step says it is waiting only while the confirmation is actually open, and working again after it.
+      const r = await deps.typing.type(text, {
+        onConfirm: (open) => ctx.setPhase(open ? 'awaiting-confirm' : 'running', open ? `Waiting for your answer in the Windows confirmation (typing into ${app})` : `Typing into ${app}`),
+      });
       if (!r.typed) {
+        const total = [...text].length;
+        if (r.stage === 'during') {
+          const n = r.chars ?? 0;
+          return {
+            ok: false,
+            phase: 'failed',
+            content: JSON.stringify({typed: 'partly', characters: n, of: total, reason: r.reason, note: 'Some of the text reached the app before typing stopped. Do not type it again automatically: tell the person how much was typed and let them check the app.'}),
+            summary: `Typing stopped after ${n} of ${total} characters (${r.reason.slice(0, 100)}). Check ${app}`,
+            verified: false,
+          };
+        }
         const declined = /declined|not approved|unavailable/i.test(r.reason);
         return declined
           ? {ok: true, phase: 'declined', content: 'Not confirmed: the person chose Cancel or the confirmation could not be shown. Nothing was typed.', summary: 'Not confirmed. Nothing was typed'}

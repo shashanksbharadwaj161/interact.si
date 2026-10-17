@@ -385,3 +385,66 @@ test('typing: the remembered window is never this app, an elevated or minimized 
     assert.ok(!bodies[1].messages[0].content.some((b) => b.type === 'text' && /window titled/.test(b.text)));
   } finally { await f.close(); }
 });
+
+test('typing review fixes: reused handle, partial input, honest phases, no false decline, removed target', async () => {
+  const target = {hwnd: 101, pid: 4242, process: 'notepad.exe', title: 'Untitled - Notepad'};
+  const phases = (events) => events.filter((e) => e.type === 'tool').map((e) => e.phase);
+  // The handle now belongs to another app before the preview: refused, no confirmation, nothing typed.
+  let f = await desktopBackend(typingTurns('hello'), {windows: () => [{...NOTEPAD, pid: 7777, process: 'chrome.exe', title: 'Bank - Chrome'}]});
+  try {
+    let asked = 0;
+    const events = [];
+    await f.b.companion.run({text: 'type hello', target}, {emit: (e) => events.push(e), confirm: async () => { asked++; return true; }, signal: new AbortController().signal});
+    assert.equal(asked, 0, 'no confirmation for a window that changed owner');
+    assert.equal(f.typed.length, 0);
+    assert.match(events.filter((e) => e.type === 'tool').at(-1).summary, /closed or now belongs to another app/);
+    assert.deepEqual(phases(events), ['running', 'failed'], 'no waiting phase without a dialog');
+    const log = (await f.b.getState()).activity.map((a) => a.summary).join('\n');
+    assert.ok(!/Declined: Type into/.test(log), 'a policy refusal is not logged as the person declining');
+  } finally { await f.close(); }
+  // Success: the waiting phase covers only the dialog, then typing runs.
+  f = await desktopBackend(typingTurns('hello there'));
+  try {
+    const events = [];
+    await f.b.companion.run({text: 'type it', target}, {emit: (e) => events.push(e), confirm: async () => true, signal: new AbortController().signal});
+    assert.deepEqual(phases(events), ['running', 'awaiting-confirm', 'running', 'done']);
+  } finally { await f.close(); }
+  // Typing stops part-way: the count is reported, never "nothing was typed".
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'desktop-companion-test-partial-'));
+  let setup = true;
+  const b = await m.createBackend({
+    userData: dir, nativeDir: dir, tmpDir: dir, selfPids: () => [999], safeStorage: fakeSafeStorage,
+    native: {
+      listWindows: async () => [NOTEPAD], focusWindow: async () => ({focused: true}),
+      typeText: async () => { throw Object.assign(new Error('Focus left the approved window; typing stopped'), {typed: 7}); },
+      dpapi: async () => ({ok: true}), speechVoices: async () => [],
+    },
+    shell: {spawnApp: async () => {}, openPath: async () => '', openExternal: async () => {}},
+    dialogs: {openImport: async () => null, pick: async () => null, saveExport: async () => null},
+    confirm: async () => setup,
+    fetchImpl: async (url, init) => typingTurns('a long note that will be interrupted')(String(url), init),
+  });
+  try {
+    await b.setProviderKey('anthropic', KEY);
+    await b.saveSettings({mode: 'online'});
+    setup = false;
+    const events = [];
+    await b.companion.run({text: 'type it', target}, {emit: (e) => events.push(e), confirm: async () => true, signal: new AbortController().signal});
+    const last = events.filter((e) => e.type === 'tool').at(-1);
+    assert.equal(last.phase, 'failed');
+    assert.match(last.summary, /Typing stopped after 7 of 36 characters/);
+    assert.equal(last.verified, false);
+    const log = (await b.getState()).activity.map((a) => `${a.summary} ${a.details ?? ''}`).join('\n');
+    assert.match(log, /7 characters were typed/);
+  } finally { await b.dispose(); await rm(dir, {recursive: true, force: true}); }
+  // The person removed the window (or closed the bubble) while the request was running: nothing typed, no dialog.
+  f = await desktopBackend(typingTurns('hello'));
+  try {
+    let asked = 0;
+    const events = [];
+    await f.b.companion.run({text: 'type hello', target, targetCurrent: () => false}, {emit: (e) => events.push(e), confirm: async () => { asked++; return true; }, signal: new AbortController().signal});
+    assert.equal(asked, 0);
+    assert.equal(f.typed.length, 0);
+    assert.match(events.filter((e) => e.type === 'tool').at(-1).summary, /removed that window or closed the bubble/);
+  } finally { await f.close(); }
+});

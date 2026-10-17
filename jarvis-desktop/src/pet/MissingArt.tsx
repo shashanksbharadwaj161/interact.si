@@ -11,7 +11,7 @@ export function MissingArt({ size, reason, status = 'missing' }: { size: number;
   const title = status === 'invalid' ? 'Character art could not be used' : 'Character art not installed';
   return (
     <div className="pet-missing" data-level={level} data-status={status} style={{ width, height: size }} title={`${title}. ${reason}`} role="img" aria-label={`${title}. ${reason}`}>
-      <span className="pet-missing-title">{level === 'compact' ? 'Art pending' : title}</span>
+      <span className="pet-missing-title">{level === 'compact' ? (status === 'invalid' ? 'Art error' : 'Art pending') : title}</span>
       {level === 'full' && <span className="pet-missing-reason">{reason}</span>}
     </div>
   );

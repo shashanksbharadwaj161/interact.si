@@ -181,6 +181,8 @@ export function createCompanion(deps: CompanionDeps) {
 
   function dragStart() {
     if (!alive() || drag || overlay) return false;
+    // While carried the pet does not look at where the pointer was before the grab.
+    if (gaze.bucket !== null) { gaze.bucket = null; send({type: 'gaze', index: null}); }
     const c = screen.getCursorScreenPoint();
     const p = currentPoint();
     const timer = setInterval(dragTick, DRAG_TICK_MS);
@@ -281,7 +283,15 @@ export function createCompanion(deps: CompanionDeps) {
     win.setAlwaysOnTop(true, 'floating');
     win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
     win.webContents.on('will-navigate', (e, url) => { if (!trusted(url)) e.preventDefault(); });
-    win.on('closed', () => { if (island === win) island = null; run?.abort(); if (drag) dragEnd(); updateGaze(); });
+    win.on('closed', () => {
+      if (island === win) island = null;
+      run?.abort();
+      if (drag) dragEnd();
+      // A new window starts closed and forgets the remembered app window.
+      bubble = null;
+      target = null;
+      updateGaze();
+    });
     win.on('show', updateGaze);
     win.on('hide', updateGaze);
     // Rest: shown without taking focus, so the app the person is using keeps the keyboard; transparent parts let clicks
@@ -414,7 +424,20 @@ export function createCompanion(deps: CompanionDeps) {
     // The remembered window goes with this request only when the page showed it and the person kept it attached; a page
     // that never displays it (or an older one) never sends it.
     const sendTarget = withTarget === true && target ? target : undefined;
-    void deps.backend.companion.run({text, image, ...(sendTarget ? {target: sendTarget} : {})}, {emit, confirm, signal: ctl.signal}).catch((e) => {
+    // An in-flight request may type only while the person still has that same window attached.
+    const targetCurrent = () => !!sendTarget && !!target && target.hwnd === sendTarget.hwnd && target.pid === sendTarget.pid;
+    // A later confirmation in the same request (after typing moved focus to the other app) brings the bubble back to the
+    // front first, but only while the bubble is still open; otherwise the trusted confirmation fails closed as before.
+    const runConfirm = async (summary: string, detail: string) => {
+      if (alive() && bubble && island!.isVisible() && !island!.isFocused()) {
+        setRestFocus(false);
+        island!.show();
+        island!.focus();
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      return confirm(summary, detail);
+    };
+    void deps.backend.companion.run({text, image, ...(sendTarget ? {target: sendTarget, targetCurrent} : {})}, {emit, confirm: runConfirm, signal: ctl.signal}).catch((e) => {
       emit({type: 'error', reason: 'provider', message: safeErrorMessage(e)});
     }).finally(() => { if (run === ctl) run = null; });
     return {runId};
@@ -437,7 +460,7 @@ export function createCompanion(deps: CompanionDeps) {
       place();
       // Closing the bubble gives the keyboard back: Windows activates the window the person was using before.
       if (!bubble && alive()) {
-        target = null;
+        if (target) { target = null; send({type: 'target', target: null}); }
         if (island!.isFocused()) island!.blur();
         setRestFocus(true);
       }
@@ -512,6 +535,8 @@ export function createCompanion(deps: CompanionDeps) {
 
   function dispose() {
     run?.abort();
+    bubble = null;
+    target = null;
     if (drag) { clearInterval(drag.timer); drag = null; }
     gazeWanted = false;
     if (gazeTimer) { clearInterval(gazeTimer); gazeTimer = null; }
