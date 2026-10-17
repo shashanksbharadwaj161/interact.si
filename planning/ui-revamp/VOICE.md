@@ -75,6 +75,7 @@ How it behaves:
 
 - `src/voice/useVoiceSession.ts` is the React hook. Unmounting releases the session; it also handles `visibilitychange` and `pagehide`.
 - `src/voice/VoiceMeter.tsx` draws real level bars written directly from the feed, with no page re-render.
+- `src/voice/VoiceBar.tsx` holds the shared bar, Talk button and push-to-talk (see slice 2).
 - `src/voice/backends.ts` holds `hubVoiceBackend(api)`.
 
 ### Assistant (`src/components/Assistant.tsx`, `src/styles/voice.css`)
@@ -136,6 +137,46 @@ How it behaves:
    - Start listening, then minimise to the tray: the recording is cancelled with a note.
 5. **No recognizer.** Remove the speech recognizer language, or try a machine without one. Talk is off and the microphone panel names the reason.
 
+## What is built (slice 2: the companion island)
+
+### Native side
+
+- **Methods:** five island-only methods (`companionVoiceStatus`, `companionTranscribe`, `companionTranscribeCancel`, `companionSpeak` and `companionSpeechStop`).
+  - They are not callable from the selection overlay.
+  - Their bounds equal the hub's; a test keeps them equal.
+- **Shared engine:** both surfaces use the same `Speech` instance, tagged by owner.
+  - A new speech from either surface supersedes the other, so only one voice plays.
+  - Stop and cancel act only on the caller's own work.
+  - Dispose stops all.
+- **Backstop:** main stops the island's speech and transcription when the bubble closes, the island window closes, or on dispose.
+- **Permission:** the session permission handler (`mediaPermissionAllowed`) grants microphone audio to the hub page and to the island's own webContents.
+  - It refuses the camera, screen and every other page, the overlay included.
+
+### Renderer side
+
+- `src/companion/api.ts` adds the voice types and methods.
+- `src/voice/backends.ts` `companionVoiceBackend`, and `src/voice/companion.ts` `useCompanionVoiceCaps`, which reports unchecked engines as unchecked, never as ready.
+- `src/voice/VoiceBar.tsx` holds the UI shared by both surfaces:
+  - `VoiceBar`, with a `compact` mode;
+  - `TalkButton`;
+  - `usePushToTalk`;
+  - `useListeningElapsed`.
+
+  The Assistant now uses the same bar.
+- **Direction board:** the static "listening proposal" is replaced by the real components in two bubble scenes, listening and reading aloud, each with Stop. They are driven by a scripted test level and labelled sample text; no microphone, recognizer or voice runs.
+
+### Evidence
+
+- `tests/companion-voice.test.mjs`: 6 tests, all passing.
+- `companion-native-check`: 31 of 31 checks pass in real Electron under Xvfb, using Chromium's generated test devices without the fake-UI switch, so the app's handler decides. It checks:
+  - voice status is local, and the engines are honestly unavailable on Linux;
+  - speak returns a reason, not a fake success;
+  - stop and cancel return false when nothing runs;
+  - bad arguments are refused;
+  - the island gets microphone audio and is refused the camera;
+  - the hub still gets microphone audio.
+- Board capture: 0 errors, 0 external requests, no overflow.
+
 ## Interface for the companion (Codex)
 
-See the "Voice for the companion" section in `COMPANION-STATUS.md`.
+See the "Voice for the companion (for Codex)" section in `COMPANION-STATUS.md`.

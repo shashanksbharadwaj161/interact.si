@@ -162,6 +162,121 @@
   margin-left: auto;
 }
 
+/* Bar buttons: own style so the island can use the bar without the hub's primitives. */
+.vx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  color: var(--vx-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm, 6px);
+  font: 600 var(--t-meta, 12px) var(--font-ui, system-ui);
+  cursor: pointer;
+  transition: background var(--dur-fast, 120ms), border-color var(--dur-fast, 120ms), transform var(--dur-press, 90ms);
+}
+
+.vx-btn:hover {
+  background: color-mix(in oklab, var(--vx-ink) 8%, transparent);
+  border-color: var(--vx-line);
+}
+
+.vx-btn:active {
+  transform: scale(0.97);
+}
+
+.vx-btn.is-strong {
+  color: var(--vx-ink);
+  background: color-mix(in oklab, var(--vx-c) 22%, transparent);
+  border-color: color-mix(in oklab, var(--vx-c) 55%, transparent);
+}
+
+.vx-btn:focus-visible,
+.vx-talk:focus-visible {
+  outline: 2px solid var(--focus, #7dd3fc);
+  outline-offset: 2px;
+}
+
+/* Talk, for surfaces without their own button (the companion bubble). */
+.vx-talk {
+  --vx-c: var(--energy, #2de2e6);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  color: var(--ink, #eef4ff);
+  background: color-mix(in oklab, var(--vx-c) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--vx-c) 45%, transparent);
+  border-radius: var(--r-pill, 999px);
+  font: 600 var(--t-meta, 12px) var(--font-display, system-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-fast, 120ms), border-color var(--dur-fast, 120ms), box-shadow var(--dur-mid, 200ms), transform var(--dur-press, 90ms);
+}
+
+.vx-talk:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--vx-c) 18%, transparent);
+  box-shadow: 0 0 18px -6px var(--vx-c);
+}
+
+.vx-talk:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.vx-talk.is-listening {
+  --vx-c: var(--danger, #ff4d6d);
+  color: #ffffff;
+  background: var(--vx-c);
+  box-shadow: 0 0 18px -4px var(--vx-c);
+}
+
+.vx-talk:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vx-spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: vx-turn 0.8s linear infinite;
+}
+
+.vx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Compact: one line for the companion bubble. */
+.vx-bar.is-compact {
+  flex-wrap: nowrap;
+  gap: var(--s2, 8px);
+  padding: 6px 6px 6px 8px;
+}
+
+.vx-bar.is-compact .vx-sig {
+  width: 24px;
+  height: 24px;
+}
+
+.vx-bar.is-compact .vx-text {
+  flex: 1 1 auto;
+}
+
+.vx-bar.is-compact .vx-meter {
+  height: 18px;
+}
+
 /* A read-aloud button while its text is being read: lit, and it stops instead of starting. */
 .iconbtn.vx-reading {
   color: var(--violet, #a78bfa);
@@ -173,6 +288,12 @@
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.985);
+  }
+}
+
+@keyframes vx-turn {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -210,6 +331,9 @@
   .vx-sig {
     animation: none !important;
   }
+  .vx-spin {
+    animation-duration: 2.4s;
+  }
   .vx-bar::before {
     background: linear-gradient(var(--vx-c), var(--vx-c));
     opacity: 0.8;
@@ -241,6 +365,10 @@
   .vx-title,
   .vx-sig {
     color: CanvasText;
+  }
+  .vx-btn,
+  .vx-talk {
+    border: 1px solid ButtonText;
   }
   .vx-meter i {
     background: Highlight;

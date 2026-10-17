@@ -20,6 +20,7 @@ This covers branch `claude/compassionate-hawking-m9x36g` in the Linux cloud sess
 | **Type into the app the person was using (journey 2b)** | `agent-tools.ts` `type_into_app`; `backend.ts` `typeIntoTarget`, `foregroundTarget`; `companionWindow.ts`; `ActionService.execute(…, {confirm})` | Four tests with a fake desktop. The flow:<br>1. Preview.<br>2. The companion's trusted confirmation shows the window, process, PID and full text.<br>3. Focus returns to exactly that window and it is re-checked.<br>4. The text is typed.<br><br>What is refused:<br>• Cancel, a window that changed owner, an elevated window, or failed focus types nothing.<br>• A remembered window is never this app, an elevated, minimized or background window.<br>• The window title is quoted to Claude as data.<br><br>How it is reported:<br>• The result is "typed, not read back", with no undo.<br><br>After the adversarial review (one more test):<br>• the preview is bound to the remembered PID and process, so a reused window handle is refused before any dialog;<br>• typing that stops part-way reports "Typing stopped after N of M characters";<br>• the step waits only while the dialog is open;<br>• a policy refusal is not logged as declined;<br>• removing the window or closing the bubble stops an in-flight request from typing. |
 | Pet core | `src/pet/contract.ts`, `manifest.ts`, `atlas-check.ts`, `clock.ts`, `adapter.ts` | `tests/pet-core.test.mjs` (31). After the review:<br>• a verified-change jump that happens mid-run waits until work ends, then plays in full, with review after it;<br>• a failure does not replay after a drag;<br>• no gaze while carried;<br>• reason texts claim only what the error code means. |
 | Pet renderer plumbing | `src/pet/registry.ts`, `loader.ts`, `PetSprite.tsx`, `PetSlot.tsx`, `MissingArt.tsx`, `styles/pet.css` | `tests/pet-renderer.test.mjs` (6) covers:<br>• registry pairing;<br>• the approval gate and its reasons;<br>• data-URL bytes against `atlasSha256`;<br>• the load check on real decoded pixels, with a real jump lift;<br>• no pack installed;<br>• no drawing in the missing-art code.<br><br>The board capture shows the renderer playing the **test pattern** through every adapter state. |
+| **Voice for the island (native side)** | `companionCore.ts` (5 methods, `mediaPermissionAllowed`); `companionWindow.ts`; `companionPreload.ts`; `backend.ts` `CompanionVoice`; `speech.ts` owner tags; `main.ts` permission | `tests/companion-voice.test.mjs` (6) covers:<br>• island-only methods;<br>• bounds equal to the hub's;<br>• audio-only permission for the hub page or the island itself;<br>• each surface stops only its own speech;<br>• the real backend reports engines honestly.<br><br>`companion-native-check` (31/31, real Electron under Xvfb):<br>• voice answers honestly with no Windows engines;<br>• bad arguments are refused;<br>• the real session handler grants microphone audio to the island and the hub and refuses the camera. |
 | **Voice in the Assistant (hub)** | `src/voice/session.ts`, `useVoiceSession.ts`, `VoiceMeter.tsx`, `backends.ts`; `Assistant.tsx`; `styles/voice.css`; hub IPC `speechStop`, `transcribeCancel` | `tests/voice-session.test.mjs` (17) and `scripts/voice-journey.mjs` (13 steps, fake microphone, scripted fixture speech). See `VOICE.md`:<br>• explicit start;<br>• real listening, transcribing and speaking states;<br>• stop and cancel that reach the backend;<br>• release on navigation;<br>• honest unavailable reasons.<br><br>Windows recognition and playback are not run here. |
 | Bubble surfaces (candidate direction) | `src/companion/surfaces.tsx`, `src/styles/companion-bubble.css` (scoped `.cd`) | Rendered on the direction board. **Not wired** into the current `CompanionApp.tsx`; Codex owns that integration. |
 
@@ -40,10 +41,10 @@ This covers branch `claude/compassionate-hawking-m9x36g` in the Linux cloud sess
   - No strips, cardinals or look rows exist, and no atlas.
   - The product shows "Character art not installed".
   - The create-pet bundled scripts are not available here. See `PET-ART-HANDOFF.md` for the exact files.
-- **Listening and speaking in the companion:**
-  - The hub Assistant has the full voice loop (see `VOICE.md`).
-  - The island has no voice IPC yet; that is the next slice.
-  - The listening bubble on the board is a proposal. It needs separate art, and no lip sync is simulated.
+- **Listening and speaking in the companion page:**
+  - The island has its own voice IPC, microphone permission and ready components (below, and the board scenes).
+  - **`CompanionApp.tsx` is not wired yet.** That integration is Codex's.
+  - Pet art for listening and speaking does not exist, and no lip sync is simulated.
 - **Settings and hub:**
   - There is no Settings page for the companion's personality, anchor or material.
   - Hub routes have not been restyled. That waits for owner approval of `DIRECTION-BOARD.md`.
@@ -107,3 +108,64 @@ This covers branch `claude/compassionate-hawking-m9x36g` in the Linux cloud sess
    - Pass `target` and `onClearTarget={() => api.clearTarget()}` to `Command`.
    - Ask with `api.ask(text, token, Boolean(target))`.
 8. **Identity:** `PetSlot mode="product"` shows only approved packs. Codex's concept art belongs on the review board or the first-run proposal, labelled as concept art, not as the animated product pet.
+
+## Voice for the companion (for Codex)
+
+The island reaches the same local Windows speech as the hub through its own island-only methods.
+
+- **Methods** (`window.companion`):
+
+  | Method | Returns |
+  |---|---|
+  | `voiceStatus()` | `{stt, tts, voice, speaking, transcribing, cloud: false}` |
+  | `transcribe(wav)` | the recognized text |
+  | `transcribeCancel()` | whether a transcription was cancelled |
+  | `speak(text)` | `{ok, reason?}` |
+  | `speechStop()` | whether speech was stopped |
+
+- **Each surface stops only its own audio:** the hub's Stop never ends the island's speech, and the reverse holds too.
+- **Main stops the island's speech and transcription** when the bubble closes, the island window closes, or on dispose.
+- **Microphone permission** is granted for audio only, to the island's own webContents; the selection overlay is refused.
+
+### Wiring for `CompanionApp.tsx`
+
+1. **Imports:**
+   - from `../voice/useVoiceSession`: `useVoiceSession`;
+   - from `../voice/companion`: `useCompanionVoiceCaps`;
+   - from `../voice/backends`: `companionVoiceBackend`;
+   - from `../voice/VoiceBar`: `VoiceBar` and `TalkButton`;
+   - the stylesheet `../styles/voice.css` (scoped to `.vx-*`, so it does not change the bubble).
+2. **Session:**
+
+   ```tsx
+   const api = companionApi();
+   const backend = useMemo(() => companionVoiceBackend(api), [api]);
+   const { caps, status, refresh } = useCompanionVoiceCaps(api);
+   const { voice, snap, blocks } = useVoiceSession({
+     backend, caps,
+     consentHint: 'Allow the microphone in the companion first. Nothing is recorded until you do.',
+     onTranscript: (t) => setText((prev) => (prev ? `${prev} ${t.text}` : t.text)),
+   });
+   ```
+
+   - Call `refresh()` on every `{type: 'invoke'}`.
+   - The transcript goes into the command field for review; never call `ask()` from `onTranscript`.
+3. **Consent:**
+   - Show a switch, bound to `snap.consent`, that calls `voice.setConsent(on)`.
+   - The default consent object reads the same storage key as the hub.
+   - Whether the two pages share that storage in the packaged `file://` build is **not verified**.
+   - If the island needs its own switch, pass `consent: createMicConsent(...)` with its own storage.
+   - Turning it off cancels at once.
+4. **Inside the bubble:**
+   - Render `<VoiceBar voice={voice} snap={snap} voiceName={status?.voice || 'Windows default voice'} compact />` above the command field.
+   - Render `<TalkButton voice={voice} snap={snap} block={blocks.listen} />` beside Ask. It is disabled while blocked, and its tooltip gives `blocks.listen.reason`; also show that reason as text when the person presses Talk.
+   - For an answer, offer read-aloud with `voice.speak(answer.text, {key: runId})`. While `snap.speaking?.key === runId`, the control becomes `voice.stopSpeaking()`.
+5. **Lifecycle:**
+   - Call `voice.release()` when the bubble closes (before `api.layout({bubble: null})`) and on collapse. Main stops speech on bubble close too, as a backstop.
+   - Unmounting releases on its own.
+   - Esc while `snap.phase !== 'idle'`: if speaking, call `voice.stopSpeaking()`; otherwise call `voice.cancel()`.
+6. **Pet adapter:**
+   - Treat `snap.phase` `listening`, `transcribing` and `speaking` as the companion's `waiting` or `running` signals only once art for them exists. Until then keep the current states.
+   - The real level is `voice.subscribeLevel((level) => …)`, emitted only while listening. Never drive the pet from a simulated level.
+7. **Check on Windows:** the five steps in `VOICE.md` › Windows checks, repeated in the island.
+

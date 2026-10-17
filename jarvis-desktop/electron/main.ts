@@ -18,6 +18,7 @@ import {createTrustedConfirm, safeErrorMessage, isAllowedRequestUrl, isTestFixtu
 import {registerIpc} from './ipc';
 import {METHODS, ACTIVITY_CHANNEL} from './channels';
 import {createCompanion} from './companionWindow';
+import {mediaPermissionAllowed} from './companionCore';
 
 // Test mode (no dialogs, no tray, auto-approved confirmations) is honoured only for an isolated temp userData with a fixture
 // prefix. Anywhere else a stray JARVIS_TEST_MODE=1 must never reach real user data, so the app refuses to start.
@@ -212,13 +213,13 @@ function hardenSession() {
   ses.webRequest.onBeforeRequest((details, cb) => {
     cb({cancel: !isAllowedRequestUrl(details.url, distDir(), DEV_ORIGIN ?? undefined)});
   });
-  // Microphone audio for the app's own page only; everything else is denied.
+  // Microphone audio for the app's own page and the companion island only; camera, screen and every other page are denied.
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
     const d = details as {mediaTypes?: string[]; requestingUrl?: string};
-    const audioOnly = permission === 'media' && !!d.mediaTypes?.length && d.mediaTypes.every((t) => t === 'audio');
-    cb(audioOnly && appUrlOk(d.requestingUrl ?? wc.getURL()));
+    const url = d.requestingUrl ?? wc.getURL();
+    cb(mediaPermissionAllowed({permission, mediaTypes: d.mediaTypes, hubPage: appUrlOk(url), islandPage: companion?.isIsland(wc, url) === true}));
   });
-  ses.setPermissionCheckHandler((wc, permission, origin) => permission === 'media' && !!wc && appUrlOk(wc.getURL() || origin));
+  ses.setPermissionCheckHandler((wc, permission, origin) => permission === 'media' && !!wc && (appUrlOk(wc.getURL() || origin) || companion?.isIsland(wc, wc.getURL()) === true));
 }
 
 function createTray() {

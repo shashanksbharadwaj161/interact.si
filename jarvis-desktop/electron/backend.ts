@@ -123,6 +123,18 @@ export interface CompanionService {
    * not minimized). Called when the person opens the companion, before the companion takes the keyboard.
    */
   foregroundTarget(): Promise<CompanionTarget | null>;
+  /** The island's own voice: the same local Windows speech as the hub, tagged so each surface stops only its own audio. */
+  voice: CompanionVoice;
+}
+
+/** Engine state for the island's voice UI. Local only: there is no cloud speech, so `cloud` is always false. */
+export type CompanionVoiceStatus = {stt: {available: boolean; reason?: string}; tts: {available: boolean; reason?: string}; voice: string | null; speaking: boolean; transcribing: boolean; cloud: false};
+export interface CompanionVoice {
+  status(): Promise<CompanionVoiceStatus>;
+  transcribe(audio: unknown): Promise<{text: string; reason?: string; cancelled?: boolean}>;
+  speak(text: unknown): Promise<{ok: boolean; reason?: string}>;
+  stop(): boolean;
+  cancelTranscribe(): boolean;
 }
 
 /** The app window the person was using when they opened the companion. Typing goes only to exactly this window. */
@@ -836,10 +848,10 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     previewAction: (a) => actions.preview(a),
     executeAction: (id, approved) => actions.execute(id, approved),
 
-    speak: (text) => speech.speak(text),
-    transcribe: (audio) => speech.transcribe(audio),
-    speechStop: async () => speech.cancel(),
-    transcribeCancel: async () => speech.cancelTranscribe(),
+    speak: (text) => speech.speak(text, {owner: 'hub'}),
+    transcribe: (audio) => speech.transcribe(audio, {owner: 'hub'}),
+    speechStop: async () => speech.cancel('hub'),
+    transcribeCancel: async () => speech.cancelTranscribe('hub'),
 
     async exportData() {
       const dest = await env.dialogs.saveExport(`jarvis-export-${stampForName((env.now ?? (() => new Date()))())}.json`);
@@ -1183,8 +1195,21 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     return {typed: false, stage: 'before', reason: r.reason ?? 'Not typed'};
   }
 
+  const companionVoice: CompanionVoice = {
+    async status() {
+      const st = await speech.status();
+      const cap = (c: {available: boolean; reason?: string}) => (c.available ? {available: true} : {available: false, reason: c.reason});
+      return {stt: cap(st.stt), tts: cap(st.tts), voice: st.tts.selectedVoice, speaking: st.speaking, transcribing: st.transcribing, cloud: false};
+    },
+    transcribe: (audio) => speech.transcribe(audio, {owner: 'companion'}),
+    speak: (text) => speech.speak(text, {owner: 'companion'}),
+    stop: () => speech.cancel('companion'),
+    cancelTranscribe: () => speech.cancelTranscribe('companion'),
+  };
+
   const companion: CompanionService = {
     readiness: companionReadiness,
+    voice: companionVoice,
     async run(input, hooks) {
       const r = await companionReadiness();
       if (!r.ready) { hooks.emit({type: 'error', reason: 'setup', message: r.reason}); return; }

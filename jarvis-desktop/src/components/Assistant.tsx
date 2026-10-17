@@ -8,7 +8,7 @@ import { AiSetup } from './AiSetup';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { Badge, Button, Notice, Panel, Segmented, Spinner, Switch, Tabs } from '../ui/primitives';
 import '../styles/assistant.css';
-import { MAX_CLIP_MS, createMicConsent, defaultConsentStorage, remainingMs } from '../ui/audio';
+import { MAX_CLIP_MS, createMicConsent, defaultConsentStorage } from '../ui/audio';
 import { actionOutcome, listedWindows, type ActionOutcome } from '../ui/action-result';
 import { useCompanion } from '../ui/companion';
 import { usePref } from '../ui/prefs';
@@ -18,15 +18,14 @@ import { DICTATION_STYLES, buildDictationCleanupRequest, cleanTranscriptOffline,
 import { useReady } from '../ui/store';
 import { cx, errMsg, fmtTime, truncate } from '../ui/util';
 import { hubVoiceBackend } from '../voice/backends';
-import type { Transcript, VoicePhase, VoiceSession, VoiceSnapshot } from '../voice/session';
+import type { Transcript, VoicePhase } from '../voice/session';
 import { useVoiceSession } from '../voice/useVoiceSession';
-import { VoiceMeter } from '../voice/VoiceMeter';
+import { HOLD_MS, VoiceBar, usePushToTalk } from '../voice/VoiceBar';
 import '../styles/voice.css';
 
 type RecPhase = 'idle' | 'starting' | 'recording' | 'transcribing';
 type DrawerTab = 'history' | 'voice' | 'context' | 'actions';
 type ComposerMode = 'chat' | 'command';
-const HOLD_MS = 400;
 const MIC_CONSENT_HINT = 'Turn on "Allow the microphone" in the microphone panel first. Nothing is recorded until you do.';
 const MAX_CHARS = 4000;
 /** Mirrors the backend planner limit (typed text limit + 200). */
@@ -743,67 +742,6 @@ export function DictationCleanup({ api, mode, original, aiBlocked, onUse, onDism
   );
 }
 
-/** The real microphone level, from the voice session's own feed (no React re-render per frame). */
-function LevelMeter({ voice }: { voice: VoiceSession }) {
-  return <VoiceMeter voice={voice} bars={20} />;
-}
-
-const fmtClock = (ms: number) => {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
-
-/**
- * What the voice is doing right now, above the composer: opening the microphone, listening (with the real level and the
- * time used), transcribing on this computer, or reading aloud, each with its way out. Nothing is shown at rest.
- */
-export function VoiceBar({ voice, snap, elapsedMs, voiceName }: { voice: VoiceSession; snap: VoiceSnapshot; elapsedMs: number; voiceName: string }) {
-  const p = snap.phase;
-  if (p === 'idle') return null;
-  const sp = snap.speaking;
-  const title = p === 'starting' ? 'Opening the microphone' : p === 'listening' ? 'Listening' : p === 'transcribing' ? 'Transcribing' : 'Reading aloud';
-  const detail =
-    p === 'starting'
-      ? 'If Windows asks, allow microphone access.'
-      : p === 'listening'
-        ? 'Let go of Talk, or press it again, when you finish. Esc cancels.'
-        : p === 'transcribing'
-          ? snap.draining
-            ? 'Waiting for Windows speech to finish the cancelled recording first.'
-            : 'Windows speech recognition, on this computer. The audio is not sent online.'
-          : `${voiceName} on this computer${sp?.truncated ? `, the first ${sp.chars.toLocaleString()} characters` : ''}. ${sp?.stoppable ? 'Esc or Stop reading ends it; Talk interrupts it.' : 'Stop is not available in this window.'}`;
-  return (
-    <div className={cx('vx vx-bar', `is-${p}`)} role="group" aria-label={`Voice: ${title}`}>
-      <span className="vx-sig" aria-hidden="true">
-        {p === 'speaking' ? <SpeakerHigh size={16} weight="fill" /> : p === 'listening' ? <Microphone size={16} weight="fill" /> : <Spinner size={14} />}
-      </span>
-      <span className="vx-text">
-        <strong className="vx-title">{title}</strong>
-        <span className="vx-detail">{detail}</span>
-      </span>
-      {p === 'listening' && <LevelMeter voice={voice} />}
-      {p === 'listening' && (
-        <span className="vx-time" title={`${Math.ceil(remainingMs(elapsedMs) / 1000)} seconds left`}>
-          {fmtClock(elapsedMs)}
-          <span className="vx-time-max"> / {fmtClock(MAX_CLIP_MS)}</span>
-        </span>
-      )}
-      <span className="vx-actions">
-        {(p === 'starting' || p === 'listening' || p === 'transcribing') && (
-          <Button size="sm" variant="quiet" icon={X} aria-keyshortcuts="Escape" onClick={() => voice.cancel()}>
-            Cancel
-          </Button>
-        )}
-        {p === 'speaking' && sp?.stoppable && (
-          <Button size="sm" icon={Stop} aria-keyshortcuts="Escape" onClick={() => void voice.stopSpeaking()}>
-            Stop reading
-          </Button>
-        )}
-      </span>
-    </div>
-  );
-}
-
 /** `initialDraft` (the route's `draft` parameter) only fills the message box. Nothing is sent until the user presses Send. */
 export function Assistant({ initialDraft, initialSetup }: { initialDraft?: string; initialSetup?: boolean } = {}) {
   const { api, state, settings, cloudConfigured, run, toast, reload, system, systemLoading, systemError, refreshSystem } = useReady();
@@ -818,7 +756,6 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const [sendError, setSendError] = useState<string | null>(null);
   /** In-app microphone consent: separate from the Windows permission, off until the user turns it on here, never granted on load. */
   const consent = useMemo(() => createMicConsent(defaultConsentStorage()), []);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [drawer, setDrawer] = useState<DrawerTab | null>(null);
   const [setupOpen, setSetupOpen] = useState(Boolean(initialSetup));
   /** The microphone panel beside Talk (consent and why Talk is off). Closed by default; Talk's tooltip carries the same reason. */
@@ -846,7 +783,6 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const [announce, setAnnounce] = useState({ n: 0, text: '' });
   const say = (text: string) => { if (text) setAnnounce((a) => ({ n: a.n + 1, text: a.n % 2 ? text : text + '\u00a0' })); };
 
-  const pressAt = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -1135,9 +1071,6 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     }
   };
 
-  /** Cancels opening the microphone, listening or transcribing. Nothing captured is transcribed or kept. */
-  const cancelRec = () => voice.cancel();
-
   /** Explicit "Use cleaned"/"Use original": swaps the transcript already placed in the message box, or adds it if it is gone. */
   const applyDictation = (text: string, which: 'cleaned' | 'original') => {
     const original = dictation?.text ?? '';
@@ -1152,22 +1085,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     inputRef.current?.focus();
   };
 
-  /** Talk: an explicit press starts listening (and interrupts read-aloud); a second press stops and transcribes. */
-  const press = () => {
-    if (voice.getSnapshot().phase === 'listening') {
-      void voice.stopListening();
-      return;
-    }
-    pressAt.current = performance.now();
-    setVoiceNote(null);
-    void voice.startListening();
-  };
-  /** Letting go after a hold stops; a quick tap keeps listening until the next press. */
-  const release = () => {
-    const p = voice.getSnapshot().phase;
-    if (p !== 'starting' && p !== 'listening') return;
-    if (performance.now() - pressAt.current > HOLD_MS) void voice.stopListening();
-  };
+  /** Talk: an explicit press starts listening (and interrupts read-aloud); a second press, or letting go after a hold, stops. */
+  const ptt = usePushToTalk(voice, { holdMs: HOLD_MS, onStart: () => setVoiceNote(null) });
 
   const doClear = async () => {
     setClearing(true);
@@ -1178,18 +1097,6 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
 
   /** The in-app consent switch. Turning it off cancels any recording or transcription at once. */
   const setMicAllowed = (v: boolean) => voice.setConsent(v);
-
-  // Time used while listening, from when the microphone really opened. The recorder enforces the limit itself.
-  useEffect(() => {
-    const t0 = snap.listeningSince;
-    if (snap.phase !== 'listening' || t0 === null) {
-      setElapsedMs(0);
-      return;
-    }
-    setElapsedMs(performance.now() - t0);
-    const id = window.setInterval(() => setElapsedMs(performance.now() - t0), 250);
-    return () => window.clearInterval(id);
-  }, [snap.phase, snap.listeningSince]);
 
   const listenBlock = blocks.listen;
   const micBlocked = listenBlock && (listenBlock.code === 'device' || listenBlock.code === 'consent') ? listenBlock.reason : null;
@@ -1417,7 +1324,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
 
           <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announce.text}</div>
 
-          <VoiceBar voice={voice} snap={snap} elapsedMs={elapsedMs} voiceName={voiceName} />
+          <VoiceBar voice={voice} snap={snap} voiceName={voiceName} />
 
           <form
             className={cx('composer', mode === 'command' && 'is-command')}
@@ -1472,28 +1379,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                   aria-label={recLabel}
                   title={micBlocked ?? (sttReady ? 'Hold to record, or tap once to start and again to stop. Esc cancels.' : sttReason)}
                   disabled={phase === 'transcribing' || (phase === 'idle' && (replyBusy || !sttReady || micBlocked !== null))}
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    press();
-                  }}
-                  onPointerUp={release}
-                  onPointerCancel={cancelRec}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') cancelRec();
-                    if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
-                      e.preventDefault();
-                      press();
-                    }
-                  }}
-                  onKeyUp={(e) => {
-                    if (e.key === ' ' || e.key === 'Enter') {
-                      e.preventDefault();
-                      release();
-                    }
-                  }}
-                  onClick={(e) => {
-                    if (e.detail === 0) press();
-                  }}
+                  {...ptt.handlers}
                 >
                   {phase === 'transcribing' || phase === 'starting' ? <Spinner size={16} /> : phase === 'recording' ? <Stop size={16} weight="fill" aria-hidden /> : <Microphone size={16} aria-hidden />}
                   <span>{phase === 'recording' ? 'Stop' : phase === 'transcribing' ? 'Transcribing' : 'Talk'}</span>

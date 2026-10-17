@@ -3,8 +3,8 @@
   "display": {
     "x": 0,
     "y": 0,
-    "width": 1280,
-    "height": 720
+    "width": 1600,
+    "height": 1000
   },
   "results": [
     {
@@ -18,8 +18,8 @@
       "name": "rest window is the pet plus margin (trimmed at screen edges), inside the work area",
       "ok": true,
       "bounds": {
-        "x": 1161,
-        "y": 594,
+        "x": 1481,
+        "y": 874,
         "width": 119,
         "height": 126
       },
@@ -32,8 +32,8 @@
       "work": {
         "x": 0,
         "y": 0,
-        "width": 1280,
-        "height": 720
+        "width": 1600,
+        "height": 1000
       }
     },
     {
@@ -42,8 +42,8 @@
       "placement": {
         "type": "placement",
         "window": {
-          "x": 1161,
-          "y": 594,
+          "x": 1481,
+          "y": 874,
           "width": 119,
           "height": 126
         },
@@ -68,8 +68,8 @@
       "name": "window grows to hold pet and bubble, still inside the work area",
       "ok": true,
       "bounds": {
-        "x": 733,
-        "y": 341,
+        "x": 1053,
+        "y": 621,
         "width": 547,
         "height": 379
       }
@@ -96,7 +96,7 @@
       "dock": "bottom",
       "pet": {
         "x": 12,
-        "y": 612,
+        "y": 892,
         "width": 89,
         "height": 96
       },
@@ -108,7 +108,7 @@
       "dock": "left",
       "pet": {
         "x": 12,
-        "y": 312,
+        "y": 452,
         "width": 89,
         "height": 96
       },
@@ -119,7 +119,7 @@
       "ok": true,
       "dock": "top",
       "pet": {
-        "x": 596,
+        "x": 756,
         "y": 12,
         "width": 89,
         "height": 96
@@ -131,8 +131,8 @@
       "ok": true,
       "dock": "right",
       "pet": {
-        "x": 1179,
-        "y": 312,
+        "x": 1499,
+        "y": 452,
         "width": 89,
         "height": 96
       },
@@ -143,8 +143,8 @@
       "ok": true,
       "dock": "bottom",
       "pet": {
-        "x": 1179,
-        "y": 612,
+        "x": 1499,
+        "y": 892,
         "width": 89,
         "height": 96
       },
@@ -217,6 +217,63 @@
     {
       "name": "gaze subscription toggles without error",
       "ok": true
+    },
+    {
+      "name": "voice status: local only, engines honestly unavailable off Windows",
+      "ok": true,
+      "status": {
+        "stt": {
+          "available": false,
+          "reason": "Windows speech could not be queried: Native helper probe-speech.ps1 could not be read"
+        },
+        "tts": {
+          "available": false,
+          "reason": "Windows speech could not be queried: Native helper probe-speech.ps1 could not be read"
+        },
+        "voice": null,
+        "speaking": false,
+        "transcribing": false,
+        "cloud": false
+      }
+    },
+    {
+      "name": "speak answers with a reason, not a fake success, when no voice exists",
+      "ok": true,
+      "said": {
+        "ok": false,
+        "reason": "Native helper speak.ps1 could not be read"
+      }
+    },
+    {
+      "name": "stop and cancel answer false when nothing runs",
+      "ok": true
+    },
+    {
+      "name": "refuses transcribe with non-audio",
+      "ok": true
+    },
+    {
+      "name": "refuses speak with empty text",
+      "ok": true
+    },
+    {
+      "name": "refuses transcribe with a non-number sample",
+      "ok": true
+    },
+    {
+      "name": "island page: microphone audio is permitted",
+      "ok": true,
+      "audio": "granted:audio"
+    },
+    {
+      "name": "island page: camera is refused",
+      "ok": true,
+      "video": "denied:NotAllowedError"
+    },
+    {
+      "name": "hub page: microphone audio is still permitted",
+      "ok": true,
+      "hubAudio": "granted"
     }
   ],
   "failed": []

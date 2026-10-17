@@ -4,6 +4,10 @@
 // facing the middle and the window grows to hold it; docking to every target lands inside the work area; resize presets;
 // placement events match the bounds; arguments outside the specs are refused.
 //
+// Voice: the island's voice methods answer honestly (no Windows engines here) and refuse bad arguments; the app's real
+// session permission handler grants microphone audio to the island and the hub and refuses the camera (Chromium's
+// generated test devices, so hardware is not the deciding factor).
+//
 // Not covered (needs a person or a desktop automation tool): dragging (main reads the real OS cursor), click-through
 // (Windows/macOS only), focus behaviour, acrylic. Linux/Xvfb results say nothing about Windows composition or DPI.
 //
@@ -14,6 +18,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
+// Test-only: Chromium's generated media devices, so the microphone permission is decided by the app's handler rather than
+// failing early for lack of hardware. No fake-UI switch: the app's own permission handler still answers every request.
+app.commandLine.appendSwitch('use-fake-device-for-media-stream');
 const data = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-companion-native-'));
 app.setPath('userData', data);
 delete process.env.JARVIS_TEST_MODE;
@@ -101,6 +108,28 @@ app.whenReady().then(async () => {
     await sleep(400);
     await js(`window.companion.gaze(false)`);
     check('gaze subscription toggles without error', gaze === true, {});
+    // Voice: the island's own methods over the same local speech as the hub. On Linux the Windows engines are absent, so
+    // every answer must be an honest "unavailable", never text or a fake success.
+    const vs = await js(`window.companion.voiceStatus()`);
+    check('voice status: local only, engines honestly unavailable off Windows', vs.cloud === false && (process.platform === 'win32' || (vs.stt.available === false && vs.tts.available === false && /Windows speech/.test(vs.stt.reason))), {status: vs});
+    const said = await js(`window.companion.speak('hello from the island')`);
+    check('speak answers with a reason, not a fake success, when no voice exists', process.platform === 'win32' || (said.ok === false && typeof said.reason === 'string'), {said});
+    check('stop and cancel answer false when nothing runs', (await js(`window.companion.speechStop()`)) === false && (await js(`window.companion.transcribeCancel()`)) === false, {});
+    for (const [call, why] of [[`window.companion.transcribe('not audio')`, 'transcribe with non-audio'], [`window.companion.speak('')`, 'speak with empty text'], [`window.companion.transcribe([1, 'x'])`, 'transcribe with a non-number sample']]) {
+      check(`refuses ${why}`, await js(`${call}.then(() => false, () => true)`), {});
+    }
+    // Microphone permission, decided by the app's real session handler: audio for the island, never the camera.
+    const media = (c) => js(`navigator.mediaDevices.getUserMedia(${c}).then((s) => { const k = s.getTracks().map((t) => t.kind).join(','); s.getTracks().forEach((t) => t.stop()); return 'granted:' + k; }, (e) => 'denied:' + e.name)`);
+    const audio = await media('{audio: true}');
+    const video = await media('{video: true}');
+    check('island page: microphone audio is permitted', audio === 'granted:audio', {audio});
+    check('island page: camera is refused', video === 'denied:NotAllowedError', {video});
+    const hub = BrowserWindow.getAllWindows().find((w) => w !== island && !/companion\.html/.test(w.webContents.getURL()));
+    if (hub) {
+      await until(() => !hub.webContents.isLoading(), 15000, 'hub loaded');
+      const hubAudio = await hub.webContents.executeJavaScript(`navigator.mediaDevices.getUserMedia({audio: true}).then((s) => { s.getTracks().forEach((t) => t.stop()); return 'granted'; }, (e) => 'denied:' + e.name)`, true);
+      check('hub page: microphone audio is still permitted', hubAudio === 'granted', {hubAudio});
+    }
     await js(`window.companion.layout({bubble: null})`);
     finish();
   } catch (e) {

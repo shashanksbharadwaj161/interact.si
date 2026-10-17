@@ -4,7 +4,7 @@
     {
       "name": "rest-consent-off",
       "ok": true,
-      "ms": 1182,
+      "ms": 1058,
       "notes": [
         "consent on, still no stream"
       ],
@@ -14,9 +14,9 @@
     {
       "name": "listening-real-level",
       "ok": true,
-      "ms": 2502,
+      "ms": 2489,
       "notes": [
-        "levels 4/20 lit, max 1"
+        "levels 2/20 lit, max 1"
       ],
       "failure": "",
       "screenshot": "02-listening-real-level.png"
@@ -24,7 +24,7 @@
     {
       "name": "transcribing",
       "ok": true,
-      "ms": 615,
+      "ms": 608,
       "notes": [],
       "failure": "",
       "screenshot": "03-transcribing.png"
@@ -32,7 +32,7 @@
     {
       "name": "transcript-for-review",
       "ok": true,
-      "ms": 1521,
+      "ms": 1530,
       "notes": [
         "[fixture transcript 1: a 1851 ms WAV clip arrived; no recognizer ran]"
       ],
@@ -42,7 +42,7 @@
     {
       "name": "cancel-while-transcribing",
       "ok": true,
-      "ms": 4200,
+      "ms": 3865,
       "notes": [
         "Clean up dictation\nThe transcript is already in the message box. Choose which version to keep.\n\nOriginal (69 characters)\n\n[fixture transcript 1: a 1851 ms WAV clip arrived; no recognizer ran]\n\nCleaned · Offline rules (no model) (69 characters)\n\n[fixture transcript 1: a 1851 ms WAV clip arrived; no recognizer ran]\n\nNo changes: the transcript is already clean.\n\nUse cleaned\nUse original\nClean with AI\nDismiss\nTranscription cancelled. Its text will be discarded."
       ],
@@ -52,7 +52,7 @@
     {
       "name": "escape-cancels-listening",
       "ok": true,
-      "ms": 1439,
+      "ms": 1429,
       "notes": [],
       "failure": "",
       "screenshot": "06-escape-cancels-listening.png"
@@ -60,7 +60,7 @@
     {
       "name": "reading-aloud",
       "ok": true,
-      "ms": 4541,
+      "ms": 4557,
       "notes": [
         "speak:222"
       ],
@@ -70,7 +70,7 @@
     {
       "name": "stop-reading",
       "ok": true,
-      "ms": 799,
+      "ms": 810,
       "notes": [],
       "failure": "",
       "screenshot": "08-stop-reading.png"
@@ -78,7 +78,7 @@
     {
       "name": "talk-interrupts-reading",
       "ok": true,
-      "ms": 738,
+      "ms": 791,
       "notes": [],
       "failure": "",
       "screenshot": "09-talk-interrupts-reading.png"
@@ -86,7 +86,7 @@
     {
       "name": "leaving-the-page-stops-everything",
       "ok": true,
-      "ms": 2058,
+      "ms": 2056,
       "notes": [
         "tracks: ended,ended,ended,ended"
       ],
@@ -105,7 +105,7 @@
     {
       "name": "listening-reduced-motion",
       "ok": true,
-      "ms": 1992,
+      "ms": 1991,
       "notes": [
         "ring animation: none"
       ],
@@ -115,7 +115,7 @@
     {
       "name": "unavailable-says-why",
       "ok": true,
-      "ms": 649,
+      "ms": 654,
       "notes": [
         "Speech recognition unavailable / Fixture backend has no speech recognizer"
       ],

@@ -1,3 +1,4 @@
+import type { CompanionApi } from '../companion/api';
 import type { JarvisAPI } from '../shared/contracts';
 import type { VoiceBackend } from './session';
 
@@ -16,5 +17,16 @@ export function hubVoiceBackend(api: Partial<Pick<JarvisAPI, 'speak' | 'transcri
     speak: typeof speak === 'function' ? (text) => speak(text) : async () => ({ ok: false, reason: NO_READ_ALOUD }),
     ...(typeof speechStop === 'function' ? { stopSpeaking: () => speechStop() } : {}),
     ...(typeof transcribeCancel === 'function' ? { cancelTranscribe: () => transcribeCancel() } : {}),
+  };
+}
+
+/** The companion island's voice calls: window.companion through its own island-only IPC (the same local Windows speech). */
+export function companionVoiceBackend(api: Pick<CompanionApi, 'transcribe' | 'transcribeCancel' | 'speak' | 'speechStop'> | null): VoiceBackend | null {
+  if (!api || typeof api.transcribe !== 'function' || typeof api.speak !== 'function') return null;
+  return {
+    transcribe: (wav) => api.transcribe(wav),
+    speak: (text) => api.speak(text),
+    stopSpeaking: () => api.speechStop(),
+    cancelTranscribe: () => api.transcribeCancel(),
   };
 }
