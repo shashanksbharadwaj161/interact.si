@@ -1,3 +1,7 @@
+@font-face { font-family: "Syne"; src: url("../assets/fonts/syne-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Syne"; src: url("../assets/fonts/syne-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Figtree"; src: url("../assets/fonts/figtree-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Figtree"; src: url("../assets/fonts/figtree-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
 /*
  * Design tokens: "the computer's soul". Obsidian / graphite architecture, electric cyan energy, ultraviolet depth,
  * scarce acid-lime and amber signals. Dark is the principal experience (bare :root); "Chrome" is an accessible light
@@ -54,8 +58,8 @@
 }
 
 :root {
-  --font-display: "Chakra Petch", "Bahnschrift", "Segoe UI", sans-serif;
-  --font-ui: "Saira", "Bahnschrift", "Segoe UI", sans-serif;
+  --font-display: "Syne", "Bahnschrift", "Segoe UI", sans-serif;
+  --font-ui: "Figtree", "Bahnschrift", "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
 
   --t-micro: 12px;

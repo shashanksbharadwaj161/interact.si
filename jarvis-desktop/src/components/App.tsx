@@ -1,6 +1,6 @@
 import { Component, Suspense, lazy, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowClockwise, ArrowsOut, Check, Info, MagnifyingGlass, Question, WarningCircle, X } from '@phosphor-icons/react';
-import { CompanionOrb } from './CompanionOrb';
+import { CompanionPet } from './CompanionPet';
 import { CommandPalette } from './CommandPalette';
 import { Onboarding, modelReadiness, safeLaunchReason } from './Onboarding';
 import { GUIDE_TOPIC_IDS, type GuidanceInput, type GuideTopicId } from '../ui/guidance';
@@ -47,6 +47,8 @@ const Clipboard = lazy(() => import('./Clipboard').then((m) => ({ default: m.Cli
 const MemoryWorkbench = lazy(() => import('./MemoryWorkbench').then((m) => ({ default: m.MemoryWorkbench })));
 const GuidedSetup = lazy(() => import('./GuidedSetup').then((m) => ({ default: m.GuidedSetup })));
 const WritingWorkbench = lazy(() => import('./WritingWorkbench').then((m) => ({ default: m.WritingWorkbench })));
+
+import '../styles/character-shell.css';
 
 /* ---------- Motion, theme and text size ---------- */
 
@@ -446,7 +448,7 @@ function Presence({ go }: { go: Go }) {
       }}
       title={readiness.title}
     >
-      <CompanionOrb size={40} decorative />
+      <span className="presence-pet"><CompanionPet decorative /></span>
       <span className="presence-text">
         <strong>{stateLabel(state)}</strong>
         <span className="sub">
@@ -891,7 +893,7 @@ function Gate() {
   if (status === 'loading') {
     return (
       <div className="boot">
-        <CompanionOrb size={72} decorative />
+        <span style={{width: 100, height: 110}}><CompanionPet decorative /></span>
         <LoadingBlock label="Loading saved data…" />
       </div>
     );

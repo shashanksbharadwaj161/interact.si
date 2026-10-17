@@ -1,7 +1,8 @@
-import {useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react';
+import {CompanionPet} from '../components/CompanionPet';
 import {CompanionOrb} from '../components/CompanionOrb';
 import type {CompanionState} from '../ui/appearance';
-import {companionApi, type AgentEvent, type CompanionPush, type CompanionStatus, type RegionEvent} from './api';
+import {companionApi, type AgentEvent, type CompanionPush, type CompanionStatus, type PlacementEvent, type RegionEvent} from './api';
 
 /*
  * The desktop companion island (production). One element docked to a screen edge that opens into a command surface,
@@ -16,8 +17,6 @@ type Answer = Extract<AgentEvent, {type: 'answer'}>;
 type Failure = Extract<AgentEvent, {type: 'error'}>;
 type Edge = 'idle' | 'working' | 'waiting' | 'done' | 'error';
 
-const REST_SIZE = {width: 196, height: 52};
-const COLLAPSE_MS = 420;
 
 export function CompanionApp() {
   const api = companionApi();
@@ -154,7 +153,7 @@ export function CompanionApp() {
   const orbState: CompanionState = surface === 'error' ? 'alert' : working ? 'thinking' : 'idle';
 
   return (
-    <Island surface={surface} anchor={anchor} edge={edge} doneKey={doneFlash} onOpen={open} label={`Desktop companion, ${surface === 'rest' ? 'resting' : surface}`} core={<CompanionOrb size={surface === 'rest' ? 34 : 44} state={orbState} level={null} decorative showWhenHidden />}>
+    <Island surface={surface} anchor={anchor} edge={edge} doneKey={doneFlash} onOpen={open} label={`Desktop companion, ${surface === 'rest' ? 'resting' : surface}`} core={status?.appearance === 'legacy-orb' ? <CompanionOrb size={96} state={orbState} level={null} decorative showWhenHidden /> : <CompanionPet state={edge} decorative />}>
       {surface === 'rest' && <RestPill status={status} />}
       {surface === 'command' && (
         <Command
@@ -177,6 +176,7 @@ export function CompanionApp() {
           onClose={collapse}
         />
       )}
+      {surface === 'command' && api && <PetControls status={status} onRefresh={refresh} />}
       {surface === 'working' && <Working pending={pending} steps={steps} hasRun={!!runId} onStop={() => void api?.cancel()} />}
       {surface === 'answer' && answer && (
         <AnswerView answer={answer} steps={steps} undone={undone} onUndo={(id) => void undo(id)} onOpen={(kind, id) => void api?.openHub(kind === 'note' ? 'notes' : kind === 'task' ? 'tasks' : 'capsules', id)} onFollow={() => { setText(''); setSurface('command'); }} onDone={collapse} />
@@ -185,6 +185,35 @@ export function CompanionApp() {
       {!api && <p className="cmp-browser">This page runs inside the Desktop Companion app. In a browser it cannot reach the app.</p>}
     </Island>
   );
+}
+
+function PetControls({status, onRefresh}: {status: CompanionStatus | null; onRefresh: () => void}) {
+  const api = companionApi();
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const change = async (action: () => Promise<unknown>) => {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try { await action(); onRefresh(); }
+    catch { setError('That change could not be saved. Try again.'); }
+    finally { setBusy(false); }
+  };
+  if (!api) return null;
+  return <details className="pet-controls">
+    <summary>Make yourself at home</summary>
+    <div className="pet-controls-body">
+      <div className="pet-control-row"><span>Pet size</span><div role="group" aria-label="Pet size">
+        {(['S', 'M', 'L'] as const).map((size, i) => <button key={size} type="button" className="btn btn-sm" disabled={busy} aria-pressed={status?.size === [64,96,128][i]} onClick={() => void change(() => api.resize(size))}>{size}</button>)}
+      </div></div>
+      <label className="pet-control-row"><span>Keep near</span><select aria-label="Dock companion" defaultValue="" disabled={busy} onChange={e => { const target = e.target.value as 'bottom-left' | 'bottom-right' | 'left' | 'right' | 'top'; if (target) void change(() => api.dock(target)); }}>
+        <option value="" disabled>Choose an edge</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option><option value="left">Left</option><option value="right">Right</option><option value="top">Top</option>
+      </select></label>
+      <label className="pet-control-row"><span>Windows frosted glass</span><input type="checkbox" disabled={busy} checked={status?.material.requested === 'acrylic'} onChange={e => { const material = e.target.checked ? 'acrylic' : 'none'; void change(() => api.setMaterial(material)); }} /></label>
+      <p className="p-meta">{status?.material.note}</p>
+      <p className="p-meta">Drag the pet to move it. Character artwork is a concept; full pose animations are still being developed.</p>
+      {error && <p className="cmd-note" role="alert">{error}</p>}
+    </div>
+  </details>;
 }
 
 function useDoneFlash(key: number): boolean {
@@ -203,51 +232,56 @@ function useDoneFlash(key: number): boolean {
  * window is enlarged first and the island springs open inside it; shrinking, the island closes first and the window
  * follows after the transition, so the edge light and shadow are never clipped.
  */
-function Island({surface, anchor, edge, doneKey, onOpen, label, core, children}: {surface: Surface; anchor: string; edge: Edge; doneKey: number; onOpen: () => void; label: string; core: ReactNode; children: ReactNode}) {
+function Island({surface, edge, doneKey, onOpen, label, core, children}: {surface: Surface; anchor: string; edge: Edge; doneKey: number; onOpen: () => void; label: string; core: ReactNode; children: ReactNode}) {
   const api = companionApi();
   const panel = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState(REST_SIZE);
-  const last = useRef(REST_SIZE);
-  useLayoutEffect(() => {
-    const el = panel.current;
-    if (!el) return undefined;
-    const measure = () => setSize({width: Math.ceil(el.offsetWidth), height: Math.ceil(el.offsetHeight)});
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [surface]);
-  useEffect(() => {
-    if (!api) return undefined;
-    const prev = last.current;
-    last.current = size;
-    const release = surface === 'rest';
-    const grows = size.width > prev.width || size.height > prev.height;
-    if (grows || reducedMotion()) {
-      void api.layout({bubble: release ? null : size});
-      return undefined;
-    }
-    const id = window.setTimeout(() => void api.layout({bubble: release ? null : size}), COLLAPSE_MS);
-    return () => window.clearTimeout(id);
-  }, [api, size, anchor, surface]);
+  const [placement, setPlacement] = useState<PlacementEvent | null>(null);
+  const pressed = useRef(false);
   const rest = surface === 'rest';
-  return (
-    <section className="island" data-surface={surface} data-anchor={anchor} data-edge={edge} style={{width: size.width, height: size.height} as CSSProperties} aria-label={label}>
+  useEffect(() => {
+    if (!api) return;
+    const off = api.onEvent(e => { if ('type' in e && e.type === 'placement') setPlacement(e); });
+    return () => { off(); if (pressed.current) void api.drag('end'); };
+  }, [api]);
+  useLayoutEffect(() => {
+    if (!api) return;
+    if (rest) { void api.layout({bubble: null}); return; }
+    const el = panel.current;
+    if (!el) return;
+    const measure = () => void api.layout({bubble: {width: Math.ceil(el.offsetWidth), height: Math.ceil(el.offsetHeight)}});
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [api, rest, surface]);
+  const pet = placement?.pet ?? {x: 20, y: 20, width: 140, height: 152};
+  const bubble = placement?.bubble ?? {x: 180, y: 20};
+  const hit = (over: boolean) => { void api?.hit(over).catch(() => undefined); };
+  const endDrag = () => {
+    if (!pressed.current) return;
+    pressed.current = false;
+    void api?.drag('end');
+  };
+  return <div className="pet-desktop" aria-label={label}>
+    <button type="button" className="pet-handle" style={{left: pet.x, top: pet.y, width: pet.width, height: pet.height}}
+      aria-label="Open companion. Drag to move. Use arrow keys to dock; plus or minus to resize."
+      onPointerEnter={() => hit(true)} onPointerLeave={() => hit(false)}
+      onPointerDown={e => { if (e.button !== 0 || !api) return; pressed.current = true; e.currentTarget.setPointerCapture(e.pointerId); void api.drag('start'); }}
+      onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
+      onClick={e => { if (!api || e.detail === 0) onOpen(); }}
+      onKeyDown={e => {
+        const docks = {ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'top', ArrowDown: 'bottom-right'} as const;
+        if (e.key in docks) { e.preventDefault(); void api?.dock(docks[e.key as keyof typeof docks]); }
+        if (e.key === '+' || e.key === '-') { e.preventDefault(); void api?.resize(e.key === '+' ? 'grow' : 'shrink'); }
+      }}>{core}</button>
+    {!rest && <section className="island pet-bubble" data-surface={surface} data-edge={edge} style={{left: bubble.x, top: bubble.y, ...(placement?.bubble ? {maxWidth: placement.bubble.width, maxHeight: placement.bubble.height} : {})}}
+      onPointerEnter={() => hit(true)} onPointerLeave={() => hit(false)}>
       <span className="edge" aria-hidden key={edge === 'done' ? `done-${doneKey}` : edge} />
-      <button type="button" className="island-core" onClick={rest ? onOpen : undefined} tabIndex={rest ? 0 : -1} aria-label={rest ? 'Open the companion' : undefined} aria-hidden={rest ? undefined : true}>
-        {core}
-      </button>
-      <div className="island-panel" data-s={surface} key={surface} ref={panel}>
-        {children}
-      </div>
-      <span className="sr-only" role="status" aria-live="polite">
-        {label}
-      </span>
-    </section>
-  );
+      <div className="island-panel" data-s={surface} key={surface} ref={panel}>{children}</div>
+    </section>}
+    <span className="sr-only" role="status" aria-live="polite">{label}</span>
+  </div>;
 }
-
-const reducedMotion = () => document.documentElement.dataset.motion === 'reduced';
 
 function Head({title, meta, children}: {title: string; meta?: ReactNode; children?: ReactNode}) {
   return (

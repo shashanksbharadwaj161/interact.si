@@ -846,3 +846,29 @@ body.ov-body {
     border-color: Highlight;
   }
 }
+
+/* Native pet + independent bubble. Bounds are local DIP from the trusted main process. */
+.pet-desktop { position: relative; width: 100%; height: 100%; }
+.pet-handle { position: absolute; padding: 0; border: 0; outline-offset: -3px; border-radius: 30%; background: transparent; cursor: grab; touch-action: none; }
+.pet-handle:active { cursor: grabbing; }
+.pet-handle:focus-visible { outline: 2px solid var(--i-cyan); }
+.pet-bubble { position: absolute; width: max-content; height: auto; border-radius: 26px; overflow: auto; scrollbar-width: thin; scrollbar-color: #596174 transparent; }
+.pet-bubble .island-panel { position: relative; width: min(440px, calc(100vw - 36px)); animation: pet-bubble-enter 350ms var(--i-spring) both; }
+.pet-bubble .p-head { padding-left: 0; min-height: 40px; }
+.pet-bubble .p-title strong { font-size: 17px; text-transform: none; letter-spacing: -.025em; }
+.pet-bubble .p-meta { font-size: 12px; }
+.pet-bubble .cmd, .pet-bubble .work, .pet-bubble .ans { padding: 18px; gap: 14px; }
+.pet-bubble .btn { border-radius: 999px; letter-spacing: 0; font-size: 13px; }
+.pet-bubble .btn-primary { background: #e2e9f8; color: #171d2a; box-shadow: inset 0 1px 0 #fff, 0 3px 10px #0003; }
+.pet-bubble .edge { position: absolute; }
+@keyframes pet-bubble-enter { from { opacity: 0; transform: translateY(8px) scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .pet-bubble .island-panel { animation: none; } }
+:root[data-motion="reduced"] .pet-bubble .island-panel { animation: none; }
+
+.pet-controls { margin: 0 18px 16px; border-top: 1px solid var(--i-line); padding-top: 10px; color: var(--i-muted); font-size: 12px; }
+.pet-controls summary { cursor: pointer; width: fit-content; padding: 4px 0; }
+.pet-controls-body { display: grid; gap: 10px; padding-top: 10px; }
+.pet-control-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pet-control-row > div { display: flex; gap: 5px; }
+.pet-control-row .btn[aria-pressed="true"] { border-color: var(--i-cyan); background: #bdd2ff1a; }
+.pet-control-row select { font: inherit; color: var(--i-text); background: var(--i-ink); padding: 6px; border: 1px solid var(--i-line-strong); border-radius: 8px; }

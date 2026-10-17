@@ -1,0 +1,20 @@
+{
+  "package": "@fontsource/syne",
+  "version": "5.3.0",
+  "license": "OFL-1.1",
+  "tarball": "https://registry.npmjs.org/@fontsource/syne/-/syne-5.3.0.tgz",
+  "files": [
+    {
+      "file": "syne-latin-600-normal.woff2",
+      "sha256": "f1dc13cad7ce032771fc930cca6f5693074faf907cd67e051b74f508b7721265"
+    },
+    {
+      "file": "syne-latin-700-normal.woff2",
+      "sha256": "0aad69416fc0ccf6f340647c46e759d5c6e4628d92576b279ec5ada0afbd9d35"
+    },
+    {
+      "file": "Syne-LICENSE.txt",
+      "sha256": "ea775d83f01ecd45fc622fa5db568fad99c9338192594c3719a52b78bab91e44"
+    }
+  ]
+}

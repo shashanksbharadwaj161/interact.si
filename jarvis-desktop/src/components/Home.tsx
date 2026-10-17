@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, ChatCircleDots, CheckSquare, Cube, Note as NoteIcon, NotePencil, Plus } from '@phosphor-icons/react';
 import type { Capsule, ChatMessage, Note, Task } from '../shared/contracts';
-import { CoreFrame } from './CompanionOrb';
+import { CompanionPet } from './CompanionPet';
 import { SHELL_PREF, useShellPref } from './Settings';
 import { Button, Spinner } from '../ui/primitives';
 import { useReady } from '../ui/store';
@@ -310,7 +310,7 @@ export function Home({ go }: { go: Go }) {
             </dl>
           )}
         </div>
-        <CoreFrame size={210} className="today-core" />
+        <button type="button" className="home-pet" onClick={() => go('assistant')} aria-label="Talk to your companion"><CompanionPet decorative /><span>What’s on your mind?</span></button>
       </header>
 
       <StartBar today={today} go={go} />

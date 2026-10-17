@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Check, CheckSquare, NotePencil, Sparkle } from '@phosphor-icons/react';
 import type { Capability, Settings } from '../shared/contracts';
-import { CoreFrame } from './CompanionOrb';
+import { CompanionPet } from './CompanionPet';
+import { CompanionField } from './CompanionField';
 import { AiSetup, type AiSetupResult } from './AiSetup';
 import { SHELL_PREF, useShellPref } from './Settings';
 import { Button, Notice, Segmented, Switch } from '../ui/primitives';
@@ -242,9 +243,9 @@ export function Onboarding() {
         {phase === 'welcome' && (
           <div className="ob-step">
             <h1 id="ob-title" ref={headRef} tabIndex={-1} className="display">
-              Your computer, <em>awake</em>.
+              A little presence.<br /><em>A new possibility.</em>
             </h1>
-            <p className="ob-lead">Keep notes, tasks and searches here, on this computer. Connect Claude when you want it to think with you.</p>
+            <p className="ob-lead">Meet your desktop companion. A place to think, keep what matters, and ask Claude for a hand.</p>
             <div className="ob-paths">
               <button type="button" className="ob-path is-primary" onClick={() => setPhase('first')}>
                 <span className="ob-path-icon" aria-hidden="true">
@@ -367,6 +368,7 @@ export function Onboarding() {
               Connect Claude
             </h1>
             <p className="ob-lead">Four short steps. Nothing is sent to Anthropic until you allow it, and you can change this later in Settings.</p>
+            <button type="button" className="linkbtn" onClick={() => void finish({ view: 'home' })}>Explore first — connect later</button>
             <AiSetup onDone={(_r: AiSetupResult) => void finish({ view: 'assistant' })} onSkip={() => void finish({ view: 'home' })} />
             {finishFailed && (
               <Notice tone="danger" title="Setup was not finished">
@@ -378,8 +380,9 @@ export function Onboarding() {
       </section>
 
       <aside className="ob-stage" aria-label="Your companion">
-        <CoreFrame size={320} label="Your companion" />
-        <p className="sub">This is your companion's core. It shows what the app is really doing. You can change its form in Studio.</p>
+        <CompanionField />
+        <div className="ob-character"><div className="ob-halo" aria-hidden /><CompanionPet /><span className="ob-hello">Hey. Let’s make this your space.</span></div>
+        <p className="sub">An original character concept. Click the desktop pet to talk. Drag it to make room.</p>
       </aside>
     </div>
   );
