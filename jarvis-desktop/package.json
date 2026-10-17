@@ -15,7 +15,9 @@
     "smoke": "node scripts/run-smoke.mjs",
     "prototype": "vite --config vite.prototype.config.mjs",
     "prototype:build": "vite build --config vite.prototype.config.mjs",
-    "companion:review": "electron scripts/companion-review.cjs"
+    "companion:review": "electron scripts/companion-review.cjs",
+    "board:review": "node scripts/board-review.mjs",
+    "pet:test-pattern": "python3 scripts/make-pet-test-pattern.py"
   },
   "dependencies": {
     "react": "19.2.0",

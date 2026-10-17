@@ -8,5 +8,5 @@ export default defineConfig({
   base: './',
   server: { host: '127.0.0.1', port: 4329, open: '/prototype/index.html' },
   preview: { host: '127.0.0.1', port: 4329 },
-  build: { outDir: 'dist-prototype', emptyOutDir: true, rollupOptions: { input: { prototype: r('./prototype/index.html'), hub: r('./index.html') } } },
+  build: { outDir: 'dist-prototype', emptyOutDir: true, rollupOptions: { input: { prototype: r('./prototype/index.html'), board: r('./prototype/board.html'), hub: r('./index.html') } } },
 });
