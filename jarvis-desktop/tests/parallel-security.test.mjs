@@ -232,7 +232,6 @@ export * as avatar from './src/ui/avatar-editor';
 export * as scene3d from './src/ui/scene3d';
 export * as motion from './src/ui/motion-presets';
 export * as timing from './src/ui/motion-timing';
-export * as widgets from './src/ui/widgets';
 export * as guidance from './src/ui/guidance';
 export * as mods from './src/ui/mod-catalog';
 export * as a11y from './src/ui/accessibility';
@@ -254,8 +253,6 @@ const PARSERS = [
   ['motion.parseSavedScenes', (x) => P.motion.parseSavedScenes(x), 'value'],
   ['motion.normalizeSettings', (x) => P.motion.normalizeSettings(x), 'value'],
   ['timing.normalizeTimeline', (x) => P.timing.normalizeTimeline(x), 'value'],
-  ['widgets.parseLayout', (x) => P.widgets.parseLayout(x), 'text'],
-  ['widgets.normalizeLayout', (x) => P.widgets.normalizeLayout(x), 'value'],
   ['guidance.parseGuidanceImport', (x) => P.guidance.parseGuidanceImport(x), 'text'],
   ['guidance.normalizeGuidancePrefs', (x) => P.guidance.normalizeGuidancePrefs(x), 'value'],
   ['mods.parseExport', (x) => P.mods.parseExport(x), 'both'],

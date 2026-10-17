@@ -1,0 +1,126 @@
+{
+  "figtree": {
+    "package": "@fontsource/figtree",
+    "version": "5.3.0",
+    "license": "OFL-1.1",
+    "family": "Figtree",
+    "variable": false,
+    "weights": [
+      "400",
+      "600"
+    ],
+    "files": [
+      {
+        "file": "figtree/figtree-latin-400-normal.woff2",
+        "sha256": "8f98dd642986f1fa39c45b89665a57372897c235b36028e0e4a136e43dc5f8ab"
+      },
+      {
+        "file": "figtree/figtree-latin-600-normal.woff2",
+        "sha256": "367d713287918784702563518f59239989da815c80d3c7337686b9816635a08b"
+      }
+    ],
+    "licenseFile": "figtree/LICENSE.txt",
+    "licenseSha256": "ee23e6c84000126692e112ff067b456470493349f993ceaa8b4d3766dd6fad5d"
+  },
+  "bricolage-grotesque": {
+    "package": "@fontsource-variable/bricolage-grotesque",
+    "version": "5.3.0",
+    "license": "OFL-1.1",
+    "family": "Bricolage Grotesque",
+    "variable": true,
+    "weights": "variable (standard axes file)",
+    "files": [
+      {
+        "file": "bricolage-grotesque/bricolage-grotesque-latin-standard-normal.woff2",
+        "sha256": "a756882d8a7802ebd4663b4544a62ebedafc7227c1c159ab95eea61393af3f8e"
+      }
+    ],
+    "licenseFile": "bricolage-grotesque/LICENSE.txt",
+    "licenseSha256": "923f4ddf0fd39f9b7794ab0df7332f3d95dc43e8ad7ec2289d6d9e8491177f51"
+  },
+  "fraunces": {
+    "package": "@fontsource-variable/fraunces",
+    "version": "5.3.0",
+    "license": "OFL-1.1",
+    "family": "Fraunces",
+    "variable": true,
+    "weights": "variable (full axes file)",
+    "files": [
+      {
+        "file": "fraunces/fraunces-latin-full-normal.woff2",
+        "sha256": "7e744849028e2219e2aa1bc467dc4032980dc4487c9c3da3010081cd72d3b103"
+      }
+    ],
+    "licenseFile": "fraunces/LICENSE.txt",
+    "licenseSha256": "cd3384cafac6f2bddc3955273958a2e029f97027c8037ac539ef5744a77b579e"
+  },
+  "atkinson-hyperlegible-next": {
+    "package": "@fontsource/atkinson-hyperlegible-next",
+    "version": "5.3.0",
+    "license": "OFL-1.1",
+    "family": "Atkinson Hyperlegible Next",
+    "variable": false,
+    "weights": [
+      "400",
+      "600"
+    ],
+    "files": [
+      {
+        "file": "atkinson-hyperlegible-next/atkinson-hyperlegible-next-latin-400-normal.woff2",
+        "sha256": "5cb240a4d99ab7e6fc3a4d4e6d11d89789fdffe9c86a8384000d662c53283f6f"
+      },
+      {
+        "file": "atkinson-hyperlegible-next/atkinson-hyperlegible-next-latin-600-normal.woff2",
+        "sha256": "828f4525c741b6864718e41aa23a4acbc049b35e6271317c0fd86e0702dd5d2e"
+      }
+    ],
+    "licenseFile": "atkinson-hyperlegible-next/LICENSE.txt",
+    "licenseSha256": "474a034e99845062f661855caaa505880d0e9009deddc2727a92795eab374955"
+  },
+  "unbounded": {
+    "package": "@fontsource/unbounded",
+    "version": "5.3.0",
+    "license": "OFL-1.1",
+    "family": "Unbounded",
+    "variable": false,
+    "weights": [
+      "500",
+      "700"
+    ],
+    "files": [
+      {
+        "file": "unbounded/unbounded-latin-500-normal.woff2",
+        "sha256": "be65bb9b1a340d1647024392fe3fbf3c21e595eda0395da3138932a01e6a183a"
+      },
+      {
+        "file": "unbounded/unbounded-latin-700-normal.woff2",
+        "sha256": "477fa23002517a32f232316d859e7b672a044f20073babec8ed3dbcfdb8e041a"
+      }
+    ],
+    "licenseFile": "unbounded/LICENSE.txt",
+    "licenseSha256": "48a780bc857729859e54d1e691b05792894a26634edc1c4b5dbeabffe6941758"
+  },
+  "onest": {
+    "package": "@fontsource/onest",
+    "version": "5.3.1",
+    "license": "OFL-1.1",
+    "family": "Onest",
+    "variable": false,
+    "weights": [
+      "400",
+      "600"
+    ],
+    "files": [
+      {
+        "file": "onest/onest-latin-400-normal.woff2",
+        "sha256": "93dfb945d217bb541c46e5cdef85bb86095009522fcede783215827e7ca14439"
+      },
+      {
+        "file": "onest/onest-latin-600-normal.woff2",
+        "sha256": "a56e6d2dcc2d24fe160cbc8c08adbca5a9da776237460704f6f24e1b5f7cba36"
+      }
+    ],
+    "licenseFile": "onest/LICENSE.txt",
+    "licenseSha256": "a2a09da98a3d0d1ec79fc2d6deeac748b20a8153e26699552e7b59b5a40b63a3"
+  }
+}

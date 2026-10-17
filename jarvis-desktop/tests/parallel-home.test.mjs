@@ -169,11 +169,11 @@ function makeStore(o = {}) {
 const renderHome = (storeOpts = {}) => render(h(TestStoreContext.Provider, { value: makeStore(storeOpts) }, h(CompanionProvider, null, h(home.Home, { go: () => {} }))));
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"');
 const text = (s) => decode(s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-/** Markup of one home widget, by its data-widget id. */
-function widget(html, id) {
-  const start = html.indexOf(`data-widget="${id}"`);
-  assert.notEqual(start, -1, `${id} widget is rendered`);
-  const next = html.indexOf('data-widget="', start + 10);
+/** Markup of one Today section, from its opening tag to the next section or the end. */
+function section(html, label) {
+  const start = html.search(new RegExp(`<(section|form)[^>]*aria-(label|labelledby)="${label}"`));
+  assert.notEqual(start, -1, `${label} is rendered`);
+  const next = html.indexOf('<section', start + 10);
   return html.slice(start, next === -1 ? undefined : next);
 }
 
@@ -209,235 +209,93 @@ test('due labels are relative to the supplied day and never read the clock', () 
   assert.equal(home.captureDueKey('tomorrow', 'nope'), '');
 });
 
-/* ---------- Pure model: status hierarchy ---------- */
+/* ---------- Rendered Today ---------- */
 
-test('status puts attention items first, notices next, and the all-clear only when nothing else applies', () => {
-  const clear = home.statusHierarchy(cockpit());
-  assert.deepEqual(clear.map((s) => s.id), ['all-clear']);
-  assert.equal(clear[0].tier, 'ok');
-  assert.equal(clear[0].detail, 'No open tasks and nothing needs attention.');
+test('Today greets by the time of day, says what is due in words and shows only real counts', () => {
+  const html = renderHome({ state: baseState({ tasks: [task('a', 'Write the abstract', '2026-10-01'), task('b', 'Call the lab', TODAY), task('c', 'Done one', TODAY, { done: true })] }) });
+  assert.match(html, /<h1 class="display">Good afternoon\.<\/h1>/);
+  assert.match(html, /<p class="today-line">1 overdue · 1 due today<\/p>/);
+  const readouts = /<dl class="readouts"[\s\S]*?<\/dl>/.exec(html)?.[0] ?? '';
+  assert.match(readouts, /<dt>Open tasks<\/dt><dd>2<\/dd>/);
+  assert.match(readouts, /<dt>Notes<\/dt><dd>2<\/dd>/);
+  assert.match(readouts, /<dt>Capsules<\/dt><dd>1<\/dd>/);
 
-  const busy = home.statusHierarchy(
-    cockpit({
-      tasks: [task('a', 'Late', '2026-10-01'), task('b', 'Now', TODAY), task('c', 'Soon', '2026-10-20')],
-      capabilities: someCaps,
-      readiness: 'unknown',
-      systemError: null,
-    }),
-  );
-  assert.deepEqual(busy.map((s) => s.id), ['overdue', 'model-unknown', 'due-today', 'capabilities']);
-  assert.deepEqual(busy.map((s) => s.tier), ['attention', 'notice', 'notice', 'notice']);
-  assert.equal(busy[0].title, '1 task is overdue');
-  assert.equal(busy[0].detail, 'Oldest: Late.');
-  assert.equal(busy[3].title, '2 of 6 capabilities unavailable');
-  assert.equal(busy[3].detail, 'Speech recognition, Secure key storage.');
-  assert.ok(busy.every((s) => !s.id.includes('all-clear')));
+  const empty = renderHome({ state: baseState({ tasks: [], notes: [], capsules: [] }) });
+  assert.match(empty, /Nothing is due today\./);
+  assert.doesNotMatch(empty, /class="readouts"/, 'no row of zeros when nothing is saved');
 });
 
-test('a failed system check and a blocked model outrank overdue work, and an unchecked system is only a notice', () => {
-  const s = home.statusHierarchy(cockpit({ systemError: 'bridge missing', readiness: 'blocked', mode: 'online', tasks: [task('a', 'Late', '2026-10-01')], capabilities: null }));
-  assert.deepEqual(s.map((x) => x.id), ['system-error', 'model-blocked', 'overdue']);
-  assert.equal(s[0].detail, 'bridge missing');
-  assert.equal(s[1].detail, 'Online mode needs a model name and a saved key.');
-  assert.deepEqual(s[1].params, { q: 'model' });
-
-  const unchecked = home.statusHierarchy(cockpit({ capabilities: null }));
-  assert.deepEqual(unchecked.map((x) => x.id), ['system-unchecked']);
-  assert.equal(unchecked[0].tier, 'notice');
-  const loading = home.statusHierarchy(cockpit({ capabilities: null, systemLoading: true }));
-  assert.deepEqual(loading.map((x) => x.id), ['all-clear'], 'a check in flight is not reported as a problem');
+test('the start bar has a labelled input, three kinds, a disabled submit while empty, and the local-only hint', () => {
+  const start = section(renderHome(), 'Start something');
+  assert.match(start, /role="radiogroup" aria-label="What to start"/);
+  assert.match(start, /role="radio" aria-checked="true"[^>]*>(?:<[^>]*>)*Note/);
+  assert.match(start, /role="radio" aria-checked="false"[^>]*>(?:<[^>]*>)*Task/);
+  assert.match(start, /role="radio" aria-checked="false"[^>]*>(?:<[^>]*>)*Ask/);
+  const inputId = /<input id="([^"]+)"/.exec(start)?.[1];
+  assert.ok(inputId, 'the input has an id');
+  assert.match(start, new RegExp(`<label for="${inputId.replace(/[:]/g, '\\:')}"[^>]*>New note title</label>`), 'the input is labelled');
+  assert.match(start, /<button[^>]*type="submit"[^>]*disabled=""/);
+  assert.match(start, /role="status">Saved on this computer only\. Nothing is sent anywhere\.<\/p>/);
 });
 
-test('the all-clear detail counts open work truthfully', () => {
-  const s = home.statusHierarchy(cockpit({ tasks: [task('a', 'A'), task('b', 'B', '2026-11-01')] }));
-  assert.equal(s[0].detail, '2 open tasks, none overdue or due today.');
+test('up next lists open tasks by due date, each with a checkbox and a relative due label, and caps the list', () => {
+  const html = renderHome({ state: baseState({ tasks: [task('d', 'Far', '2026-12-01'), task('a', 'Late', '2026-10-01'), task('b', 'Now', TODAY), task('c', 'Soon', '2026-10-17'), task('e', 'Undated'), task('f', 'Sixth')] }) });
+  const up = section(html, 'today-up');
+  const names = [...up.matchAll(/aria-label="Mark “([^”]+)” done"/g)].map((m) => m[1]);
+  assert.deepEqual(names, ['Late', 'Now', 'Soon', 'Far', 'Undated'], 'overdue, today, this week, later, then undated; five at most');
+  assert.match(up, /today-due is-overdue">Overdue since /);
+  assert.match(up, /today-due is-today">Today</);
+  assert.match(up, /today-due">In 2 days</);
+  assert.match(up, />All 6 open</, 'the full list is one click away');
 });
 
-/* ---------- Pure model: quick actions ---------- */
-
-test('quick actions are navigation only, adapt to saved data, and never exceed six', () => {
-  const empty = home.quickActions(cockpit());
-  assert.deepEqual(empty.map((a) => a.id), ['ask', 'new-capsule', 'tasks', 'search']);
-  assert.equal(empty[0].hint, 'Offline mode: answers come from the local model.');
-
-  const full = home.quickActions(
-    cockpit({
-      chat: [{ id: 'm1', role: 'assistant', text: 'Here is   the plan', createdAt: '2026-10-15T11:30:00', source: 'local' }],
-      capsules: [{ id: 'c_old', name: 'Old', description: '', scene: 'dusk', createdAt: STAMP, updatedAt: '2026-10-01T00:00:00.000Z', items: [] }, { id: 'c_new', name: 'A very long capsule name that gets cut', description: '', scene: 'dusk', createdAt: STAMP, updatedAt: '2026-10-14T00:00:00.000Z', items: [{ kind: 'file', target: 'x', label: 'x' }] }],
-      notes: [{ id: 'n_1', title: '', body: '', tags: [], updatedAt: STAMP }],
-      capabilities: someCaps,
-      readiness: 'blocked',
-    }),
-  );
-  assert.deepEqual(full.map((a) => a.id), ['setup-model', 'continue-chat', 'reopen-capsule', 'latest-note', 'tasks', 'review-capabilities']);
-  assert.equal(full.length, 6, 'search is dropped once six actions exist');
-  assert.equal(full[1].hint, 'Last message 30 min ago: Here is the plan');
-  assert.deepEqual(full[2].params, { item: 'c_new' }, 'the newest capsule wins');
-  assert.equal(full[2].hint, '1 item, changed 1 d ago.');
-  assert.equal(full[3].label, 'Open Untitled');
-  assert.equal(full[5].hint, '2 unavailable on this computer.');
-  const views = new Set(['assistant', 'capsules', 'notes', 'tasks', 'status', 'search', 'settings']);
-  for (const a of [...empty, ...full]) assert.ok(views.has(a.view), `${a.id} opens a known screen`);
+test('empty sections say what to do next', () => {
+  const html = renderHome({ state: baseState({ tasks: [], notes: [], capsules: [], chat: [] }) });
+  assert.match(section(html, 'today-continue'), /Nothing to continue yet\.[\s\S]*Write a note or add a task above/);
+  assert.match(section(html, 'today-up'), /No tasks yet\.[\s\S]*Choose Task above/);
+  const allDone = renderHome({ state: baseState({ tasks: [task('x', 'Old', undefined, { done: true })] }) });
+  assert.match(section(allDone, 'today-up'), /Everything is done\./);
 });
 
-/* ---------- Pure model: activity and capabilities ---------- */
-
-test('activity is grouped by local day, newest first, capped, and kinds get readable labels', () => {
-  const act = (id, at, kind = 'task') => ({ id, at, kind, summary: `did ${id}` });
-  const groups = home.groupActivity([act('e', '2026-10-01T10:00:00'), act('a', '2026-10-15T09:00:00'), act('b', '2026-10-15T08:00:00'), act('c', '2026-10-14T23:00:00', 'launch-app'), act('d', '2026-10-13T12:00:00', 'ui.automation')], TODAY, 4);
-  assert.deepEqual(
-    groups.map((g) => [g.label, g.items.map((i) => i.id)]),
-    [
-      ['Today', ['a', 'b']],
-      ['Yesterday', ['c']],
-      ['Earlier', ['d']],
-    ],
-  );
-  assert.deepEqual(home.groupActivity([], TODAY), []);
-  assert.equal(home.kindLabel('task'), 'Task');
-  assert.equal(home.kindLabel('launch-app'), 'Launch app');
-  assert.equal(home.kindLabel('ui.automation'), 'Ui automation');
-  assert.equal(home.kindLabel(''), 'Event');
-});
-
-test('capability view distinguishes loading, failed, unchecked and loaded without inventing counts', () => {
-  assert.deepEqual(home.capabilityView(null, null, true), { status: 'loading', available: 0, total: 0, unavailable: [] });
-  assert.deepEqual(home.capabilityView(null, 'boom', false), { status: 'error', available: 0, total: 0, unavailable: [] });
-  assert.deepEqual(home.capabilityView(null, null, false).status, 'unloaded');
-  const v = home.capabilityView(someCaps, null, false);
-  assert.equal(v.status, 'loaded');
-  assert.equal(v.available, 4);
-  assert.equal(v.total, 6);
-  assert.deepEqual(v.unavailable.map((c) => c.id), ['stt', 'secure-storage']);
-});
-
-/* ---------- Layout registry keeps its contract ---------- */
-
-test('the new cockpit panels are registered widgets and the layout helpers still round-trip', () => {
-  const ids = home.WIDGETS.map((w) => w.id);
-  for (const id of ['status', 'capture', 'actions', 'due', 'activity']) assert.ok(ids.includes(id), id);
-  assert.equal(ids[0], 'status', 'status leads the default order');
-  const l = home.normalizeLayout({ order: ['activity', 'status'], hidden: ['capture'] });
-  assert.deepEqual(l.order.slice(0, 2), ['activity', 'status']);
-  assert.equal(l.order.length, ids.length);
-  assert.deepEqual(home.setWidgetHidden(home.DEFAULT_LAYOUT, 'capture', true).hidden, ['capture']);
-});
-
-/* ---------- Rendered screen ---------- */
-
-test('the status strip shows the primary item, its action and the rest as links, with mode and model badges', () => {
-  const html = renderHome({
-    state: baseState({ tasks: [task('a', 'Write the abstract', '2026-10-01'), task('b', 'Call the lab', TODAY)] }),
-    system: { capabilities: someCaps },
-  });
-  const strip = widget(html, 'status');
-  assert.match(strip, /data-status-tier="attention"/);
-  assert.match(strip, /Needs attention/);
-  assert.match(strip, /<h2 class="ph-status-title">1 task is overdue<\/h2>/);
-  assert.match(strip, /Oldest: Write the abstract\./);
-  assert.match(strip, /<span>Open Tasks<\/span>/);
-  assert.match(strip, /aria-label="Other status items"/);
-  assert.match(strip, /1 task due today/);
-  assert.match(strip, /2 of 6 capabilities unavailable/);
-  assert.doesNotMatch(strip, /The model has not been checked/, 'the loaded local-llm capability is an affirmative backend check');
-  assert.match(strip, /Offline mode/);
-  assert.match(strip, /Model ready/);
-});
-
-test('all clear renders as the ok tier with no secondary list', () => {
-  const html = renderHome({ state: baseState({ tasks: [] }), system: { capabilities: allCaps } });
-  const strip = widget(html, 'status');
-  assert.match(strip, /data-status-tier="ok"/);
-  assert.match(strip, /All clear/);
-  assert.doesNotMatch(strip, /Other status items/);
-});
-
-test('quick capture renders labelled fields, a disabled submit while empty, and the local-only hint', () => {
+test('continue opens the newest saved record and the rest are listed with their kind', () => {
   const html = renderHome();
-  const cap = widget(html, 'capture');
-  assert.match(cap, /role="radiogroup" aria-label="What to capture"/);
-  assert.match(cap, /role="radio" aria-checked="true"[^>]*>[^<]*Task/);
-  assert.match(cap, /role="radio" aria-checked="false"[^>]*>[^<]*Note/);
-  const inputId = /<input id="([^"]+)"/.exec(cap)?.[1];
-  assert.ok(inputId, 'title input has an id');
-  assert.match(cap, new RegExp(`<label for="${inputId.replace(/[:]/g, '\\:')}"`), 'title input is labelled');
-  const selectId = /<select id="([^"]+)"/.exec(cap)?.[1];
-  assert.ok(selectId, 'due select has an id');
-  assert.match(cap, new RegExp(`<label for="${selectId.replace(/[:]/g, '\\:')}"`), 'due select is labelled');
-  assert.match(cap, /<option value="none"[^>]*>No date<\/option><option value="today">Today<\/option><option value="tomorrow">Tomorrow<\/option>/);
-  assert.match(cap, /<button[^>]*type="submit"[^>]*disabled=""/);
-  assert.match(cap, /<p class="field-hint" role="status">Saved on this computer only\. Nothing is sent anywhere\.<\/p>/);
-  assert.doesNotMatch(cap, /Not saved/);
+  const cont = section(html, 'today-continue');
+  assert.match(cont, /class="today-continue"[\s\S]*Note · [\s\S]*<strong>First note<\/strong>/, 'the newest note is first');
+  assert.match(cont, /Recently saved/);
+  assert.match(cont, /<strong>Second note<\/strong>/);
+  assert.match(cont, /<strong>Thesis<\/strong>/);
 });
 
-test('quick actions render as buttons with a label and hint each, and say they only open screens', () => {
-  const html = renderHome({ state: baseState({ chat: [{ id: 'm', role: 'user', text: 'hello', createdAt: STAMP, source: 'local' }] }) });
-  const acts = widget(html, 'actions');
-  const buttons = [...acts.matchAll(/<button type="button" class="ph-action" data-action="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(buttons, ['continue-chat', 'reopen-capsule', 'latest-note', 'tasks', 'search']);
-  assert.match(acts, /<strong>Continue the conversation<\/strong>/);
-  assert.match(acts, /<strong>Reopen Thesis<\/strong>/);
-  assert.match(acts, /Nothing is sent or run until you act there\./);
+test('the AI row appears only when chat cannot answer, and points to Claude, not a local model', () => {
+  const legacy = renderHome({ system: { capabilities: allCaps } });
+  assert.doesNotMatch(legacy, /aria-label="Assistant readiness"/, 'an answering legacy model needs no prompt');
+  const off = renderHome({ system: { capabilities: someCaps.map((c) => (c.id === 'local-llm' ? { ...c, available: false, reason: 'Ollama is not running' } : c)) } });
+  const row = section(off, 'Assistant readiness');
+  assert.match(row, /AI is not connected/);
+  assert.match(row, /<span>Connect Claude<\/span>/);
+  assert.doesNotMatch(row, /Ollama|Check again/);
+  const noKey = renderHome({ settings: settings({ mode: 'online' }), cloudConfigured: false, system: { capabilities: allCaps } });
+  const keyRow = section(noKey, 'Assistant readiness');
+  assert.match(keyRow, /No API key is saved/);
+  assert.match(keyRow, /<span>Fix AI setup<\/span>/);
+  assert.match(keyRow, /<span>Check again<\/span>/);
 });
 
-test('due now lists overdue, today and this-week tasks with relative badges and a checkbox each', () => {
-  const html = renderHome({ state: baseState({ tasks: [task('a', 'Late', '2026-10-01'), task('b', 'Now', TODAY), task('c', 'Soon', '2026-10-17'), task('d', 'Far', '2026-12-01'), task('e', 'Undated')] }) });
-  const due = widget(html, 'due');
-  const names = [...due.matchAll(/aria-label="Mark “([^”]+)” done"/g)].map((m) => m[1]);
-  assert.deepEqual(names, ['Late', 'Now', 'Soon']);
-  assert.match(due, /badge-danger">Overdue since /);
-  assert.match(due, /badge-warn">Today</);
-  assert.match(due, /badge-muted">In 2 days</);
-  assert.doesNotMatch(due, /Far|Undated/, 'later and undated tasks stay in Tasks');
-});
-
-test('empty states offer a way forward and loading, failed and unchecked capability states are distinct', () => {
-  const empty = renderHome({ state: baseState({ tasks: [], notes: [], capsules: [], activity: [] }) });
-  assert.match(widget(empty, 'due'), /No open tasks[\s\S]*Add a task/);
-  assert.match(widget(empty, 'capsules'), /No capsules yet[\s\S]*Create one/);
-  assert.match(widget(empty, 'notes'), /No notes yet[\s\S]*Write one/);
-  assert.match(widget(empty, 'activity'), /No activity recorded/);
-  assert.match(widget(empty, 'capabilities'), /Not checked yet/);
-  assert.match(widget(empty, 'companion'), /No chat yet\. The companion is idle\./);
-
-  const loading = renderHome({ systemLoading: true });
-  assert.match(widget(loading, 'capabilities'), /role="status">Checking what this computer supports…/);
-  const failed = renderHome({ systemError: 'The bridge did not answer.' });
-  assert.match(widget(failed, 'capabilities'), /The system check failed[\s\S]*The bridge did not answer\./);
-  assert.match(widget(failed, 'status'), /data-status-tier="attention"[\s\S]*The system check failed/);
-  const some = renderHome({ system: { capabilities: someCaps } });
-  assert.match(widget(some, 'capabilities'), /<p class="big-line">4<span> of 6 available<\/span><\/p>/);
-  assert.match(widget(some, 'capabilities'), /Speech recognition[\s\S]*not here/);
-  const all = renderHome({ system: { capabilities: allCaps } });
-  assert.match(widget(all, 'capabilities'), /Everything the app checks for is available here\./);
-});
-
-test('activity is grouped by day headings with readable kinds', () => {
-  const today = `${localDateKey()}T08:00:00`;
-  const html = renderHome({ state: baseState({ activity: [{ id: 'x', at: today, kind: 'launch-app', summary: 'Opened Notepad' }, { id: 'y', at: '2026-01-01T00:00:00', kind: 'task', summary: 'Added a task' }] }) });
-  const act = widget(html, 'activity');
-  assert.match(act, /<h3 class="ph-activity-day">Today<\/h3>/);
-  assert.match(act, /<h3 class="ph-activity-day">Earlier<\/h3>/);
-  assert.match(act, /<span class="tl-kind">Launch app<\/span>/);
-  assert.match(act, /<span class="tl-kind">Task<\/span>/);
-});
-
-test('every control on Home has an accessible name and the page keeps the existing header actions', () => {
+test('every control on Today has an accessible name', () => {
   const html = renderHome({ system: { capabilities: someCaps }, state: baseState({ tasks: [task('a', 'Late', '2026-10-01')] }) });
+  let buttons = 0;
   for (const [, attrs, inner] of html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)) {
+    buttons += 1;
     const labelled = /\baria-labelledby="([^"]+)"/.exec(attrs)?.[1];
-    const resolved = labelled && labelled.split(/\s+/).every(id => new RegExp(`id="${id}"`).test(html));
+    const resolved = labelled && labelled.split(/\s+/).every((id) => new RegExp(`id="${id}"`).test(html));
     assert.ok(/\baria-label="[^"]+"/.test(attrs) || resolved || text(inner).length > 0, `button without a name: ${attrs}`);
   }
+  assert.ok(buttons >= 6, 'the audit inspected the real controls');
   for (const [, attrs] of html.matchAll(/<input\b([^>]*)>/g)) {
     const id = /\bid="([^"]+)"/.exec(attrs)?.[1];
     const named = /\baria-label="[^"]+"/.test(attrs) || (id && new RegExp(`<label for="${id.replace(/[:]/g, '\\:')}"`).test(html));
     assert.ok(named, `input without a name: ${attrs}`);
   }
-  assert.match(html, /Ask the assistant/);
-  assert.match(html, /New note/);
-  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>Arrange<\/span>/);
-  assert.match(html, /Showing the default layout/, 'the dashboard summaries still render above the widgets');
 });
 
 /* ---------- Ambient backdrop ---------- */
@@ -470,37 +328,37 @@ test('the backdrop source subscribes to visibility and the motion attribute and 
 
 /* ---------- Stylesheet guards ---------- */
 
-test('the home stylesheet gates motion on the ambient attribute, reduced motion and the root attribute, and uses compositor-only properties', async () => {
-  const css = await read('src/styles/parallel-home.css');
-  assert.match(css, /\.scene\[data-ambient='on'\] \.scene-drift \{\s*animation: ph-drift 48s ease-in-out infinite;/);
+test('the backdrop stylesheet gates drift motion on the ambient attribute, reduced motion and the root attribute, and uses compositor-only properties', async () => {
+  const css = await read('src/styles/scenes.css');
+  assert.match(css, /\.scene\[data-ambient='on'\] \.scene-drift \{\s*animation: scene-drift 48s ease-in-out infinite;/);
   assert.match(css, /\.scene\[data-ambient='paused'\] \.scene-drift \{[^}]*animation-play-state: paused;/);
   assert.match(css, /\.scene\[data-ambient='off'\] \.scene-drift \{[^}]*animation: none;/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.scene-drift \{[^}]*animation: none !important;/);
   assert.match(css, /:root\[data-motion='reduced'\] \.scene-drift \{[^}]*animation: none !important;/);
-  const keyframes = /@keyframes ph-drift \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+  const keyframes = /@keyframes scene-drift \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
   assert.ok(keyframes.length > 0, 'drift keyframes exist');
   const props = new Set([...keyframes.matchAll(/^\s*([a-z-]+):/gm)].map((m) => m[1]));
   assert.deepEqual([...props].sort(), ['opacity', 'transform'], 'keyframes only animate opacity and transform');
-  assert.match(css, /\.ph-action:focus-visible \{[^}]*outline: 2px solid var\(--focus\)/);
-  assert.match(css, /\.ph-status-link:focus-visible \{[^}]*outline: 2px solid var\(--focus\)/);
-  assert.match(css, /@media \(forced-colors: active\)/);
-  assert.match(css, /@container \(max-width: 640px\)/, 'the status strip reflows by container width');
-  assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b/i, 'colours come from tokens, not hard-coded hex');
-  assert.match(src(await read('src/components/Home.tsx')), /import '\.\.\/styles\/parallel-home\.css';/);
-  function src(s) {
-    return s;
-  }
 });
 
-test('owned files avoid the working name, em and en dashes, and the summary path stays free of timing noise', async () => {
-  for (const f of ['src/components/Home.tsx', 'src/components/SceneBackdrop.tsx', 'src/styles/parallel-home.css', 'tests/parallel-home.test.mjs']) {
+test('the Today stylesheet takes colours from tokens and drops the core on narrow windows', async () => {
+  const css = await read('src/styles/today.css');
+  assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b/i, 'colours come from tokens, not hard-coded hex');
+  assert.match(css, /@media \(max-width: 760px\) \{[\s\S]*\.today-core \{\s*display: none;/);
+  assert.match(await read('src/components/Home.tsx'), /import '\.\.\/styles\/today\.css';/);
+});
+
+test('owned files avoid the working name, em and en dashes, and the pure model stays free of timing noise', async () => {
+  for (const f of ['src/components/Home.tsx', 'src/components/SceneBackdrop.tsx', 'src/styles/today.css', 'tests/parallel-home.test.mjs']) {
     const t = await read(f);
     assert.doesNotMatch(t, new RegExp('jar' + 'vis', 'i'), f);
     assert.doesNotMatch(t, new RegExp('[\\u2014\\u2013]'), `${f} uses em or en dashes`);
   }
   const homeSrc = await read('src/components/Home.tsx');
-  const pure = homeSrc.slice(homeSrc.indexOf('/* ---------- Cockpit model'), homeSrc.indexOf('/* ---------- Screen'));
-  assert.ok(pure.length > 1000, 'the cockpit model section exists');
+  const pure = homeSrc.slice(homeSrc.indexOf('/* ---------- Pure model'), homeSrc.indexOf('/* ---------- Today'));
+  assert.ok(pure.length > 1000, 'the pure model section exists');
   assert.doesNotMatch(pure, /Date\.now|new Date\(\)|Math\.random|localStorage|navigator\./, 'pure helpers take time as a parameter and touch no browser state');
-  assert.doesNotMatch(homeSrc, /getBattery|setInterval|fetch\(/, 'Home polls nothing and probes nothing');
+  assert.doesNotMatch(homeSrc, /getBattery|fetch\(/, 'Today probes nothing');
+  assert.equal([...homeSrc.matchAll(/setInterval\(/g)].length, 1, 'one timer: the clock readout');
+  assert.match(homeSrc, /if \(document\.visibilityState !== 'hidden'\) setNow\(new Date\(\)\)/, 'the clock does not tick while the window is hidden');
 });

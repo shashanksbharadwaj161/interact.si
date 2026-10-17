@@ -1,0 +1,63 @@
+{
+  "pages": [
+    {
+      "name": "board-1280",
+      "width": 1280,
+      "height": 720
+    },
+    {
+      "name": "board-760",
+      "width": 760,
+      "height": 900
+    }
+  ],
+  "errors": [],
+  "external": [],
+  "overflow": [],
+  "lab": [
+    {
+      "state": "rest",
+      "shown": "idle Resting until you need it"
+    },
+    {
+      "state": "open-wave",
+      "shown": "waving Saying hello: you opened the companion"
+    },
+    {
+      "state": "request-in-flight",
+      "shown": "running Working on your request"
+    },
+    {
+      "state": "confirmation-open",
+      "shown": "waiting Waiting for your answer in the confirmation"
+    },
+    {
+      "state": "verified-change-jump",
+      "shown": "jumping A change was verified"
+    },
+    {
+      "state": "answer-review",
+      "shown": "review Looking over the answer just shown"
+    },
+    {
+      "state": "provider-error",
+      "shown": "failed Stopped: Claude returned an error"
+    },
+    {
+      "state": "cancelled",
+      "shown": "idle Stopped because you cancelled"
+    },
+    {
+      "state": "gaze-sweep",
+      "shown": "look 337.5° Looking toward your pointer"
+    },
+    {
+      "state": "drag-left",
+      "shown": "running-left Running left as you drag it"
+    },
+    {
+      "state": "reduced-motion-working",
+      "shown": "running · still frame (reduced motion) Working on your request"
+    }
+  ]
+}

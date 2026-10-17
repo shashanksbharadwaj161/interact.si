@@ -40,6 +40,10 @@ export function effectiveCloudModel(provider:unknown,cloudModel:unknown):string{
 }
 /** Per-provider key status for the renderer. Never carries a key. keyChannel says how keys are stored for this provider in this build. */
 export type CloudProviderStatus={provider:CloudProvider;name:string;hasKey:boolean|null;origin:string;defaultModel:string;keyChannel?:'per-provider'|'legacy'|'unavailable';reason?:string};
+/** One model a provider reports as available to the saved key. Ids come from the provider, never from this app. */
+export type CloudModelInfo={id:string;name:string;createdAt?:string};
+/** Result of asking a provider which models the saved key can use. available=false always carries a reason. */
+export type CloudModelList={provider:CloudProvider;available:boolean;models:CloudModelInfo[];reason?:string;checkedAt:string};
 /** Per-provider key methods are required in the full host; partial preview clients may omit them. */
 export type CloudProviderMethod='cloudProviderStatus'|'setProviderKey'|'clearProviderKey';
 export type Settings={onboarded:boolean;mode:Mode;theme:'graphite'|'nebula'|'paper';reduceMotion:boolean;startInTray:boolean;localModel:string;localEndpoint:string;cloudModel:string;/** Always present in state parsed by the backend (defaults to 'anthropic'); optional only so older literal Settings still type-check. */cloudProvider?:CloudProvider;voice:string;allowedRoots:string[];approvedApps:string[];retainDays:number};
@@ -102,12 +106,16 @@ export interface JarvisAPI {
  saveNote(note:Partial<Note>):Promise<AppState>;deleteNote(id:string):Promise<AppState>;saveTask(task:Partial<Task>):Promise<AppState>;deleteTask(id:string):Promise<AppState>;
  chat(text:string):Promise<ChatMessage>;clearChat():Promise<AppState>;setCloudKey(key:string):Promise<{configured:boolean}>;cloudKeyStatus():Promise<{configured:boolean}>;deleteCloudKey():Promise<void>;
  previewAction(action:AnyActionRequest):Promise<ActionPreview>;executeAction(previewId:string,approved:boolean):Promise<unknown>;
- speak(text:string):Promise<{ok:boolean;reason?:string}>;transcribe(audio:number[]):Promise<{text:string;reason?:string}>;
+ speak(text:string):Promise<{ok:boolean;reason?:string}>;transcribe(audio:number[]):Promise<{text:string;reason?:string;cancelled?:boolean}>;
+ /** v2.5 voice controls, optional. speechStop ends this app's read-aloud (true when something was playing). transcribeCancel makes a transcription in flight return no text; the Windows helper may still finish its own work, and the pending transcribe() call settles when it does. */
+ speechStop?():Promise<boolean>;transcribeCancel?():Promise<boolean>;
  exportData():Promise<{path:string|null}>;importData():Promise<AppState>;pickPath(kind:'file'|'folder'):Promise<string|null>;onActivity(handler:(activity:Activity)=>void):()=>void;
  /** v2, optional. Absent in the browser preview bridge; callers must check before use. */
  getApiInfo?():Promise<ApiInfo>;
  /** Per-provider cloud keys (goal 102), optional. Provider ids are validated before any secret is touched; keys are never returned. */
  cloudProviderStatus?():Promise<CloudProviderStatus[]>;setProviderKey?(provider:CloudProvider,key:string):Promise<{provider:CloudProvider;configured:boolean}>;clearProviderKey?(provider:CloudProvider):Promise<{provider:CloudProvider;configured:boolean}>;
+ /** Models the saved key for this provider can use (GET /v1/models through the network guard). Online mode only; the key never leaves the main process. */
+ cloudModels?(provider:CloudProvider):Promise<CloudModelList>;
  planIntent?(command:string,options?:IntentOptions):Promise<IntentPlan>;
  search?(query:string,options?:SearchOptions):Promise<SearchResult[]>;
  listLocalModels?():Promise<LocalModelList>;

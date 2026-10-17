@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { orbStats, type OrbStats } from '../ui/orb-engine';
 import { ArrowSquareOut, Copy } from '@phosphor-icons/react';
 import { VIEWS } from '../ui/nav';
 import { Button, Empty, Field, KV, Notice, PageHeader, Panel } from '../ui/primitives';
@@ -987,11 +988,13 @@ export function Developer() {
             <dl className="kv-list">
               <KV k="Backend">{isPreview ? 'None (browser preview bridge)' : 'Electron preload API (window.jarvis)'}</KV>
               <KV k="Platform">{system ? `${system.platform} ${system.arch}` : 'unknown'}</KV>
-              <KV k="Theme">{settings.theme}</KV>
+              <KV k="Theme">{typeof document !== 'undefined' ? document.documentElement.dataset.theme ?? 'dark' : 'dark'} (saved setting from earlier versions: {settings.theme})</KV>
               <KV k="Records">{state.capsules.length} capsules · {state.notes.length} notes · {state.tasks.length} tasks · {state.chat.length} messages</KV>
             </dl>
             <Button icon={Copy} onClick={() => void copy()}>Copy diagnostics</Button>
           </Panel>
+
+          <CompanionRendererPanel />
 
           <Panel title="Keyboard" eyebrow="Shortcuts">
             <dl className="kv-list">
@@ -1028,5 +1031,30 @@ export function Developer() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+/**
+ * Numbers from the one shared companion renderer, read when the panel opens and on Refresh (this page runs no timers).
+ * These are the renderer's own counters; nothing here is estimated.
+ */
+function CompanionRendererPanel() {
+  const [stats, setStats] = useState<OrbStats>(() => orbStats());
+  // Read again after the first paint, once the shell's placements have registered.
+  useEffect(() => setStats(orbStats()), []);
+  const backend = stats.backend === 'webgl' ? 'WebGL (one shared context)' : stats.backend === 'canvas2d' ? 'Canvas 2D fallback' : 'Not drawing (no companion on screen)';
+  return (
+    <Panel title="Companion renderer" eyebrow="This window">
+      <dl className="kv-list">
+        <KV k="Drawing with">{backend}</KV>
+        <KV k="Graphics adapter">{stats.renderer ?? 'Not reported'}</KV>
+        <KV k="Placements">{stats.visible} visible of {stats.placements}</KV>
+        <KV k="Quality">{stats.quality === 'full' ? 'Full' : `Reduced${stats.qualityReason ? `: ${stats.qualityReason}` : ''}`}</KV>
+        <KV k="Animation">{stats.running ? 'Running' : 'Paused (hidden, still or idle)'}</KV>
+        <KV k="Frames drawn">{stats.frames.toLocaleString()} · last {stats.lastFrameMs.toFixed(1)} ms</KV>
+        <KV k="Context losses">{stats.contextLosses}</KV>
+      </dl>
+      <Button size="sm" onClick={() => setStats(orbStats())}>Refresh</Button>
+    </Panel>
   );
 }

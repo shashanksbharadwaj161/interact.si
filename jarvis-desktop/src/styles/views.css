@@ -40,7 +40,7 @@
 }
 
 .stat-n {
-  font: 700 28px/1 var(--font-display);
+  font: 700 28px/1 var(--font-ui);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
@@ -78,7 +78,7 @@
 }
 
 .big-line {
-  font: 700 26px/1 var(--font-display);
+  font: 700 26px/1 var(--font-ui);
 }
 
 .big-line span {
@@ -216,235 +216,6 @@
   gap: 8px;
   padding-top: 8px;
   border-top: 1px dashed var(--line-strong);
-}
-
-/* Assistant */
-.assist-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 16px;
-  align-items: start;
-}
-
-.chat {
-  padding: 0;
-  gap: 0;
-  height: calc(100vh - 175px);
-  min-height: 420px;
-}
-
-.chat-log {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  scroll-behavior: smooth;
-}
-
-.msg {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 78%;
-  padding: 10px 14px;
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: 4px var(--r-lg) var(--r-lg) var(--r-lg);
-  animation: view-in 0.2s var(--ease) both;
-}
-
-.msg header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.msg-who {
-  font: 700 10.5px var(--font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-.msg time {
-  font-family: var(--font-mono);
-}
-
-.msg header .iconbtn {
-  margin-left: auto;
-  width: 24px;
-  height: 24px;
-}
-
-.msg p {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.msg-user {
-  align-self: flex-end;
-  background: var(--accent-soft);
-  border-color: transparent;
-  border-radius: var(--r-lg) 4px var(--r-lg) var(--r-lg);
-}
-
-.msg-user .msg-who {
-  color: var(--amber);
-}
-
-.msg-system {
-  align-self: center;
-  max-width: 90%;
-  background: var(--amber-soft);
-  border-style: dashed;
-}
-
-.msg-pending {
-  opacity: 0.7;
-}
-
-.typing {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.typing i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: blink-dot 1.2s infinite ease-in-out;
-}
-
-.typing i:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.typing i:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-.typing span {
-  margin-left: 4px;
-}
-
-@keyframes blink-dot {
-  0%,
-  80%,
-  100% {
-    opacity: 0.25;
-  }
-  40% {
-    opacity: 1;
-  }
-}
-
-.chat-error {
-  padding: 0 16px 8px;
-}
-
-.composer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 16px 14px;
-  border-top: 1px solid var(--line);
-}
-
-.composer textarea {
-  resize: none;
-}
-
-.composer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.counter {
-  margin-right: auto;
-  font: 11px var(--font-mono);
-  color: var(--muted);
-}
-
-.ptt {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 6px 14px;
-  font: 600 13px var(--font-ui);
-  color: var(--text);
-  background: var(--raised);
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  cursor: pointer;
-  user-select: none;
-  touch-action: none;
-  transition: background 0.14s, border-color 0.14s, box-shadow 0.14s;
-}
-
-.ptt:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-.ptt:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ptt-recording {
-  color: #fff;
-  background: var(--danger);
-  border-color: var(--danger);
-  box-shadow: 0 0 0 4px var(--danger-soft);
-  animation: rec-pulse 1.4s infinite;
-}
-
-.ptt-starting,
-.ptt-transcribing {
-  border-color: var(--amber);
-  color: var(--amber);
-}
-
-@keyframes rec-pulse {
-  50% {
-    box-shadow: 0 0 0 8px transparent;
-  }
-}
-
-.meter {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 36px;
-  padding: 4px 6px;
-  background: var(--sunken);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
-
-.meter i {
-  flex: 1;
-  background: var(--line-strong);
-  border-radius: 2px;
-  transition: background 0.08s;
-}
-
-.meter i.lit {
-  background: var(--accent);
-}
-
-.meter.on i.lit:nth-child(n + 11) {
-  background: var(--amber);
 }
 
 /* Companion */
@@ -763,182 +534,6 @@
   justify-content: flex-end;
 }
 
-/* Onboarding */
-.onboard {
-  position: relative;
-  height: 100%;
-  overflow: auto;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  isolation: isolate;
-}
-
-.onboard-scene {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  opacity: 0.7;
-}
-
-.onboard-shell {
-  display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  width: min(980px, 100%);
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: 18px;
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-
-.onboard-side {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 22px 18px;
-  background: linear-gradient(180deg, var(--sunken), var(--panel-solid));
-  border-right: 1px solid var(--line);
-}
-
-.onboard-side .brand {
-  align-self: flex-start;
-}
-
-.steps {
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.steps li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  color: var(--muted);
-  border-radius: var(--r-sm);
-}
-
-.steps li.current {
-  color: var(--text);
-  background: var(--accent-soft);
-}
-
-.steps li.done {
-  color: var(--text-2);
-}
-
-.step-dot {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  font: 700 11px var(--font-mono);
-  border: 1.5px solid var(--line-strong);
-  border-radius: 50%;
-}
-
-.steps li.current .step-dot {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.steps li.done .step-dot {
-  background: var(--ok);
-  border-color: var(--ok);
-  color: var(--accent-ink);
-}
-
-.onboard-main {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 26px 28px;
-  min-height: 560px;
-}
-
-.onboard-main h1:focus-visible {
-  outline: none;
-}
-
-.onboard-foot {
-  display: flex;
-  justify-content: space-between;
-  margin-top: auto;
-  padding-top: 8px;
-}
-
-/* Home widgets: a single ordered list laid out in two columns; full widgets span both. */
-.home-widgets {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-auto-flow: dense;
-  gap: 16px;
-  align-items: start;
-}
-
-/* Dashboard summary cards: exact 12-column placement when wide, two-up when medium, one column when narrow.
-   Container queries follow the panel width, so a collapsed sidebar or a narrow window both reflow. */
-.dash-wrap {
-  container-type: inline-size;
-}
-
-.dash-grid {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: minmax(56px, auto);
-  gap: 12px;
-}
-
-.dash-card {
-  grid-column: var(--dash-col, 1 / -1);
-  grid-row: var(--dash-row, auto);
-  min-width: 0;
-}
-
-@container (max-width: 760px) {
-  .dash-card {
-    grid-column: var(--dash-mid, 1 / -1);
-    grid-row: var(--dash-rows, auto);
-  }
-}
-
-@container (max-width: 480px) {
-  .dash-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .dash-card {
-    grid-column: 1 / -1;
-  }
-}
-
-.widget {
-  position: relative;
-  min-width: 0;
-}
-
-.widget-full {
-  grid-column: 1 / -1;
-}
-
-.widget.is-arranging {
-  padding: 8px;
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--sunken);
-}
-
-.widget-tools {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 2px 8px;
-}
-
 .widget-name {
   margin-right: auto;
   font: 600 11px var(--font-mono);
@@ -1160,8 +755,78 @@
   transform: none;
 }
 
-@media (max-width: 1000px) {
-  .home-widgets {
-    grid-template-columns: minmax(0, 1fr);
+/* Settings · AI: the guided Claude setup sits first, as one row with a cut mark and a single action. */
+.connect-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.connect-row p {
+  max-width: 64ch;
+}
+
+.connect-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  color: var(--energy);
+  background: var(--energy-soft);
+  border: 1px solid var(--energy-line);
+  transform: rotate(45deg) scale(0.86);
+}
+
+.connect-mark > svg {
+  transform: rotate(-45deg);
+}
+
+@media (max-width: 760px) {
+  .connect-row {
+    flex-wrap: wrap;
   }
+}
+
+/* Task rows carry a due badge, reminder snoozes and actions; the title keeps at least 200px and the controls wrap below. */
+.task-row {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.task-row .task-title {
+  flex: 1 1 200px;
+}
+
+/* Settings search: the clear button sits inside the field, which keeps one readable width. */
+.settings-search .search-wide {
+  max-width: 440px;
+}
+
+/* Usage summary: label above a mono value, laid out as a row of readouts. */
+.usage-kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--s3) var(--s5);
+}
+
+.usage-kv > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--s3);
+  border-left: 1px solid var(--line-strong);
+}
+
+.usage-kv dt {
+  color: var(--muted);
+  font: 600 11.5px var(--font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.usage-kv dd {
+  color: var(--ink);
+  font: 500 20px / 1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }

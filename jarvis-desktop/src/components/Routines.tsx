@@ -393,7 +393,7 @@ export function Routines({ api: injected, initialView }: { api?: RoutinesApi; in
   if (!api) {
     return (
       <div className="page page-wide">
-        <PageHeader eyebrow="Automation" title="Routines" />
+        <PageHeader eyebrow="Automation" title="Automations" subtitle="Saved step lists you run by hand or on a schedule. Every desktop step asks for confirmation before it runs." />
         <Notice tone="warn" title="Routines are not connected">The routine engine is not available in this build, so routines cannot be created or run.</Notice>
       </div>
     );
@@ -402,7 +402,7 @@ export function Routines({ api: injected, initialView }: { api?: RoutinesApi; in
   const shownRuns = view ? filterRuns(view.runs, filter) : [];
   return (
     <div className="page page-wide">
-      <PageHeader eyebrow="Automation" title="Routines" subtitle="Saved step lists you run by hand or on a schedule. Every desktop step asks for confirmation before it runs."
+      <PageHeader eyebrow="Automation" title="Automations" subtitle="Saved step lists you run by hand or on a schedule. Every desktop step asks for confirmation before it runs."
         actions={<>
           {view?.paused ? <Button icon={Play} onClick={() => void call(() => api.resumeAll(), 'Routines resumed.')}>Resume all</Button> : <Button icon={Pause} onClick={() => void call(() => api.pauseAll(), 'All routines paused.')}>Pause all</Button>}
           <Button variant="primary" icon={Plus} onClick={() => setEditing(blankDraft())}>New routine</Button>

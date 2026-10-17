@@ -199,6 +199,12 @@ export function createPreviewBridge(): JarvisAPI {
     async transcribe() {
       return { text: '', reason: UNAVAILABLE };
     },
+    async speechStop() {
+      return false;
+    },
+    async transcribeCancel() {
+      return false;
+    },
     async exportData() {
       return { path: null };
     },

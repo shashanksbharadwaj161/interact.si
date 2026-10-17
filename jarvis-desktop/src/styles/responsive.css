@@ -1,12 +1,13 @@
+/*
+ * Route layouts at narrower window widths. The shell's own rules (rail, tabs, page padding) are in shell.css.
+ * Targets: 1440x900, 1366x768 and 1280x720 at 100%, and the same laptops at 125-200% Windows scaling,
+ * which leave a 640-1150px wide viewport.
+ */
 @media (max-width: 1180px) {
   .assist-grid,
   .computer-grid,
   .tasks-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .chat {
-    height: 70vh;
   }
 
   .split-list,
@@ -16,172 +17,31 @@
 }
 
 @media (max-width: 1000px) {
-  :root {
-    --sidebar-w: 68px;
-  }
-
-  .brand-text,
-  .nav-label,
-  .nav-item span,
-  .dock-lines {
-    display: none;
-  }
-
-  .sidebar {
-    align-items: center;
-    padding-inline: 8px;
-  }
-
-  .nav-item {
-    justify-content: center;
-    padding: 10px;
-  }
-
-  .nav-item.active::before {
-    left: -8px;
-  }
-
-  .nav-group {
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .dock-status {
-    padding: 4px;
-    background: transparent;
-    border: 0;
-  }
-
-  .dock-status .avatar {
-    --av-size: 44px !important;
-  }
-
   .home-grid,
   .two-col,
-  .companion-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
+  .companion-grid,
   .split {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .split-list {
-    max-height: 280px;
-  }
-
-  .main {
-    padding: 20px 18px 40px;
+    max-height: 300px;
   }
 }
 
 @media (max-width: 720px) {
-  .app {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-
-  .sidebar {
-    grid-row: 2;
-    flex-direction: row;
-    gap: 0;
-    padding: 4px 6px;
-    border-right: 0;
-    border-top: 1px solid var(--line);
-    overflow-x: auto;
-  }
-
-  .brand,
-  .dock-status {
-    display: none;
-  }
-
-  .nav {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 2px;
-  }
-
-  .nav-group {
-    flex-direction: row;
-    border-bottom: 0;
-    padding-bottom: 0;
-    gap: 2px;
-  }
-
-  .nav-item {
-    flex: none;
-  }
-
-  .nav-item.active::before {
-    left: 8px;
-    right: 8px;
-    top: auto;
-    bottom: -4px;
-    width: auto;
-    height: 3px;
-    border-radius: 3px 3px 0 0;
-  }
-
-  .stage {
-    grid-row: 1;
-  }
-
-  .main {
-    padding: 16px 12px 28px;
-  }
-
   h1 {
-    font-size: 23px;
+    font-size: 22px;
   }
 
   .grid2,
-  .grid4 {
+  .grid4,
+  .lab-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .msg {
-    max-width: 94%;
-  }
-
-  .onboard {
-    padding: 0;
-    place-items: stretch;
-  }
-
-  .onboard-shell {
-    grid-template-columns: minmax(0, 1fr);
-    border-radius: 0;
-    border: 0;
-  }
-
-  .onboard-side {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .onboard-side .avatar,
-  .onboard-side .field-hint {
-    display: none;
-  }
-
-  .steps {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .onboard-main {
-    padding: 18px 16px;
-    min-height: 0;
-  }
-
-  .lab-grid {
-    grid-template-columns: minmax(0, 1fr);
+    max-width: 96%;
   }
 
   .kv {
@@ -191,11 +51,6 @@
 
   .dialog {
     width: calc(100vw - 16px) !important;
-  }
-
-  .toasts {
-    bottom: 64px;
-    right: 8px;
   }
 
   .stage-card {

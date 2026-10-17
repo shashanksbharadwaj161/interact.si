@@ -46,7 +46,8 @@ class BrowserWindow extends Emitter {
   constructor(options) { super(); this.options = options; this.webContents = new WebContents(); rec.windows.push(this); }
   loadFile(p) { this.webContents.url = pathToFileURL(p).href; return Promise.resolve(); }
   loadURL(u) { this.webContents.url = u; return Promise.resolve(); }
-  show() {} hide() {} focus() {} restore() {}
+  show() {} hide() {} focus() {} restore() {} showInactive() {} blur() {} destroy() {} setAlwaysOnTop() {} setBackgroundMaterial() {}
+  setBounds(b) { this.bounds = b; } getBounds() { return this.bounds ?? {x: 0, y: 0, width: 1, height: 1}; }
   isDestroyed() { return false; } isVisible() { return true; } isMinimized() { return false; } isFocused() { return true; }
   static getAllWindows() { return rec.windows; }
 }
@@ -82,6 +83,8 @@ module.exports = {
   Notification: Object.assign(class { on() {} show() {} close() {} }, {isSupported: () => false}),
   nativeImage: {createFromDataURL: () => ({})},
   globalShortcut: {register: () => true, isRegistered: () => false, unregister() {}, unregisterAll() {}},
+  screen: Object.assign(new Emitter(), (() => { const d = {id: 1, scaleFactor: 1.5, bounds: {x: 0, y: 0, width: 1280, height: 720}, size: {width: 1280, height: 720}, workArea: {x: 0, y: 0, width: 1280, height: 680}}; return {getCursorScreenPoint: () => ({x: 10, y: 10}), getDisplayNearestPoint: () => d, getDisplayMatching: () => d, getPrimaryDisplay: () => d}; })()),
+  desktopCapturer: {getSources: async () => { rec.captured = (rec.captured ?? 0) + 1; return []; }},
   powerMonitor: new Emitter(),
   clipboard: {readText: () => '', has: () => false},
   shell: {openExternal: async () => { rec.external = true; }, openPath: async () => ''},
@@ -201,8 +204,13 @@ async function runMain(probes, {packaged = true, env = {}, testMode = false} = {
 test('packaged boot: sandboxed window, no menu or devtools, no child process at startup, packaged page is the only trusted origin', async () => {
   const r = await runMain(String.raw`
     const wp = win.options.webPreferences;
+    const secure = (w) => { const p = w.options.webPreferences; return {contextIsolation: p.contextIsolation, sandbox: p.sandbox, nodeIntegration: p.nodeIntegration, webSecurity: p.webSecurity, devTools: p.devTools, nodeInSub: p.nodeIntegrationInSubFrames, nodeInWorker: p.nodeIntegrationInWorker, insecure: p.allowRunningInsecureContent}; };
+    const island = rec.windows.find((w) => /companion\.html$/.test(w.webContents.url));
     return {wp: {contextIsolation: wp.contextIsolation, sandbox: wp.sandbox, nodeIntegration: wp.nodeIntegration, webSecurity: wp.webSecurity, devTools: wp.devTools, nodeInSub: wp.nodeIntegrationInSubFrames, nodeInWorker: wp.nodeIntegrationInWorker, insecure: wp.allowRunningInsecureContent},
-      menu: rec.menu, appUrl, ipcCount: rec.ipc.size,
+      menu: rec.menu, appUrl, ipcCount: rec.ipc.size, channels: [...rec.ipc.keys()],
+      island: island ? {wp: secure(island), preload: island.options.webPreferences.preload.split(/[\\/]/).pop(), transparent: island.options.transparent, frame: island.options.frame, skipTaskbar: island.options.skipTaskbar,
+        open: island.webContents.openHandler({url: 'https://example.com'}), navRemote: fire(island.webContents, 'will-navigate', 'https://example.com/'), navHub: fire(island.webContents, 'will-navigate', appUrl)} : null,
+      windowCount: rec.windows.length, captured: rec.captured ?? 0,
       open: win.webContents.openHandler({url: 'https://example.com'}),
       navSelf: fire(win.webContents, 'will-navigate', appUrl),
       navRemote: fire(win.webContents, 'will-navigate', 'https://example.com/'),
@@ -215,7 +223,20 @@ test('packaged boot: sandboxed window, no menu or devtools, no child process at 
   assert.deepEqual(r.wp, {contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, devTools: false, nodeInSub: false, nodeInWorker: false, insecure: false});
   assert.equal(r.menu, null, 'packaged builds remove the application menu (no View > Toggle DevTools / Reload)');
   assert.match(r.appUrl, /^file:\/\/\/.*\/dist\/index\.html$/);
-  assert.equal(r.ipcCount, channels.METHODS.length, 'exactly one handler per channel-table method');
+  // The hub's table, and separately the companion island's own small table (electron/companionCore.ts), nothing else.
+  const hubChannels = r.channels.filter((c) => c.startsWith('jarvis:')).map((c) => c.slice('jarvis:'.length));
+  const companionChannels = r.channels.filter((c) => c.startsWith('companion:')).map((c) => c.slice('companion:'.length));
+  assert.deepEqual(hubChannels.sort(), [...channels.METHODS].sort(), 'exactly one handler per channel-table method');
+  assert.deepEqual(companionChannels.sort(), [...channels.COMPANION_METHODS].sort(), 'the companion registers only its own methods');
+  assert.equal(r.ipcCount, channels.METHODS.length + channels.COMPANION_METHODS.length, 'no other channels');
+  // The island is a second sandboxed window with its own preload; it denies popups and leaves for nowhere. Nothing is
+  // captured at startup: the screen is read only when the person starts a region selection.
+  assert.equal(r.windowCount, 2);
+  assert.deepEqual(r.island?.wp, {contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true, devTools: false, nodeInSub: false, nodeInWorker: false, insecure: false});
+  assert.deepEqual([r.island.preload, r.island.transparent, r.island.frame, r.island.skipTaskbar], ['companionPreload.cjs', true, false, true]);
+  assert.deepEqual(r.island.open, {action: 'deny'});
+  assert.deepEqual([r.island.navRemote, r.island.navHub], [true, true], 'the island cannot navigate to a site or to the hub page');
+  assert.equal(r.captured, 0, 'no screen capture at startup');
   assert.deepEqual(r.open, {action: 'deny'});
   assert.equal(r.navSelf, false, 'the app page itself may load');
   assert.deepEqual([r.navRemote, r.navOtherFile, r.navUnc, r.redirectRemote, r.webview], [true, true, true, true, true]);
@@ -397,7 +418,7 @@ async function bundleTs(contents) {
   return mod.exports;
 }
 const core = await bundleTs(`export {safeErrorMessage, isAllowedFileRequest, isTrustedUrl} from './electron/ipcCore';`);
-const channels = await bundleTs(`export {METHODS} from './electron/channels';`);
+const channels = await bundleTs(`export {METHODS} from './electron/channels'; export {COMPANION_METHODS} from './electron/companionCore';`);
 
 test('error redaction removes the Windows profile path in the forms Node actually produces', () => {
   const m = core.safeErrorMessage(new Error("ENOENT: no such file or directory, open 'C:\\Users\\alice\\Documents\\notes.json'"));

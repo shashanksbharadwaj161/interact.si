@@ -8,11 +8,11 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
+import { phosphorIconNames } from './helpers/icon-stub.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ICONS = ['ArrowClockwise', 'CaretLeft', 'Broom', 'ChatCircleDots', 'Lightning', 'MagnifyingGlass', 'Microphone', 'PaperPlaneRight', 'ShieldCheck', 'SpeakerHigh', 'Stop',
-  'ArrowCounterClockwise', 'Copy', 'DownloadSimple', 'FloppyDisk', 'Pause', 'Play', 'Plus', 'Trash', 'UploadSimple', 'Info', 'Warning', 'WarningCircle',
-  'Check', 'CaretDown', 'X', 'CircleNotch', 'MagnifyingGlassPlus', 'Eye', 'EyeSlash', 'CaretRight', 'ArrowSquareOut', 'Question'];
+// Icons render as nothing; the names come from the real phosphor imports in src/.
+const ICONS = await phosphorIconNames(root);
 
 /** A fake store so the Assistant renders without the Electron bridge. Capability flags are injectable. */
 const STORE_STUB = `
@@ -385,7 +385,7 @@ test('on load the Assistant renders with consent off, the talk button disabled a
     assert.match(html, /Allow the microphone in Desktop Companion/);
     assert.match(html, /Off: the talk button stays disabled and this window never opens the microphone/);
     assert.match(html, /<button[^>]*class="ptt"[^>]*disabled/, 'push-to-talk is disabled without in-app consent');
-    assert.match(html, /Turn on &quot;Allow the microphone&quot; in the Push to talk panel first/);
+    assert.match(html, /Turn on &quot;Allow the microphone&quot; in the microphone panel first/);
     assert.doesNotMatch(html, /autoplay/i);
     assert.doesNotMatch(html, /Recording: \d+ s left/, 'no recording is in progress on load');
     assert.doesNotMatch(html, /Microphone unavailable/);

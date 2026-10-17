@@ -116,6 +116,9 @@ export type SpeechProbe = {ok: true; voices: string[]; recognizers: string[]} | 
 export class Speech {
   private current: AbortController | null = null;
   private transcribing: AbortController | null = null;
+  /** Which surface started the speech / transcription in flight (hub, companion), so one surface's stop never ends another's. */
+  private currentOwner: string | null = null;
+  private transcribingOwner: string | null = null;
   private probeCache: {at: number; value: SpeechProbe} | null = null;
   private now: () => number;
 
@@ -221,21 +224,25 @@ export class Speech {
     return {stt, tts, qualityGate: st.qualityGate, speaking: st.speaking, transcribing: st.transcribing, cloud: false};
   }
 
-  cancel(): boolean {
+  /** Stops the current speech. With `owner`, only speech that owner started (another surface's speech keeps playing). */
+  cancel(owner?: string): boolean {
+    if (owner !== undefined && this.current && this.currentOwner !== owner) return false;
     const had = this.current !== null;
     this.current?.abort();
     this.current = null;
+    this.currentOwner = null;
     return had;
   }
 
   /** Stops an in-flight transcription from returning text. The native helper may keep running until its own timeout. */
-  cancelTranscribe(): boolean {
+  cancelTranscribe(owner?: string): boolean {
+    if (owner !== undefined && this.transcribing && this.transcribingOwner !== owner) return false;
     const had = this.transcribing !== null;
     this.transcribing?.abort();
     return had;
   }
 
-  async speak(text: unknown, opts: {engine?: string} = {}): Promise<{ok: boolean; reason?: string}> {
+  async speak(text: unknown, opts: {engine?: string; owner?: string} = {}): Promise<{ok: boolean; reason?: string}> {
     if (typeof text !== 'string' || !text.trim()) throw new ValidationError('text is required');
     if (text.length > LIMITS.speakChars) throw new ValidationError(`text is too long (max ${LIMITS.speakChars})`);
     let engineId = opts.engine ?? WINDOWS_ENGINE;
@@ -258,6 +265,7 @@ export class Speech {
     this.cancel();
     const ac = new AbortController();
     this.current = ac;
+    this.currentOwner = opts.owner ?? null;
     try {
       const r = extra ? await extra.speak(text, {voice, signal: ac.signal}) : await this.d.native.speak(text, voice, ac.signal);
       return ac.signal.aborted ? {ok: false, reason: 'Speech was stopped'} : r;
@@ -265,11 +273,14 @@ export class Speech {
       if ((e instanceof NativeError && e.kind === 'cancelled') || ac.signal.aborted) return {ok: false, reason: 'Superseded by newer speech'};
       return {ok: false, reason: (e as Error).message};
     } finally {
-      if (this.current === ac) this.current = null;
+      if (this.current === ac) {
+        this.current = null;
+        this.currentOwner = null;
+      }
     }
   }
 
-  async transcribe(audio: unknown, opts: {engine?: string} = {}): Promise<{text: string; reason?: string; cancelled?: boolean}> {
+  async transcribe(audio: unknown, opts: {engine?: string; owner?: string} = {}): Promise<{text: string; reason?: string; cancelled?: boolean}> {
     const wav = validateAudio(audio);
     const gate = this.d.audioGate;
     if (gate) {
@@ -297,6 +308,7 @@ export class Speech {
     if (this.transcribing) return {text: '', reason: 'Another transcription is already running'};
     const ac = new AbortController();
     this.transcribing = ac;
+    this.transcribingOwner = opts.owner ?? null;
     const timeoutMs = this.d.transcribeTimeoutMs ?? DEFAULT_TRANSCRIBE_TIMEOUT_MS;
     let timedOut = false;
     let onTimeout: (v: typeof ABORTED) => void = () => undefined;
@@ -333,7 +345,10 @@ export class Speech {
       return ac.signal.aborted ? stopped() : {text: '', reason: (e as Error).message};
     } finally {
       clearTimeout(timer);
-      if (this.transcribing === ac) this.transcribing = null;
+      if (this.transcribing === ac) {
+        this.transcribing = null;
+        this.transcribingOwner = null;
+      }
     }
   }
 }

@@ -163,8 +163,11 @@ test('file-shelf source is pure and offline', async () => {
   assert.equal(/\bfetch\s*\(|XMLHttpRequest|from\s+['"](node:)?fs|\bdocument\b|\bwindow\b|localStorage/.test(src), false);
 });
 
-test('Home wires the file shelf through preview then confirmed execute', async () => {
-  const src = await readFile(path.join(root, 'src/components/Home.tsx'), 'utf8');
+test('the file shelf is mounted on Capsules and opens items through preview then confirmed execute', async () => {
+  const capsules = await readFile(path.join(root, 'src/components/Capsules.tsx'), 'utf8');
+  assert.match(capsules, /import \{ FileShelf \} from '\.\/FileShelf';/);
+  assert.match(capsules, /<FileShelf \/>/);
+  const src = await readFile(path.join(root, 'src/components/FileShelf.tsx'), 'utf8');
   assert.match(src, /from '\.\.\/ui\/file-shelf'/);
   assert.match(src, /shelfModel\.SHELF_PREF_KEY/);
   for (const s of ['File shelf', 'Recently opened', 'api.pickPath(kind)', 'Confirm', 'Cancel', 'recentItems', 'groupByKind', 'filterShelf', 'recordOpened', "e.key === 'Escape'", "e.key === 'Enter'", "type: 'launch'"]) assert.ok(src.includes(s), s);

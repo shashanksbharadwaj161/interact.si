@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {build} from 'esbuild';
+import { phosphorIconNames } from './helpers/icon-stub.mjs';
 import {createRequire} from 'node:module';
 import {mkdtemp, rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -20,9 +21,8 @@ async function bundle(contents, extra = {}) {
   return mod.exports;
 }
 
-// Icons render as nothing; the names below are every phosphor icon the bundled components import.
-const ICONS = ['ArrowClockwise', 'CaretLeft', 'CaretRight', 'Broom', 'ChatCircleDots', 'Lightning', 'MagnifyingGlass', 'Microphone', 'PaperPlaneRight', 'ShieldCheck', 'SpeakerHigh', 'Stop', 'FolderOpen', 'ShieldWarning', 'WarningCircle', 'CircleNotch', 'Info', 'Warning', 'X',
-  'ArrowCounterClockwise', 'Copy', 'DownloadSimple', 'FloppyDisk', 'Pause', 'Play', 'Plus', 'Trash', 'UploadSimple'];
+// Icons render as nothing; the names come from the real phosphor imports in src/.
+const ICONS = await phosphorIconNames(root);
 const backendMod = await bundle(`export {createBackend} from './electron/backend';`);
 const ui = await bundle(`
   export {planCommand, previewCommand, decideCommand, classifyReply, incompleteReplyIds, unavailableDetail, notRunCause, explainNotRun, CommandFlow, PREVIEW_VALID_MS} from './src/components/Assistant';

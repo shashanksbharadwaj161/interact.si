@@ -122,9 +122,11 @@ test('every group has a blurb and every section sits in a known group', () => {
 
 test('search ranks title matches first and keeps screen order for ties', () => {
   const ids = (q) => S.searchSettings(q).map((e) => e.id);
-  assert.equal(ids('cloud')[0], 'cloud-model', 'title match beats a keyword match on another section');
+  assert.equal(ids('providers')[0], 'cloud-model', 'title match beats a keyword match on another section');
+  assert.equal(ids('claude')[0], 'connect', 'the guided Claude setup is the first answer for "claude"');
   assert.ok(ids('cloud').includes('status'));
-  assert.ok(ids('cloud').indexOf('cloud-model') < ids('cloud').indexOf('mode'));
+  assert.ok(ids('cloud').includes('cloud-model'));
+  assert.ok(ids('legacy').indexOf('local-model') === 0, 'a title word ranks first');
   assert.deepEqual(ids('connection status'), ['status']);
   assert.deepEqual(ids('x'.repeat(500)), [], 'long queries are bounded and match nothing');
   assert.ok(ids('KEY').includes('cloud-model'), 'case-insensitive');
@@ -133,8 +135,9 @@ test('search ranks title matches first and keeps screen order for ties', () => {
 test('the initial query opens a flat result list with live-region text, and each tab shows its blurb', () => {
   const found = renderSettings({}, { initialQuery: 'api key' });
   assert.match(found, /id="settings-results"/);
-  assert.match(found, /role="status"[^>]*>[^<]*1 matching section\./);
-  assert.match(found, /Cloud model/);
+  assert.match(found, /role="status"[^>]*>[^<]*2 matching sections\./);
+  assert.match(found, /Providers and keys/);
+  assert.match(found, /Connect Claude/);
   assert.doesNotMatch(found, /id="settings-appearance"/, 'only matching sections render while searching');
   assert.doesNotMatch(found, /role="tablist"/);
 
@@ -176,7 +179,7 @@ test('unsaved mode changes and unknown key status are labelled instead of assume
   assert.match(pending.note, /keeps using the saved mode until you press Save/i);
   assert.equal(rows.find((r) => r.id === 'key').value, 'Status unknown');
   assert.equal(rows.find((r) => r.id === 'key').tone, 'muted');
-  assert.equal(rows.find((r) => r.id === 'local').value, 'Unknown');
+  assert.equal(rows.find((r) => r.id === 'local'), undefined, 'an unchecked legacy local model is not listed as if it were part of the product');
 });
 
 test('the rendered status panel reflects local readiness from the live check, not from filled-in fields', () => {
@@ -186,12 +189,15 @@ test('the rendered status panel reflects local readiness from the live check, no
   assert.match(up, /Nothing is sent to a provider to produce it/);
 
   const down = text(renderSettings({ system: { platform: 'win32', arch: 'x64', ramGB: 8, cpu: 'x', capabilities: caps(false, 'Ollama did not respond') } }, { initialQuery: 'connection status' }));
-  assert.match(down, /Local model is not available/);
   assert.doesNotMatch(down, /Local model is ready/);
+  assert.doesNotMatch(down, /Ollama/, 'the normal status never points at a local model server');
+  const legacy = text(renderSettings({ system: { platform: 'win32', arch: 'x64', ramGB: 8, cpu: 'x', capabilities: caps(false, 'Ollama did not respond') } }, { initialQuery: 'legacy' }));
+  assert.match(legacy, /Local model is not available/, 'the Advanced legacy section still reports the live check');
+  assert.match(legacy, /Ollama did not respond/);
 
   const noKey = text(renderSettings({ cloudConfigured: false, settings: { mode: 'online' } }, { initialQuery: 'connection status' }));
   assert.match(noKey, /Online \(cloud\)/);
-  assert.match(noKey, /Online mode has no API key/);
+  assert.match(noKey, /No API key is saved/);
   assert.match(noKey, /No key is stored, so online chat cannot send/);
 });
 

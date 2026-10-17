@@ -1,7 +1,7 @@
 import { Component, Suspense, lazy, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowClockwise, ArrowsOut, Check, Info, Question, WarningCircle, WifiHigh, WifiSlash, X } from '@phosphor-icons/react';
-import { Avatar, AVATAR_STATES } from './Avatar';
-import { SceneBackdrop } from './SceneBackdrop';
+import { ArrowClockwise, ArrowsOut, Check, Info, MagnifyingGlass, Question, WarningCircle, X } from '@phosphor-icons/react';
+import { CompanionOrb } from './CompanionOrb';
+import { CommandPalette } from './CommandPalette';
 import { Onboarding, modelReadiness, safeLaunchReason } from './Onboarding';
 import { GUIDE_TOPIC_IDS, type GuidanceInput, type GuideTopicId } from '../ui/guidance';
 import type { ApiFeature } from '../shared/contracts';
@@ -10,15 +10,18 @@ import { Settings, useShellPref, SHELL_PREF } from './Settings';
 import { MemorySearch } from './MemorySearch';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { Button, LoadingBlock, Notice, PageHeader, Segmented } from '../ui/primitives';
-import { VIEWS, VIEW_FOR_CATEGORY, hashFor, navGroups, parseHash, shortcutAction, viewById, type HashLocation, type ViewId } from '../ui/nav';
+import { AREAS, VIEWS, VIEW_FOR_CATEGORY, areaHome, areaOf, hashFor, parseHash, shortcutAction, viewById, type AreaDef, type HashLocation, type ViewDef, type ViewId } from '../ui/nav';
 import { useStore, useReady } from '../ui/store';
-import { usePref } from '../ui/prefs';
-import { DEFAULT_SCENE } from '../ui/scenes';
 import { CompanionProvider, useCompanion, hostVoiceLevel } from '../ui/companion';
+import { AppearanceProvider } from '../ui/appearance-context';
+import { stateLabel } from '../ui/appearance';
+import { normalizeThemeChoice, resolveTheme } from '../ui/theme';
 import { resetPreviewData, seedPreviewDemo } from '../preview';
 import { calendarBridge, clipboardBridge, integrationsBridge, modelsBridge, routinesBridge, usageBridge } from '../ui/bridges';
 import type { UsageSummary } from '../shared/contracts';
 import { cx, errMsg } from '../ui/util';
+import { useIndicator } from '../ui/indicator';
+import type { CSSProperties } from 'react';
 
 const Assistant = lazy(() => import('./Assistant').then((m) => ({ default: m.Assistant })));
 const Companion = lazy(() => import('./Companion').then((m) => ({ default: m.Companion })));
@@ -109,15 +112,31 @@ function useReducedMotion(pref: boolean): MotionState {
   return { reduced: false, source: null };
 }
 
+function useSystemDark(): boolean {
+  const [dark, setDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mq) return undefined;
+    const on = () => setDark(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return dark;
+}
+
+/** Resolves System / Light / Dark (System by default) and writes data-theme, data-motion and data-text on <html>. */
 function useThemeSync(): MotionState {
   const { settings } = useStore();
   const motion = useReducedMotion(settings?.reduceMotion ?? false);
   const [textSize] = useShellPref(SHELL_PREF.textSize, 'normal');
+  const [choiceRaw] = useShellPref<string | null>(SHELL_PREF.theme, null);
+  const systemDark = useSystemDark();
+  const theme = resolveTheme(normalizeThemeChoice(choiceRaw, settings?.theme), systemDark);
   useEffect(() => {
-    document.documentElement.dataset.theme = settings?.theme ?? 'graphite';
+    document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.motion = motion.reduced ? 'reduced' : 'full';
     document.documentElement.dataset.text = textSize === 'large' ? 'large' : 'normal';
-  }, [settings?.theme, motion.reduced, textSize]);
+  }, [theme, motion.reduced, textSize]);
   return motion;
 }
 
@@ -221,7 +240,7 @@ function PreviewBanner() {
     <div className="preview-banner" role="note">
       <strong>Browser preview</strong>
       <span>
-        This is not the Electron app. AI, voice, native actions, file pickers and cloud keys are unavailable. Records you add are demo data kept in this browser only.
+        This is not the Electron app. AI, voice, desktop actions, file pickers and saved keys are unavailable here. Anything you add is demo data kept in this browser.
       </span>
       <Button
         size="sm"
@@ -321,6 +340,7 @@ function SystemCheckBanner() {
 /* ---------- Help ---------- */
 
 const GENERAL_KEYS: { keys: string[]; what: string }[] = [
+  { keys: ['Ctrl', 'K'], what: 'Quick search: saved items and screens' },
   { keys: ['F1'], what: 'Open this help' },
   { keys: ['Esc'], what: 'Close a dialog or cancel a recording' },
   { keys: ['Ctrl', 'S'], what: 'Save the note you are editing' },
@@ -364,12 +384,12 @@ export function HelpContent({ go }: { go: Go }) {
             </div>
           ))}
         </dl>
-        <p className="field-hint">Shortcuts pause while a dialog is open. Alt shortcuts follow the order in the sidebar.</p>
+        <p className="field-hint">Shortcuts pause while a dialog is open. Alt+1 to Alt+0 keep the same screens as earlier versions.</p>
       </section>
       <section className="help-col" aria-labelledby="help-where">
         <h3 id="help-where">Where things are</h3>
         <ul className="help-list">
-          {VIEWS.map((v) => (
+          {AREAS.flatMap((a) => a.views.map(viewById)).map((v) => (
             <li key={v.id}>
               <button type="button" className="help-link" onClick={() => go(v.id)}>
                 <v.icon size={15} aria-hidden />
@@ -383,7 +403,7 @@ export function HelpContent({ go }: { go: Go }) {
         </ul>
         <h3>When something is off</h3>
         <p className="field-hint">
-          System status lists what this app detected and why a feature is unavailable. Developer has a copyable diagnostics block. Settings shows whether the model is ready using a live check, and the Home screen repeats that result.
+          Settings, then System status, lists what this computer supports and why a feature is unavailable. Developer has a copyable diagnostics block. The Assistant shows whether its model is ready and offers the one step that fixes it.
         </p>
       </section>
     </div>
@@ -403,46 +423,131 @@ function HelpDialog({ open, onClose, go }: { open: boolean; onClose: () => void;
   );
 }
 
-/* ---------- Sidebar ---------- */
+/* ---------- Rail ---------- */
 
-function SidebarStatus() {
+/**
+ * The companion's presence in the rail: the live orb, its real state in words, and whether chat can answer.
+ * It links to the Assistant, where the one step that fixes a blocked model is offered.
+ */
+function Presence({ go }: { go: Go }) {
   const { settings, cloudConfigured, system, systemError } = useStore();
   const { state } = useCompanion();
   if (!settings) return null;
   const online = settings.mode === 'online';
   const readiness = modelReadiness({ settings, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
-  const stateLabel = AVATAR_STATES.find((s) => s.id === state)?.label ?? state;
+  const chat = readiness.level === 'ready' ? (online ? 'AI connected' : 'Legacy local AI') : readiness.level === 'blocked' ? (online ? 'AI needs attention' : 'AI not connected') : 'AI not checked';
   return (
-    <div className="dock-status">
-      <Avatar state={state} size={64} />
-      <div className="dock-lines">
-        <span className={cx('mode-pill', online ? 'online' : 'offline')}>
-          {online ? <WifiHigh size={13} aria-hidden /> : <WifiSlash size={13} aria-hidden />}
-          {online ? 'Online mode' : 'Offline mode'}
+    <a
+      className="presence"
+      href={hashFor('assistant')}
+      onClick={(e) => {
+        e.preventDefault();
+        go('assistant');
+      }}
+      title={readiness.title}
+    >
+      <CompanionOrb size={40} decorative />
+      <span className="presence-text">
+        <strong>{stateLabel(state)}</strong>
+        <span className="sub">
+          <span className={cx('dot', readiness.level === 'ready' ? 'dot-ok' : readiness.level === 'blocked' ? 'dot-warn' : '')} aria-hidden /> {chat}
         </span>
-        <span className="dock-line" title={online ? settings.cloudModel : settings.localModel}>
-          {online ? settings.cloudModel || 'No cloud model set' : settings.localModel || 'No local model set'}
-        </span>
-        <span className="dock-line">{readiness.level === 'ready' ? 'Model ready' : readiness.level === 'blocked' ? 'Model not ready' : 'Model not checked'}</span>
-        {online && <span className="dock-line">{cloudConfigured === null ? 'Key status unknown' : cloudConfigured ? 'Key saved' : 'No key saved'}</span>}
-        <span className="dock-line dock-state">Companion: {stateLabel}</span>
+      </span>
+      <span className="sr-only">Open the Assistant</span>
+    </a>
+  );
+}
+
+const keyAttr = (v: ViewDef) => (v.shortcut && !v.shortcut.startsWith('Ctrl') ? v.shortcut : undefined);
+const tip = (label: string, shortcut?: string) => (shortcut ? `${label} (${shortcut})` : label);
+
+/** One rail entry per area. Single-screen areas are the page; multi-screen areas are the section (aria-current="true"). */
+function RailLink({ area, view, go }: { area: AreaDef; view: ViewId; go: Go }) {
+  const home = viewById(areaHome(area));
+  const inArea = areaOf(view).id === area.id;
+  const single = area.views.length === 1;
+  const shortcut = keyAttr(home);
+  return (
+    <a
+      href={hashFor(home.id)}
+      className={cx('rail-item', inArea && 'active')}
+      aria-current={inArea ? (single ? 'page' : 'true') : undefined}
+      aria-label={single ? home.label : area.label}
+      aria-keyshortcuts={shortcut}
+      title={tip(single ? home.label : area.label, shortcut)}
+      onClick={(e) => {
+        e.preventDefault();
+        go(home.id);
+      }}
+    >
+      <area.icon size={20} weight={inArea ? 'fill' : 'regular'} aria-hidden />
+      <span>{area.label}</span>
+    </a>
+  );
+}
+
+/** Contextual screens of the current area. Advanced screens sit after a quiet divider. */
+function AreaTabs({ area, view, go }: { area: AreaDef; view: ViewId; go: Go }) {
+  const [ref, box] = useIndicator<HTMLElement>('.tab[aria-current="page"]', `${area.id}:${view}`);
+  // A single-screen area keeps the same band, with its name and what it is for, so every page starts at the same height.
+  if (area.views.length < 2) {
+    return (
+      <div className="area-tabs area-solo">
+        <span className="hud">{area.label}</span>
+        <span className="area-blurb">{area.blurb}</span>
       </div>
-    </div>
+    );
+  }
+  const defs = area.views.map(viewById);
+  const main = defs.filter((v) => !v.advanced);
+  const advanced = defs.filter((v) => v.advanced);
+  const link = (v: ViewDef) => {
+    const shortcut = keyAttr(v);
+    return (
+      <a
+        key={v.id}
+        href={hashFor(v.id)}
+        className="tab"
+        aria-current={v.id === view ? 'page' : undefined}
+        aria-label={v.label}
+        aria-keyshortcuts={shortcut}
+        title={tip(v.label, shortcut)}
+        onClick={(e) => {
+          e.preventDefault();
+          go(v.id);
+        }}
+      >
+        {v.label}
+      </a>
+    );
+  };
+  return (
+    <nav ref={ref} className="area-tabs tabs has-indicator" aria-label={`${area.label} screens`}>
+      {box && <span className="tab-indicator" aria-hidden="true" style={{ '--ix': `${box.x}px`, '--iw': `${box.w}px` } as CSSProperties} />}
+      {main.map(link)}
+      {advanced.length > 0 && (
+        <>
+          <span className="tabs-divider" aria-hidden="true" />
+          <span className="tabs-label">Advanced</span>
+          {advanced.map(link)}
+        </>
+      )}
+    </nav>
   );
 }
 
 /* ---------- Views that only need a page frame around a shared module ---------- */
 
-function SearchView({ go, focusOnMount }: { go: Go; focusOnMount: boolean }) {
+function SearchView({ go, initialQuery }: { go: Go; initialQuery?: string }) {
   const { state } = useReady();
   const wrap = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (focusOnMount) wrap.current?.querySelector<HTMLInputElement>('input')?.focus();
-  }, [focusOnMount]);
+    wrap.current?.querySelector<HTMLInputElement>('input')?.focus();
+  }, []);
   return (
     <div className="page" ref={wrap}>
-      <PageHeader eyebrow="Work" title="Memory search" subtitle="Find anything already saved here. Choosing a result opens the screen that holds it." />
-      <MemorySearch state={state} onNavigate={(r) => go(VIEW_FOR_CATEGORY[r.category], { item: r.id })} />
+      <PageHeader title="Search" subtitle="Find anything saved on this computer. Choosing a result opens the screen that holds it." />
+      <MemorySearch key={initialQuery ?? ''} state={state} initialQuery={initialQuery} onNavigate={(r) => go(VIEW_FOR_CATEGORY[r.category], { item: r.id })} />
     </div>
   );
 }
@@ -452,7 +557,7 @@ function MotionView({ motion }: { motion: MotionState }) {
   const why = motion.source === 'setting' ? 'your Reduce motion setting' : motion.source === 'windows' ? 'the Windows reduced-motion setting' : motion.source === 'battery' ? 'the battery rule in Settings' : null;
   return (
     <div className="page page-wide">
-      <PageHeader eyebrow="Cockpit" title="Motion studio" subtitle="Original wave, particle and orbit effects drawn on a canvas in this window. Presets are kept in this app only." />
+      <PageHeader title="Motion studio" subtitle="Original wave, particle and 3D scenes drawn in this window. Presets are saved on this computer." />
       {why && (
         <Notice title="Playback is paused by reduced motion">
           Animation is off because of {why}. You can still change settings and save presets; the stage shows a single still frame.
@@ -526,9 +631,8 @@ function UsageView() {
   return (
     <div className="page page-wide">
       <PageHeader
-        eyebrow="Local ledger"
         title="Usage"
-        subtitle="Tokens and estimated spend recorded on this computer. Nothing is estimated unless the ledger has data."
+        subtitle="Tokens and estimated spend that this app recorded on this computer. Provider bills are the authority; nothing is estimated without recorded data."
         actions={
           <Button icon={ArrowClockwise} busy={busy} disabled={!client} onClick={() => void refresh()}>
             Refresh
@@ -555,7 +659,7 @@ function ClipboardView() {
   const client = useMemo(() => clipboardBridge(api), [api]);
   return (
     <div className="page">
-      <PageHeader eyebrow="Work" title="Clipboard history" subtitle="Off by default. When on, recent copied text is kept in memory on this computer only, with secrets filtered on a best-effort basis." />
+      <PageHeader title="Clipboard" subtitle="Off by default. When you turn it on, recent copied text is kept in memory on this computer only, and likely secrets are filtered out on a best-effort basis." />
       <Clipboard client={client} />
     </div>
   );
@@ -573,11 +677,12 @@ function AvatarView({ go, reducedMotion }: { go: Go; reducedMotion: boolean }) {
   const live = useCompanion();
   return (
     <div className="page page-wide">
-      <PageHeader eyebrow="Cockpit" title="Avatar" subtitle="Shape, colours, expressions and motion of the original, procedurally drawn avatar. Saved on this computer." />
+      <PageHeader
+        title="Character editor"
+        subtitle="Edit the classic character pack from earlier versions: shape, colours, expressions and timelines. Choose Classic character in Companion to use it across the app."
+        actions={<Button onClick={() => go('companion')}>Choose companion</Button>}
+      />
       <AvatarStudio reducedMotion={reducedMotion} voiceLevel={hostVoiceLevel(live)} />
-      <div className="row wrap">
-        <Button onClick={() => go('companion')}>Open Companion poses</Button>
-      </div>
     </div>
   );
 }
@@ -608,12 +713,11 @@ export class RouteBoundary extends Component<{ label: string; children: ReactNod
 }
 
 function Shell({ motion }: { motion: MotionState }) {
-  const { settings, isPreview } = useStore();
+  const { settings, isPreview, state, productivity } = useStore();
   const [loc, go] = useView();
   const view = loc.view;
-  const [scene] = usePref('scene', DEFAULT_SCENE);
   const [help, setHelp] = useState(false);
-  const [searchFocusKey, setSearchFocusKey] = useState(0);
+  const [palette, setPalette] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const first = useRef(true);
 
@@ -633,10 +737,7 @@ function Shell({ motion }: { motion: MotionState }) {
       e.preventDefault();
       if (action.kind === 'view') go(action.view);
       else if (action.kind === 'help') setHelp(true);
-      else {
-        setSearchFocusKey((k) => k + 1);
-        go('search');
-      }
+      else setPalette(true);
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
@@ -650,7 +751,7 @@ function Shell({ motion }: { motion: MotionState }) {
   let body: ReactNode;
   switch (view) {
     case 'assistant':
-      body = <Assistant />;
+      body = <Assistant key={loc.params.setup ?? ''} initialDraft={loc.params.draft} initialSetup={loc.params.setup === '1'} />;
       break;
     case 'companion':
       body = <Companion />;
@@ -659,7 +760,7 @@ function Shell({ motion }: { motion: MotionState }) {
       body = <Capsules initialItem={loc.params.item} />;
       break;
     case 'notes':
-      body = <Notes initialItem={loc.params.item} />;
+      body = <Notes initialItem={loc.params.item} newTitle={loc.params.new} />;
       break;
     case 'tasks':
       body = <Tasks />;
@@ -680,7 +781,7 @@ function Shell({ motion }: { motion: MotionState }) {
       body = <Developer />;
       break;
     case 'search':
-      body = <SearchView go={go} focusOnMount={searchFocusKey > 0} />;
+      body = <SearchView go={go} initialQuery={loc.params.q} />;
       break;
     case 'motion':
       body = <MotionView motion={motion} />;
@@ -720,70 +821,55 @@ function Shell({ motion }: { motion: MotionState }) {
   }
 
   const current = viewById(view);
+  const area = areaOf(view);
+  const [railRef, railBox] = useIndicator<HTMLElement>('.rail-item.active', view);
+  const primary = AREAS.filter((a) => !a.footer);
+  const footer = AREAS.filter((a) => a.footer);
 
   return (
-    <div className="app">
+    <div className="app" data-area={area.id}>
       <a className="skip" href="#main" onClick={(e) => { e.preventDefault(); mainRef.current?.focus(); }}>
         Skip to content
       </a>
-      {/* Keyed on the scene so a change cross-fades; the fade is opacity only and is removed under reduced motion. */}
-      <div key={scene} className="scene-layer" aria-hidden="true">
-        <SceneBackdrop scene={scene} className="app-scene" />
-      </div>
-      <aside className="sidebar">
+      <aside className="rail">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            <i />
-          </span>
+          <span className="brand-mark" aria-hidden="true" />
           <div className="brand-text">
             <strong>Desktop Companion</strong>
-            <span>{settings?.mode === 'online' ? 'Online by choice' : 'Offline first'}</span>
+            <span>{settings?.mode === 'online' ? 'AI online · files local' : 'Files local · AI off'}</span>
           </div>
         </div>
-        <nav aria-label="Primary" className="nav">
-          {navGroups().map((g) => (
-            <div className="nav-group" key={g.name}>
-              <p className="nav-label">{g.name}</p>
-              {g.views.map((v) => (
-                <a
-                  key={v.id}
-                  href={hashFor(v.id)}
-                  className={cx('nav-item', view === v.id && 'active')}
-                  aria-current={view === v.id ? 'page' : undefined}
-                  aria-label={v.label}
-                  aria-keyshortcuts={v.shortcut ? v.shortcut.replace(/^Ctrl/, 'Control') : undefined}
-                  title={v.shortcut ? `${v.label} (${v.shortcut})` : v.label}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    go(v.id);
-                  }}
-                >
-                  <v.icon size={18} weight={view === v.id ? 'fill' : 'regular'} aria-hidden />
-                  <span>{v.label}</span>
-                </a>
-              ))}
-            </div>
-          ))}
+        <button type="button" className="rail-search" aria-keyshortcuts="Control+K" title="Quick search (Ctrl+K)" onClick={() => setPalette(true)}>
+          <MagnifyingGlass size={16} aria-hidden />
+          <span>Search</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <nav ref={railRef} aria-label="Primary" className="rail-nav">
+          {railBox && <span className="rail-indicator" aria-hidden="true" style={{ '--iy': `${railBox.y}px`, '--ih': `${railBox.h}px` } as CSSProperties} />}
+          {primary.map((a) => <RailLink key={a.id} area={a} view={view} go={go} />)}
+          <span className="rail-spacer" aria-hidden="true" />
+          {footer.map((a) => <RailLink key={a.id} area={a} view={view} go={go} />)}
         </nav>
-        <div className="dock-tools">
+        <div className="rail-tools">
           <button type="button" className="iconbtn" aria-label="Help and keyboard shortcuts (F1)" title="Help (F1)" aria-keyshortcuts="F1" onClick={() => setHelp(true)}>
-            <Question size={16} aria-hidden />
+            <Question size={18} aria-hidden />
           </button>
           <button type="button" className="iconbtn" aria-label="Toggle fullscreen" title="Toggle fullscreen" onClick={toggleFullscreen}>
-            <ArrowsOut size={16} aria-hidden />
+            <ArrowsOut size={18} aria-hidden />
           </button>
           {motion.reduced && (
-            <span className="dock-motion" title={motion.source === 'battery' ? 'Reduced motion: low battery' : motion.source === 'windows' ? 'Reduced motion: Windows setting' : 'Reduced motion: app setting'}>
+            <span className="rail-motion" title={motion.source === 'battery' ? 'Reduced motion: low battery' : motion.source === 'windows' ? 'Reduced motion: Windows setting' : 'Reduced motion: app setting'}>
               Reduced motion
             </span>
           )}
         </div>
-        <SidebarStatus />
+        <Presence go={go} />
       </aside>
       <div className="stage">
         {isPreview && <PreviewBanner />}
         <RecoveryBanner />
         <SystemCheckBanner />
+        <AreaTabs area={area} view={view} go={go} />
         <main id="main" ref={mainRef} tabIndex={-1} className="main" aria-label={current.label}>
           <div key={view} className="view">
             <RouteBoundary key={view} label={current.label}>
@@ -792,6 +878,7 @@ function Shell({ motion }: { motion: MotionState }) {
           </div>
         </main>
       </div>
+      <CommandPalette open={palette} onClose={() => setPalette(false)} onGo={go} state={state} productivity={productivity} />
       <HelpDialog open={help} onClose={() => setHelp(false)} go={go} />
       <Toasts />
     </div>
@@ -804,6 +891,7 @@ function Gate() {
   if (status === 'loading') {
     return (
       <div className="boot">
+        <CompanionOrb size={72} decorative />
         <LoadingBlock label="Loading saved data…" />
       </div>
     );
@@ -836,8 +924,10 @@ function Gate() {
 
 export function App() {
   return (
-    <CompanionProvider>
-      <Gate />
-    </CompanionProvider>
+    <AppearanceProvider>
+      <CompanionProvider>
+        <Gate />
+      </CompanionProvider>
+    </AppearanceProvider>
   );
 }

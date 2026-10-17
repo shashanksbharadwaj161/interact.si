@@ -1,0 +1,208 @@
+/* Direction board page (prototype only). The bubble, controls and character slot come from production CSS. */
+
+body.board-body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(168, 139, 255, 0.16), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(255, 138, 107, 0.08), transparent 60%),
+    #0b0e16;
+  color: var(--cd-text);
+}
+
+.board {
+  display: grid;
+  gap: 40px;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 40px max(20px, env(safe-area-inset-right, 0px)) 64px max(20px, env(safe-area-inset-left, 0px));
+}
+
+.board h1,
+.board h2 {
+  margin: 0;
+  font-family: var(--cd-display);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.board h1 { font-size: 34px; font-weight: 700; line-height: 1.1; font-variation-settings: "opsz" 60; }
+.board h2 { font-size: 23px; font-weight: 650; font-variation-settings: "opsz" 36; }
+.board .kicker { margin: 0 0 6px; color: var(--cd-muted); font-weight: 600; font-size: 13px; }
+.board .lede { max-width: 72ch; margin: 8px 0 0; color: var(--cd-muted); font-size: 15px; line-height: 1.55; }
+.board .note { margin: 0; color: var(--cd-faint); font-size: 12.5px; line-height: 1.45; }
+.board .small { margin: 0; font-size: 13px; color: var(--cd-muted); }
+.board .small strong { color: var(--cd-text); }
+.board .tag { padding: 2px 9px; border-radius: 999px; background: rgba(200, 255, 77, 0.14); color: #dcff8a; font-size: 11.5px; font-weight: 600; }
+
+.sec { display: grid; gap: 16px; }
+
+/* ---------- Concepts ---------- */
+
+.concepts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+
+.concept {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(168deg, rgba(36, 42, 61, 0.7), rgba(17, 21, 33, 0.75));
+  box-shadow: inset 0 0 0 1px var(--cd-line);
+}
+
+.concept header { display: flex; align-items: center; gap: 10px; }
+.concept header strong { font: 650 17px var(--cd-display); }
+.concept p { margin: 0; font-size: 14px; line-height: 1.5; }
+
+.letter {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--cd-moon);
+  color: var(--cd-moon-ink);
+  font: 700 16px var(--cd-display);
+}
+
+.sizes { display: flex; align-items: flex-end; gap: 10px; min-height: 132px; padding: 4px 0; }
+.swatches { display: flex; gap: 6px; }
+.swatches span { width: 28px; height: 28px; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+
+/* ---------- Renderer lab ---------- */
+
+.lab { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+
+.lab-stage {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  min-height: 280px;
+  padding-bottom: 24px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #1a2034 0%, #121726 70%, #0e1220 100%);
+  box-shadow: inset 0 0 0 1px var(--cd-line);
+  cursor: crosshair;
+}
+
+.lab-stage::after {
+  content: "";
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lab-label {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(255, 181, 71, 0.16);
+  color: #ffd08a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lab-side { display: grid; align-content: start; gap: 12px; }
+.lab-now { margin: 0; font-size: 14px; line-height: 1.5; }
+.lab-now strong { font: 650 19px var(--cd-display); }
+.lab-now span { color: var(--cd-muted); }
+.lab-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-buttons .btn[aria-pressed="true"] { background: rgba(185, 164, 255, 0.22); border-color: rgba(185, 164, 255, 0.55); }
+
+/* ---------- Typography specimens ---------- */
+
+.specs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+
+.spec {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(168deg, var(--cd-glass-top), var(--cd-glass-bottom));
+  box-shadow: inset 0 0 0 1px var(--cd-line);
+  font-family: var(--spec-body);
+}
+
+.spec[data-recommended] { box-shadow: inset 0 0 0 1px rgba(200, 255, 77, 0.35); }
+.spec p { margin: 0; }
+.spec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--cd-muted); }
+.spec-first { font: 700 30px / 1.1 var(--spec-display); letter-spacing: -0.015em; }
+.spec-title { font: 650 17.5px / 1.2 var(--spec-display); }
+.spec-body { font-size: 14.5px; line-height: 1.55; }
+.spec-meta { font-size: 12.5px; color: var(--cd-muted); }
+.spec-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.spec-btn { padding: 8px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); box-shadow: inset 0 0 0 1px var(--cd-line-strong); font-size: 13.5px; font-weight: 600; }
+.spec-btn.primary { background: var(--cd-moon); color: var(--cd-moon-ink); box-shadow: none; }
+.spec-chip { padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); font-size: 13px; }
+.spec-proof { font-size: 14px; color: var(--cd-text); }
+.spec-why { font-size: 13px; color: var(--cd-muted); line-height: 1.5; }
+.spec-lic { font-size: 11.5px; color: var(--cd-faint); }
+
+/* ---------- Glass and edge ---------- */
+
+.controls,
+.edges { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.edge-demo { width: 170px; }
+.edge-demo .bubble-body { width: 100%; }
+.mini { padding: 18px 16px; font-size: 13px; }
+.mini strong { font-weight: 600; }
+
+/* ---------- Surfaces on a desktop ---------- */
+
+.desk {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: 18px;
+  padding: 20px;
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, rgba(114, 233, 242, 0.06), transparent 40%),
+    linear-gradient(315deg, rgba(255, 138, 107, 0.08), transparent 45%),
+    #10141f;
+  box-shadow: inset 0 0 0 1px var(--cd-line);
+}
+
+.scene { display: grid; align-content: start; justify-items: start; gap: 8px; }
+.scene .bubble { max-width: 100%; }
+.scene-label { color: var(--cd-muted); font-size: 12.5px; font-weight: 600; }
+.scene.rest .ground { display: grid; place-items: end start; min-height: 150px; padding: 12px; border-radius: 18px; background: rgba(255, 255, 255, 0.03); }
+
+.meter { display: flex; align-items: center; gap: 4px; height: 40px; }
+.meter span { width: 6px; border-radius: 3px; background: linear-gradient(180deg, var(--cd-cyan), var(--cd-violet)); }
+
+/* ---------- First run ---------- */
+
+.first { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: center; }
+
+.first-stage {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 28px;
+  border-radius: 26px;
+  background:
+    radial-gradient(600px 300px at 20% 100%, rgba(168, 139, 255, 0.16), transparent 70%),
+    #121726;
+  box-shadow: inset 0 0 0 1px var(--cd-line);
+}
+
+.first-stage .bubble { flex: 1; min-width: 0; margin-bottom: 40px; }
+.first-stage .bubble-body { width: 100%; }
+.first-copy { margin: 0; font-size: 14.5px; line-height: 1.5; }
+.first-notes { display: grid; gap: 10px; margin: 0; padding-left: 18px; color: var(--cd-muted); font-size: 13.5px; line-height: 1.5; }
+
+.board-foot { display: flex; align-items: center; gap: 14px; color: var(--cd-faint); font-size: 12.5px; }
+
+@media (max-width: 980px) {
+  .concepts,
+  .specs { grid-template-columns: minmax(0, 1fr); }
+  .lab,
+  .first { grid-template-columns: minmax(0, 1fr); }
+  .first-stage { flex-direction: column; align-items: flex-start; }
+}

@@ -1,0 +1,30 @@
+/* Island review journey: original mock desktops (flat shapes drawn here, no third-party art) under the production island. */
+html, body.island-body { margin: 0; background: #0b0d14; }
+.desk { position: relative; width: 1280px; height: 720px; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; }
+.mock { position: absolute; inset: 0; }
+.desk[data-scene="light"] .mock { background: radial-gradient(120% 90% at 20% 10%, #f6efe2, #d8dde8 60%, #c5cfe0); }
+.desk[data-scene="dark"] .mock { background: radial-gradient(120% 90% at 80% 0%, #2a2f4a, #11131c 60%, #090a10); }
+.desk[data-scene="busy"] .mock {
+  background:
+    linear-gradient(transparent 0 calc(100% - 1px), rgba(168, 139, 255, 0.18) calc(100% - 1px)) 0 0 / 100% 48px,
+    linear-gradient(90deg, transparent 0 calc(100% - 1px), rgba(114, 233, 242, 0.12) calc(100% - 1px)) 0 0 / 48px 100%,
+    linear-gradient(170deg, #3a1d4f, #14102a 55%, #0a1622);
+}
+.mock-win { position: absolute; border-radius: 10px; overflow: hidden; box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55); background: #fff; color: #222; font-size: 14px; }
+.mock-bar { padding: 8px 12px; background: #eceef3; color: #333; font-size: 12px; border-bottom: 1px solid #dde0e7; }
+.mock-body { padding: 14px 16px; white-space: pre; line-height: 1.6; }
+.mock-notepad { left: 64px; top: 70px; width: 520px; height: 300px; }
+.mock-code { left: 420px; top: 210px; width: 520px; height: 260px; background: #1b1e2b; color: #d6dcef; }
+.mock-code .mock-bar { background: #242838; color: #aeb6d0; border-color: #2e3346; }
+.mock-browser { left: 760px; top: 40px; width: 380px; height: 190px; }
+.mock-chat { left: 120px; top: 420px; width: 300px; height: 170px; }
+.mock-icons { position: absolute; left: 24px; top: 24px; display: grid; grid-template-columns: 24px; gap: 14px; }
+.mock-icons span { width: 24px; height: 24px; border-radius: 6px; background: rgba(255, 255, 255, 0.22); }
+.mock-taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 0; }
+.preview-tag {
+  position: absolute; left: 16px; top: 12px; z-index: 5; max-width: 560px;
+  padding: 6px 12px; border-radius: 999px; background: rgba(10, 12, 20, 0.78); color: #e9ecf5;
+  font: 500 12px/1.35 "Figtree", system-ui, sans-serif; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.pet-anchor { position: absolute; z-index: 2; }
+.desk .cmp-browser { position: absolute; left: 20px; bottom: 20px; color: #fff; }

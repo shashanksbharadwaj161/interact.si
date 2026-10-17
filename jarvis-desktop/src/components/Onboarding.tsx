@@ -1,12 +1,15 @@
-import { useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Check, Cpu, Key, Lock, WifiHigh, WifiSlash } from '@phosphor-icons/react';
-import type { Capability, Mode, Settings } from '../shared/contracts';
-import { Avatar } from './Avatar';
-import { SceneBackdrop } from './SceneBackdrop';
-import { PathListEditor, SystemBlock } from './shared';
-import { Badge, Button, Field, Notice, Panel, Segmented, Switch } from '../ui/primitives';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeft, ArrowRight, Check, CheckSquare, NotePencil, Sparkle } from '@phosphor-icons/react';
+import type { Capability, Settings } from '../shared/contracts';
+import { CoreFrame } from './CompanionOrb';
+import { AiSetup, type AiSetupResult } from './AiSetup';
+import { SHELL_PREF, useShellPref } from './Settings';
+import { Button, Notice, Segmented, Switch } from '../ui/primitives';
 import { useReady, useStore } from '../ui/store';
-import { errMsg, isLoopbackHost } from '../ui/util';
+import { hashFor } from '../ui/nav';
+import { THEME_CHOICES, normalizeThemeChoice, type ThemeChoice } from '../ui/theme';
+import { cx, isLoopbackHost, relTime, truncate } from '../ui/util';
+import '../styles/onboarding.css';
 
 const STEPS = ['Mode & look', 'Permissions', 'Hardware & model', 'Review'] as const;
 
@@ -69,32 +72,52 @@ type ReadinessInput = {
   cloudConfigured: boolean | null;
 };
 
-const OLLAMA_HINT = 'Offline chat needs Ollama running on this computer. Install it, start it, then install the model with “ollama pull” followed by the model name.';
-
 /**
- * What the assistant can actually do right now. Offline readiness comes from the backend's live Ollama check
- * (capability "local-llm"), never from whether the settings fields are filled in. Online readiness is whether
- * a model name and a saved key exist; the cloud provider itself is only reached when a message is sent.
+ * What the assistant can actually do right now. AI is a cloud service the user connects with their own key (Claude
+ * first). Online readiness is whether a model name and that provider's saved key exist; the provider itself is reached
+ * only when a message is sent. Offline means AI is not connected, except for an earlier local-model setup that still
+ * answers its live check: that keeps working and is labelled as the legacy local model.
  */
 export function modelReadiness(input: ReadinessInput): ModelReadiness {
   const { settings, capabilities, systemError, cloudConfigured } = input;
   if (settings.mode === 'online') {
-    if (!settings.cloudModel.trim()) return { route: 'cloud', level: 'blocked', title: 'Online mode has no model name', detail: 'Enter a cloud model name in Settings before using chat in online mode.' };
+    if (!settings.cloudModel.trim()) return { route: 'cloud', level: 'blocked', title: 'No model is chosen', detail: 'Choose a model in Connect AI before chatting. Nothing is sent until then.' };
+    const modelError = cloudModelError(settings.cloudModel);
+    if (modelError) return { route: 'cloud', level: 'blocked', title: 'The model name is not valid', detail: `${modelError} Choose a model from the list in Connect AI.` };
     if (cloudConfigured === false) {
-      return { route: 'cloud', level: 'blocked', title: 'Online mode has no API key', detail: 'Chat shows an error and sends nothing until you save a key. It does not switch to the local model.' };
+      return { route: 'cloud', level: 'blocked', title: 'No API key is saved', detail: 'Chat shows an error and sends nothing until you save your key in Connect AI. It never switches to another provider or to a local model.' };
     }
-    if (cloudConfigured === null) return { route: 'cloud', level: 'unknown', title: 'Key status unknown', detail: 'The saved-key check did not answer. Check again, or open Settings.' };
-    return { route: 'cloud', level: 'ready', title: 'Online mode is set up', detail: `Messages go to the cloud model “${settings.cloudModel}” with your saved key. Whether the provider is reachable is only known when a message is sent.` };
+    if (cloudConfigured === null) return { route: 'cloud', level: 'unknown', title: 'Key status unknown', detail: 'The saved-key check did not answer. Check again, or open Connect AI.' };
+    return { route: 'cloud', level: 'ready', title: 'AI is connected', detail: `Messages go to “${settings.cloudModel}” with your saved key when you send them. Whether the provider answers is shown in the conversation.` };
   }
+  // Offline: AI is off unless an earlier local-model setup proves it still answers. Until the check answers we do not know.
+  if (systemError) return { route: 'cloud', level: 'unknown', title: 'AI status unknown', detail: `${systemError} Notes, tasks and search still work on this computer.` };
+  if (capabilities === null) return { route: 'cloud', level: 'unknown', title: 'Checking AI', detail: 'The capability check has not answered yet. Notes, tasks and search work on this computer meanwhile.' };
+  const local = capabilities.find((c) => c.id === 'local-llm');
+  const legacyValid = !localEndpointError(settings.localEndpoint) && !localModelError(settings.localModel);
+  if (local?.available && legacyValid) {
+    return { route: 'local', level: 'ready', title: 'Legacy local model is answering', detail: `Replies come from “${settings.localModel}” on this computer, set up in an earlier version. Connect Claude for the full assistant.` };
+  }
+  return { route: 'cloud', level: 'blocked', title: 'AI is not connected', detail: 'Connect Claude with your own Anthropic API key to chat. Notes, tasks and search work on this computer without it.' };
+}
+
+const OLLAMA_HINT = 'This legacy route needs Ollama running on this computer with the model installed (“ollama pull” followed by the model name). Claude does not need it.';
+
+/**
+ * Readiness of the legacy local-model route alone, for the Advanced section in Settings where an earlier setup is
+ * managed. It comes from the live local-llm check, never from filled-in fields. Normal flows use modelReadiness.
+ */
+export function legacyLocalReadiness(input: Omit<ReadinessInput, 'cloudConfigured'>): ModelReadiness {
+  const { settings, capabilities, systemError } = input;
   if (localEndpointError(settings.localEndpoint) || localModelError(settings.localModel)) {
-    return { route: 'local', level: 'blocked', title: 'The local model settings are incomplete', detail: 'Fix the endpoint and model name in Settings.' };
+    return { route: 'local', level: 'blocked', title: 'The local model settings are incomplete', detail: 'Fix the endpoint and model name in the legacy local model section.' };
   }
   if (systemError) return { route: 'local', level: 'unknown', title: 'The local model could not be checked', detail: systemError };
   const cap = capabilities?.find((c) => c.id === 'local-llm');
   if (!cap) return { route: 'local', level: 'unknown', title: 'Local model not checked yet', detail: 'Waiting for the check to finish.' };
-  if (cap.available) return { route: 'local', level: 'ready', title: 'Local model is ready', detail: `Ollama is running and “${settings.localModel}” is installed. Replies are generated on this computer.` };
-  const reason = cap.reason ?? 'Ollama did not respond.';
-  return { route: 'local', level: 'blocked', title: 'Local model is not available', detail: /ollama pull/i.test(reason) ? reason : `${reason}. ${OLLAMA_HINT}` };
+  if (cap.available) return { route: 'local', level: 'ready', title: 'Local model is ready', detail: `“${settings.localModel}” answered on this computer. It is used only while AI requests are off.` };
+  const reason = cap.reason ?? 'The local model server did not respond.';
+  return { route: 'local', level: 'blocked', title: 'Local model is not available', detail: /ollama pull/i.test(reason) ? reason : `${reason.replace(/[.\s]+$/, '')}. ${OLLAMA_HINT}` };
 }
 
 /** The backend reports safe launch only through the desktop-control capability. Returns its reason, or null. */
@@ -134,308 +157,230 @@ export function ModelReadinessNotice({ readiness, checking, onRecheck, action }:
 
 /* ---------- First-run setup ---------- */
 
+type Phase = 'welcome' | 'first' | 'saved' | 'ai';
+type FirstKind = 'note' | 'task';
+type SavedRecord = { kind: FirstKind; id: string; title: string; body?: string; due?: string; at: string };
+
+/**
+ * First run. One welcoming scene and two paths:
+ * Start locally saves a real note or task (no model, no account, nothing leaves the computer) and shows the record as it
+ * was read back from storage. Connect AI runs the shared AI setup, which either reaches a working model or ends at one
+ * concrete recovery step; local tools always stay available. Setup is marked finished only when the user continues.
+ * Nothing is requested or probed beyond the capability check the app already runs on start.
+ */
 export function Onboarding() {
-  const { settings, mutate, api, system, systemError, cloudConfigured, refreshCloud, refreshSystem, isPreview } = useReady();
-  const check = useModelCheck();
-  const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<Settings>(settings);
+  const { settings, mutate, api, state } = useReady();
+  const [phase, setPhase] = useState<Phase>('welcome');
+  const [kind, setKind] = useState<FirstKind>('note');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedRecord | null>(null);
+  const [finishing, setFinishing] = useState(false);
   const [finishFailed, setFinishFailed] = useState(false);
-  const [key, setKey] = useState('');
-  const [keyBusy, setKeyBusy] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
+  const [themeRaw, setThemeRaw] = useShellPref<string | null>(SHELL_PREF.theme, null);
+  const theme = normalizeThemeChoice(themeRaw, settings.theme);
   const headRef = useRef<HTMLHeadingElement>(null);
-  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  const titleId = useId();
+  const bodyId = useId();
 
-  const endpointError = localEndpointError(draft.localEndpoint);
-  const modelError = localModelError(draft.localModel);
-  const cloudError = draft.mode === 'online' ? cloudModelError(draft.cloudModel) : null;
-  const online = draft.mode === 'online';
-
-  // The backend probes the saved settings, so the result only describes the draft while the two agree.
-  const draftMatchesSaved = draft.mode === settings.mode && draft.localEndpoint.trim() === settings.localEndpoint && draft.localModel.trim() === settings.localModel;
-  const readiness = modelReadiness({ settings: draft, capabilities: system?.capabilities ?? null, systemError, cloudConfigured });
-
-  const go = (n: number) => {
-    setStep(n);
+  useEffect(() => {
     requestAnimationFrame(() => headRef.current?.focus());
-  };
+  }, [phase]);
 
-  const saveKey = async () => {
-    const k = key.trim();
-    if (k.length < 8) return setKeyError('That does not look like a full API key.');
-    if (k.length > 400) return setKeyError('That key is too long.');
-    setKeyBusy(true);
-    setKeyError(null);
-    try {
-      await api.setCloudKey(k);
-      setKey('');
-      await refreshCloud();
-    } catch (e) {
-      setKeyError(errMsg(e, 'The key could not be saved.'));
-    } finally {
-      setKeyBusy(false);
-    }
-  };
-
-  const finish = async () => {
-    if (endpointError || modelError || cloudError) {
-      go(2);
+  const saveFirst = async (e: FormEvent) => {
+    e.preventDefault();
+    const t = title.trim();
+    if (!t || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    const before = new Set((kind === 'note' ? state.notes : state.tasks).map((x) => x.id));
+    const ok = await mutate(() => (kind === 'note' ? api.saveNote({ title: t, body: body.trim(), tags: [] }) : api.saveTask({ title: t, done: false })));
+    if (!ok) {
+      setSaving(false);
+      setSaveError('It was not saved. Nothing was changed; try again.');
       return;
     }
-    setSaving(true);
-    setFinishFailed(false);
-    const ok = await mutate(
-      () => api.saveSettings({ ...draft, localEndpoint: draft.localEndpoint.trim(), localModel: draft.localModel.trim(), cloudModel: draft.cloudModel.trim(), onboarded: true }),
-      'Setup saved.',
-    );
+    // Show what storage now holds, not what was typed.
+    const fresh = await api.getState().catch(() => null);
     setSaving(false);
-    if (ok) {
-      void refreshSystem();
-      void refreshCloud();
-    } else setFinishFailed(true);
+    const list = fresh ? (kind === 'note' ? fresh.notes : fresh.tasks) : [];
+    const rec = list.find((x) => !before.has(x.id));
+    if (!rec) {
+      setSaveError('It was saved, but it could not be read back. It will appear in the app.');
+      return;
+    }
+    setSaved(kind === 'note' ? { kind, id: rec.id, title: rec.title, body: (rec as { body: string }).body, at: (rec as { updatedAt: string }).updatedAt } : { kind, id: rec.id, title: rec.title, due: (rec as { due?: string }).due, at: (rec as { createdAt: string }).createdAt });
+    setPhase('saved');
   };
 
-  // Saves only the local endpoint and model (not "onboarded"), so the live check can run against the draft
-  // before setup finishes. Windows may ask to confirm a changed model address, as it does in Settings.
-  const [checkingDraft, setCheckingDraft] = useState(false);
-  const saveAndCheck = async () => {
-    if (endpointError || modelError) return;
-    setCheckingDraft(true);
-    const ok = await mutate(() => api.saveSettings({ localEndpoint: draft.localEndpoint.trim(), localModel: draft.localModel.trim() }));
-    if (ok) await check.recheck();
-    setCheckingDraft(false);
+  // The only write that finishes setup. The destination is set first so the shell opens there.
+  const finish = async (to: { view: 'home' | 'notes' | 'tasks' | 'assistant'; params?: Record<string, string> }) => {
+    setFinishing(true);
+    setFinishFailed(false);
+    window.location.hash = hashFor(to.view, to.params).slice(1);
+    const ok = await mutate(() => api.saveSettings({ onboarded: true }));
+    setFinishing(false);
+    if (!ok) setFinishFailed(true);
   };
 
-  const canNext = step !== 2 || !(endpointError || modelError || cloudError);
+  const prefs = (
+    <div className="ob-prefs">
+      <Segmented<ThemeChoice> label="Theme" value={theme} onChange={(v) => setThemeRaw(v)} options={THEME_CHOICES.map((c) => ({ value: c.value, label: c.label }))} />
+      <Switch label="Reduce motion" description="A still core and simpler transitions." checked={settings.reduceMotion} onChange={(v) => void mutate(() => api.saveSettings({ reduceMotion: v }))} />
+    </div>
+  );
 
   return (
     <div className="onboard">
-      <SceneBackdrop scene="deep-space" className="onboard-scene" />
-      <div className="onboard-shell">
-        <aside className="onboard-side">
-          <div className="brand">
-            <span className="brand-mark" aria-hidden="true">
-              <i />
-            </span>
-            <div className="brand-text">
-              <strong>Desktop Companion</strong>
-              <span>First-run setup</span>
+      <section className="ob-main" aria-labelledby="ob-title">
+        <p className="ob-brand">
+          <span className="brand-mark" aria-hidden="true" /> Desktop Companion
+        </p>
+
+        {phase === 'welcome' && (
+          <div className="ob-step">
+            <h1 id="ob-title" ref={headRef} tabIndex={-1} className="display">
+              Your computer, <em>awake</em>.
+            </h1>
+            <p className="ob-lead">Keep notes, tasks and searches here, on this computer. Connect Claude when you want it to think with you.</p>
+            <div className="ob-paths">
+              <button type="button" className="ob-path is-primary" onClick={() => setPhase('first')}>
+                <span className="ob-path-icon" aria-hidden="true">
+                  <NotePencil size={22} />
+                </span>
+                <span className="grow">
+                  <strong>Start locally</strong>
+                  <span>Notes, tasks and search. No account, no download, nothing leaves this computer.</span>
+                </span>
+                <ArrowRight size={18} aria-hidden />
+              </button>
+              <button type="button" className="ob-path" onClick={() => setPhase('ai')}>
+                <span className="ob-path-icon" aria-hidden="true">
+                  <Sparkle size={22} />
+                </span>
+                <span className="grow">
+                  <strong>Connect Claude</strong>
+                  <span>Use your own Anthropic API key. Notes stay here; only messages you send go to Anthropic.</span>
+                </span>
+                <ArrowRight size={18} aria-hidden />
+              </button>
+            </div>
+            <p className="field-hint">Nothing is allowed by default. Folders, apps, the microphone and clipboard history are only asked for when you use them.</p>
+            {prefs}
+          </div>
+        )}
+
+        {phase === 'first' && (
+          <div className="ob-step">
+            <button type="button" className="linkbtn back-link" onClick={() => setPhase('welcome')}>
+              <ArrowLeft size={14} aria-hidden /> Back
+            </button>
+            <h1 id="ob-title" ref={headRef} tabIndex={-1}>
+              What should we keep first?
+            </h1>
+            <form className="ob-first" onSubmit={(e) => void saveFirst(e)} aria-busy={saving}>
+              <div className="start-kinds" role="radiogroup" aria-label="Note or task">
+                {(
+                  [
+                    ['note', 'A note', NotePencil],
+                    ['task', 'A task', CheckSquare],
+                  ] as const
+                ).map(([k, name, Icon]) => (
+                  <button key={k} type="button" role="radio" aria-checked={kind === k} className={cx('start-kind', kind === k && 'on')} onClick={() => setKind(k)}>
+                    <Icon size={16} weight={kind === k ? 'fill' : 'regular'} aria-hidden />
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <label htmlFor={titleId} className="field-label">
+                {kind === 'note' ? 'Title' : 'What needs doing?'}
+              </label>
+              <input id={titleId} className="input ob-input" value={title} maxLength={200} autoFocus placeholder={kind === 'note' ? 'For example: Ideas for the weekend' : 'For example: Call the bank about the card'} onChange={(e) => setTitle(e.target.value)} />
+              {kind === 'note' && (
+                <>
+                  <label htmlFor={bodyId} className="field-label">
+                    Note <span className="sub">optional</span>
+                  </label>
+                  <textarea id={bodyId} className="input" rows={4} maxLength={4000} value={body} onChange={(e) => setBody(e.target.value)} />
+                </>
+              )}
+              {saveError && (
+                <Notice tone="danger" title="Not saved">
+                  {saveError}
+                </Notice>
+              )}
+              <div className="row wrap">
+                <Button type="submit" variant="primary" size="lg" busy={saving} disabled={!title.trim()}>
+                  {kind === 'note' ? 'Save note' : 'Add task'}
+                </Button>
+                <span className="sub">Saved on this computer only.</span>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {phase === 'saved' && saved && (
+          <div className="ob-step">
+            <h1 id="ob-title" ref={headRef} tabIndex={-1}>
+              Saved. It’s yours.
+            </h1>
+            <article className="ob-record" aria-label={`Saved ${saved.kind}`}>
+              <span className="ob-record-check" aria-hidden="true">
+                <Check size={16} weight="bold" />
+              </span>
+              <div className="grow">
+                <p className="sub">
+                  {saved.kind === 'note' ? 'Note' : 'Task'} · saved {relTime(saved.at)} on this computer
+                </p>
+                <strong>{saved.title}</strong>
+                {saved.body && <p className="ob-record-body">{truncate(saved.body, 220)}</p>}
+              </div>
+            </article>
+            <p className="ob-lead">You can find it in Workspace, on Today, and in search with Ctrl+K.</p>
+            {finishFailed && (
+              <Notice tone="danger" title="Setup was not finished">
+                The app could not save that setup is finished. Your {saved.kind} is saved. Try again.
+              </Notice>
+            )}
+            <div className="row wrap">
+              <Button variant="primary" size="lg" icon={ArrowRight} busy={finishing} onClick={() => void finish({ view: 'home' })}>
+                Continue to Today
+              </Button>
+              <Button busy={finishing} onClick={() => void finish(saved.kind === 'note' ? { view: 'notes', params: { item: saved.id } } : { view: 'tasks' })}>
+                Open the {saved.kind}
+              </Button>
+              <button type="button" className="linkbtn" onClick={() => setPhase('ai')}>
+                Connect Claude too
+              </button>
             </div>
           </div>
-          <Avatar state="idle" size={132} />
-          <ol className="steps" aria-label="Setup steps">
-            {STEPS.map((s, i) => (
-              <li key={s} className={i === step ? 'current' : i < step ? 'done' : ''} aria-current={i === step ? 'step' : undefined}>
-                <span className="step-dot">{i < step ? <Check size={12} weight="bold" aria-hidden /> : i + 1}</span>
-                {s}
-              </li>
-            ))}
-          </ol>
-          <p className="field-hint">Nothing is allowed by default. You can change every choice later in Settings.</p>
-        </aside>
+        )}
 
-        <section className="onboard-main" aria-labelledby="ob-title">
-          <p className="eyebrow">
-            Step {step + 1} of {STEPS.length}
-          </p>
-          <h1 id="ob-title" ref={headRef} tabIndex={-1}>
-            {step === 0 && 'Choose where answers come from'}
-            {step === 1 && 'Decide what it may touch'}
-            {step === 2 && 'Check this machine and set up the model'}
-            {step === 3 && 'Review and finish'}
-          </h1>
-
-          {step === 0 && (
-            <div className="stack">
-              <Segmented<Mode>
-                label="Mode"
-                value={draft.mode}
-                onChange={(v) => set('mode', v)}
-                options={[
-                  { value: 'offline', label: 'Offline (default)', icon: WifiSlash },
-                  { value: 'online', label: 'Online (optional)', icon: WifiHigh },
-                ]}
-              />
-              {draft.mode === 'offline' ? (
-                <Notice title="Offline mode">
-                  Chat uses a model that runs on this computer (Ollama). Nothing is sent to the cloud. If the model is not running, chat shows an error instead of answering. The next steps show whether it is ready.
-                </Notice>
-              ) : (
-                <Notice tone="warn" title="Online mode sends your messages to a cloud provider">
-                  You choose the cloud model and provide your own API key on the “Hardware &amp; model” step. If no key is saved, chat shows an error and sends nothing. It does not switch to the local model.
-                </Notice>
-              )}
-              <Field label="Theme">
-                {() => (
-                  <Segmented
-                    label="Theme"
-                    value={draft.theme}
-                    onChange={(v) => {
-                      set('theme', v);
-                      document.documentElement.dataset.theme = v;
-                    }}
-                    options={[
-                      { value: 'graphite', label: 'Graphite' },
-                      { value: 'nebula', label: 'Nebula' },
-                      { value: 'paper', label: 'Paper (light)' },
-                    ]}
-                  />
-                )}
-              </Field>
-              <Switch
-                label="Reduce motion"
-                description="Turns off ambient animation. The Windows reduced-motion setting is always respected too."
-                checked={draft.reduceMotion}
-                onChange={(v) => {
-                  set('reduceMotion', v);
-                  document.documentElement.dataset.motion = v ? 'reduced' : 'full';
-                }}
-              />
-            </div>
-          )}
-
-          {step === 1 && (
-            <div className="stack">
-              <Notice title="Two lists, both empty until you add to them">
-                Windows asks you to confirm each folder or app you add. Even allowed actions on the Computer screen show a preview and wait for your approval, and a blocked action tells you why.
+        {phase === 'ai' && (
+          <div className="ob-step">
+            <button type="button" className="linkbtn back-link" onClick={() => setPhase(saved ? 'saved' : 'welcome')}>
+              <ArrowLeft size={14} aria-hidden /> Back
+            </button>
+            <h1 id="ob-title" ref={headRef} tabIndex={-1}>
+              Connect Claude
+            </h1>
+            <p className="ob-lead">Four short steps. Nothing is sent to Anthropic until you allow it, and you can change this later in Settings.</p>
+            <AiSetup onDone={(_r: AiSetupResult) => void finish({ view: 'assistant' })} onSkip={() => void finish({ view: 'home' })} />
+            {finishFailed && (
+              <Notice tone="danger" title="Setup was not finished">
+                The app could not save that setup is finished. Try again.
               </Notice>
-              <Panel title="Allowed folders" eyebrow="Files">
-                <p className="field-hint">Folders Desktop Companion may be asked to work inside. Files outside them are out of scope.</p>
-                <PathListEditor kind="folder" items={draft.allowedRoots} onChange={(v) => set('allowedRoots', v)} />
-              </Panel>
-              <Panel title="Approved apps" eyebrow="Launching">
-                <p className="field-hint">Applications Desktop Companion may launch for you after you approve the action.</p>
-                <PathListEditor kind="app" items={draft.approvedApps} onChange={(v) => set('approvedApps', v)} />
-              </Panel>
-              <Switch label="Start in the system tray" description="Open minimised to the tray when Windows starts this app." checked={draft.startInTray} onChange={(v) => set('startInTray', v)} />
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="stack">
-              <Panel title="Detected on this computer" eyebrow="Hardware" actions={<Cpu size={18} aria-hidden />}>
-                <SystemBlock />
-              </Panel>
-              <Panel title="Local model" eyebrow={online ? 'Offline route (not used in online mode)' : 'Offline chat'}>
-                <p className="field-hint">
-                  Desktop Companion does not include a model. Offline chat needs Ollama running on this computer (it only accepts addresses on this computer). Install Ollama, start it, then install a model once with “ollama pull” followed by the model name.
-                </p>
-                <div className="grid2">
-                  <Field label="Endpoint" error={endpointError} hint="Usually http://127.0.0.1:11434">
-                    {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.localEndpoint} maxLength={200} onChange={(e) => set('localEndpoint', e.target.value)} spellCheck={false} />}
-                  </Field>
-                  <Field label="Model name" error={modelError} hint="For example llama3.2:3b">
-                    {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.localModel} maxLength={200} onChange={(e) => set('localModel', e.target.value)} spellCheck={false} />}
-                  </Field>
-                </div>
-                {!online &&
-                  (draftMatchesSaved ? (
-                    <ModelReadinessNotice readiness={readiness} checking={check.checking} onRecheck={() => void check.recheck()} />
-                  ) : (
-                    <Notice
-                      title="Not checked yet"
-                      action={
-                        <Button size="sm" busy={checkingDraft} disabled={Boolean(endpointError || modelError)} onClick={() => void saveAndCheck()}>
-                          Save and check now
-                        </Button>
-                      }
-                    >
-                      The check uses saved settings. Save the endpoint and model now to see whether Ollama answers, or finish setup and the result then shows on Home.
-                    </Notice>
-                  ))}
-              </Panel>
-              {online && (
-                <Panel title="Cloud model" eyebrow="Online route">
-                  <Field label="Model name" error={cloudError} hint="The cloud provider's name for the model.">
-                    {(id, d) => <input id={id} aria-describedby={d} className="input mono" value={draft.cloudModel} maxLength={100} spellCheck={false} onChange={(e) => set('cloudModel', e.target.value)} />}
-                  </Field>
-                  <div className="key-box">
-                    <div className="key-head">
-                      <Key size={18} aria-hidden />
-                      <strong>API key</strong>
-                      {cloudConfigured === null ? <Badge>Status unknown</Badge> : cloudConfigured ? <Badge tone="ok">Saved</Badge> : <Badge tone="warn">Not saved</Badge>}
-                    </div>
-                    <p className="field-hint">Saved with Windows protection and never shown again. Saving a new key replaces the old one. You can skip this and add it later in Settings; until then chat shows an error.</p>
-                    <form
-                      className="row wrap"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void saveKey();
-                      }}
-                    >
-                      <Field label="API key" error={keyError} className="grow">
-                        {(id, d) => <input id={id} aria-describedby={d} className="input mono" type="password" autoComplete="off" spellCheck={false} value={key} maxLength={400} onChange={(e) => { setKey(e.target.value); setKeyError(null); }} placeholder={isPreview ? 'Unavailable in browser preview' : 'Paste your key'} />}
-                      </Field>
-                      <div className="row align-end">
-                        <Button type="submit" busy={keyBusy} disabled={!key.trim()}>
-                          Save key
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                </Panel>
-              )}
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="stack">
-              <Panel title="Your choices" eyebrow="Summary">
-                <dl className="kv-list">
-                  <div className="kv"><dt>Mode</dt><dd>{online ? 'Online (cloud model with your own key)' : 'Offline (model on this computer only)'}</dd></div>
-                  <div className="kv"><dt>Theme</dt><dd>{draft.theme}{draft.reduceMotion ? ', reduced motion' : ''}</dd></div>
-                  <div className="kv"><dt>Allowed folders</dt><dd>{draft.allowedRoots.length ? draft.allowedRoots.join(', ') : 'none'}</dd></div>
-                  <div className="kv"><dt>Approved apps</dt><dd>{draft.approvedApps.length ? draft.approvedApps.join(', ') : 'none'}</dd></div>
-                  <div className="kv"><dt>{online ? 'Cloud model' : 'Local model'}</dt><dd>{online ? draft.cloudModel : `${draft.localModel} at ${draft.localEndpoint}`}</dd></div>
-                  <div className="kv">
-                    <dt>Ready to answer</dt>
-                    <dd>
-                      {online || draftMatchesSaved ? (
-                        <>
-                          <Badge tone={readiness.level === 'ready' ? 'ok' : readiness.level === 'blocked' ? 'warn' : 'muted'}>{readiness.level === 'ready' ? 'Yes' : readiness.level === 'blocked' ? 'Not yet' : 'Not checked'}</Badge> {readiness.title}
-                        </>
-                      ) : (
-                        <>
-                          <Badge>Not checked</Badge> The new endpoint and model are checked after you finish.
-                        </>
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-              </Panel>
-              {online && cloudConfigured !== true && (
-                <Notice tone="warn" title="No API key is saved yet">
-                  You can finish now. Chat shows an error and sends nothing until you add a key in Settings, under Mode &amp; models. It does not use the local model.
-                </Notice>
-              )}
-              {finishFailed && (
-                <Notice tone="danger" title="Setup was not saved" action={<Button size="sm" onClick={() => go(2)}>Review model settings</Button>}>
-                  Windows asks you to confirm new folders, apps, online mode and a changed model address, and nothing is saved if you decline. A setting may also have been rejected; the message above names it. Try again when ready.
-                </Notice>
-              )}
-              <Notice title="What happens next">
-                Windows asks you to confirm any folders or apps you added, switching to online mode, or a changed model address. You can skip the model or permissions; features that need them will say what is missing.
-              </Notice>
-            </div>
-          )}
-
-          <footer className="onboard-foot">
-            <Button icon={ArrowLeft} onClick={() => go(step - 1)} disabled={step === 0 || saving}>
-              Back
-            </Button>
-            {step < STEPS.length - 1 ? (
-              <Button variant="primary" icon={ArrowRight} onClick={() => go(step + 1)} disabled={!canNext}>
-                Next
-              </Button>
-            ) : (
-              <Button variant="primary" icon={Lock} busy={saving} onClick={() => void finish()}>
-                Finish setup
-              </Button>
             )}
-          </footer>
-        </section>
-      </div>
+          </div>
+        )}
+      </section>
+
+      <aside className="ob-stage" aria-label="Your companion">
+        <CoreFrame size={320} label="Your companion" />
+        <p className="sub">This is your companion's core. It shows what the app is really doing. You can change its form in Studio.</p>
+      </aside>
     </div>
   );
 }

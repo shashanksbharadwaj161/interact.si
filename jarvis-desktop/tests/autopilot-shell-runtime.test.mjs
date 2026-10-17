@@ -227,7 +227,7 @@ const nameOfButton = (html, b) => b.attrs['aria-label'] || visibleText(b.inner) 
 const wrappingLabel = (html, f) => visibleText(elements(html, 'label').find((l) => !l.attrs.for && l.inner.includes(f.raw))?.inner ?? '');
 const nameOfField = (html, f) => f.attrs['aria-label'] || labelFor(html, f.attrs.id) || wrappingLabel(html, f) || '';
 const mainLabel = (html) => decode((html.match(/<main\b[^>]*aria-label="([^"]*)"/) ?? [])[1] ?? '');
-const headingOf = (html) => decode((html.match(/<h1>([^<]*)<\/h1>/) ?? [])[1] ?? '');
+const headingOf = (html) => decode((html.match(/<h1\b[^>]*>([^<]*)<\/h1>/) ?? [])[1] ?? '');
 const currentNavItems = (html) => elements(html, 'a').filter((a) => a.attrs['aria-current'] === 'page').map((a) => a.attrs['aria-label']);
 
 const H1 = {
@@ -236,25 +236,25 @@ const H1 = {
   companion: 'Companion',
   capsules: 'Capsules',
   notes: 'Notes',
-  tasks: 'Tasks & focus',
-  computer: 'Computer',
+  tasks: 'Tasks',
+  computer: 'Desktop actions',
   status: 'System status',
   settings: 'Settings',
-  lab: 'Feature Lab',
+  lab: 'Roadmap',
   developer: 'Developer',
-  search: 'Memory search',
+  search: 'Search',
   motion: 'Motion studio',
-  avatar: 'Avatar',
-  routines: 'Routines',
-  integrations: 'Integrations',
-  models: 'Models',
+  avatar: 'Character editor',
+  routines: 'Automations',
+  integrations: 'Connections',
+  models: 'Local models',
   usage: 'Usage',
-  clipboard: 'Clipboard history',
+  clipboard: 'Clipboard',
   calendar: 'Calendar',
   // Workspace screens integrated 15 Oct 2026 (captain).
   memory: 'Memory',
   writing: 'Writing',
-  guide: 'Guided setup',
+  guide: 'Help & setup',
 };
 
 /* ---------- Routes ---------- */
@@ -298,28 +298,37 @@ test('every navigable view renders its own page with one current nav item and a 
 test('the empty hash and unknown view names fall back to Home', () => {
   for (const hash of ['', '#', '#/nope', '#/nope?item=x']) {
     const html = page(hash, { system: STATES.available.system });
-    assert.equal(mainLabel(html), 'Home', JSON.stringify(hash));
-    assert.deepEqual(currentNavItems(html), ['Home']);
+    assert.equal(mainLabel(html), 'Today', JSON.stringify(hash));
+    assert.deepEqual(currentNavItems(html), ['Today']);
   }
 });
 
 test('every shortcut the nav displays opens the view it names, through the same key handler', () => {
-  const html = page('#/home', { system: STATES.available.system });
-  const links = elements(html, 'a').filter((a) => a.attrs['aria-keyshortcuts']);
-  const shortcutViews = nav.VIEWS.filter((v) => v.shortcut);
-  assert.equal(links.length, shortcutViews.length, 'one aria-keyshortcuts entry per shortcut view');
+  // The rail shows areas and each area shows its own tabs, so a shortcut link appears on the pages of its area.
+  // Collect every displayed shortcut across all pages; one view must always show the same shortcut.
+  const seen = new Map();
+  for (const v of nav.VIEWS) {
+    const html = page(nav.hashFor(v.id), { system: STATES.available.system });
+    for (const link of elements(html, 'a').filter((a) => a.attrs['aria-keyshortcuts'])) {
+      const prev = seen.get(link.attrs['aria-label']);
+      if (prev) assert.equal(prev.attrs['aria-keyshortcuts'], link.attrs['aria-keyshortcuts'], `${link.attrs['aria-label']} shows one shortcut everywhere`);
+      seen.set(link.attrs['aria-label'], link);
+    }
+  }
+  const shortcutViews = nav.VIEWS.filter((v) => v.shortcut && !v.shortcut.startsWith('Ctrl+'));
+  assert.equal(shortcutViews.length, 10, 'Alt+1…9 and Alt+0');
   for (const v of shortcutViews) {
-    const link = links.find((l) => l.attrs['aria-label'] === v.label);
-    assert.ok(link, `${v.id} nav link carries its shortcut`);
-    // The nav writes Control where the handler reads ctrlKey; split the label the way a keyboard event is built.
+    const link = seen.get(v.label);
+    assert.ok(link, `${v.id} nav link carries its shortcut on at least one page`);
     const parts = link.attrs['aria-keyshortcuts'].split('+');
     const key = parts.at(-1);
     const event = { key, altKey: parts.includes('Alt'), ctrlKey: parts.includes('Control'), metaKey: false, shiftKey: false };
-    const action = nav.shortcutAction(event, false);
-    if (v.id === 'search') assert.deepEqual(action, { kind: 'search' }, 'Ctrl+K opens memory search');
-    else assert.deepEqual(action, { kind: 'view', view: v.id }, `${link.attrs['aria-keyshortcuts']} opens ${v.id}`);
+    assert.deepEqual(nav.shortcutAction(event, false), { kind: 'view', view: v.id }, `${link.attrs['aria-keyshortcuts']} opens ${v.id}`);
     assert.equal(link.attrs.title, `${v.label} (${v.shortcut})`, `${v.id} tooltip shows the same shortcut`);
   }
+  assert.deepEqual(nav.shortcutAction({ key: 'k', altKey: false, ctrlKey: true, metaKey: false, shiftKey: false }, false), { kind: 'search' }, 'Ctrl+K opens quick search');
+  const home = page('#/home', { system: STATES.available.system });
+  assert.match(home, /<button[^>]*aria-keyshortcuts="Control\+K"/, 'the rail search button names Ctrl+K');
 });
 
 test('the route parameters the shell emits survive the hash round trip for every view', () => {
@@ -371,7 +380,7 @@ const NOT_CONNECTED = {
 };
 
 test('the routines, integrations, models, usage, clipboard, calendar and avatar pages are reachable and titled', () => {
-  for (const [id, title] of [['routines', 'Routines'], ['integrations', 'Integrations'], ['models', 'Models'], ['usage', 'Usage'], ['clipboard', 'Clipboard history'], ['calendar', 'Calendar'], ['avatar', 'Avatar']]) {
+  for (const [id, title] of [['routines', 'Automations'], ['integrations', 'Connections'], ['models', 'Local models'], ['usage', 'Usage'], ['clipboard', 'Clipboard'], ['calendar', 'Calendar'], ['avatar', 'Character editor']]) {
     for (const o of [STATES.available, STATES.connected]) {
       const html = page(`#/${id}`, o);
       assert.equal(headingOf(html), title, id);
@@ -496,7 +505,8 @@ test('an unavailable reason that already ends in a full stop is not followed by 
 
 test('an unavailable capability shows its reason on the assistant and does not hide it', () => {
   const html = page('#/assistant', STATES.unavailable);
-  assert.match(html, /local-llm reason/);
+  assert.match(html, /AI is not connected\. Connect Claude/, 'offline without an answering legacy model says what to do');
+  assert.doesNotMatch(html, /local-llm reason/, 'a legacy local-model failure is not the advice in a Claude-first app');
   assert.match(html, /tts reason/);
   assert.match(html, /stt reason/);
   assert.match(html, /<strong>Unavailable<\/strong>/);
@@ -536,9 +546,10 @@ test('the computer page explains why it cannot preview and disables Preview unti
 
 test('home lists what is unavailable with its reason, and is silent about it when everything is available', () => {
   const blocked = page('#/home', STATES.unavailable);
-  assert.match(blocked, /Local model is not available/);
-  assert.match(blocked, /local-llm reason/);
-  assert.doesNotMatch(page('#/home', STATES.available), /Local model is not available/);
+  assert.match(blocked, /AI is not connected/);
+  assert.match(blocked, /Connect Claude/);
+  assert.doesNotMatch(blocked, /local-llm reason/);
+  assert.doesNotMatch(page('#/home', STATES.available), /AI is not connected/, 'an answering legacy model needs no setup prompt');
 });
 
 /* ---------- Accessible names ---------- */

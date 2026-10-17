@@ -32,7 +32,7 @@ export function FeatureLab() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="System" title="Feature Lab" subtitle="The roadmap, with what exists and what does not. Nothing here is marked as working unless there is a screen for it." />
+      <PageHeader eyebrow="System" title="Roadmap" subtitle="The roadmap, with what exists and what does not. Nothing here is marked as working unless there is a screen for it." />
 
       <Notice title="How to read this">
         “Interface built” means a screen exists. It does not guarantee the underlying engine (model, speech, native control) is installed; the live capability report below is the source of truth. Everything else is plan or research.

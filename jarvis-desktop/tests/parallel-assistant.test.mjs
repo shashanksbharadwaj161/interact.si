@@ -7,11 +7,11 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
+import { phosphorIconNames } from './helpers/icon-stub.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const ICONS = ['ArrowClockwise', 'CaretLeft', 'Broom', 'ChatCircleDots', 'Lightning', 'MagnifyingGlass', 'Microphone', 'PaperPlaneRight', 'ShieldCheck', 'SpeakerHigh', 'Stop',
-  'ArrowCounterClockwise', 'Copy', 'DownloadSimple', 'FloppyDisk', 'Pause', 'Play', 'Plus', 'Trash', 'UploadSimple', 'Info', 'Warning', 'WarningCircle',
-  'Check', 'CaretDown', 'X', 'CircleNotch', 'MagnifyingGlassPlus', 'Eye', 'EyeSlash', 'CaretRight', 'ArrowSquareOut', 'Question'];
+// Icons render as nothing; the names come from the real phosphor imports in src/.
+const ICONS = await phosphorIconNames(root);
 const STORE_STUB = `
   export function useReady() { return globalThis.__fakeStore(); }
   export function useOptionalStore() { return null; }
@@ -320,7 +320,7 @@ test('Assistant: a failed reply shows a typed note and an explicit Retry that sa
   assert.match(html, /<button[^>]*>[^<]*(?:<[^>]*>)*Retry/);
   assert.equal(providerCalls, 0, 'rendering never sends');
   const down = render({ chat, routeOk: false, reason: 'Ollama is not running' });
-  assert.match(down, /Unavailable: Ollama is not running/);
+  assert.match(down, /Unavailable: AI is not connected\. Connect Claude/, 'offline without an answering legacy model says what to do, not why a local model failed');
   assert.match(down, /<button[^>]*disabled[^>]*>[^<]*(?:<[^>]*>)*Retry/, 'Retry is disabled while the route is unavailable');
 });
 
@@ -343,7 +343,7 @@ const src = readFileSync(path.join(root, 'src/components/Assistant.tsx'), 'utf8'
 test('wiring: one synchronous send lock, a stream sequence guard, Esc to stop and a stop watchdog are in place', () => {
   assert.match(src, /const sendLock = useRef\(false\)/);
   assert.match(src, /if \(!text \|\| sendLock\.current \|\| pending !== null \|\| live !== null \|\| settling/, 'a second send in the same tick is refused before any state update lands');
-  assert.match(src, /sendLock\.current = true;\n/);
+  assert.match(src, /sendLock\.current = true;\r?\n/);
   assert.equal((src.match(/sendLock\.current = false/g) ?? []).length >= 3, true, 'the lock is released on every exit path (error, finally, finish)');
   assert.match(src, /seq !== streamSeq\.current/, 'late events and late finishes from an older stream are dropped');
   assert.match(src, /e\.key === 'Escape' && liveRef\.current/);

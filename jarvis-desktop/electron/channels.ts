@@ -4,7 +4,7 @@ export const METHODS = [
   'saveCapsule', 'deleteCapsule', 'restoreCapsule',
   'saveNote', 'deleteNote', 'saveTask', 'deleteTask',
   'chat', 'clearChat', 'setCloudKey', 'cloudKeyStatus', 'deleteCloudKey',
-  'cloudProviderStatus', 'setProviderKey', 'clearProviderKey',
+  'cloudProviderStatus', 'setProviderKey', 'clearProviderKey', 'cloudModels',
   'previewAction', 'executeAction', 'speak', 'transcribe',
   'exportData', 'importData', 'pickPath',
   // API v2
@@ -25,6 +25,8 @@ export const METHODS = [
   'chatStreamStart', 'chatStreamRead', 'chatStreamCancel',
   // v2.4 approved documents: main-process dialog, token-held preview, save as note only after review.
   'documentsChoose', 'documentsSave', 'documentsDiscard',
+  // v2.5 voice controls: stop reading aloud and drop a transcription in flight. Both act only on this app's own speech.
+  'speechStop', 'transcribeCancel',
 ] as const;
 
 export type MethodName = (typeof METHODS)[number];
@@ -35,7 +37,7 @@ export const ARITY: Record<MethodName, number> = {
   saveCapsule: 1, deleteCapsule: 1, restoreCapsule: 1,
   saveNote: 1, deleteNote: 1, saveTask: 1, deleteTask: 1,
   chat: 1, clearChat: 0, setCloudKey: 1, cloudKeyStatus: 0, deleteCloudKey: 0,
-  cloudProviderStatus: 0, setProviderKey: 2, clearProviderKey: 1,
+  cloudProviderStatus: 0, setProviderKey: 2, clearProviderKey: 1, cloudModels: 1,
   previewAction: 1, executeAction: 2, speak: 1, transcribe: 1,
   exportData: 0, importData: 0, pickPath: 1,
   getApiInfo: 0, planIntent: 2, search: 2, listLocalModels: 0,
@@ -51,6 +53,7 @@ export const ARITY: Record<MethodName, number> = {
   calendarList: 0, calendarImportText: 1, calendarImportFile: 0, calendarExport: 0, calendarClear: 0,
   chatStreamStart: 1, chatStreamRead: 2, chatStreamCancel: 1,
   documentsChoose: 0, documentsSave: 2, documentsDiscard: 1,
+  speechStop: 0, transcribeCancel: 0,
 };
 
 export const channel = (m: string) => `jarvis:${m}`;

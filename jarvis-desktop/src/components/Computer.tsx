@@ -240,7 +240,7 @@ export function Computer() {
 
   return (
     <div className="page page-wide">
-      <PageHeader eyebrow="Work" title="Computer" subtitle="Ask the backend to preview an action. Nothing runs until you read the preview and approve it." />
+      <PageHeader eyebrow="Work" title="Desktop actions" subtitle="Describe one action on this computer and read its preview. Nothing runs until you approve it in a Windows confirmation." />
 
       {needsDesktop&&!desktopReady&&<Notice tone="warn" title="Desktop control unavailable">{desktopReason}<div className="row"><Button size="sm" busy={systemLoading} onClick={()=>void refreshSystem()}>Check again</Button><a className="btn btn-ghost btn-sm" href="#/status">System status</a></div></Notice>}
       <div className="computer-grid">
