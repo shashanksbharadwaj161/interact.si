@@ -369,7 +369,7 @@ export function Onboarding() {
               Connect Claude
             </h1>
             <p className="ob-lead">Four short steps. Nothing is sent to Anthropic until you allow it, and you can change this later in Settings.</p>
-            <button type="button" className="linkbtn" onClick={() => void finish({ view: 'home' })}>Explore first — connect later</button>
+            <button type="button" className="linkbtn" onClick={() => void finish({ view: 'home' })}>Explore first. Connect later.</button>
             <AiSetup onDone={(_r: AiSetupResult) => void finish({ view: 'assistant' })} onSkip={() => void finish({ view: 'home' })} />
             {finishFailed && (
               <Notice tone="danger" title="Setup was not finished">

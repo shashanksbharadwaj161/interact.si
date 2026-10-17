@@ -31,6 +31,8 @@ Detailed evidence:
 - `native-companion/native-placement-check.json` is the current Windows result. Historical Linux voice and pre-voice Windows results are retained separately, not relabelled.
 - `voice-windows-renderer/voice-journey.json` records the actual Windows test environment. Earlier Claude Linux captures remain under `voice/`.
 
+The wider Windows suite also passed **1,725/1,725** after correcting the onboarding wording-rule violation. This result describes the local source before integrating the new island shell.
+
 ## Claude assignment and ongoing work
 
 The full `CLAUDE-ISLAND-COMPUTER-USE-2026-10-18.md` was sent in the existing Claude Code session. It includes the owner's product direction, actual Dribbble/Hitodama observations, Nivo image URLs, five complete journeys, transition state/timing/material contracts, native execution/security boundaries, file ownership and evidence requirements.
