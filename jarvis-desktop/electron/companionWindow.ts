@@ -15,7 +15,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import type {Backend, CompanionReadiness} from './backend';
+import type {Backend, CompanionReadiness, CompanionTarget} from './backend';
 import type {AgentEvent} from './services/agent';
 import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
 import {createTrustedConfirm, safeErrorMessage, validateArgsAgainst} from './ipcCore';
@@ -32,7 +32,7 @@ export type CompanionDeps = {
 
 export type MaterialState = {requested: 'none' | 'acrylic'; applied: boolean; note: string};
 export type Appearance = 'pet' | 'legacy-orb';
-export type CompanionStatus = {readiness: CompanionReadiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock};
+export type CompanionStatus = {readiness: CompanionReadiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock; target: {process: string; title: string} | null};
 
 const SHORTCUTS = ['Control+Shift+Space', 'Control+Alt+Space'] as const;
 const REGION_TTL_MS = 5 * 60 * 1000;
@@ -99,6 +99,9 @@ export function createCompanion(deps: CompanionDeps) {
   let gazeTimer: ReturnType<typeof setInterval> | null = null;
   let gaze: {bucket: number | null; last: Point | null; movedAt: number} = {bucket: null, last: null, movedAt: 0};
   let interactive = !CLICK_THROUGH;
+  /** The window the person was using when they opened the companion; typing may go only there. Cleared on close. */
+  let target: CompanionTarget | null = null;
+  const TARGET_WAIT_MS = 700;
   const regions = new Map<string, Region>();
   const undoable = new Set<string>();
 
@@ -155,17 +158,31 @@ export function createCompanion(deps: CompanionDeps) {
     if (!NO_ACTIVATE || !alive()) return;
     island!.setFocusable(!rest);
   }
-  function invoke() {
+  const shownTarget = () => (target ? {process: target.process, title: target.title.slice(0, 120)} : null);
+  /**
+   * Opens the bubble. When it was closed, the window in the foreground is remembered first (the companion has not taken
+   * the keyboard yet), so a later "type this there" goes to exactly the app the person was using.
+   */
+  async function invoke() {
+    if (!alive()) return;
+    const opening = !bubble;
+    if (!island!.isVisible()) island!.showInactive();
+    send({type: 'invoke'});
+    if (opening) {
+      const wait = new Promise<null>((r) => setTimeout(() => r(null), TARGET_WAIT_MS));
+      target = await Promise.race([deps.backend.companion.foregroundTarget().catch(() => null), wait]);
+      send({type: 'target', target: shownTarget()});
+    }
     if (!alive()) return;
     setRestFocus(false);
-    if (!island!.isVisible()) island!.showInactive();
     island!.show();
     island!.focus();
-    send({type: 'invoke'});
   }
 
   function dragStart() {
     if (!alive() || drag || overlay) return false;
+    // While carried the pet does not look at where the pointer was before the grab.
+    if (gaze.bucket !== null) { gaze.bucket = null; send({type: 'gaze', index: null}); }
     const c = screen.getCursorScreenPoint();
     const p = currentPoint();
     const timer = setInterval(dragTick, DRAG_TICK_MS);
@@ -266,7 +283,15 @@ export function createCompanion(deps: CompanionDeps) {
     win.setAlwaysOnTop(true, 'floating');
     win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
     win.webContents.on('will-navigate', (e, url) => { if (!trusted(url)) e.preventDefault(); });
-    win.on('closed', () => { if (island === win) island = null; run?.abort(); if (drag) dragEnd(); updateGaze(); });
+    win.on('closed', () => {
+      if (island === win) island = null;
+      run?.abort();
+      if (drag) dragEnd();
+      // A new window starts closed and forgets the remembered app window.
+      bubble = null;
+      target = null;
+      updateGaze();
+    });
     win.on('show', updateGaze);
     win.on('hide', updateGaze);
     // Rest: shown without taking focus, so the app the person is using keeps the keyboard; transparent parts let clicks
@@ -375,7 +400,7 @@ export function createCompanion(deps: CompanionDeps) {
     return {ok: true as const};
   }
 
-  async function ask(text: string, token?: string) {
+  async function ask(text: string, token?: string, withTarget?: boolean) {
     run?.abort();
     const ctl = new AbortController();
     run = ctl;
@@ -396,15 +421,32 @@ export function createCompanion(deps: CompanionDeps) {
       if (event.type === 'tool' && event.undo) undoable.add(event.undo.id);
       send({runId, event});
     };
-    void deps.backend.companion.run({text, image}, {emit, confirm, signal: ctl.signal}).catch((e) => {
+    // The remembered window goes with this request only when the page showed it and the person kept it attached; a page
+    // that never displays it (or an older one) never sends it.
+    const sendTarget = withTarget === true && target ? target : undefined;
+    // An in-flight request may type only while the person still has that same window attached.
+    const targetCurrent = () => !!sendTarget && !!target && target.hwnd === sendTarget.hwnd && target.pid === sendTarget.pid;
+    // A later confirmation in the same request (after typing moved focus to the other app) brings the bubble back to the
+    // front first, but only while the bubble is still open; otherwise the trusted confirmation fails closed as before.
+    const runConfirm = async (summary: string, detail: string) => {
+      if (alive() && bubble && island!.isVisible() && !island!.isFocused()) {
+        setRestFocus(false);
+        island!.show();
+        island!.focus();
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      return confirm(summary, detail);
+    };
+    void deps.backend.companion.run({text, image, ...(sendTarget ? {target: sendTarget, targetCurrent} : {})}, {emit, confirm: runConfirm, signal: ctl.signal}).catch((e) => {
       emit({type: 'error', reason: 'provider', message: safeErrorMessage(e)});
     }).finally(() => { if (run === ctl) run = null; });
     return {runId};
   }
 
   const handlers: Record<CompanionMethod, (...args: never[]) => Promise<unknown> | unknown> = {
-    companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock}),
-    companionAsk: (text: string, token?: string) => ask(text, token),
+    companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock, target: shownTarget()}),
+    companionClearTarget: () => { target = null; send({type: 'target', target: null}); return true; },
+    companionAsk: (text: string, token?: string, withTarget?: boolean) => ask(text, token, withTarget),
     companionCancel: () => { run?.abort(); return true; },
     companionUndo: async (id: string) => {
       if (!undoable.has(id)) return false;
@@ -418,6 +460,7 @@ export function createCompanion(deps: CompanionDeps) {
       place();
       // Closing the bubble gives the keyboard back: Windows activates the window the person was using before.
       if (!bubble && alive()) {
+        if (target) { target = null; send({type: 'target', target: null}); }
         if (island!.isFocused()) island!.blur();
         setRestFocus(true);
       }
@@ -427,7 +470,7 @@ export function createCompanion(deps: CompanionDeps) {
       if (phase === 'start') return {started: dragStart()};
       const r = dragEnd();
       // A press without movement is a click on the pet: open the companion (the person chose to give it the keyboard).
-      if (!r.moved) invoke();
+      if (!r.moved) void invoke();
       return r;
     },
     companionHit: (over: boolean) => { if (!drag) setInteractive(over); return true; },
@@ -480,7 +523,7 @@ export function createCompanion(deps: CompanionDeps) {
   function toggle() {
     if (!alive()) { createIsland(); return; }
     if (island!.isFocused()) send({type: 'collapse'});
-    else invoke();
+    else void invoke();
   }
 
   function registerShortcut(): string | null {
@@ -492,6 +535,8 @@ export function createCompanion(deps: CompanionDeps) {
 
   function dispose() {
     run?.abort();
+    bubble = null;
+    target = null;
     if (drag) { clearInterval(drag.timer); drag = null; }
     gazeWanted = false;
     if (gazeTimer) { clearInterval(gazeTimer); gazeTimer = null; }

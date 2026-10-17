@@ -1,5 +1,11 @@
 # Pet renderer, manifest and desktop overlay: plan and interfaces
 
+**Status (17 Oct):**
+- **Implemented in `src/pet/`:**
+  - `contract.ts`, `manifest.ts`, `atlas-check.ts`, `clock.ts` and `adapter.ts`, with 30 tests;
+  - `registry.ts`, `loader.ts`, `PetSprite.tsx`, `PetSlot.tsx` and `MissingArt.tsx`, with 6 tests.
+- **Integration:** Codex wires these into `CompanionApp.tsx` (see `COMPANION-STATUS.md`, "Integration for CompanionApp.tsx").
+
 This plan puts an original animated character in the app as its primary identity, following `PET-DIRECTION.md` and the production contract in `pet-skill-reference/`.
 
 This document is the contract the implementation follows.
@@ -74,6 +80,10 @@ A pack is a folder: `assets/pets/<id>/pet.json` plus the atlas file it names (`.
 **Approval gate:** the product companion uses only packs with `review.status === 'approved'`. The review board and tests can show `concept` and `in-review` packs, and always labels them with their status. A pack is never treated as approved because it exists.
 
 **Integrity:** the loader checks the atlas bytes against `atlasSha256` before decoding. A mismatch makes the pack invalid.
+
+- **How the bytes are read:** each bundled atlas is a lazy Vite chunk that holds it as an inline data URL (`?inline`). The page decodes the real bytes and checks the SHA-256 with `crypto.subtle`, then decodes the bitmap from a Blob, so the canvas is never tainted.
+- **Why not fetch or `<img>`:** a packaged `file://` page cannot reliably `fetch()` a `file:` URL or read pixels of a `file:` image. The inline path needs no fetch and no CSP change.
+- **Test coverage:** `tests/pet-renderer.test.mjs` also verifies the SHA-256 of every pack in `assets/pets/`.
 
 ## 3. In-app load check (`src/pet/atlas-check.ts`)
 

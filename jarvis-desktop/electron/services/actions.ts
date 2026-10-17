@@ -127,7 +127,7 @@ export class ActionService {
   }
 
   /** Builds the decision for a request using live settings and (for window actions) live window data. */
-  private async evaluate(req: AnyActionRequest): Promise<Evaluation> {
+  private async evaluate(req: AnyActionRequest, expect?: {pid: number; process: string}): Promise<Evaluation> {
     const deny = (summary: string, reason: string, requiresApproval = true): Evaluation => ({allowed: false, reason, summary, requiresApproval});
     if (this.d.safeLaunch()) return deny(`Blocked ${req.type}`, 'Safe launch is active: actions are disabled until Desktop Companion is restarted normally');
     const s = this.d.settings();
@@ -152,7 +152,7 @@ export class ActionService {
         return this.evaluatePathAction(req.type, req.target ?? '', s);
       }
       default:
-        return this.evaluateWindowAction(req);
+        return this.evaluateWindowAction(req, expect);
     }
   }
 
@@ -195,13 +195,16 @@ export class ActionService {
     return `Open ${p.url}`;
   }
 
-  private async evaluateWindowAction(req: ActionRequest): Promise<Evaluation> {
+  private async evaluateWindowAction(req: ActionRequest, expect?: {pid: number; process: string}): Promise<Evaluation> {
     const type = req.type;
     const deny = (summary: string, reason: string): Evaluation => ({allowed: false, reason, summary, requiresApproval: true});
     let windows: WindowInfo[];
     try { windows = await this.d.native.listWindows(); } catch (e) { return deny(`Blocked ${type}`, `Windows could not be enumerated: ${(e as Error).message}`); }
     const sel = selectWindow(req.target, windows, type === 'type-text' || type === 'click');
     if (!sel.ok) return deny(`Blocked ${type}`, sel.reason);
+    if (expect && (sel.window.pid !== expect.pid || sel.window.process.toLowerCase() !== expect.process.toLowerCase())) {
+      return deny(`Blocked ${type}`, 'The window you were using has closed or now belongs to another app');
+    }
     return this.finishWindowEvaluation(req, sel.window);
   }
 
@@ -242,13 +245,17 @@ export class ActionService {
     }
   }
 
-  async preview(raw: unknown): Promise<ActionPreview> {
+  /**
+   * `opts.expect` (main-process callers only) binds a window action to the exact window a caller remembered: the preview
+   * is denied when the handle now belongs to another process. The hub's IPC passes only the request.
+   */
+  async preview(raw: unknown, opts?: {expect?: {pid: number; process: string}}): Promise<ActionPreview> {
     const req: AnyActionRequest = validatePathActionRequest(raw) ?? validateActionRequest(raw);
     const t = this.now();
     this.previewed = this.previewed.filter((x) => t - x < 60_000);
     if (this.previewed.length >= MAX_PREVIEWS_PER_MINUTE) throw new Error(`Too many action previews (max ${MAX_PREVIEWS_PER_MINUTE} per minute)`);
     this.previewed.push(t);
-    const ev = await this.evaluate(req);
+    const ev = await this.evaluate(req, opts?.expect);
     this.prune();
     const id = this.d.newId();
     this.registry.set(id, {req, ev, expiresAt: this.now() + PREVIEW_TTL_MS, createdAt: t});
@@ -270,6 +277,11 @@ export class ActionService {
    * Cancels every pending preview and any execution that is waiting in the native confirmation. Call it when
    * settings, mode or safe-launch state change: an approval given under old permissions must not carry over.
    */
+  /** Drops one pending preview without running it or writing a "declined" entry (used when policy already refused it). */
+  discard(previewId: string): void {
+    this.registry.delete(previewId);
+  }
+
   cancelPending(): void {
     this.registry.clear();
     this.generation++;
@@ -352,7 +364,12 @@ export class ActionService {
     }
   }
 
-  async execute(previewId: unknown, approved: unknown): Promise<unknown> {
+  /**
+   * `opts.confirm` lets a caller in the main process (the desktop companion) show the same trusted confirmation from its
+   * own window; it never skips the confirmation, the revalidation, the focus re-check or the window policy. The hub's
+   * IPC passes only the first two arguments.
+   */
+  async execute(previewId: unknown, approved: unknown, opts?: {confirm?: (summary: string, detail: string) => Promise<boolean>}): Promise<unknown> {
     if (typeof previewId !== 'string' || previewId.length > 100) throw new Error('Preview id is invalid');
     if (typeof approved !== 'boolean') throw new Error('approved must be true or false');
     this.prune();
@@ -385,9 +402,10 @@ export class ActionService {
     const generation = this.generation;
     if (entry.ev.requiresApproval) {
       // A confirmation that throws (dialog error, destroyed window) is a refusal, never an approval.
-      const ok = await Promise.resolve(this.d.confirm?.(summary, this.detail(entry.ev.plan))).then((v) => v === true, () => false);
+      const confirm = opts?.confirm ?? this.d.confirm;
+      const ok = await Promise.resolve(confirm?.(summary, this.detail(entry.ev.plan))).then((v) => v === true, () => false);
       if (!ok) {
-        if (this.d.confirm) this.recordDecline();
+        if (confirm) this.recordDecline();
         await this.d.activity('action', `Declined in native confirmation: ${summary}`);
         return {executed: false, reason: 'Native confirmation declined or unavailable'};
       }
@@ -421,8 +439,10 @@ export class ActionService {
       return {executed: true, ...result};
     } catch (e) {
       const reason = (e as Error).message.slice(0, 300);
-      await this.d.activity('action', `Failed: ${summary}`, reason);
-      return {executed: false, reason};
+      // Input that stopped part-way still changed the app: say how much was sent.
+      const typed = typeof (e as {typed?: unknown}).typed === 'number' ? (e as {typed: number}).typed : undefined;
+      await this.d.activity('action', `Failed: ${summary}`, typed !== undefined ? `${reason} (${typed} characters were typed)` : reason);
+      return {executed: false, reason, ...(typed !== undefined ? {typed} : {})};
     }
   }
 

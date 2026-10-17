@@ -26,6 +26,14 @@ export interface NativeAdapter {
 
 type Res = {ok: boolean; error?: string; reason?: string} & Record<string, unknown>;
 
+/** Keyboard input that stopped after some characters were already sent; `typed` says how many. */
+export class InputStoppedError extends Error {
+  constructor(message: string, readonly typed: number) {
+    super(message);
+    this.name = 'InputStoppedError';
+  }
+}
+
 function need(r: Res): Res {
   if (!r.ok) throw new Error(String(r.error ?? r.reason ?? 'Native helper failed'));
   return r;
@@ -50,8 +58,10 @@ export function createNativeAdapter(runner: NativeRunner): NativeAdapter {
       return {x: Number(r.x), y: Number(r.y), width: Number(r.width), height: Number(r.height), clamped: !!r.clamped};
     },
     async typeText(w, text) {
-      const r = need(await runner.run<Res>('type-text', {...w, text}, {timeoutMs: 30_000}));
-      return {typed: Number(r.typed ?? 0)};
+      const r = await runner.run<Res>('type-text', {...w, text}, {timeoutMs: 30_000});
+      // Typing that stopped part-way (focus left the window) reports how much was already typed.
+      if (!r.ok && typeof r.typed === 'number' && r.typed > 0) throw new InputStoppedError(String(r.error ?? 'Typing stopped'), r.typed);
+      return {typed: Number(need(r).typed ?? 0)};
     },
     async click(w, x, y) {
       need(await runner.run<Res>('click', {...w, x, y}));

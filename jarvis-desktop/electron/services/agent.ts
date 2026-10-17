@@ -35,7 +35,8 @@ export type ToolOutcome = {
   found?: Citation[];
 };
 
-export type ToolContext = {signal: AbortSignal; setPhase: (phase: Extract<ToolPhase, 'awaiting-confirm'>, summary: string) => void};
+/** setPhase reports a confirmation opening ('awaiting-confirm') and work resuming after it ('running'). */
+export type ToolContext = {signal: AbortSignal; setPhase: (phase: Extract<ToolPhase, 'awaiting-confirm' | 'running'>, summary: string) => void};
 
 export interface AgentTool<I = unknown> {
   def: AnthropicToolDef;
@@ -101,7 +102,9 @@ export async function runAgent(req: AgentRequest): Promise<void> {
       // Transport failures (no connection, DNS, reset, timeout) say so; the provider's own answers keep their message.
       const transport = /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN|socket|timed? ?out|TimeoutError/i.test(raw) || (e instanceof Error && e.name === 'TimeoutError');
       if (transport) return emit({type: 'error', reason: 'network', message: 'Anthropic could not be reached. Check the connection and try again. Nothing was sent after this point.'});
-      return emit({type: 'error', reason: /network|offline|blocked|denied|limit/i.test(raw) ? 'network' : 'provider', message: raw});
+      // The app's own network guard (offline mode, denied hosts, its per-minute cap) reads as a network stop; the
+      // provider's answers, including its rate limiting, stay provider errors.
+      return emit({type: 'error', reason: /network|offline|blocked|denied|request limit reached/i.test(raw) ? 'network' : 'provider', message: raw});
     }
     if (res.inputTokens !== null && res.outputTokens !== null) req.onUsage?.(res.inputTokens, res.outputTokens);
     if (signal.aborted) return cancelled();

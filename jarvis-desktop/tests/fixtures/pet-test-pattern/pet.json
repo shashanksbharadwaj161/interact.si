@@ -1,0 +1,20 @@
+{
+  "format": "desktop-companion/pet-pack@1",
+  "id": "test-pattern",
+  "name": "Test pattern (not character art)",
+  "description": "Flat labelled rectangles for renderer tests. Not a character.",
+  "spriteVersion": 2,
+  "atlas": "spritesheet.png",
+  "atlasSha256": "3344a6693d3685682e1d8ff01b6879f95434eaa2cdc49c73b32a6af99120b0a3",
+  "rendering": "smooth",
+  "anchor": {
+    "x": 96,
+    "y": 196
+  },
+  "review": {
+    "status": "concept",
+    "notes": "Engineering fixture only. Never ship."
+  },
+  "source": "scripts/make-pet-test-pattern.py",
+  "license": "Project test fixture"
+}
