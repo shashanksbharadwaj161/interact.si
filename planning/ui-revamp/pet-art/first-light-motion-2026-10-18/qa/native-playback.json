@@ -20,7 +20,7 @@
       "name": "invocation plays multiple distinct generated wave poses",
       "ok": true,
       "frames": [
-        "10:5",
+        "0:0",
         "3:0",
         "3:0",
         "3:1",
@@ -32,195 +32,199 @@
       ],
       "diagnostics": [
         {
-          "now": 1922.800000000745,
-          "raf": 1,
+          "now": 2038.5,
+          "raf": 2,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 322,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 322,
             "right": 536,
-            "bottom": 338,
+            "bottom": 418,
             "left": 447
           },
           "viewport": [
             548,
-            327
+            426
           ]
         },
         {
-          "now": 2021.800000000745,
-          "raf": 1,
+          "now": 2143.39999999851,
+          "raf": 2,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            327
+            426
           ]
         },
         {
-          "now": 2121.5,
-          "raf": 1,
+          "now": 2242.800000000745,
+          "raf": 2,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            327
+            426
           ]
         },
         {
-          "now": 2226.89999999851,
-          "raf": 1,
+          "now": 2343.699999999255,
+          "raf": 2,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            327
+            426
           ]
         },
         {
-          "now": 2321.699999999255,
-          "raf": 1,
+          "now": 2438.599999997765,
+          "raf": 2,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            327
+            426
           ]
         },
         {
-          "now": 3988.199999999255,
-          "raf": 4,
+          "now": 3802.89999999851,
+          "raf": 3,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            348
+            444
           ]
         },
         {
-          "now": 4092.10000000149,
-          "raf": 5,
+          "now": 3908.099999997765,
+          "raf": 3,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            348
+            444
           ]
         },
         {
-          "now": 4205,
-          "raf": 5,
+          "now": 4001.099999997765,
+          "raf": 3,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            348
+            444
           ]
         },
         {
-          "now": 4304,
-          "raf": 6,
+          "now": 4096,
+          "raf": 3,
           "hidden": false,
           "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 242,
+            "y": 338,
             "width": 89,
             "height": 96,
-            "top": 242,
+            "top": 338,
             "right": 536,
-            "bottom": 338,
+            "bottom": 434,
             "left": 447
           },
           "viewport": [
             548,
-            348
+            444
           ]
         }
       ]
+    },
+    {
+      "name": "voice input is visible with microphone off and Talk blocked until consent",
+      "ok": true
     },
     {
       "name": "saved reduced-motion setting reaches the separate companion document",

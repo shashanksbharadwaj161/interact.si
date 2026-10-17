@@ -217,6 +217,60 @@
     {
       "name": "gaze subscription toggles without error",
       "ok": true
+    },
+    {
+      "name": "voice status: local only, engines honestly unavailable off Windows",
+      "ok": true,
+      "status": {
+        "stt": {
+          "available": true
+        },
+        "tts": {
+          "available": true
+        },
+        "voice": null,
+        "speaking": false,
+        "transcribing": false,
+        "cloud": false
+      }
+    },
+    {
+      "name": "speak answers with a reason, not a fake success, when no voice exists",
+      "ok": true,
+      "said": {
+        "ok": true
+      }
+    },
+    {
+      "name": "stop and cancel answer false when nothing runs",
+      "ok": true
+    },
+    {
+      "name": "refuses transcribe with non-audio",
+      "ok": true
+    },
+    {
+      "name": "refuses speak with empty text",
+      "ok": true
+    },
+    {
+      "name": "refuses transcribe with a non-number sample",
+      "ok": true
+    },
+    {
+      "name": "island page: microphone audio is permitted",
+      "ok": true,
+      "audio": "granted:audio"
+    },
+    {
+      "name": "island page: camera is refused",
+      "ok": true,
+      "video": "denied:NotAllowedError"
+    },
+    {
+      "name": "hub page: microphone audio is still permitted",
+      "ok": true,
+      "hubAudio": "granted"
     }
   ],
   "failed": []

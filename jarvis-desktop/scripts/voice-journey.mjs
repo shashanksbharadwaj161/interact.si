@@ -73,7 +73,9 @@ const levels = (page) => page.evaluate(() => [...document.querySelectorAll('.vx-
 async function main() {
   const { chromium } = await loadPlaywright();
   const { server, origin } = await serveDist();
-  const browser = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
+  // An installed Chromium/Edge executable may be reused on Windows; the test still gets an isolated temporary profile.
+  const executablePath = arg('browser-executable', process.env.VOICE_REVIEW_BROWSER || undefined);
+  const browser = await chromium.launch({ executablePath, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
   try {
     const { page, errors, external, context } = await open(browser, origin);
     const ptt = page.locator('button.ptt');
@@ -232,7 +234,7 @@ async function main() {
     server.close();
   }
   const failed = results.filter((r) => !r.ok);
-  fs.writeFileSync(path.join(out, 'voice-journey.json'), `${JSON.stringify({ environment: 'Linux Chromium (Playwright), fake microphone, fixture bridge with scripted speech', results }, null, 2)}\n`);
+  fs.writeFileSync(path.join(out, 'voice-journey.json'), `${JSON.stringify({ environment: {platform: process.platform, browser: browser.version(), microphone: 'Chromium generated test device', speech: 'scripted fixture; no recognizer ran'}, results }, null, 2)}\n`);
   console.log(`${results.length - failed.length}/${results.length} passed`);
   process.exit(failed.length ? 1 : 0);
 }

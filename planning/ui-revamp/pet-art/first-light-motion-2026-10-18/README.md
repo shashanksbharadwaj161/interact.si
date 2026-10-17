@@ -23,7 +23,7 @@ Raw source strips, extracted frames and intermediate atlases remain on this lapt
 - `final-previews/all-states.gif` and `all-states.mp4`: all nine states, using only known cells from the exact encoded atlas. MP4 is a timing-preserving copy, not generated/interpolated extra poses.
 - Per-state GIFs, `idle-jump-idle.gif` at native cell bounds, `look-loop.gif`, four labelled-by-filename stills, and `qa/final-contact.png` / `qa/directions.png`.
 - `qa/studio-flow.png`: real local browser UI. The banner correctly identifies unavailable native/cloud features in browser preview.
-- `qa/native-playback.json` and `native-companion.png`: real Windows Electron, isolated offline profile, scripted invocation. Seven checks pass: validated character rendered, draft label, multiple actual wave columns, saved reduced motion reaching the separate companion document, still key pose, hidden-page throttling/visibility, zero external requests. No microphone, provider call or external-app input was used.
+- `qa/native-playback.json` and `native-companion.png`: real Windows Electron, isolated offline profile, scripted invocation. Eight checks pass: validated character rendered, draft label, multiple actual wave columns, saved reduced motion reaching the separate companion document, still key pose, explicit voice consent/Talk state, hidden-page throttling/visibility, zero external requests. No microphone, provider call or external-app input was used.
 
 ## Runtime fixes exposed by the native test
 

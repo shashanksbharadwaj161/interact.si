@@ -1,8 +1,13 @@
-import {useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type MutableRefObject} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type MutableRefObject} from 'react';
 import {PetIdentity} from './PetIdentity';
 import type {PetHitTest} from '../pet/PetSprite';
 import {Bubble, Command, Working, AnswerView, ErrorView, PlacementOptions} from './surfaces';
 import '../styles/companion-bubble.css';
+import {useVoiceSession} from '../voice/useVoiceSession';
+import {useCompanionVoiceCaps} from '../voice/companion';
+import {companionVoiceBackend} from '../voice/backends';
+import {TalkButton, VoiceBar} from '../voice/VoiceBar';
+import '../styles/voice.css';
 import {companionApi, type AgentEvent, type CompanionPush, type CompanionStatus, type PlacementEvent, type RegionEvent, type TypingTarget} from './api';
 
 /*
@@ -30,6 +35,12 @@ export function CompanionApp() {
   const [status, setStatus] = useState<CompanionStatus | null>(null);
   const [surface, setSurface] = useState<Surface>('rest');
   const [text, setText] = useState('');
+  const voiceBackend = useMemo(() => companionVoiceBackend(api), [api]);
+  const {caps, status: voiceStatus, refresh: refreshVoice} = useCompanionVoiceCaps(api);
+  const {voice, snap, blocks} = useVoiceSession({
+    backend: voiceBackend, caps, consentHint: 'Turn on Microphone below, then press Talk. Nothing is recorded until you do.',
+    onTranscript: transcript => setText(previous => previous ? `${previous} ${transcript.text}` : transcript.text),
+  });
   const [region, setRegion] = useState<RegionEvent | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [pending, setPending] = useState<'sending' | 'thinking' | null>(null);
@@ -70,11 +81,11 @@ export function CompanionApp() {
   }, [status?.material.applied]);
 
   const open = useCallback(() => {
-    refresh();
+    refresh(); refreshVoice();
     setNote(null);
     setSurface((s) => (s === 'rest' ? 'command' : s));
-  }, [refresh]);
-  const collapse = useCallback(() => setSurface('rest'), []);
+  }, [refresh, refreshVoice]);
+  const collapse = useCallback(() => {voice.release(); setSurface('rest');}, [voice]);
 
   // Applies one event of the current run. Only state setters are used, so it never goes stale.
   const applyRunEvent = useCallback((ev: AgentEvent) => {
@@ -130,16 +141,22 @@ export function CompanionApp() {
     const on = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.preventDefault();
-      if (runRef.current || starting.current) void api?.cancel();
+      if (snap.phase === 'speaking') void voice.stopSpeaking();
+      else if (snap.phase !== 'idle') voice.cancel();
+      else if (runRef.current || starting.current) void api?.cancel();
       else collapse();
     };
     window.addEventListener('keydown', on);
     return () => window.removeEventListener('keydown', on);
-  }, [api, collapse]);
+  }, [api, collapse, voice, snap.phase]);
 
   const ask = async () => {
+    if (snap.phase === 'starting' || snap.phase === 'listening' || snap.phase === 'transcribing') {
+      setNote('Finish or cancel voice input, then review the text before asking.'); return;
+    }
     const t = text.trim();
     if (!api || !t || runRef.current || starting.current) return;
+    voice.release();
     setSteps([]);
     setAnswer(null);
     setFailure(null);
@@ -179,6 +196,7 @@ export function CompanionApp() {
 
   return (
     <Island surface={surface} anchor={anchor} edge={edge} doneKey={doneFlash} onOpen={open} label={`Desktop companion, ${surface === 'rest' ? 'resting' : surface}`} hitRef={petHit} core={size => <PetIdentity size={size} appearance={status?.appearance ?? 'pet'} surface={surface} steps={steps} failure={failure?.reason ?? null} invoked={invoked} answered={doneFlash} drag={drag} gaze={gaze} hitRef={petHit} />}>
+      {surface !== 'rest' && <VoiceBar voice={voice} snap={snap} voiceName={voiceStatus?.voice || 'Windows default voice'} compact />}
 
       {surface === 'command' && (
         <Command
@@ -206,10 +224,22 @@ export function CompanionApp() {
           onClose={collapse}
         />
       )}
+      {surface === 'command' && api && <section className="pet-voice" aria-label="Voice input">
+        <div className="pet-voice-controls">
+          <TalkButton voice={voice} snap={snap} block={blocks.listen} />
+          <label><input type="checkbox" checked={snap.consent} onChange={e => voice.setConsent(e.target.checked)} /> Microphone</label>
+        </div>
+        <p className="b-meta">{blocks.listen?.reason || 'Talk, review the transcript above, then press Ask. Speech recognition stays on this computer.'}</p>
+        {snap.note && <p className="b-meta" role="status">{snap.note.text}</p>}
+      </section>}
       {surface === 'working' && <Working pending={pending} steps={steps} hasRun={!!runId} onStop={() => void api?.cancel()} />}
       {surface === 'answer' && answer && (
         <AnswerView answer={answer} steps={steps} undone={undone} onUndo={(id) => void undo(id)} onOpen={(kind, id) => void api?.openHub(kind === 'note' ? 'notes' : kind === 'task' ? 'tasks' : 'capsules', id)} onFollow={() => { setText(''); setSurface('command'); }} onDone={collapse} />
       )}
+      {surface === 'answer' && answer && api && <div className="pet-voice">
+        <button type="button" className="chipbtn" disabled={!!blocks.speak && snap.phase !== 'speaking'} onClick={() => snap.phase === 'speaking' ? void voice.stopSpeaking() : void voice.speak(answer.text, {key: `answer-${doneFlash}`})}>{snap.phase === 'speaking' ? 'Stop reading' : 'Read aloud'}</button>
+        {blocks.speak && <p className="b-meta">{blocks.speak.reason}</p>}
+      </div>}
       {surface === 'error' && failure && <ErrorView failure={failure} steps={steps} undone={undone} onUndo={(id) => void undo(id)} onRetry={() => setSurface('command')} onSettings={() => void api?.openHub('settings')} onDone={collapse} />}
       {!api && <p className="cmp-browser">This page runs inside the Desktop Companion app. In a browser it cannot reach the app.</p>}
     </Island>

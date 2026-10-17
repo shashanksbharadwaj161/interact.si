@@ -56,6 +56,7 @@ app.whenReady().then(async () => {
     }
     const waveFrames = [...new Set(seen.filter(v => v?.startsWith('3:')))];
     check('invocation plays multiple distinct generated wave poses', waveFrames.length >= 2, {frames:seen,diagnostics});
+    check('voice input is visible with microphone off and Talk blocked until consent', await js('!!document.querySelector(".pet-voice input[type=checkbox]") && !document.querySelector(".pet-voice input[type=checkbox]").checked && document.querySelector(".vx-talk")?.disabled === true'));
     const hub = BrowserWindow.getAllWindows().find(w => w !== island && /index\.html/.test(w.webContents.getURL()));
     if (!hub) throw new Error('Hub not found');
     await until(() => !hub.webContents.isLoading(), 'hub loaded');
