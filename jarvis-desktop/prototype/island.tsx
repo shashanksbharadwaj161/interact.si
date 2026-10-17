@@ -3,7 +3,8 @@ import {createRoot} from 'react-dom/client';
 import type {AgentEvent, CompanionApi, CompanionPush, CompanionStatus, PlacementEvent} from '../src/companion/api';
 import {CompanionIsland} from '../src/companion/island/CompanionIsland';
 import {PlacementOptions} from '../src/companion/surfaces';
-import {MissingArt} from '../src/pet/MissingArt';
+import {CompanionPet} from '../src/components/CompanionPet';
+import type {PetState} from '../src/pet/contract';
 import {petBoxWidth} from '../src/pet/PetSprite';
 import '../src/styles/companion-bubble.css';
 import '../src/styles/pet.css';
@@ -12,9 +13,9 @@ import './island.css';
 
 /*
  * Island review journey (prototype only). It mounts the PRODUCTION island (src/companion/island/CompanionIsland.tsx,
- * the same component the desktop companion window renders) over original mock desktops, against a SCRIPTED preview of
+ * sharing the native companion's production shell and surfaces) over original mock desktops, against a SCRIPTED preview of
  * window.companion: every run event, placement and confirmation below is a labelled preview, not the native app.
- * No character art exists in this branch, so the character slot shows the real missing-art state.
+ * The original First Light animation is a labelled review pack; actions remain scripted examples.
  *
  * window.__island exposes the controls scripts/island-journey.mjs drives; window.__frames records the shell's frame
  * timing; window.__layout records the native layout requests the island made, in order.
@@ -169,6 +170,7 @@ const api = previewApi();
 function Desk() {
   const [scene, setScene] = useState<'light' | 'dark' | 'busy'>('light');
   const [reduced, setReduced] = useState(false);
+  const [pose, setPose] = useState<PetState>('idle');
   useEffect(() => {
     window.__island = {
       invoke: () => api.emit({type: 'invoke'}),
@@ -192,12 +194,23 @@ function Desk() {
       <div className="preview-tag" role="note">
         Preview: the production island over a mock desktop. Run events, placement and the Windows confirmation are scripted; no model, microphone or native window is used.
       </div>
-      <div className="pet-anchor" style={{left: DESK.width - MARGIN - petW, top: DESK.height - MARGIN - SIZE, width: petW, height: SIZE}}>
-        <MissingArt size={SIZE} reason="No approved character art is installed in this branch. The character is drawn by the companion page (owned separately)." />
+      <div className="island-review-controls" aria-label="Motion preview controls">
+        <button type="button" onClick={() => api.emit({type: 'invoke'})}>Open companion</button>
+        <button type="button" onClick={() => api.emit({type: 'collapse'})}>Collapse</button>
+        <label>Desktop <select aria-label="Desktop scene" value={scene} onChange={e => setScene(e.target.value as typeof scene)}><option value="light">Light</option><option value="dark">Dark</option><option value="busy">Busy / grid</option></select></label>
+        <label>Example <select aria-label="Preview example" defaultValue="saved" onChange={e => {api.scenario = e.target.value;}}><option value="saved">Saved information + task</option><option value="type">Typing receipt</option><option value="offline">Offline recovery</option></select></label>
+        <label><input type="checkbox" checked={reduced} onChange={e => {setReduced(e.target.checked); document.documentElement.dataset.motion = e.target.checked ? 'reduced' : 'full';}} /> Reduce motion</label>
+        <span>Scripted confirmation:</span>
+        <button type="button" onClick={() => api.confirm(true)}>Accept sample</button>
+        <button type="button" onClick={() => api.confirm(false)}>Decline sample</button>
       </div>
+      <button type="button" className="pet-anchor review-pet" aria-label="Open companion motion preview" onClick={() => api.emit({type: 'invoke'})} style={{left: DESK.width - MARGIN - petW, top: DESK.height - MARGIN - SIZE, width: petW, height: SIZE}}>
+        <CompanionPet size={SIZE} pose={pose} showWhenHidden />
+      </button>
       <CompanionIsland
         api={api}
         reducedMotion={reduced}
+        onPetSignals={signals => setPose(signals.awaitingPerson ? 'waiting' : signals.surface === 'working' ? 'running' : signals.surface === 'answer' ? 'review' : signals.surface === 'error' ? 'failed' : 'idle')}
         options={<PlacementOptions size={SIZE} dock="bottom" appearance="pet" onDock={() => undefined} onResize={() => undefined} onAppearance={() => undefined} />}
         onFrameSample={(f) => window.__frames.push(f)}
       />

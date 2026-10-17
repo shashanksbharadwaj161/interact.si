@@ -44,12 +44,13 @@ function stats(frames) {
 async function main() {
   const { chromium } = await loadPlaywright();
   const { server, origin } = await serve();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({executablePath: arg('browser-executable', process.env.ISLAND_REVIEW_BROWSER || undefined)});
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, colorScheme: 'dark', recordVideo: { dir: out, size: { width: 1280, height: 720 } } });
   const external = [];
   context.on('request', (r) => { if (!r.url().startsWith(origin) && !/^(data|blob|about):/.test(r.url())) external.push(r.url()); });
   const page = await context.newPage();
   const errors = [];
+  page.on('response', (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status()}: ${r.url().replace(origin, '')}`); });
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto(`${origin}/prototype/island.html`);
@@ -263,7 +264,7 @@ async function main() {
   if (video && video !== 'island-journey.webm') fs.renameSync(path.join(out, video), path.join(out, 'island-journey.webm'));
   for (const f of fs.readdirSync(out)) if (f.endsWith('.webm') && f !== 'island-journey.webm') fs.rmSync(path.join(out, f));
   const failed = results.filter((r) => !r.ok);
-  fs.writeFileSync(path.join(out, 'island-journey.json'), `${JSON.stringify({ environment: 'Linux container, headless Chromium (Playwright). Frame timing is from this environment only; it says nothing about the owner\'s laptop or the native Windows window.', results }, null, 2)}\n`);
+  fs.writeFileSync(path.join(out, 'island-journey.json'), `${JSON.stringify({ environment: {platform: process.platform, browser: browser.version(), headless: true, actions: 'scripted preview', note: 'Frame timing describes this headless test, not native Windows composition.'}, results }, null, 2)}\n`);
   console.log(`${results.length - failed.length}/${results.length} passed`);
   process.exit(failed.length ? 1 : 0);
 }

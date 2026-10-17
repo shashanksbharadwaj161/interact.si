@@ -5,6 +5,11 @@ import type {PetView} from '../pet/adapter';
 type SlotComponent = typeof import('../pet/PetSlot').PetSlot;
 import '../styles/pet.css';
 
+// Vite rebases this URL for nested pages and Electron. SSR/data-module reviews have no resolvable asset base.
+const conceptUrl = /^(https?|file):/.test(import.meta.url)
+  ? new URL('../../public/pets/first-light/concept.png', import.meta.url).href
+  : './pets/first-light/concept.png';
+
 /** Shared frame-based character. Unapproved art is explicitly marked as an animation preview. */
 export function CompanionPet({state = 'idle', decorative = false, hitRef, size, pose, look, replay = 0, showWhenHidden = false}: {state?: 'idle' | 'working' | 'waiting' | 'done' | 'error'; decorative?: boolean; hitRef?: MutableRefObject<((x: number, y: number) => boolean) | null>; size?: number; pose?: PetState; look?: number | null; replay?: number; showWhenHidden?: boolean}) {
   const [appearance] = useAppearance();
@@ -83,6 +88,6 @@ export function CompanionPet({state = 'idle', decorative = false, hitRef, size, 
   if (!appearance.visible && !showWhenHidden) return null;
   return <span ref={host} className="companion-pet" data-state={state} data-animated={sprite ? 'true' : undefined}
     onPointerEnter={() => { if (state === 'idle' && !pose && !reduced) setGreeting(true); }}>
-    {sprite ? <sprite.Slot size={measured} view={view} packId={sprite.packId} mode={sprite.mode} hitRef={hitRef} /> : <img ref={image} src="./pets/first-light/concept.png" alt={decorative ? '' : 'Cream and indigo companion with one folded ear'} draggable={false} />}
+    {sprite ? <sprite.Slot size={measured} view={view} packId={sprite.packId} mode={sprite.mode} hitRef={hitRef} /> : <img ref={image} src={conceptUrl} alt={decorative ? '' : 'Cream and indigo companion with one folded ear'} draggable={false} />}
   </span>;
 }

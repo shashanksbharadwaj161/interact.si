@@ -37,14 +37,15 @@ export function PetIdentity(p: {size: number; appearance: 'pet' | 'legacy-orb'; 
     if (seen.current.invoked !== p.invoked) adapter.current.event({kind: 'invoked'}, now);
     if (seen.current.answered !== p.answered) adapter.current.event({kind: 'answer-shown'}, now);
     for (const step of p.steps) {
-      if (step.phase === 'done' && step.verified && !seen.current.verified.has(step.callId)) {
+      if (step.phase === 'done' && step.verified && step.undo && !seen.current.verified.has(step.callId)) {
         seen.current.verified.add(step.callId); adapter.current.event({kind: 'verified-change'}, now);
       }
     }
     seen.current.invoked = p.invoked; seen.current.answered = p.answered;
     const next = adapter.current.view(now); setView(next);
     const until = next.kind === 'state' ? next.until : null;
-    if (until !== null && !reduced) {
+    // Reduced motion still needs one semantic expiry (for example greeting -> resting); it must not hold a stale state.
+    if (until !== null) {
       const timer = window.setTimeout(() => setTick(v => v + 1), Math.max(1, until - now + 1));
       return () => window.clearTimeout(timer);
     }

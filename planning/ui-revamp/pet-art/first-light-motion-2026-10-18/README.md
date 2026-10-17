@@ -23,13 +23,15 @@ Raw source strips, extracted frames and intermediate atlases remain on this lapt
 - `final-previews/all-states.gif` and `all-states.mp4`: all nine states, using only known cells from the exact encoded atlas. MP4 is a timing-preserving copy, not generated/interpolated extra poses.
 - Per-state GIFs, `idle-jump-idle.gif` at native cell bounds, `look-loop.gif`, four labelled-by-filename stills, and `qa/final-contact.png` / `qa/directions.png`.
 - `qa/studio-flow.png`: real local browser UI. The banner correctly identifies unavailable native/cloud features in browser preview.
-- `qa/native-playback.json` and `native-companion.png`: real Windows Electron, isolated offline profile, scripted invocation. Eight checks pass: validated character rendered, draft label, multiple actual wave columns, saved reduced motion reaching the separate companion document, still key pose, explicit voice consent/Talk state, hidden-page throttling/visibility, zero external requests. No microphone, provider call or external-app input was used.
+- `qa/native-playback.json`, `native-companion.png` and `native-island-open.png`: real Windows Electron, isolated offline profile, scripted invocation. Twelve checks pass: validated character rendered, draft label, multiple actual wave columns, explicit voice consent/Talk state, production island shell, grow/close/shrink/reopen, context cleanup, saved reduced motion reaching the separate companion document, still key pose, hidden-page throttling/visibility, zero external requests. No real microphone, screen capture, provider call or external-app input was used.
 
 ## Runtime fixes exposed by the native test
 
 The browser preview alone missed a real floating-window freeze: timers and page visibility remained live, while requestAnimationFrame stopped delivering. The shared clock now races rAF against one 64ms fallback, with exactly-once completion. It still schedules only the next pose change and pauses when hidden. Visible native windows avoid background throttling; hiding restores it. This is tested recovery, not a measured 60fps claim. The base v2 art itself changes at its contract's roughly 7–10 poses/second; a higher-resolution continuous rig or denser baked animation remains a separate art-quality improvement.
 
 Companion status now returns only the saved reduced-motion boolean needed by the floating document, not the full application state. A visible-only status refresh applies changes from the hub. The raw Windows cursor stays in main and is reduced to the existing sixteen gaze buckets.
+
+Reduced motion still expires semantic one-shots: a greeting returns to its resting key pose rather than freezing in a stale greeting state. A read-only verified search no longer triggers the celebration reserved for a verified change.
 
 ## Next art iteration
 

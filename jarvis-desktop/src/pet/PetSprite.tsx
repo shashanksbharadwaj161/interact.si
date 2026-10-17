@@ -96,6 +96,7 @@ export function PetSprite({ pet, view, size, hitRef, className, style }: { pet: 
     const sub: FrameSubscription = { nextChangeAt: (now) => (src && !broken ? src.nextChangeAt(now) : null), draw };
     const scheduler = sharedFrameScheduler();
     let off: (() => void) | null = scheduler.subscribe(sub);
+    canvas.dataset.petSubscribed = 'true';
     const dprQuery = typeof matchMedia === 'function' ? matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`) : null;
     const onDpr = () => {
       if (off) off = scheduler.subscribe(sub);
@@ -105,10 +106,12 @@ export function PetSprite({ pet, view, size, hitRef, className, style }: { pet: 
     if (typeof IntersectionObserver === 'function') {
       io = new IntersectionObserver((entries) => {
         const visible = entries.some((e) => e.isIntersecting);
-        if (visible && !off) off = scheduler.subscribe(sub);
+        canvas.dataset.petVisible = String(visible);
+        if (visible && !off) {off = scheduler.subscribe(sub); canvas.dataset.petSubscribed = 'true';}
         if (!visible && off) {
           off();
           off = null;
+          canvas.dataset.petSubscribed = 'false';
         }
       });
       io.observe(canvas);

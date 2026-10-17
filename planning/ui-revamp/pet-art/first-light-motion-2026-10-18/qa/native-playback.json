@@ -10,7 +10,7 @@
     {
       "name": "validated character is drawn in the native companion",
       "ok": true,
-      "frame": "10:5"
+      "frame": "10:4"
     },
     {
       "name": "draft animation is visibly labelled",
@@ -20,136 +20,62 @@
       "name": "invocation plays multiple distinct generated wave poses",
       "ok": true,
       "frames": [
-        "0:0",
-        "3:0",
-        "3:0",
+        "10:4",
+        "3:1",
         "3:1",
         "3:2",
         "3:3",
-        "10:5",
-        "10:5",
-        "10:5"
+        "3:3",
+        "3:3",
+        "10:4",
+        "10:4"
       ],
       "diagnostics": [
         {
-          "now": 2038.5,
-          "raf": 2,
+          "now": 1786.3999999985099,
+          "raf": 0,
           "hidden": false,
           "motion": "full",
-          "reason": "Saying hello: you opened the companion",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "10:4",
+            "petVisible": "true"
+          },
+          "reason": "Resting until you need it",
           "rect": {
-            "x": 447,
-            "y": 322,
+            "x": 19,
+            "y": 23,
             "width": 89,
             "height": 96,
-            "top": 322,
-            "right": 536,
-            "bottom": 418,
-            "left": 447
+            "top": 23,
+            "right": 108,
+            "bottom": 119,
+            "left": 19
           },
           "viewport": [
-            548,
-            426
+            120,
+            128
           ]
         },
         {
-          "now": 2143.39999999851,
-          "raf": 2,
+          "now": 2006.3999999985099,
+          "raf": 1,
           "hidden": false,
           "motion": "full",
-          "reason": "Saying hello: you opened the companion",
-          "rect": {
-            "x": 447,
-            "y": 338,
-            "width": 89,
-            "height": 96,
-            "top": 338,
-            "right": 536,
-            "bottom": 434,
-            "left": 447
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "3:1",
+            "petVisible": "true"
           },
-          "viewport": [
-            548,
-            426
-          ]
-        },
-        {
-          "now": 2242.800000000745,
-          "raf": 2,
-          "hidden": false,
-          "motion": "full",
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 338,
+            "y": 359,
             "width": 89,
             "height": 96,
-            "top": 338,
+            "top": 359,
             "right": 536,
-            "bottom": 434,
-            "left": 447
-          },
-          "viewport": [
-            548,
-            426
-          ]
-        },
-        {
-          "now": 2343.699999999255,
-          "raf": 2,
-          "hidden": false,
-          "motion": "full",
-          "reason": "Saying hello: you opened the companion",
-          "rect": {
-            "x": 447,
-            "y": 338,
-            "width": 89,
-            "height": 96,
-            "top": 338,
-            "right": 536,
-            "bottom": 434,
-            "left": 447
-          },
-          "viewport": [
-            548,
-            426
-          ]
-        },
-        {
-          "now": 2438.599999997765,
-          "raf": 2,
-          "hidden": false,
-          "motion": "full",
-          "reason": "Saying hello: you opened the companion",
-          "rect": {
-            "x": 447,
-            "y": 338,
-            "width": 89,
-            "height": 96,
-            "top": 338,
-            "right": 536,
-            "bottom": 434,
-            "left": 447
-          },
-          "viewport": [
-            548,
-            426
-          ]
-        },
-        {
-          "now": 3802.89999999851,
-          "raf": 3,
-          "hidden": false,
-          "motion": "full",
-          "reason": "Saying hello: you opened the companion",
-          "rect": {
-            "x": 447,
-            "y": 338,
-            "width": 89,
-            "height": 96,
-            "top": 338,
-            "right": 536,
-            "bottom": 434,
+            "bottom": 455,
             "left": 447
           },
           "viewport": [
@@ -158,19 +84,24 @@
           ]
         },
         {
-          "now": 3908.099999997765,
-          "raf": 3,
+          "now": 2106,
+          "raf": 1,
           "hidden": false,
           "motion": "full",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "3:1",
+            "petVisible": "true"
+          },
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 338,
+            "y": 359,
             "width": 89,
             "height": 96,
-            "top": 338,
+            "top": 359,
             "right": 536,
-            "bottom": 434,
+            "bottom": 455,
             "left": 447
           },
           "viewport": [
@@ -179,19 +110,24 @@
           ]
         },
         {
-          "now": 4001.099999997765,
-          "raf": 3,
+          "now": 2213.89999999851,
+          "raf": 1,
           "hidden": false,
           "motion": "full",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "3:2",
+            "petVisible": "true"
+          },
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 338,
+            "y": 359,
             "width": 89,
             "height": 96,
-            "top": 338,
+            "top": 359,
             "right": 536,
-            "bottom": 434,
+            "bottom": 455,
             "left": 447
           },
           "viewport": [
@@ -200,30 +136,173 @@
           ]
         },
         {
-          "now": 4096,
-          "raf": 3,
+          "now": 2312,
+          "raf": 1,
           "hidden": false,
           "motion": "full",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "3:3",
+            "petVisible": "true"
+          },
           "reason": "Saying hello: you opened the companion",
           "rect": {
             "x": 447,
-            "y": 338,
+            "y": 359,
             "width": 89,
             "height": 96,
-            "top": 338,
+            "top": 359,
             "right": 536,
-            "bottom": 434,
+            "bottom": 455,
             "left": 447
           },
           "viewport": [
             548,
             444
+          ]
+        },
+        {
+          "now": 2413.7999999970198,
+          "raf": 1,
+          "hidden": false,
+          "motion": "full",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "3:3",
+            "petVisible": "true"
+          },
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 359,
+            "width": 89,
+            "height": 96,
+            "top": 359,
+            "right": 536,
+            "bottom": 455,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            444
+          ]
+        },
+        {
+          "now": 2518.39999999851,
+          "raf": 1,
+          "hidden": false,
+          "motion": "full",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "3:3",
+            "petVisible": "true"
+          },
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 359,
+            "width": 89,
+            "height": 96,
+            "top": 359,
+            "right": 536,
+            "bottom": 455,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            444
+          ]
+        },
+        {
+          "now": 3965.89999999851,
+          "raf": 3,
+          "hidden": false,
+          "motion": "full",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "10:4",
+            "petVisible": "true"
+          },
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 359,
+            "width": 89,
+            "height": 96,
+            "top": 359,
+            "right": 536,
+            "bottom": 455,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            444
+          ]
+        },
+        {
+          "now": 4063.89999999851,
+          "raf": 4,
+          "hidden": false,
+          "motion": "full",
+          "canvas": {
+            "petSubscribed": "true",
+            "petFrame": "10:4",
+            "petVisible": "true"
+          },
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 359,
+            "width": 89,
+            "height": 96,
+            "top": 359,
+            "right": 536,
+            "bottom": 455,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            464
           ]
         }
       ]
     },
     {
       "name": "voice input is visible with microphone off and Talk blocked until consent",
+      "ok": true
+    },
+    {
+      "name": "the real native companion uses the new production island shell",
+      "ok": true
+    },
+    {
+      "name": "native window stays expanded during the island leave animation",
+      "ok": true,
+      "openBounds": {
+        "x": 988,
+        "y": 312,
+        "width": 548,
+        "height": 504
+      },
+      "closingBounds": {
+        "x": 988,
+        "y": 312,
+        "width": 548,
+        "height": 504
+      }
+    },
+    {
+      "name": "native window shrinks after the island closes",
+      "ok": true,
+      "bounds": {
+        "x": 1416,
+        "y": 687,
+        "width": 120,
+        "height": 129
+      }
+    },
+    {
+      "name": "closing discards the selected context before reopening",
       "ok": true
     },
     {

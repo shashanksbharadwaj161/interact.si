@@ -1,7 +1,10 @@
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type MutableRefObject} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type MutableRefObject} from 'react';
 import {PetIdentity} from './PetIdentity';
 import type {PetHitTest} from '../pet/PetSprite';
-import {Bubble, Command, Working, AnswerView, ErrorView, PlacementOptions} from './surfaces';
+import {Command, Working, AnswerView, ErrorView, PlacementOptions} from './surfaces';
+import {IslandShell} from './island/IslandShell';
+import {useReducedMotion} from './island/useReducedMotion';
+import type {Rect} from './island/motion';
 import '../styles/companion-bubble.css';
 import {useVoiceSession} from '../voice/useVoiceSession';
 import {useCompanionVoiceCaps} from '../voice/companion';
@@ -42,6 +45,8 @@ export function CompanionApp() {
     onTranscript: transcript => setText(previous => previous ? `${previous} ${transcript.text}` : transcript.text),
   });
   const [region, setRegion] = useState<RegionEvent | null>(null);
+  const regionRef = useRef<RegionEvent | null>(null);
+  regionRef.current = region;
   const [runId, setRunId] = useState<string | null>(null);
   const [pending, setPending] = useState<'sending' | 'thinking' | null>(null);
   const [steps, setSteps] = useState<ToolStep[]>([]);
@@ -50,6 +55,7 @@ export function CompanionApp() {
   const [undone, setUndone] = useState<Record<string, 'done' | 'failed'>>({});
   const [note, setNote] = useState<string | null>(null);
   const [doneFlash, setDoneFlash] = useState(0);
+  const [boxReady, setBoxReady] = useState(false);
   // The run id is tracked in a ref (set as soon as ask() returns) so events are matched without waiting for a render.
   const runRef = useRef<string | null>(null);
   const starting = useRef(false);
@@ -82,10 +88,17 @@ export function CompanionApp() {
 
   const open = useCallback(() => {
     refresh(); refreshVoice();
+    setInvoked(value => value + 1);
     setNote(null);
     setSurface((s) => (s === 'rest' ? 'command' : s));
   }, [refresh, refreshVoice]);
-  const collapse = useCallback(() => {voice.release(); setSurface('rest');}, [voice]);
+  const collapse = useCallback(() => {
+    voice.release();
+    const selected = regionRef.current;
+    if (selected) void api?.regionDiscard(selected.token).catch(() => undefined);
+    setRegion(null);
+    setSurface('rest');
+  }, [voice, api]);
 
   // Applies one event of the current run. Only state setters are used, so it never goes stale.
   const applyRunEvent = useCallback((ev: AgentEvent) => {
@@ -127,7 +140,7 @@ export function CompanionApp() {
       else if (e.type === 'gaze') setGaze(e.index);
       else if (e.type === 'placement') setStatus(s => s ? {...s, size: e.size, dock: e.dock} : s);
       else if (e.type === 'target') setTarget(e.target);
-      else if (e.type === 'invoke') {setInvoked(v => v + 1); open();}
+      else if (e.type === 'invoke') open();
       else if (e.type === 'collapse') collapse();
       else if (e.type === 'region') {
         setRegion(e);
@@ -192,15 +205,17 @@ export function CompanionApp() {
   const working = surface === 'working';
   const waiting = steps.some((s) => s.phase === 'awaiting-confirm');
   const doneVisible = useDoneFlash(doneFlash);
-  const edge: Edge = surface === 'error' ? 'error' : waiting ? 'waiting' : working ? 'working' : doneVisible ? 'done' : 'idle';
+  const verifiedChange = steps.some(step => step.phase === 'done' && step.verified && step.undo);
+  const edge: Edge = surface === 'error' ? 'error' : waiting ? 'waiting' : working ? 'working' : doneVisible && verifiedChange ? 'done' : 'idle';
 
   return (
-    <Island surface={surface} anchor={anchor} edge={edge} doneKey={doneFlash} onOpen={open} label={`Desktop companion, ${surface === 'rest' ? 'resting' : surface}`} hitRef={petHit} core={size => <PetIdentity size={size} appearance={status?.appearance ?? 'pet'} surface={surface} steps={steps} failure={failure?.reason ?? null} invoked={invoked} answered={doneFlash} drag={drag} gaze={gaze} hitRef={petHit} />}>
+    <Island surface={surface} anchor={anchor} edge={edge} doneKey={doneFlash} onOpen={open} onPlaced={setBoxReady} label={`Desktop companion, ${surface === 'rest' ? 'resting' : surface}`} hitRef={petHit} core={size => <PetIdentity size={size} appearance={status?.appearance ?? 'pet'} surface={surface} steps={steps} failure={failure?.reason ?? null} invoked={invoked} answered={doneFlash} drag={drag} gaze={gaze} hitRef={petHit} />}>
       {surface !== 'rest' && <VoiceBar voice={voice} snap={snap} voiceName={voiceStatus?.voice || 'Windows default voice'} compact />}
 
       {surface === 'command' && (
         <Command
           status={status}
+          autoFocus={boxReady}
           target={target}
           onClearTarget={() => { setTarget(null); void api?.clearTarget(); }}
           showOptions={showOptions}
@@ -240,7 +255,7 @@ export function CompanionApp() {
         <button type="button" className="chipbtn" disabled={!!blocks.speak && snap.phase !== 'speaking'} onClick={() => snap.phase === 'speaking' ? void voice.stopSpeaking() : void voice.speak(answer.text, {key: `answer-${doneFlash}`})}>{snap.phase === 'speaking' ? 'Stop reading' : 'Read aloud'}</button>
         {blocks.speak && <p className="b-meta">{blocks.speak.reason}</p>}
       </div>}
-      {surface === 'error' && failure && <ErrorView failure={failure} steps={steps} undone={undone} onUndo={(id) => void undo(id)} onRetry={() => setSurface('command')} onSettings={() => void api?.openHub('settings')} onDone={collapse} />}
+      {surface === 'error' && failure && <ErrorView failure={failure} draft={text} autoFocus={boxReady} steps={steps} undone={undone} onUndo={(id) => void undo(id)} onRetry={() => setSurface('command')} onSettings={() => void api?.openHub('settings')} onDone={collapse} />}
       {!api && <p className="cmp-browser">This page runs inside the Desktop Companion app. In a browser it cannot reach the app.</p>}
     </Island>
   );
@@ -289,37 +304,31 @@ function useDoneFlash(key: number): boolean {
  * window is enlarged first and the island springs open inside it; shrinking, the island closes first and the window
  * follows after the transition, so the edge light and shadow are never clipped.
  */
-function Island({surface, edge, doneKey, onOpen, label, core, hitRef, children}: {surface: Surface; anchor: string; edge: Edge; doneKey: number; onOpen: () => void; label: string; core: (size: number) => ReactNode; hitRef: MutableRefObject<PetHitTest | null>; children: ReactNode}) {
+function Island({surface, edge, doneKey, onOpen, onPlaced, label, core, hitRef, children}: {surface: Surface; anchor: string; edge: Edge; doneKey: number; onOpen: () => void; onPlaced: (ready: boolean) => void; label: string; core: (size: number) => ReactNode; hitRef: MutableRefObject<PetHitTest | null>; children: ReactNode}) {
   const api = companionApi();
-  const panel = useRef<HTMLElement>(null);
+  const islandRect = useRef<Rect | null>(null);
   const [placement, setPlacement] = useState<PlacementEvent | null>(null);
   const pressed = useRef(false);
   const rest = surface === 'rest';
+  const reduced = useReducedMotion();
+  // Hold the last content while closing; changing to an empty rest view would restart its fade/morph.
+  const lastOpen = useRef({surface, children});
+  if (!rest) lastOpen.current = {surface, children};
   useEffect(() => {
     if (!api) return;
-    const off = api.onEvent(e => { if ('type' in e && e.type === 'placement') setPlacement(e); });
+    const off = api.onEvent(e => { if ('type' in e && e.type === 'placement') {setPlacement(e); onPlaced(e.bubble !== null);} });
+    // Initial rest placement can precede React's subscription. Request it once after subscribing, not during a close.
+    void api.layout({bubble: null});
     return () => { off(); if (pressed.current) void api.drag('end'); };
-  }, [api]);
-  useLayoutEffect(() => {
-    if (!api) return;
-    if (rest) { void api.layout({bubble: null}); return; }
-    const el = panel.current?.querySelector<HTMLElement>('.bubble-body');
-    if (!el) return;
-    const measure = () => void api.layout({bubble: {width: Math.ceil(el.offsetWidth), height: Math.ceil(el.offsetHeight)}});
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [api, rest, surface]);
+  }, [api, onPlaced]);
   const pet = placement?.pet ?? {x: 20, y: 20, width: 140, height: 152};
-  const bubble = placement?.bubble ?? {x: 180, y: 20};
   const hit = useRef<boolean | null>(null);
   useEffect(() => {
     if (!api) return;
     const update = (e: MouseEvent) => {
       const inPet = hitRef.current?.(e.clientX - pet.x, e.clientY - pet.y) ?? false;
-      const box = panel.current?.getBoundingClientRect();
-      const inBubble = !!box && e.clientX >= box.left && e.clientY >= box.top && e.clientX < box.right && e.clientY < box.bottom;
+      const box = islandRect.current;
+      const inBubble = !rest && !!box && e.clientX >= box.x && e.clientY >= box.y && e.clientX < box.x + box.width && e.clientY < box.y + box.height;
       const over = inPet || inBubble;
       if (over !== hit.current) { hit.current = over; void api.hit(over).catch(() => undefined); }
     };
@@ -343,11 +352,12 @@ function Island({surface, edge, doneKey, onOpen, label, core, hitRef, children}:
         if (e.key in docks) { e.preventDefault(); void api?.dock(docks[e.key as keyof typeof docks]); }
         if (e.key === '+' || e.key === '-') { e.preventDefault(); void api?.resize(e.key === '+' ? 'grow' : 'shrink'); }
       }}>{core(placement?.size ?? 96)}</button>
-    {!rest && <Bubble ref={panel} surface={surface} side={placement?.side ?? 'none'} edge={edge} edgeKey={doneKey} label="Companion conversation"
-      measuring={!!api && !placement?.bubble}
-      style={{position: 'absolute', left: bubble.x, top: bubble.y, ...(placement?.bubble ? {width: placement.bubble.width, maxHeight: placement.bubble.height, '--bubble-height': `${placement.bubble.height}px`} : {})}}>
-      {children}
-    </Bubble>}
+    <IslandShell open={!rest} view={lastOpen.current.surface} box={placement?.bubble ?? null} side={placement?.side ?? 'none'} edge={edge} edgeKey={doneKey} label="Companion conversation" reducedMotion={reduced}
+      onContentSize={size => {if (!rest) void api?.layout({bubble: size});}}
+      onClosed={() => {void api?.layout({bubble: null});}}
+      onRect={rect => {islandRect.current = rect;}}>
+      <div inert={rest} aria-hidden={rest || undefined}>{lastOpen.current.children}</div>
+    </IslandShell>
     <span className="sr-only" role="status" aria-live="polite">{label}</span>
   </div>;
 }

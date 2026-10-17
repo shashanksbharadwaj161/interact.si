@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-18",
+  "platform": "win32",
+  "branch": "codex/character-companion",
+  "productionBuild": "pass",
+  "prototypeBuild": "pass",
+  "fullSuite": {
+    "skipped": 0,
+    "pass": 1739,
+    "durationMs": 111974.6796,
+    "fail": 0,
+    "tests": 1739,
+    "concurrency": 2,
+    "cancelled": 0
+  },
+  "nativePetIsland": {
+    "realMicrophone": false,
+    "checks": 12,
+    "externalAppInput": false,
+    "externalRequests": 0,
+    "fail": 0,
+    "screenCapture": false
+  },
+  "liveProvider": false,
+  "installedCopyUpdated": false,
+  "nativeMaterialAppearanceVerified": false,
+  "claudeSession": "limit reached; page shows auto-continue enabled",
+  "note": "Browser island journey is recorded separately with actual environment and scripted events."
+}
