@@ -1,0 +1,7 @@
+# Preserve raw generation/extraction artifacts locally; ship the exact final atlas, prompts, QA and review previews.
+**/decoded/
+**/frames/
+**/final-frames/
+**/previews/
+**/final/spritesheet.png
+**/final/spritesheet-extended-before-despill.png

@@ -5,12 +5,14 @@ One folder per character pack: `assets/pets/<id>/pet.json` (format `desktop-comp
 1536×2288, 8×11 cells of 192×208, 73 frames).
 
 - The folder name must equal the manifest `id`.
-- The product companion shows a pack only when `review.status` is `"approved"` (with `approvedBy`, `approvedOn` and
-  the `qa` report paths from the create-pet pipeline). `concept` and `in-review` packs appear only on the review board,
-  labelled with their status.
+- The loader's product mode requires `review.status: "approved"` with owner approval metadata and QA report paths.
+  Review mode permits a clearly labelled draft. The current review build explicitly selects the validated First Light
+  animation in review mode in the hub, onboarding and floating companion; this does not grant owner approval or allow
+  arbitrary concept packs into product mode.
 - `atlasSha256` must be the SHA-256 of the exact atlas bytes; the app refuses a mismatch, and
   `tests/pet-renderer.test.mjs` checks every pack here.
-- Never put concept art, generated test patterns or hand-made placeholders here. Until a real approved atlas exists
-  the companion shows "Character art not installed".
+- Never install test patterns or hand-made placeholders as character packs. Invalid/missing atlases show the real
+  load error, not a simulated animated character.
 
-This folder is empty on purpose: no character atlas has been produced or approved yet (see `PET-ART-HANDOFF.md`).
+First Light contains an original generated v2 atlas, exact-byte QA reports and provenance. It remains **in review**.
+See `planning/ui-revamp/pet-art/first-light-motion-2026-10-18/README.md` for generated source/preview records.

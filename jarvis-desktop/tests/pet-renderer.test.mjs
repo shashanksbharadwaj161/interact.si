@@ -1,8 +1,8 @@
 // Pet renderer plumbing (src/pet/registry.ts, loader.ts): bundled packs pair manifests with atlases by folder, the
 // product companion uses only approved packs and says why when none is usable, the atlas bytes are checked against the
 // manifest's SHA-256, and the in-app load check passes on a real decoded atlas. The atlas used here is the labelled
-// engineering test pattern (flat rectangles saying TEST PATTERN), never character art. Also asserts that no character
-// pack is installed yet, so the product shows "Character art not installed" rather than a stand-in.
+// engineering test pattern (flat rectangles saying TEST PATTERN), never character art. Installed character packs must
+// carry matching validation evidence; the First Light animation remains explicitly in review until owner approval.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -90,7 +90,7 @@ test('atlas bytes come from an inline data URL and are checked against atlasSha2
 test('the in-app load check passes on the decoded test pattern, with a real lift in the jump row', () => {
   assert.equal(m.parsePetManifest(fixtureManifest).ok, true);
   const raw = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pet-rgba-')), 'atlas.rgba');
-  execFileSync('python3', ['-I', '-c', 'import sys; from PIL import Image; im = Image.open(sys.argv[1]).convert("RGBA"); open(sys.argv[2], "wb").write(im.tobytes()); print(im.size)', path.join(fixtureDir, 'spritesheet.png'), raw]);
+  execFileSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), ['-I', '-c', 'import sys; from PIL import Image; im = Image.open(sys.argv[1]).convert("RGBA"); open(sys.argv[2], "wb").write(im.tobytes()); print(im.size)', path.join(fixtureDir, 'spritesheet.png'), raw]);
   const rgba = new Uint8Array(fs.readFileSync(raw));
   const check = m.checkAtlasPixels(rgba, 1536, 2288);
   assert.equal(check.ok, true, JSON.stringify(check.errors.slice(0, 3)));
@@ -104,7 +104,7 @@ test('the in-app load check passes on the decoded test pattern, with a real lift
   assert.equal(bottom(4), bottom(0), 'and lands back on it');
 });
 
-test('no character pack is installed yet, and any future pack must verify', () => {
+test('installed character packs verify their actual atlas and retain truthful review status', () => {
   const dir = path.join(root, 'assets', 'pets');
   const packs = fs.readdirSync(dir, {withFileTypes: true}).filter((d) => d.isDirectory());
   for (const d of packs) {
@@ -115,8 +115,15 @@ test('no character pack is installed yet, and any future pack must verify', () =
     const bytes = fs.readFileSync(path.join(dir, d.name, manifest.atlas));
     assert.equal(createHash('sha256').update(bytes).digest('hex'), manifest.atlasSha256, `${d.name}: atlasSha256`);
     assert.notEqual(manifest.id, 'test-pattern', 'the test pattern must never be installed as a pet');
+    assert.ok(manifest.qa, `${d.name}: generation QA is required`);
+    for (const key of ['atlasValidation', 'petQuality']) {
+      const report = JSON.parse(fs.readFileSync(path.join(dir, d.name, manifest.qa[key]), 'utf8'));
+      assert.equal(report.ok, true, `${d.name}: ${key} must pass`);
+      assert.equal(report.sha256, manifest.atlasSha256, `${d.name}: ${key} must describe these exact bytes`);
+    }
+    if (d.name === 'first-light') assert.equal(manifest.review.status, 'in-review', 'QA does not imply owner approval');
   }
-  assert.equal(packs.length, 0, 'no approved character atlas exists yet; the product shows the missing-art state');
+  assert.ok(packs.some(d => d.name === 'first-light'), 'the reviewed First Light animation is bundled');
   const registry = fs.readFileSync(path.join(root, 'src', 'pet', 'registry.ts'), 'utf8');
   assert.match(registry, /'\.\.\/\.\.\/assets\/pets\/\*\/pet\.json'/);
 });

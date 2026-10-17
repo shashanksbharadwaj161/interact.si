@@ -1,3 +1,4 @@
+import { ExperienceControls } from './ExperienceEffects';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { ArrowCounterClockwise, Plugs, DownloadSimple, Export, FloppyDisk, Key, MagnifyingGlass, Trash, UploadSimple, WifiHigh, WifiSlash, X } from '@phosphor-icons/react';
 import type { CloudProvider, CloudProviderStatus, Mode, Settings as SettingsT } from '../shared/contracts';
@@ -1161,6 +1162,8 @@ export function Settings({ initialQuery = '' }: { initialQuery?: string }) {
             )}
           </Field>
         </SettingsSection>
+
+        {!searching && tab === 'general' && <section className="panel"><ExperienceControls /></section>}
 
         <SettingsSection ctx={sectionCtx} id="profile" panelTab="general" title="Profile" eyebrow="This window only">
           <form

@@ -1,8 +1,9 @@
-import {useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react';
-import {CompanionPet} from '../components/CompanionPet';
-import {CompanionOrb} from '../components/CompanionOrb';
-import type {CompanionState} from '../ui/appearance';
-import {companionApi, type AgentEvent, type CompanionPush, type CompanionStatus, type PlacementEvent, type RegionEvent} from './api';
+import {useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type MutableRefObject} from 'react';
+import {PetIdentity} from './PetIdentity';
+import type {PetHitTest} from '../pet/PetSprite';
+import {Bubble, Command, Working, AnswerView, ErrorView, PlacementOptions} from './surfaces';
+import '../styles/companion-bubble.css';
+import {companionApi, type AgentEvent, type CompanionPush, type CompanionStatus, type PlacementEvent, type RegionEvent, type TypingTarget} from './api';
 
 /*
  * The desktop companion island (production). One element docked to a screen edge that opens into a command surface,
@@ -20,6 +21,12 @@ type Edge = 'idle' | 'working' | 'waiting' | 'done' | 'error';
 
 export function CompanionApp() {
   const api = companionApi();
+  const [invoked, setInvoked] = useState(0);
+  const [drag, setDrag] = useState<number | null>(null);
+  const [gaze, setGaze] = useState<number | null>(null);
+  const petHit = useRef<PetHitTest | null>(null);
+  const [target, setTarget] = useState<TypingTarget | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
   const [status, setStatus] = useState<CompanionStatus | null>(null);
   const [surface, setSurface] = useState<Surface>('rest');
   const [text, setText] = useState('');
@@ -39,9 +46,24 @@ export function CompanionApp() {
   const anchor = 'corner';
 
   const refresh = useCallback(() => {
-    void api?.state().then(setStatus).catch(() => undefined);
+    void api?.state().then(s => {setStatus(s); setTarget(s.target);}).catch(() => undefined);
   }, [api]);
   useEffect(refresh, [refresh]);
+  // The hub and floating window have distinct documents. Read only the narrow status (never user data) while visible
+  // so a saved motion preference applies here as well. Pause the timer while this window is hidden.
+  useEffect(() => {
+    if (!api) return;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const sync = () => {
+      clearInterval(timer);
+      if (!document.hidden) {refresh(); timer = setInterval(refresh, 1500);}
+    };
+    document.addEventListener('visibilitychange', sync); sync();
+    return () => {clearInterval(timer); document.removeEventListener('visibilitychange', sync);};
+  }, [api, refresh]);
+  useEffect(() => {
+    document.documentElement.dataset.motion = status?.reduceMotion ? 'reduced' : 'full';
+  }, [status?.reduceMotion]);
   // The surface thins out only when Windows reports the acrylic material applied; otherwise it stays solid smoked glass.
   useEffect(() => {
     document.documentElement.dataset.material = status?.material.applied ? 'acrylic' : 'solid';
@@ -90,7 +112,11 @@ export function CompanionApp() {
         else if (starting.current) early.current.push(e);
         return;
       }
-      if (e.type === 'invoke') open();
+      if (e.type === 'drag') setDrag(e.vx);
+      else if (e.type === 'gaze') setGaze(e.index);
+      else if (e.type === 'placement') setStatus(s => s ? {...s, size: e.size, dock: e.dock} : s);
+      else if (e.type === 'target') setTarget(e.target);
+      else if (e.type === 'invoke') {setInvoked(v => v + 1); open();}
       else if (e.type === 'collapse') collapse();
       else if (e.type === 'region') {
         setRegion(e);
@@ -125,7 +151,7 @@ export function CompanionApp() {
     starting.current = true;
     early.current = [];
     try {
-      const r = await api.ask(t, token);
+      const r = await api.ask(t, token, Boolean(target));
       runRef.current = r.runId;
       setRunId(r.runId);
       const queued = early.current.filter((q) => q.runId === r.runId);
@@ -150,14 +176,18 @@ export function CompanionApp() {
   const waiting = steps.some((s) => s.phase === 'awaiting-confirm');
   const doneVisible = useDoneFlash(doneFlash);
   const edge: Edge = surface === 'error' ? 'error' : waiting ? 'waiting' : working ? 'working' : doneVisible ? 'done' : 'idle';
-  const orbState: CompanionState = surface === 'error' ? 'alert' : working ? 'thinking' : 'idle';
 
   return (
-    <Island surface={surface} anchor={anchor} edge={edge} doneKey={doneFlash} onOpen={open} label={`Desktop companion, ${surface === 'rest' ? 'resting' : surface}`} core={status?.appearance === 'legacy-orb' ? <CompanionOrb size={96} state={orbState} level={null} decorative showWhenHidden /> : <CompanionPet state={edge} decorative />}>
-      {surface === 'rest' && <RestPill status={status} />}
+    <Island surface={surface} anchor={anchor} edge={edge} doneKey={doneFlash} onOpen={open} label={`Desktop companion, ${surface === 'rest' ? 'resting' : surface}`} hitRef={petHit} core={size => <PetIdentity size={size} appearance={status?.appearance ?? 'pet'} surface={surface} steps={steps} failure={failure?.reason ?? null} invoked={invoked} answered={doneFlash} drag={drag} gaze={gaze} hitRef={petHit} />}>
+
       {surface === 'command' && (
         <Command
           status={status}
+          target={target}
+          onClearTarget={() => { setTarget(null); void api?.clearTarget(); }}
+          showOptions={showOptions}
+          onToggleOptions={() => setShowOptions(v => !v)}
+          options={<PetControls status={status} onRefresh={refresh} />}
           text={text}
           setText={setText}
           region={region}
@@ -176,7 +206,6 @@ export function CompanionApp() {
           onClose={collapse}
         />
       )}
-      {surface === 'command' && api && <PetControls status={status} onRefresh={refresh} />}
       {surface === 'working' && <Working pending={pending} steps={steps} hasRun={!!runId} onStop={() => void api?.cancel()} />}
       {surface === 'answer' && answer && (
         <AnswerView answer={answer} steps={steps} undone={undone} onUndo={(id) => void undo(id)} onOpen={(kind, id) => void api?.openHub(kind === 'note' ? 'notes' : kind === 'task' ? 'tasks' : 'capsules', id)} onFollow={() => { setText(''); setSurface('command'); }} onDone={collapse} />
@@ -198,22 +227,20 @@ function PetControls({status, onRefresh}: {status: CompanionStatus | null; onRef
     catch { setError('That change could not be saved. Try again.'); }
     finally { setBusy(false); }
   };
-  if (!api) return null;
-  return <details className="pet-controls">
-    <summary>Make yourself at home</summary>
-    <div className="pet-controls-body">
-      <div className="pet-control-row"><span>Pet size</span><div role="group" aria-label="Pet size">
-        {(['S', 'M', 'L'] as const).map((size, i) => <button key={size} type="button" className="btn btn-sm" disabled={busy} aria-pressed={status?.size === [64,96,128][i]} onClick={() => void change(() => api.resize(size))}>{size}</button>)}
-      </div></div>
-      <label className="pet-control-row"><span>Keep near</span><select aria-label="Dock companion" defaultValue="" disabled={busy} onChange={e => { const target = e.target.value as 'bottom-left' | 'bottom-right' | 'left' | 'right' | 'top'; if (target) void change(() => api.dock(target)); }}>
-        <option value="" disabled>Choose an edge</option><option value="bottom-left">Bottom left</option><option value="bottom-right">Bottom right</option><option value="left">Left</option><option value="right">Right</option><option value="top">Top</option>
-      </select></label>
-      <label className="pet-control-row"><span>Windows frosted glass</span><input type="checkbox" disabled={busy} checked={status?.material.requested === 'acrylic'} onChange={e => { const material = e.target.checked ? 'acrylic' : 'none'; void change(() => api.setMaterial(material)); }} /></label>
-      <p className="p-meta">{status?.material.note}</p>
-      <p className="p-meta">Drag the pet to move it. Character artwork is a concept; full pose animations are still being developed.</p>
-      {error && <p className="cmd-note" role="alert">{error}</p>}
-    </div>
-  </details>;
+  if (!api || !status) return null;
+  return <div className="pet-preferences" aria-busy={busy}>
+    <fieldset disabled={busy}>
+      <legend className="sr-only">Companion appearance and placement</legend>
+      <PlacementOptions size={status.size} dock={status.dock} appearance={status.appearance}
+        onDock={d => void change(() => api.dock(d))}
+        onResize={size => void change(() => api.resize(size))}
+        onAppearance={appearance => void change(() => api.setAppearance(appearance))} />
+      <label className="pet-control-row"><span>Windows frosted glass</span><input type="checkbox" checked={status.material.requested === 'acrylic'} onChange={e => { const material = e.target.checked ? 'acrylic' : 'none'; void change(() => api.setMaterial(material)); }} /></label>
+    </fieldset>
+    <p className="b-meta">{status.material.note}</p>
+    <p className="b-meta">Animated character preview. The sprite includes nine action states and sixteen look directions.</p>
+    {error && <p className="cmd-note" role="alert">{error}</p>}
+  </div>;
 }
 
 function useDoneFlash(key: number): boolean {
@@ -232,9 +259,9 @@ function useDoneFlash(key: number): boolean {
  * window is enlarged first and the island springs open inside it; shrinking, the island closes first and the window
  * follows after the transition, so the edge light and shadow are never clipped.
  */
-function Island({surface, edge, doneKey, onOpen, label, core, children}: {surface: Surface; anchor: string; edge: Edge; doneKey: number; onOpen: () => void; label: string; core: ReactNode; children: ReactNode}) {
+function Island({surface, edge, doneKey, onOpen, label, core, hitRef, children}: {surface: Surface; anchor: string; edge: Edge; doneKey: number; onOpen: () => void; label: string; core: (size: number) => ReactNode; hitRef: MutableRefObject<PetHitTest | null>; children: ReactNode}) {
   const api = companionApi();
-  const panel = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const [placement, setPlacement] = useState<PlacementEvent | null>(null);
   const pressed = useRef(false);
   const rest = surface === 'rest';
@@ -246,7 +273,7 @@ function Island({surface, edge, doneKey, onOpen, label, core, children}: {surfac
   useLayoutEffect(() => {
     if (!api) return;
     if (rest) { void api.layout({bubble: null}); return; }
-    const el = panel.current;
+    const el = panel.current?.querySelector<HTMLElement>('.bubble-body');
     if (!el) return;
     const measure = () => void api.layout({bubble: {width: Math.ceil(el.offsetWidth), height: Math.ceil(el.offsetHeight)}});
     measure();
@@ -256,16 +283,28 @@ function Island({surface, edge, doneKey, onOpen, label, core, children}: {surfac
   }, [api, rest, surface]);
   const pet = placement?.pet ?? {x: 20, y: 20, width: 140, height: 152};
   const bubble = placement?.bubble ?? {x: 180, y: 20};
-  const hit = (over: boolean) => { void api?.hit(over).catch(() => undefined); };
+  const hit = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!api) return;
+    const update = (e: MouseEvent) => {
+      const inPet = hitRef.current?.(e.clientX - pet.x, e.clientY - pet.y) ?? false;
+      const box = panel.current?.getBoundingClientRect();
+      const inBubble = !!box && e.clientX >= box.left && e.clientY >= box.top && e.clientX < box.right && e.clientY < box.bottom;
+      const over = inPet || inBubble;
+      if (over !== hit.current) { hit.current = over; void api.hit(over).catch(() => undefined); }
+    };
+    const leave = () => { hit.current = false; void api.hit(false).catch(() => undefined); };
+    document.addEventListener('mousemove', update); document.addEventListener('mouseleave', leave);
+    return () => { document.removeEventListener('mousemove', update); document.removeEventListener('mouseleave', leave); };
+  }, [api, pet.x, pet.y, pet.width, pet.height, rest, hitRef]);
   const endDrag = () => {
     if (!pressed.current) return;
     pressed.current = false;
     void api?.drag('end');
   };
-  return <div className="pet-desktop" aria-label={label}>
+  return <div className="pet-desktop" data-surface={surface} aria-label={label}>
     <button type="button" className="pet-handle" style={{left: pet.x, top: pet.y, width: pet.width, height: pet.height}}
       aria-label="Open companion. Drag to move. Use arrow keys to dock; plus or minus to resize."
-      onPointerEnter={() => hit(true)} onPointerLeave={() => hit(false)}
       onPointerDown={e => { if (e.button !== 0 || !api) return; pressed.current = true; e.currentTarget.setPointerCapture(e.pointerId); void api.drag('start'); }}
       onPointerUp={endDrag} onPointerCancel={endDrag} onLostPointerCapture={endDrag}
       onClick={e => { if (!api || e.detail === 0) onOpen(); }}
@@ -273,259 +312,12 @@ function Island({surface, edge, doneKey, onOpen, label, core, children}: {surfac
         const docks = {ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'top', ArrowDown: 'bottom-right'} as const;
         if (e.key in docks) { e.preventDefault(); void api?.dock(docks[e.key as keyof typeof docks]); }
         if (e.key === '+' || e.key === '-') { e.preventDefault(); void api?.resize(e.key === '+' ? 'grow' : 'shrink'); }
-      }}>{core}</button>
-    {!rest && <section className="island pet-bubble" data-surface={surface} data-edge={edge} style={{left: bubble.x, top: bubble.y, ...(placement?.bubble ? {maxWidth: placement.bubble.width, maxHeight: placement.bubble.height} : {})}}
-      onPointerEnter={() => hit(true)} onPointerLeave={() => hit(false)}>
-      <span className="edge" aria-hidden key={edge === 'done' ? `done-${doneKey}` : edge} />
-      <div className="island-panel" data-s={surface} key={surface} ref={panel}>{children}</div>
-    </section>}
+      }}>{core(placement?.size ?? 96)}</button>
+    {!rest && <Bubble ref={panel} surface={surface} side={placement?.side ?? 'none'} edge={edge} edgeKey={doneKey} label="Companion conversation"
+      measuring={!!api && !placement?.bubble}
+      style={{position: 'absolute', left: bubble.x, top: bubble.y, ...(placement?.bubble ? {width: placement.bubble.width, maxHeight: placement.bubble.height, '--bubble-height': `${placement.bubble.height}px`} : {})}}>
+      {children}
+    </Bubble>}
     <span className="sr-only" role="status" aria-live="polite">{label}</span>
   </div>;
-}
-
-function Head({title, meta, children}: {title: string; meta?: ReactNode; children?: ReactNode}) {
-  return (
-    <header className="p-head">
-      <div className="p-title">
-        <strong>{title}</strong>
-        {meta && <span className="p-meta">{meta}</span>}
-      </div>
-      <div className="p-tools">{children}</div>
-    </header>
-  );
-}
-
-function Foot({children}: {children: ReactNode}) {
-  return <footer className="p-foot">{children}</footer>;
-}
-
-function RestPill({status}: {status: CompanionStatus | null}) {
-  const ready = status?.readiness.ready;
-  return (
-    <div className="pill">
-      <span className="pill-text">
-        <strong>{ready ? 'Ready' : 'Companion'}</strong>
-        <span>{status ? (ready ? 'Nothing is listening' : 'Not connected yet') : 'Starting…'}</span>
-      </span>
-      {status?.shortcut && <kbd>{status.shortcut.replace(/Control/g, 'Ctrl').replace(/\+/g, ' ')}</kbd>}
-    </div>
-  );
-}
-
-function Command(p: {
-  status: CompanionStatus | null;
-  text: string;
-  setText: (t: string) => void;
-  region: RegionEvent | null;
-  note: string | null;
-  onAsk: () => void;
-  onRegion: () => void;
-  onRemoveRegion: () => void;
-  onHub: (view: 'home' | 'settings') => void;
-  onClose: () => void;
-}) {
-  const input = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => input.current?.focus(), []);
-  const readiness = p.status?.readiness;
-  const ready = readiness?.ready === true;
-  return (
-    <div className="cmd">
-      <Head title="Companion" meta={ready ? `Claude · ${readiness.model}` : 'Not connected'}>
-        <button type="button" className="ibtn" onClick={() => p.onHub('home')} aria-label="Open the full hub" title="Open the full hub">
-          <span aria-hidden>⤢</span>
-        </button>
-        <button type="button" className="ibtn" onClick={p.onClose} aria-label="Close (Esc)" title="Close (Esc)">
-          <span aria-hidden>✕</span>
-        </button>
-      </Head>
-      {readiness && !readiness.ready && (
-        <div className="cmd-setup" role="status">
-          <p>{readiness.reason}</p>
-          <button type="button" className="btn btn-sm" onClick={() => p.onHub('settings')}>
-            Open Settings › AI
-          </button>
-        </div>
-      )}
-      <form
-        className="cmd-row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          p.onAsk();
-        }}
-      >
-        <label htmlFor="cmp-input" className="sr-only">
-          Ask or tell the companion
-        </label>
-        <textarea
-          id="cmp-input"
-          ref={input}
-          className="cmd-input"
-          rows={1}
-          maxLength={2000}
-          value={p.text}
-          onChange={(e) => p.setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              p.onAsk();
-            }
-          }}
-          placeholder={p.region ? 'Ask about the selected region' : 'Ask, or tell it to do something'}
-          disabled={!ready}
-        />
-        <button type="submit" className="btn btn-primary" disabled={!ready || !p.text.trim()}>
-          Ask
-        </button>
-      </form>
-      {p.note && (
-        <p className="cmd-note" role="status">
-          {p.note}
-        </p>
-      )}
-      <div className="ctx">
-        {p.region ? (
-          <div className="ctx-chip">
-            <img className="ctx-img" src={p.region.preview} alt="The selected screen region" />
-            <span className="grow">
-              <strong>Region attached</strong>
-              <span>
-                {p.region.width}×{p.region.height} px. Sent with this request only, then forgotten.
-              </span>
-            </span>
-            <button type="button" className="linkbtn" onClick={p.onRemoveRegion}>
-              Remove
-            </button>
-          </div>
-        ) : (
-          <div className="ctx-empty">
-            <span>No screen context attached.</span>
-            <button type="button" className="chipbtn" onClick={p.onRegion} disabled={!ready}>
-              Select a region
-            </button>
-          </div>
-        )}
-      </div>
-      <Foot>
-        <span className="p-meta">{ready ? `Sends your request${p.region ? ' and the region' : ''} to Anthropic with your key. Esc closes.` : 'Notes, tasks and search work in the hub without a key.'}</span>
-      </Foot>
-    </div>
-  );
-}
-
-const PHASE_WORD: Record<ToolStep['phase'], string> = {running: 'Working', 'awaiting-confirm': 'Needs your answer', done: 'Done', declined: 'Not done', failed: 'Did not work'};
-
-function StepList({steps}: {steps: ToolStep[]}) {
-  if (!steps.length) return null;
-  return (
-    <ol className="steps">
-      {steps.map((s) => (
-        <li key={s.callId} className={`is-${s.phase}`}>
-          <span className="step-word">{PHASE_WORD[s.phase]}</span> {s.summary}
-          {s.phase === 'done' && s.verified && <span className="tag-ok">checked</span>}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function Working({pending, steps, hasRun, onStop}: {pending: 'sending' | 'thinking' | null; steps: ToolStep[]; hasRun: boolean; onStop: () => void}) {
-  const stop = useRef<HTMLButtonElement>(null);
-  useEffect(() => stop.current?.focus(), []);
-  const waiting = steps.some((s) => s.phase === 'awaiting-confirm');
-  return (
-    <div className="work">
-      <Head title={waiting ? 'Waiting for you' : 'Working'} meta={waiting ? 'Answer the Windows confirmation. Cancel is the default.' : pending === 'sending' ? 'Sending to Claude' : pending === 'thinking' ? 'Claude is working on the next step' : 'Running a step'} />
-      <StepList steps={steps} />
-      <Foot>
-        <span className="p-meta">Esc stops. Anything already confirmed stays done.</span>
-        <button type="button" className="stop" ref={stop} onClick={onStop} disabled={!hasRun && !pending}>
-          Stop
-        </button>
-      </Foot>
-    </div>
-  );
-}
-
-const CITE_RE = /\[(note|task|capsule):([A-Za-z0-9_-]{1,64})\]/g;
-
-function AnswerView({answer, steps, undone, onUndo, onOpen, onFollow, onDone}: {answer: Answer; steps: ToolStep[]; undone: Record<string, 'done' | 'failed'>; onUndo: (id: string) => void; onOpen: (kind: 'note' | 'task' | 'capsule', id: string) => void; onFollow: () => void; onDone: () => void}) {
-  const done = useRef<HTMLButtonElement>(null);
-  useEffect(() => done.current?.focus(), []);
-  const plain = answer.text.replace(CITE_RE, '').replace(/[ \t]+([.,;:!?])/g, '$1').trim();
-  return (
-    <div className="ans">
-      <Head title="Answer" meta={`Claude · ${answer.steps} step${answer.steps === 1 ? '' : 's'}`} />
-      <p className="ans-text">{plain}</p>
-      {answer.citations.length > 0 && (
-        <div className="cites" aria-label="Saved items used">
-          {answer.citations.map((c) => (
-            <button key={`${c.kind}:${c.id}`} type="button" className="cite" onClick={() => onOpen(c.kind, c.id)}>
-              <span className="cite-kind">{c.kind}</span> {c.title.slice(0, 48)}
-            </button>
-          ))}
-        </div>
-      )}
-      {/* What did not happen is shown as plainly as what did. */}
-      <StepList steps={steps.filter((s) => s.phase === 'declined' || s.phase === 'failed')} />
-      <Receipts steps={steps} undone={undone} onUndo={onUndo} />
-      <Foot>
-        <button type="button" className="btn" onClick={onFollow}>
-          Follow up
-        </button>
-        <button type="button" className="btn btn-primary" ref={done} onClick={onDone}>
-          Done
-        </button>
-      </Foot>
-    </div>
-  );
-}
-
-function Receipts({steps, undone, onUndo}: {steps: ToolStep[]; undone: Record<string, 'done' | 'failed'>; onUndo: (id: string) => void}) {
-  const changes = steps.filter((s) => s.undo);
-  if (!changes.length) return null;
-  return (
-    <ul className="receipts" aria-label="What changed">
-      {changes.map((s) => (
-        <li key={s.callId}>
-          <span className="grow">{s.summary}</span>
-          {undone[s.undo!.id] === 'done' ? (
-            <span className="tag-ok">undone</span>
-          ) : undone[s.undo!.id] === 'failed' ? (
-            <span className="tag-warn">could not undo</span>
-          ) : (
-            <button type="button" className="btn btn-sm" onClick={() => onUndo(s.undo!.id)}>
-              Undo
-            </button>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function ErrorView({failure, steps, undone, onUndo, onRetry, onSettings, onDone}: {failure: Failure; steps: ToolStep[]; undone: Record<string, 'done' | 'failed'>; onUndo: (id: string) => void; onRetry: () => void; onSettings: () => void; onDone: () => void}) {
-  const title = {setup: 'Not set up yet', cancelled: 'Stopped', refused: 'Declined by Claude', truncated: 'Cut off', steps: 'Stopped after too many steps', provider: 'Claude could not answer', network: 'Could not reach Claude'}[failure.reason];
-  return (
-    <div className="ans is-error">
-      <Head title={title} />
-      <p className="ans-text" role="alert">
-        {failure.message}
-      </p>
-      <StepList steps={steps} />
-      <Receipts steps={steps} undone={undone} onUndo={onUndo} />
-      <Foot>
-        {failure.reason === 'setup' && (
-          <button type="button" className="btn" onClick={onSettings}>
-            Open Settings › AI
-          </button>
-        )}
-        <button type="button" className="btn" onClick={onRetry}>
-          {failure.reason === 'cancelled' ? 'Ask again' : 'Try again'}
-        </button>
-        <button type="button" className="btn btn-primary" onClick={onDone}>
-          Done
-        </button>
-      </Foot>
-    </div>
-  );
 }

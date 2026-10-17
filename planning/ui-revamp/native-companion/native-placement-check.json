@@ -1,10 +1,10 @@
 {
-  "platform": "linux",
+  "platform": "win32",
   "display": {
     "x": 0,
     "y": 0,
-    "width": 1280,
-    "height": 720
+    "width": 1536,
+    "height": 816
   },
   "results": [
     {
@@ -18,22 +18,22 @@
       "name": "rest window is the pet plus margin (trimmed at screen edges), inside the work area",
       "ok": true,
       "bounds": {
-        "x": 1161,
-        "y": 594,
-        "width": 119,
-        "height": 126
+        "x": 1416,
+        "y": 687,
+        "width": 120,
+        "height": 129
       },
       "pet": {
-        "x": 18,
-        "y": 18,
+        "x": 19,
+        "y": 21,
         "width": 89,
         "height": 96
       },
       "work": {
         "x": 0,
         "y": 0,
-        "width": 1280,
-        "height": 720
+        "width": 1536,
+        "height": 816
       }
     },
     {
@@ -42,14 +42,14 @@
       "placement": {
         "type": "placement",
         "window": {
-          "x": 1161,
-          "y": 594,
-          "width": 119,
-          "height": 126
+          "x": 1416,
+          "y": 687,
+          "width": 120,
+          "height": 129
         },
         "pet": {
-          "x": 18,
-          "y": 18,
+          "x": 19,
+          "y": 21,
           "width": 89,
           "height": 96
         },
@@ -68,24 +68,24 @@
       "name": "window grows to hold pet and bubble, still inside the work area",
       "ok": true,
       "bounds": {
-        "x": 733,
-        "y": 341,
-        "width": 547,
-        "height": 379
+        "x": 988,
+        "y": 436,
+        "width": 548,
+        "height": 380
       }
     },
     {
       "name": "bubble does not cover the pet",
       "ok": true,
       "pet": {
-        "x": 446,
-        "y": 271,
+        "x": 447,
+        "y": 272,
         "width": 89,
         "height": 96
       },
       "bubble": {
-        "x": 18,
-        "y": 18,
+        "x": 19,
+        "y": 19,
         "width": 420,
         "height": 320
       }
@@ -96,7 +96,7 @@
       "dock": "bottom",
       "pet": {
         "x": 12,
-        "y": 612,
+        "y": 708,
         "width": 89,
         "height": 96
       },
@@ -108,7 +108,7 @@
       "dock": "left",
       "pet": {
         "x": 12,
-        "y": 312,
+        "y": 360,
         "width": 89,
         "height": 96
       },
@@ -119,7 +119,7 @@
       "ok": true,
       "dock": "top",
       "pet": {
-        "x": 596,
+        "x": 724,
         "y": 12,
         "width": 89,
         "height": 96
@@ -131,8 +131,8 @@
       "ok": true,
       "dock": "right",
       "pet": {
-        "x": 1179,
-        "y": 312,
+        "x": 1435,
+        "y": 360,
         "width": 89,
         "height": 96
       },
@@ -143,8 +143,8 @@
       "ok": true,
       "dock": "bottom",
       "pet": {
-        "x": 1179,
-        "y": 612,
+        "x": 1435,
+        "y": 708,
         "width": 89,
         "height": 96
       },

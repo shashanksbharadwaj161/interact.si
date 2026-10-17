@@ -87,6 +87,7 @@ export function PetSprite({ pet, view, size, hitRef, className, style }: { pet: 
       ctx.imageSmoothingQuality = 'high';
       try {
         ctx.drawImage(pet.bitmap, r.x, r.y, r.w, r.h, 0, 0, canvas.width, canvas.height);
+        canvas.dataset.petFrame = `${c.row}:${c.col}`;
       } catch {
         // The bitmap was released (the pack is being swapped): stop drawing rather than throw every frame.
         broken = true;

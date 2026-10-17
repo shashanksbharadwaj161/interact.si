@@ -24,6 +24,28 @@ const out = await build({
 });
 const m = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 
+test('a stalled native animation frame falls back once and ignores a late callback', () => {
+  let animation; let fallback; let draws = 0;
+  const cleared = []; const cancelled = [];
+  m.resilientFrame(() => draws++, {
+    request: cb => {animation = cb; return 1;}, cancel: id => cancelled.push(id),
+    timer: (cb, ms) => {assert.equal(ms, 64); fallback = cb; return 2;}, clear: id => cleared.push(id),
+  });
+  fallback(); animation(); fallback();
+  assert.equal(draws, 1);
+  assert.deepEqual(cancelled, [1]); assert.deepEqual(cleared, [2]);
+});
+
+test('a normal animation frame cancels its fallback without drawing twice', () => {
+  let animation; let fallback; let draws = 0;
+  m.resilientFrame(() => draws++, {
+    request: cb => {animation = cb; return 1;}, cancel: () => undefined,
+    timer: cb => {fallback = cb; return 2;}, clear: () => undefined,
+  });
+  animation(); fallback();
+  assert.equal(draws, 1);
+});
+
 /* ---------------------------------------------------------------- geometry */
 
 test('the v2 atlas has 73 required and 15 unused cells in an 8 x 11 grid of 192 x 208', () => {

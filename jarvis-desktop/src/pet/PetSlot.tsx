@@ -85,7 +85,7 @@ export function PetSlot({ size, view, appearance = 'pet', mode = 'product', pack
     body = (
       <>
         <PetSprite pet={load} view={view} size={size} hitRef={hitRef} />
-        {mode === 'review' && load.manifest.review.status !== 'approved' && <span className="pet-review-tag">{load.manifest.review.status}</span>}
+        {mode === 'review' && load.manifest.review.status !== 'approved' && <span className="pet-review-tag">{load.manifest.review.status === 'concept' ? 'Art concept' : 'Animation preview'}</span>}
       </>
     );
   } else if (load?.status === 'invalid') {

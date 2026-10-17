@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Check, CheckSquare, NotePencil, Sparkle } from '
 import type { Capability, Settings } from '../shared/contracts';
 import { CompanionPet } from './CompanionPet';
 import { CompanionField } from './CompanionField';
+import { ExperienceControls } from './ExperienceEffects';
 import { AiSetup, type AiSetupResult } from './AiSetup';
 import { SHELL_PREF, useShellPref } from './Settings';
 import { Button, Notice, Segmented, Switch } from '../ui/primitives';
@@ -236,9 +237,9 @@ export function Onboarding() {
   return (
     <div className="onboard">
       <section className="ob-main" aria-labelledby="ob-title">
-        <p className="ob-brand">
+        <header className="ob-topbar"><p className="ob-brand">
           <span className="brand-mark" aria-hidden="true" /> Desktop Companion
-        </p>
+        </p><ExperienceControls compact /></header>
 
         {phase === 'welcome' && (
           <div className="ob-step">
@@ -381,8 +382,8 @@ export function Onboarding() {
 
       <aside className="ob-stage" aria-label="Your companion">
         <CompanionField />
-        <div className="ob-character"><div className="ob-halo" aria-hidden /><CompanionPet /><span className="ob-hello">Hey. Let’s make this your space.</span></div>
-        <p className="sub">An original character concept. Click the desktop pet to talk. Drag it to make room.</p>
+        <div className="ob-character"><div className="ob-halo" aria-hidden /><CompanionPet showWhenHidden /><span className="ob-hello">Hey. Let’s make this your space.</span></div>
+        <p className="sub">Your companion blinks, waves and looks around. Click the desktop pet to talk. Drag it to make room.</p>
       </aside>
     </div>
   );

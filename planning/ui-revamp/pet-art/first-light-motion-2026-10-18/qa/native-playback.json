@@ -1,0 +1,251 @@
+{
+  "platform": "win32",
+  "display": {
+    "x": 0,
+    "y": 0,
+    "width": 1536,
+    "height": 816
+  },
+  "results": [
+    {
+      "name": "validated character is drawn in the native companion",
+      "ok": true,
+      "frame": "10:5"
+    },
+    {
+      "name": "draft animation is visibly labelled",
+      "ok": true
+    },
+    {
+      "name": "invocation plays multiple distinct generated wave poses",
+      "ok": true,
+      "frames": [
+        "10:5",
+        "3:0",
+        "3:0",
+        "3:1",
+        "3:2",
+        "3:3",
+        "10:5",
+        "10:5",
+        "10:5"
+      ],
+      "diagnostics": [
+        {
+          "now": 1922.800000000745,
+          "raf": 1,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            327
+          ]
+        },
+        {
+          "now": 2021.800000000745,
+          "raf": 1,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            327
+          ]
+        },
+        {
+          "now": 2121.5,
+          "raf": 1,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            327
+          ]
+        },
+        {
+          "now": 2226.89999999851,
+          "raf": 1,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            327
+          ]
+        },
+        {
+          "now": 2321.699999999255,
+          "raf": 1,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            327
+          ]
+        },
+        {
+          "now": 3988.199999999255,
+          "raf": 4,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            348
+          ]
+        },
+        {
+          "now": 4092.10000000149,
+          "raf": 5,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            348
+          ]
+        },
+        {
+          "now": 4205,
+          "raf": 5,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            348
+          ]
+        },
+        {
+          "now": 4304,
+          "raf": 6,
+          "hidden": false,
+          "motion": "full",
+          "reason": "Saying hello: you opened the companion",
+          "rect": {
+            "x": 447,
+            "y": 242,
+            "width": 89,
+            "height": 96,
+            "top": 242,
+            "right": 536,
+            "bottom": 338,
+            "left": 447
+          },
+          "viewport": [
+            548,
+            348
+          ]
+        }
+      ]
+    },
+    {
+      "name": "saved reduced-motion setting reaches the separate companion document",
+      "ok": true
+    },
+    {
+      "name": "reduced motion keeps a single still pose",
+      "ok": true,
+      "frames": [
+        "0:0",
+        "0:0",
+        "0:0"
+      ]
+    },
+    {
+      "name": "hidden window restores throttling and page visibility pause",
+      "ok": true
+    },
+    {
+      "name": "no external requests during native animation checks",
+      "ok": true
+    }
+  ],
+  "errors": [],
+  "externalRequests": [],
+  "scriptedInvocation": true,
+  "liveProvider": false
+}

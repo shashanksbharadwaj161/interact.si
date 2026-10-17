@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowClockwise, ArrowsOut, Check, Info, MagnifyingGlass, Question, WarningCircle, X } from '@phosphor-icons/react';
 import { CompanionPet } from './CompanionPet';
+import { ExperienceProvider, ExperienceBackdrop, ExperienceControls } from './ExperienceEffects';
 import { CommandPalette } from './CommandPalette';
 import { Onboarding, modelReadiness, safeLaunchReason } from './Onboarding';
 import { GUIDE_TOPIC_IDS, type GuidanceInput, type GuideTopicId } from '../ui/guidance';
@@ -865,6 +866,7 @@ function Shell({ motion }: { motion: MotionState }) {
             </span>
           )}
         </div>
+        <ExperienceControls compact />
         <Presence go={go} />
       </aside>
       <div className="stage">
@@ -928,7 +930,7 @@ export function App() {
   return (
     <AppearanceProvider>
       <CompanionProvider>
-        <Gate />
+        <ExperienceProvider><ExperienceBackdrop /><Gate /></ExperienceProvider>
       </CompanionProvider>
     </AppearanceProvider>
   );

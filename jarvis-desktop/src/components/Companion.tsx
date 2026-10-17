@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { ArrowCounterClockwise, Check, PencilSimple } from '@phosphor-icons/react';
+import { CharacterStudio } from './CharacterStudio';
 import { CompanionOrb, CoreFrame } from './CompanionOrb';
 import { SceneBackdrop } from './SceneBackdrop';
 import { Button, PageHeader, Segmented, Switch } from '../ui/primitives';
@@ -23,6 +24,11 @@ const STAGE_PLAIN = 'plain';
  * app is doing, and the Live option shows the real state.
  */
 export function Companion() {
+  const [legacy, setLegacy] = useState(false);
+  return <div className="page page-wide"><CharacterStudio /><button className="linkbtn legacy-companion-toggle" type="button" aria-expanded={legacy} onClick={() => setLegacy(v => !v)}>{legacy ? 'Close legacy orb controls' : 'Legacy orb controls'}</button>{legacy && <LegacyCompanion />}</div>;
+}
+
+function LegacyCompanion() {
   const { settings, api, mutate } = useReady();
   const live = useCompanion();
   const [applied, setApplied] = useAppearance();
@@ -52,11 +58,11 @@ export function Companion() {
     <div className="page page-wide studio">
       <PageHeader
         title="Companion"
-        subtitle="Choose the companion shown across the app. It reflects what the app is really doing: ready, listening, transcribing, working, speaking or needing attention."
+        subtitle="Controls for the retained legacy energy forms. The animated character and desktop pet are configured separately."
         actions={
           <div className="studio-apply" role="group" aria-label="Apply changes">
             <span className={cx('studio-dirty', dirty && 'on')} role="status">
-              {dirty ? 'Not applied yet' : justApplied ? 'Applied everywhere' : 'In use everywhere'}
+              {dirty ? 'Not applied yet' : justApplied ? 'Legacy renderer updated' : 'Legacy renderer settings'}
             </span>
             <Button icon={ArrowCounterClockwise} disabled={!dirty} onClick={() => setDraft(applied)}>
               Revert

@@ -33,6 +33,23 @@ export type FrameScheduler = {
 
 type Entry = { sub: FrameSubscription; dueAt: number | null; version: number };
 
+/** Windows can stall rAF in a shown transparent/non-activating window while timers and page visibility stay live.
+ * Keep one bounded fallback for that case. Both paths share one completion, so a late rAF cannot double-draw.
+ * The scheduler still checks visibility before drawing and never runs a continuous fallback loop.
+ */
+export function resilientFrame(fn: () => void, env: {request: (cb: () => void) => unknown; cancel: (id: unknown) => void; timer: (cb: () => void, ms: number) => unknown; clear: (id: unknown) => void}): unknown {
+  let fired = false;
+  let frame: unknown;
+  let timer: unknown;
+  const run = () => {
+    if (fired) return;
+    fired = true; env.cancel(frame); env.clear(timer); fn();
+  };
+  timer = env.timer(run, 64);
+  frame = env.request(run);
+  return frame;
+}
+
 const browserEnv = (): Required<SchedulerEnv> => {
   const g = globalThis as typeof globalThis & { document?: Document };
   const doc = typeof g.document === 'undefined' ? null : g.document;
@@ -40,7 +57,10 @@ const browserEnv = (): Required<SchedulerEnv> => {
     now: typeof g.performance?.now === 'function' ? () => g.performance.now() : () => Date.now(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
-    requestFrame: typeof g.requestAnimationFrame === 'function' ? (fn) => g.requestAnimationFrame(() => fn()) : (fn) => setTimeout(fn, 16),
+    requestFrame: typeof g.requestAnimationFrame === 'function' ? (fn) => resilientFrame(fn, {
+      request: cb => g.requestAnimationFrame(cb), cancel: id => g.cancelAnimationFrame(id as number),
+      timer: (cb, ms) => setTimeout(cb, ms), clear: id => clearTimeout(id as ReturnType<typeof setTimeout>),
+    }) : (fn) => setTimeout(fn, 16),
     isHidden: () => doc?.visibilityState === 'hidden',
     onVisibilityChange: (fn) => {
       if (!doc) return () => {};

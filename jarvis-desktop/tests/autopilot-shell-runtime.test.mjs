@@ -227,13 +227,13 @@ const nameOfButton = (html, b) => b.attrs['aria-label'] || visibleText(b.inner) 
 const wrappingLabel = (html, f) => visibleText(elements(html, 'label').find((l) => !l.attrs.for && l.inner.includes(f.raw))?.inner ?? '');
 const nameOfField = (html, f) => f.attrs['aria-label'] || labelFor(html, f.attrs.id) || wrappingLabel(html, f) || '';
 const mainLabel = (html) => decode((html.match(/<main\b[^>]*aria-label="([^"]*)"/) ?? [])[1] ?? '');
-const headingOf = (html) => decode((html.match(/<h1\b[^>]*>([^<]*)<\/h1>/) ?? [])[1] ?? '');
+const headingOf = (html) => visibleText(elements(html, 'h1')[0]?.inner ?? '');
 const currentNavItems = (html) => elements(html, 'a').filter((a) => a.attrs['aria-current'] === 'page').map((a) => a.attrs['aria-label']);
 
 const H1 = {
   home: /^Good (morning|afternoon|evening|night)\.$/,
   assistant: 'Assistant',
-  companion: 'Companion',
+  companion: 'Small companion. Quite a character.',
   capsules: 'Capsules',
   notes: 'Notes',
   tasks: 'Tasks',
@@ -399,7 +399,7 @@ test('without the backend methods each module page says it is not connected and 
     return 'disabled' in b.attrs;
   };
   const calendar = page('#/calendar', STATES.available);
-  assert.deepEqual(fields(calendar), [], 'without the calendar methods no import control is offered');
+  assert.deepEqual(fields(elements(calendar, 'main')[0]?.inner ?? ''), [], 'without the calendar methods no import control is offered');
   assert.doesNotMatch(calendar, /Import with file dialog|Export all as \.ics/);
   // Avatar Studio needs no backend: it edits a locally saved avatar pack and says the voice level is only simulated.
   const avatar = page('#/avatar', STATES.available);
@@ -410,7 +410,7 @@ test('without the backend methods each module page says it is not connected and 
   assert.match(avatar, /Simulated level \(preview only\)/, 'the level slider is labelled as preview only');
   assert.ok(disabled(page('#/usage', STATES.available), 'Refresh'), 'usage refresh is disabled');
   const clip = page('#/clipboard', STATES.available);
-  assert.ok(fields(clip).every((f) => 'disabled' in f.attrs), 'the clipboard switch is disabled');
+  assert.ok(fields(elements(clip, 'main')[0]?.inner ?? '').every((f) => 'disabled' in f.attrs), 'the clipboard switch is disabled');
   const models = page('#/models', STATES.available);
   assert.match(models, /Browser preview/, 'models states there is no backend');
   assert.ok(disabled(models, 'Refresh'), 'models refresh is disabled');
@@ -423,7 +423,7 @@ test('with the backend methods the module pages connect, and a single missing me
   assert.match(connected('models'), /Checking Ollama/, 'models waits for its first overview');
   assert.match(connected('usage'), /Usage is not loaded yet/, 'usage shows nothing until the ledger answers');
   // The switch stays disabled until the first status read returns (effects do not run here), so it is never offered on a guess.
-  assert.ok(fields(connected('clipboard')).every((f) => 'disabled' in f.attrs), 'clipboard waits for its status');
+  assert.ok(fields(elements(connected('clipboard'), 'main')[0]?.inner ?? '').every((f) => 'disabled' in f.attrs), 'clipboard waits for its status');
   const partial = (omit) => ({ system: STATES.available.system, api: connectedApi([omit]) });
   assert.match(page('#/routines', partial('routinesUndo')), NOT_CONNECTED.routines, 'routines need every method');
   assert.match(page('#/usage', partial('usageExport')), NOT_CONNECTED.usage);

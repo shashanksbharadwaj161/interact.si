@@ -32,7 +32,7 @@ export type CompanionDeps = {
 
 export type MaterialState = {requested: 'none' | 'acrylic'; applied: boolean; note: string};
 export type Appearance = 'pet' | 'legacy-orb';
-export type CompanionStatus = {readiness: CompanionReadiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock; target: {process: string; title: string} | null};
+export type CompanionStatus = {readiness: CompanionReadiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock; target: {process: string; title: string} | null; reduceMotion: boolean};
 
 const SHORTCUTS = ['Control+Shift+Space', 'Control+Alt+Space'] as const;
 const REGION_TTL_MS = 5 * 60 * 1000;
@@ -142,10 +142,24 @@ export function createCompanion(deps: CompanionDeps) {
     const p = currentPoint();
     const work = displayFor(p).workArea;
     point = clampPetPoint(p, prefs.size, work);
-    placement = placePet(point, prefs.size, bubble, work);
-    const b = island!.getBounds();
-    const w = placement.window;
-    if (b.x !== w.x || b.y !== w.y || b.width !== w.width || b.height !== w.height) island!.setBounds(w, false);
+    const planned = placePet(point, prefs.size, bubble, work);
+    const before = island!.getBounds();
+    const wanted = planned.window;
+    if (before.x !== wanted.x || before.y !== wanted.y || before.width !== wanted.width || before.height !== wanted.height) island!.setBounds(wanted, false);
+    // At fractional Windows display scales setBounds can round the physical extent up by one DIP.
+    // Keep the ACTUAL window inside the work area and rebase the content, preserving the pet's global feet.
+    let actual = island!.getBounds();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const overflowX = actual.x + actual.width - (work.x + work.width);
+      const overflowY = actual.y + actual.height - (work.y + work.height);
+      const x = actual.x < work.x ? work.x + attempt : overflowX > 0 ? actual.x - overflowX - attempt : actual.x;
+      const y = actual.y < work.y ? work.y + attempt : overflowY > 0 ? actual.y - overflowY - attempt : actual.y;
+      if (x === actual.x && y === actual.y) break;
+      island!.setPosition(x, y, false);
+      actual = island!.getBounds();
+    }
+    const rebase = (box: {x: number; y: number; width: number; height: number}) => ({...box, x: box.x + wanted.x - actual.x, y: box.y + wanted.y - actual.y});
+    placement = {window: actual, pet: rebase(planned.pet), bubble: planned.bubble ? rebase(planned.bubble) : null, side: planned.side};
     send({type: 'placement', ...placement, size: prefs.size, dock: prefs.dock});
   };
   function setInteractive(on: boolean) {
@@ -275,7 +289,9 @@ export function createCompanion(deps: CompanionDeps) {
       webPreferences: {
         preload: deps.preloadPath, contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true,
         nodeIntegrationInWorker: false, nodeIntegrationInSubFrames: false, allowRunningInsecureContent: false, spellcheck: false,
-        backgroundThrottling: true, devTools: !!deps.devOrigin,
+        // A visible transparent/non-activating Windows window may be treated as occluded by Chromium. Keep its
+        // pose clock running while shown; restore normal throttling on hide so the renderer's visibility pause works.
+        backgroundThrottling: false, devTools: !!deps.devOrigin,
       },
     });
     island = win;
@@ -292,8 +308,8 @@ export function createCompanion(deps: CompanionDeps) {
       target = null;
       updateGaze();
     });
-    win.on('show', updateGaze);
-    win.on('hide', updateGaze);
+    win.on('show', () => {win.webContents.setBackgroundThrottling(false); updateGaze();});
+    win.on('hide', () => {win.webContents.setBackgroundThrottling(true); updateGaze();});
     // Rest: shown without taking focus, so the app the person is using keeps the keyboard; transparent parts let clicks
     // through to the desktop until the pointer is over the pet or the bubble.
     win.once('ready-to-show', () => {
@@ -444,7 +460,7 @@ export function createCompanion(deps: CompanionDeps) {
   }
 
   const handlers: Record<CompanionMethod, (...args: never[]) => Promise<unknown> | unknown> = {
-    companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock, target: shownTarget()}),
+    companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock, target: shownTarget(), reduceMotion: (await deps.backend.getState()).settings.reduceMotion}),
     companionClearTarget: () => { target = null; send({type: 'target', target: null}); return true; },
     companionAsk: (text: string, token?: string, withTarget?: boolean) => ask(text, token, withTarget),
     companionCancel: () => { run?.abort(); return true; },
