@@ -22,9 +22,11 @@ const manifest = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manife
 const sha = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
 for (const spec of specs) {
-  const [pkg, weightList] = spec.split(/:(?=[\d,]+$)/);
+  // `pkg:400,600` picks static weights; for a variable package `pkg:standard` (or full, opsz, wght...) picks that axes file.
+  const [pkg, weightList] = spec.split(/:(?=[\d,]+$|[a-z]+$)/);
   const variable = pkg.startsWith('@fontsource-variable/');
-  const weights = weightList ? weightList.split(',') : [];
+  const axes = weightList && /^[a-z]+$/.test(weightList) ? weightList : 'wght';
+  const weights = weightList && /^[\d,]+$/.test(weightList) ? weightList.split(',') : [];
   const info = JSON.parse(execFileSync('npm', ['view', pkg, 'name', 'version', 'license', '--json'], {encoding: 'utf8'}));
   if (!/^(OFL-1\.1|Apache-2\.0)$/.test(info.license)) throw new Error(`${pkg}: licence "${info.license}" is not OFL-1.1 or Apache-2.0`);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'font-pack-'));
@@ -33,7 +35,7 @@ for (const spec of specs) {
     execFileSync('tar', ['-xzf', tarball], {cwd: tmp});
     const pkgDir = path.join(tmp, 'package');
     const files = fs.readdirSync(path.join(pkgDir, 'files'));
-    const wanted = files.filter((f) => f.endsWith('.woff2') && /-latin-/.test(f) && !/-latin-ext-/.test(f) && (variable ? /-wght-normal\.woff2$/.test(f) : weights.some((w) => f.endsWith(`-latin-${w}-normal.woff2`))));
+    const wanted = files.filter((f) => f.endsWith('.woff2') && /-latin-/.test(f) && !/-latin-ext-/.test(f) && (variable ? f.endsWith(`-${axes}-normal.woff2`) : weights.some((w) => f.endsWith(`-latin-${w}-normal.woff2`))));
     if (!wanted.length) throw new Error(`${pkg}: no matching latin woff2 files (have: ${files.slice(0, 6).join(', ')} …)`);
     const id = pkg.split('/')[1];
     const dir = path.join(outRoot, id);
@@ -47,7 +49,7 @@ for (const spec of specs) {
     if (!licence) throw new Error(`${pkg}: the package has no licence file`);
     fs.copyFileSync(path.join(pkgDir, licence), path.join(dir, 'LICENSE.txt'));
     const meta = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
-    manifest[id] = {package: pkg, version: info.version, license: info.license, family: meta.description?.match(/^Self-host the (.+?) font/)?.[1] ?? id, variable, weights: variable ? 'variable (wght)' : weights, files: copied, licenseFile: `${id}/LICENSE.txt`, licenseSha256: sha(path.join(dir, 'LICENSE.txt'))};
+    manifest[id] = {package: pkg, version: info.version, license: info.license, family: meta.description?.match(/^Self-host the (.+?) font/)?.[1] ?? id, variable, weights: variable ? `variable (${axes} axes file)` : weights, files: copied, licenseFile: `${id}/LICENSE.txt`, licenseSha256: sha(path.join(dir, 'LICENSE.txt'))};
     console.log(`${pkg}@${info.version} ${info.license}: ${copied.map((c) => path.basename(c.file)).join(', ')}`);
   } finally {
     fs.rmSync(tmp, {recursive: true, force: true});

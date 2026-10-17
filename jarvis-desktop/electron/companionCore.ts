@@ -22,6 +22,7 @@ export const COMPANION_METHODS = [
   'companionDock',
   'companionGaze',
   'companionSetAppearance',
+  'companionClearTarget',
   'companionOpenHub',
   'companionSetMaterial',
   'regionBegin',
@@ -38,7 +39,8 @@ export const companionChannel = (m: CompanionMethod) => `${COMPANION_CHANNEL_PRE
 const TOKEN: ArgSpec = {kind: 'string', min: 16, max: 64};
 export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = {
   companionState: [],
-  companionAsk: [{kind: 'string', min: 1, max: 2000}, {...TOKEN, optional: true}],
+  // text, region token, and whether the page showed the remembered app window and the person kept it attached.
+  companionAsk: [{kind: 'string', min: 1, max: 2000}, {...TOKEN, optional: true}, {kind: 'boolean', optional: true}],
   companionCancel: [],
   companionUndo: [{kind: 'string', min: 1, max: 64}],
   companionLayout: [{kind: 'object'}],
@@ -48,6 +50,7 @@ export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = 
   companionDock: [{kind: 'enum', values: ['bottom-left', 'bottom-right', 'left', 'right', 'top']}],
   companionGaze: [{kind: 'boolean'}],
   companionSetAppearance: [{kind: 'enum', values: ['pet', 'legacy-orb']}],
+  companionClearTarget: [],
   companionOpenHub: [{kind: 'enum', values: ['home', 'assistant', 'notes', 'tasks', 'capsules', 'search', 'companion', 'settings']}, {kind: 'string', min: 1, max: 64, optional: true}],
   companionSetMaterial: [{kind: 'enum', values: ['none', 'acrylic']}],
   regionBegin: [],

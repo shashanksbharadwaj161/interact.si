@@ -352,7 +352,12 @@ export class ActionService {
     }
   }
 
-  async execute(previewId: unknown, approved: unknown): Promise<unknown> {
+  /**
+   * `opts.confirm` lets a caller in the main process (the desktop companion) show the same trusted confirmation from its
+   * own window; it never skips the confirmation, the revalidation, the focus re-check or the window policy. The hub's
+   * IPC passes only the first two arguments.
+   */
+  async execute(previewId: unknown, approved: unknown, opts?: {confirm?: (summary: string, detail: string) => Promise<boolean>}): Promise<unknown> {
     if (typeof previewId !== 'string' || previewId.length > 100) throw new Error('Preview id is invalid');
     if (typeof approved !== 'boolean') throw new Error('approved must be true or false');
     this.prune();
@@ -385,9 +390,10 @@ export class ActionService {
     const generation = this.generation;
     if (entry.ev.requiresApproval) {
       // A confirmation that throws (dialog error, destroyed window) is a refusal, never an approval.
-      const ok = await Promise.resolve(this.d.confirm?.(summary, this.detail(entry.ev.plan))).then((v) => v === true, () => false);
+      const confirm = opts?.confirm ?? this.d.confirm;
+      const ok = await Promise.resolve(confirm?.(summary, this.detail(entry.ev.plan))).then((v) => v === true, () => false);
       if (!ok) {
-        if (this.d.confirm) this.recordDecline();
+        if (confirm) this.recordDecline();
         await this.d.activity('action', `Declined in native confirmation: ${summary}`);
         return {executed: false, reason: 'Native confirmation declined or unavailable'};
       }

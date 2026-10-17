@@ -7,7 +7,7 @@ const call = <T>(method: CompanionMethod, ...args: unknown[]): Promise<T> => ipc
 
 contextBridge.exposeInMainWorld('companion', {
   state: () => call('companionState'),
-  ask: (text: string, token?: string) => (token === undefined ? call('companionAsk', text) : call('companionAsk', text, token)),
+  ask: (text: string, token?: string, withTarget?: boolean) => (withTarget === undefined ? (token === undefined ? call('companionAsk', text) : call('companionAsk', text, token)) : call('companionAsk', text, token, withTarget)),
   cancel: () => call('companionCancel'),
   undo: (id: string) => call('companionUndo', id),
   layout: (l: {bubble: {width: number; height: number} | null}) => call('companionLayout', l),
@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('companion', {
   dock: (target: 'bottom-left' | 'bottom-right' | 'left' | 'right' | 'top') => call('companionDock', target),
   gaze: (on: boolean) => call('companionGaze', on),
   setAppearance: (a: 'pet' | 'legacy-orb') => call('companionSetAppearance', a),
+  clearTarget: () => call('companionClearTarget'),
   openHub: (view: string, item?: string) => (item === undefined ? call('companionOpenHub', view) : call('companionOpenHub', view, item)),
   setMaterial: (m: 'none' | 'acrylic') => call('companionSetMaterial', m),
   regionBegin: () => call('regionBegin'),

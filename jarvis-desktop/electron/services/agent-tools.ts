@@ -1,6 +1,8 @@
 // The companion's tools. Each one wraps an existing, already-validated operation of the backend; none of them reaches the
-// network, the shell or the desktop. Reading saved data needs no prompt. Changing saved data (create_task) asks the
-// trusted native confirmation first (Cancel is the default), then reads the list back to verify the change.
+// network or the shell. Reading saved data needs no prompt. Changing saved data (create_task) asks the trusted native
+// confirmation first (Cancel is the default), then reads the list back to verify the change. Typing into another app
+// (type_into_app) exists only for the window the person was using when they opened the companion, and runs through the
+// desktop action service: preview, the trusted confirmation with the full text, then a re-check of that exact window.
 import type {AppState, Task} from '../../src/shared/contracts';
 import type {AgentTool, Citation, ToolOutcome} from './agent';
 import {searchState} from './search';
@@ -12,6 +14,11 @@ export type AgentToolDeps = {
   confirm: (summary: string, detail: string) => Promise<boolean>;
   /** Local calendar day, YYYY-MM-DD; the model is told today's date through this. */
   today: () => string;
+  /**
+   * The app window the person was using when they opened the companion, when they kept it attached. Without it there is
+   * no typing tool. `type` previews and executes one type-text action on exactly that window (confirmation included).
+   */
+  typing?: {target: {process: string; title: string}; type: (text: string) => Promise<{typed: true; chars: number} | {typed: false; reason: string}>};
 };
 
 const isPlainText = (s: string) => !/[\u0000-\u0008\u000b-\u001f\u007f]/.test(s);
@@ -156,6 +163,50 @@ function createTask(deps: AgentToolDeps): AgentTool<{title: string; due?: string
   };
 }
 
+export const MAX_TYPED_CHARS = 2000;
+
+function typeIntoApp(deps: AgentToolDeps & {typing: NonNullable<AgentToolDeps['typing']>}): AgentTool<{text: string}> {
+  const app = deps.typing.target.process.replace(/\.exe$/i, '');
+  return {
+    label: `Typing into ${app}`,
+    def: {
+      name: 'type_into_app',
+      description: `Type text at the cursor in the app the person was using before opening you (${app}). Use it only when the person asks you to write, insert or fill in text there. The person sees the exact text in a Windows confirmation and can cancel. It types plain text only: it cannot press shortcuts, click, read the app, or check what the app did with the text.`,
+      input_schema: {
+        type: 'object',
+        properties: {text: {type: 'string', description: `The exact text to type, at most ${MAX_TYPED_CHARS} characters. Line breaks are typed as Enter.`}},
+        required: ['text'],
+      },
+    },
+    validate(input) {
+      const t = input.text;
+      if (typeof t !== 'string' || !t.length || t.length > MAX_TYPED_CHARS || !isPlainText(t)) return {ok: false, error: `text must be 1 to ${MAX_TYPED_CHARS} characters of plain text`};
+      return {ok: true, value: {text: t}};
+    },
+    async run({text}, ctx): Promise<ToolOutcome> {
+      ctx.setPhase('awaiting-confirm', `Waiting for your answer in the Windows confirmation (typing into ${app})`);
+      if (ctx.signal.aborted) return {ok: false, phase: 'failed', content: 'Stopped before typing. Nothing was typed.', summary: 'Stopped before typing'};
+      const r = await deps.typing.type(text);
+      if (!r.typed) {
+        const declined = /declined|not approved|unavailable/i.test(r.reason);
+        return declined
+          ? {ok: true, phase: 'declined', content: 'Not confirmed: the person chose Cancel or the confirmation could not be shown. Nothing was typed.', summary: 'Not confirmed. Nothing was typed'}
+          : {ok: false, phase: 'failed', content: `Nothing was typed: ${r.reason}`, summary: `Not typed: ${r.reason.slice(0, 160)}`};
+      }
+      // Windows accepted the keystrokes for that exact window; the app's contents are not read back, so this is not verified.
+      return {
+        ok: true,
+        phase: 'done',
+        content: JSON.stringify({typed: true, characters: r.chars, verified: false, note: 'Windows accepted the input for the approved window. Its contents were not read back, so say that you typed it, not that it is saved or sent.'}),
+        summary: `Typed ${r.chars} character${r.chars === 1 ? '' : 's'} into ${app}. Not read back`,
+        verified: false,
+      };
+    },
+  };
+}
+
 export function createAgentTools(deps: AgentToolDeps): AgentTool[] {
-  return [searchSaved(deps), readSaved(deps), createTask(deps)] as AgentTool[];
+  const tools: AgentTool[] = [searchSaved(deps), readSaved(deps), createTask(deps)] as AgentTool[];
+  if (deps.typing) tools.push(typeIntoApp({...deps, typing: deps.typing}) as AgentTool);
+  return tools;
 }

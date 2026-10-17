@@ -71,6 +71,9 @@ test('companion arguments are checked before any handler runs', () => {
   assert.ok(check('companionAsk', ['x'.repeat(2001)]));
   assert.ok(check('companionAsk', ['ok', 'short']), 'region tokens are long random ids');
   assert.ok(check('companionAsk', [42]));
+  assert.equal(check('companionAsk', ['type it', undefined, true]), null, 'the remembered window is opted in per request');
+  assert.ok(check('companionAsk', ['type it', undefined, 'yes']));
+  assert.equal(check('companionClearTarget', []), null);
   assert.ok(check('companionCancel', ['extra']));
   assert.ok(check('companionOpenHub', ['developer']), 'only listed hub views');
   assert.equal(check('companionOpenHub', ['notes', 'n_123']), null);
