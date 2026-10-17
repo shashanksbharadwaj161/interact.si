@@ -1,4 +1,4 @@
-import {StrictMode, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
+import {StrictMode, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
 import {createRoot} from 'react-dom/client';
 import {AppearanceProvider} from '../src/ui/appearance-context';
 import {AnswerView, Bubble, Command, ErrorView, PlacementOptions, Working, type BubbleEdge, type ToolStep} from '../src/companion/surfaces';
@@ -12,7 +12,11 @@ import {PetSprite} from '../src/pet/PetSprite';
 import patternUrl from '../tests/fixtures/pet-test-pattern/spritesheet.png?inline';
 import patternManifestRaw from '../tests/fixtures/pet-test-pattern/pet.json?raw';
 import fontsRaw from './fonts/fonts.json?raw';
+import {createMicConsent} from '../src/ui/audio';
+import {VoiceSession, type VoiceRecorder} from '../src/voice/session';
+import {TalkButton, VoiceBar} from '../src/voice/VoiceBar';
 import '../src/styles/companion-bubble.css';
+import '../src/styles/voice.css';
 import '../src/styles/pet.css';
 import './fonts/fonts.css';
 import './board.css';
@@ -37,6 +41,73 @@ const ANSWER_STEPS = [
   step('b', 'done', 'Added “Re-pair the mesh”, due 2026-10-18', {verified: true, undo: {kind: 'task', id: 't1', label: 'Remove'}}),
   step('c', 'done', 'Typed 112 characters into notepad. Not read back', {verified: false}),
 ];
+/**
+ * Board only: a recorder that emits a scripted TEST level (a slow wave), never a microphone, and a backend that returns
+ * labelled sample text after a delay. They drive the real voice session and components so their states can be reviewed.
+ */
+function scriptedRecorder(): VoiceRecorder {
+  let timer = 0;
+  let t0 = 0;
+  const r: VoiceRecorder = {
+    async start() {
+      t0 = performance.now();
+      timer = window.setInterval(() => r.onLevel?.(0.4 + 0.35 * Math.sin((performance.now() - t0) / 170) * Math.sin((performance.now() - t0) / 610)), 60);
+    },
+    async stop() {
+      window.clearInterval(timer);
+      return {wav: [], durationMs: performance.now() - t0, peak: 0.4};
+    },
+    cancel() { window.clearInterval(timer); },
+  };
+  return r;
+}
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function boardVoice(): VoiceSession {
+  const consent = createMicConsent(null);
+  consent.grant();
+  return new VoiceSession({
+    backend: {
+      transcribe: async () => { await wait(1600); return {text: 'Sample transcript (board: no recognizer ran)'}; },
+      speak: async () => { await wait(60_000); return {ok: true}; },
+      stopSpeaking: async () => true,
+      cancelTranscribe: async () => true,
+    },
+    consent,
+    support: {supported: true},
+    caps: () => ({stt: {available: true}, tts: {available: true}}),
+    createRecorder: scriptedRecorder,
+  });
+}
+
+/** The island's voice row as Codex would place it in the bubble: compact bar plus Talk, from src/voice. */
+function VoiceScene({start}: {start: 'listening' | 'speaking'}) {
+  const [voice] = useState(boardVoice);
+  const snap = useSyncExternalStore(voice.subscribe, voice.getSnapshot);
+  const [last, setLast] = useState<string | null>(null);
+  useEffect(() => {
+    voice.onTranscript = (t) => setLast(t.text);
+    if (start === 'listening') void voice.startListening();
+    else void voice.speak('Your router note says: hold the reset pin for ten seconds.', {key: 'board'});
+    return () => voice.release();
+  }, [voice, start]);
+  return (
+    <div className="cmd">
+      <div className="b-head">
+        <div className="b-title">
+          <strong>{start === 'listening' ? 'Voice: listening' : 'Voice: reading the answer'}</strong>
+          <span className="b-meta">Real components; scripted test level and sample text</span>
+        </div>
+      </div>
+      <VoiceBar voice={voice} snap={snap} voiceName="Windows default voice" compact />
+      {snap.phase === 'idle' && <p className="b-meta">{last ? `Placed for review: “${last}”` : snap.note?.text ?? 'At rest. Talk starts listening.'}</p>}
+      <div className="b-foot">
+        <span className="b-meta">Level: scripted test signal, not a microphone.</span>
+        <TalkButton voice={voice} snap={snap} block={voice.blocks().listen} />
+      </div>
+    </div>
+  );
+}
+
 const WORK_STEPS = [step('a', 'done', 'Found 2 saved items for “invoice”', {verified: true}), step('b', 'awaiting-confirm', 'Waiting for your answer in the Windows confirmation (typing into notepad)')];
 const noop = () => undefined;
 
@@ -316,7 +387,7 @@ function Board() {
         </div>
       </Section>
 
-      <Section id="surfaces" title="Resting, listening, working and answering" lede="Sample content, real components. Voice is not built yet: the listening bubble is a proposal and is marked so.">
+      <Section id="surfaces" title="Resting, listening, working and answering" lede="Sample content, real components. The voice scenes run the real voice session (src/voice) with a scripted test level and labelled sample text: no microphone, recognizer or voice is used on this board.">
         <div className="desk">
           <div className="scene rest">
             <span className="scene-label">Resting: only the character, nothing moving but its idle</span>
@@ -331,25 +402,15 @@ function Board() {
             </Bubble>
           </div>
           <div className="scene">
-            <span className="scene-label">Listening (proposal: voice is not built)</span>
-            <Bubble surface="listening" side="left" edge="waiting" label="Listening proposal">
-              <div className="cmd">
-                <div className="b-head">
-                  <div className="b-title">
-                    <strong>I'm listening</strong>
-                    <span className="b-meta">Microphone on · measured level only · Esc stops</span>
-                  </div>
-                </div>
-                <div className="meter" aria-hidden>
-                  {[0.2, 0.5, 0.8, 0.6, 0.3, 0.7, 0.4, 0.25, 0.55, 0.35].map((v, i) => (
-                    <span key={i} style={{height: `${12 + v * 26}px`}} />
-                  ))}
-                </div>
-                <div className="b-foot">
-                  <span className="b-meta">Proposal: the level bars would come from the real microphone, never an animation.</span>
-                  <button type="button" className="stop">Stop</button>
-                </div>
-              </div>
+            <span className="scene-label">Listening: compact voice bar and Talk (scripted test level)</span>
+            <Bubble surface="listening" side="left" edge="waiting" label="Listening">
+              <VoiceScene start="listening" />
+            </Bubble>
+          </div>
+          <div className="scene">
+            <span className="scene-label">Reading the answer aloud, with Stop (sample, no voice plays)</span>
+            <Bubble surface="answer" side="left" edge="done" label="Reading aloud">
+              <VoiceScene start="speaking" />
             </Bubble>
           </div>
           <div className="scene">

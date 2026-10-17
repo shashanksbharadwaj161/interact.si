@@ -25,6 +25,12 @@ export const COMPANION_METHODS = [
   'companionClearTarget',
   'companionOpenHub',
   'companionSetMaterial',
+  // Voice, island only: the same local Windows speech as the hub (backend CompanionVoice), stopped on bubble close.
+  'companionVoiceStatus',
+  'companionTranscribe',
+  'companionTranscribeCancel',
+  'companionSpeak',
+  'companionSpeechStop',
   'regionBegin',
   'regionDiscard',
   'overlayImage',
@@ -37,6 +43,9 @@ export const OVERLAY_METHODS: readonly CompanionMethod[] = ['overlayImage', 'ove
 export const companionChannel = (m: CompanionMethod) => `${COMPANION_CHANNEL_PREFIX}${m}`;
 
 const TOKEN: ArgSpec = {kind: 'string', min: 16, max: 64};
+/** The hub's transcribe/speak bounds (LIMITS in services/validation.ts), repeated so this file stays pure; a test keeps them equal. */
+export const COMPANION_WAV_MAX = 44 + 480_000 * 2 + 1024;
+export const COMPANION_SPEAK_MAX = 4000;
 export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = {
   companionState: [],
   // text, region token, and whether the page showed the remembered app window and the person kept it attached.
@@ -53,6 +62,11 @@ export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = 
   companionClearTarget: [],
   companionOpenHub: [{kind: 'enum', values: ['home', 'assistant', 'notes', 'tasks', 'capsules', 'search', 'companion', 'settings']}, {kind: 'string', min: 1, max: 64, optional: true}],
   companionSetMaterial: [{kind: 'enum', values: ['none', 'acrylic']}],
+  companionVoiceStatus: [],
+  companionTranscribe: [{kind: 'numbers', max: COMPANION_WAV_MAX}],
+  companionTranscribeCancel: [],
+  companionSpeak: [{kind: 'string', min: 1, max: COMPANION_SPEAK_MAX}],
+  companionSpeechStop: [],
   regionBegin: [],
   regionDiscard: [TOKEN],
   overlayImage: [],
@@ -285,4 +299,13 @@ export function sendSize(crop: {width: number; height: number}, maxEdge = REGION
   if (long <= maxEdge) return {width: crop.width, height: crop.height};
   const k = maxEdge / long;
   return {width: Math.max(1, Math.round(crop.width * k)), height: Math.max(1, Math.round(crop.height * k))};
+}
+
+/**
+ * Whether a media permission request may be granted: microphone audio only (never camera or screen), and only for the
+ * hub page or the companion island itself. The selection overlay and every other page are refused.
+ */
+export function mediaPermissionAllowed(o: {permission: string; mediaTypes?: readonly string[]; hubPage: boolean; islandPage: boolean}): boolean {
+  const audioOnly = o.permission === 'media' && !!o.mediaTypes?.length && o.mediaTypes.every((t) => t === 'audio');
+  return audioOnly && (o.hubPage || o.islandPage);
 }

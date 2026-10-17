@@ -223,6 +223,6 @@ test('Assistant.tsx wires the dictation preview, confirm and cancel paths', () =
   assert.match(src, /onClick=\{\(\) => onUse\(cleaned\.text, 'cleaned'\)\}/);
   assert.match(src, /onClick=\{\(\) => onUse\(original, 'original'\)\}/);
   // The AI result replaces the preview only; it never calls setInput directly.
-  const comp = src.slice(src.indexOf('export function DictationCleanup'), src.indexOf('function LevelMeter'));
+  const comp = src.slice(src.indexOf('export function DictationCleanup'), src.indexOf('export function Assistant('));
   assert.ok(comp.length > 0 && !comp.includes('setInput'));
 });

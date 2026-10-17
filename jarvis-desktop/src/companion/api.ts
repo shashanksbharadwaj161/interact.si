@@ -9,6 +9,8 @@ export type DockTarget = 'bottom-left' | 'bottom-right' | 'left' | 'right' | 'to
 export type TypingTarget = {process: string; title: string};
 export type CompanionStatus = {readiness: Readiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock; target: TypingTarget | null; reduceMotion?: boolean};
 export type Box = {x: number; y: number; width: number; height: number};
+/** The island's voice engines (local Windows speech; `cloud` is always false). */
+export type CompanionVoiceStatus = {stt: {available: boolean; reason?: string}; tts: {available: boolean; reason?: string}; voice: string | null; speaking: boolean; transcribing: boolean; cloud: false};
 export type PlacementEvent = {type: 'placement'; window: Box; pet: Box; bubble: Box | null; side: 'left' | 'right' | 'above' | 'below' | null; size: number; dock: Dock};
 export type RegionEvent = {type: 'region'; token: string; preview: string; width: number; height: number; sourceScale: number};
 export type CompanionPush =
@@ -38,6 +40,12 @@ export interface CompanionApi {
   clearTarget(): Promise<boolean>;
   openHub(view: 'home' | 'assistant' | 'notes' | 'tasks' | 'capsules' | 'search' | 'companion' | 'settings', item?: string): Promise<boolean>;
   setMaterial(m: 'none' | 'acrylic'): Promise<MaterialState>;
+  /** Voice (island only). Same local Windows speech as the hub; closing the bubble stops the island's speech and transcription. */
+  voiceStatus(): Promise<CompanionVoiceStatus>;
+  transcribe(wav: number[]): Promise<{text: string; reason?: string; cancelled?: boolean}>;
+  transcribeCancel(): Promise<boolean>;
+  speak(text: string): Promise<{ok: boolean; reason?: string}>;
+  speechStop(): Promise<boolean>;
   regionBegin(): Promise<{ok: true} | {ok: false; reason: string}>;
   regionDiscard(token: string): Promise<boolean>;
   overlayImage(): Promise<{dataUrl: string; width: number; height: number} | null>;

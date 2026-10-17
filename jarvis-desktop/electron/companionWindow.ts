@@ -259,6 +259,8 @@ export function createCompanion(deps: CompanionDeps) {
   }
   const onLock = () => { gazeLocked = true; updateGaze(); };
   const onUnlock = () => { gazeLocked = false; updateGaze(); };
+  /** Backstop for the page's own release: closing the bubble or the island ends the island's speech and transcription. */
+  const stopVoice = () => { deps.backend.companion.voice.stop(); deps.backend.companion.voice.cancelTranscribe(); };
 
   function applyMaterial(want: 'none' | 'acrylic') {
     prefs.material = want;
@@ -306,6 +308,7 @@ export function createCompanion(deps: CompanionDeps) {
       // A new window starts closed and forgets the remembered app window.
       bubble = null;
       target = null;
+      stopVoice();
       updateGaze();
     });
     win.on('show', () => {win.webContents.setBackgroundThrottling(false); updateGaze();});
@@ -476,6 +479,7 @@ export function createCompanion(deps: CompanionDeps) {
       place();
       // Closing the bubble gives the keyboard back: Windows activates the window the person was using before.
       if (!bubble && alive()) {
+        stopVoice();
         if (target) { target = null; send({type: 'target', target: null}); }
         if (island!.isFocused()) island!.blur();
         setRestFocus(true);
@@ -512,6 +516,11 @@ export function createCompanion(deps: CompanionDeps) {
       return true;
     },
     companionSetMaterial: (m: 'none' | 'acrylic') => { applyMaterial(m); return material; },
+    companionVoiceStatus: () => deps.backend.companion.voice.status(),
+    companionTranscribe: (audio: number[]) => deps.backend.companion.voice.transcribe(audio),
+    companionTranscribeCancel: () => deps.backend.companion.voice.cancelTranscribe(),
+    companionSpeak: (text: string) => deps.backend.companion.voice.speak(text),
+    companionSpeechStop: () => deps.backend.companion.voice.stop(),
     regionBegin: () => regionBegin(),
     regionDiscard: (token: string) => regions.delete(token),
     overlayImage: () => overlayImage(),
@@ -551,6 +560,7 @@ export function createCompanion(deps: CompanionDeps) {
 
   function dispose() {
     run?.abort();
+    stopVoice();
     bubble = null;
     target = null;
     if (drag) { clearInterval(drag.timer); drag = null; }
@@ -588,6 +598,8 @@ export function createCompanion(deps: CompanionDeps) {
     show: () => { if (!alive()) createIsland(); else island!.showInactive(); },
     hide: () => island?.hide(),
     isVisible: () => !!island && !island.isDestroyed() && island.isVisible(),
+    /** True only for the island page itself (trusted URL, the island's own webContents), never the selection overlay. */
+    isIsland: (wc: Electron.WebContents | null | undefined, url: string) => !!wc && !!island && !island.isDestroyed() && wc.id === island.webContents.id && trusted(url),
     dispose,
   };
 }

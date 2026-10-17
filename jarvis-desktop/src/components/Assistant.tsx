@@ -8,7 +8,7 @@ import { AiSetup } from './AiSetup';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { Badge, Button, Notice, Panel, Segmented, Spinner, Switch, Tabs } from '../ui/primitives';
 import '../styles/assistant.css';
-import { ClipRecorder, MAX_CLIP_MS, bindLevel, createMicConsent, defaultConsentStorage, micErrorMessage, micSupport, remainingMs } from '../ui/audio';
+import { MAX_CLIP_MS, createMicConsent, defaultConsentStorage } from '../ui/audio';
 import { actionOutcome, listedWindows, type ActionOutcome } from '../ui/action-result';
 import { useCompanion } from '../ui/companion';
 import { usePref } from '../ui/prefs';
@@ -17,11 +17,16 @@ import { HISTORY_PREF_KEY, chatToConversation, conversationToMarkdown, exportCon
 import { DICTATION_STYLES, buildDictationCleanupRequest, cleanTranscriptOffline, describeChanges, describeDestination, runDictationCleanup, type DictationStyle } from '../ui/dictation-cleanup';
 import { useReady } from '../ui/store';
 import { cx, errMsg, fmtTime, truncate } from '../ui/util';
+import { hubVoiceBackend } from '../voice/backends';
+import type { Transcript, VoicePhase } from '../voice/session';
+import { useVoiceSession } from '../voice/useVoiceSession';
+import { HOLD_MS, VoiceBar, usePushToTalk } from '../voice/VoiceBar';
+import '../styles/voice.css';
 
 type RecPhase = 'idle' | 'starting' | 'recording' | 'transcribing';
 type DrawerTab = 'history' | 'voice' | 'context' | 'actions';
 type ComposerMode = 'chat' | 'command';
-const HOLD_MS = 400;
+const MIC_CONSENT_HINT = 'Turn on "Allow the microphone" in the microphone panel first. Nothing is recorded until you do.';
 const MAX_CHARS = 4000;
 /** Mirrors the backend planner limit (typed text limit + 200). */
 export const MAX_COMMAND_CHARS = 2200;
@@ -737,16 +742,6 @@ export function DictationCleanup({ api, mode, original, aiBlocked, onUse, onDism
   );
 }
 
-function LevelMeter({ level, active }: { level: number; active: boolean }) {
-  return (
-    <div className={cx('meter', active && 'on')} aria-hidden="true">
-      {Array.from({ length: 14 }, (_, i) => (
-        <i key={i} className={active && level * 14 > i ? 'lit' : ''} style={{ height: `${30 + ((i * 37) % 50)}%` }} />
-      ))}
-    </div>
-  );
-}
-
 /** `initialDraft` (the route's `draft` parameter) only fills the message box. Nothing is sent until the user presses Send. */
 export function Assistant({ initialDraft, initialSetup }: { initialDraft?: string; initialSetup?: boolean } = {}) {
   const { api, state, settings, cloudConfigured, run, toast, reload, system, systemLoading, systemError, refreshSystem } = useReady();
@@ -759,13 +754,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const unsubRef = useRef<(() => void) | null>(null);
   const streamMounted = useRef(true);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<RecPhase>('idle');
-  const [level, setLevel] = useState(0);
   /** In-app microphone consent: separate from the Windows permission, off until the user turns it on here, never granted on load. */
   const consent = useMemo(() => createMicConsent(defaultConsentStorage()), []);
-  const [micAllowed, setMicAllowedState] = useState(() => consent.granted());
-  const support = useMemo(() => micSupport(), []);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [drawer, setDrawer] = useState<DrawerTab | null>(null);
   const [setupOpen, setSetupOpen] = useState(Boolean(initialSetup));
   /** The microphone panel beside Talk (consent and why Talk is off). Closed by default; Talk's tooltip carries the same reason. */
@@ -775,7 +765,6 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const [dictation, setDictation] = useState<{ n: number; text: string } | null>(null);
   const [autoSpeak, setAutoSpeak] = usePref('autoSpeak', false);
   const [speakText, setSpeakText] = useState('');
-  const [speaking, setSpeaking] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [mode, setMode] = useState<ComposerMode>('chat');
@@ -794,17 +783,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const [announce, setAnnounce] = useState({ n: 0, text: '' });
   const say = (text: string) => { if (text) setAnnounce((a) => ({ n: a.n + 1, text: a.n % 2 ? text : text + '\u00a0' })); };
 
-  const recorder = useRef<ClipRecorder | null>(null);
-  const phaseRef = useRef<RecPhase>('idle');
-  const pressAt = useRef(0);
-  const pendingStop = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
-
-  const setPhaseBoth = (p: RecPhase) => {
-    phaseRef.current = p;
-    setPhase(p);
-  };
 
   // Follow new text only while the reader is at the end; scrolling up to read stops the log from jumping away.
   useEffect(() => {
@@ -830,11 +810,9 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     if (l) void api.chatStreamCancel?.(l.streamId).catch(() => undefined);
   }; }, [api]);
 
+  // Leaving the Assistant: useVoiceSession closes the microphone, discards a transcription and stops read-aloud; the companion rests.
   useEffect(
     () => () => {
-      const r = recorder.current;
-      recorder.current = null;
-      r?.cancel();
       companion.set('idle');
       companion.setSource('none');
     },
@@ -883,31 +861,64 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const replyBusy = pending !== null || live !== null || settling;
   const ttsReason = unavailable(tts?.reason), sttReason = unavailable(stt?.reason);
 
+  // Voice: one session owns the microphone, local transcription and read-aloud for this page (src/voice/session.ts).
+  const voiceBackend = useMemo(() => hubVoiceBackend(api), [api]);
+  /** A finished transcript goes into the message box for review; it is never sent from here. */
+  const onTranscript = (out: Transcript) => {
+    setInput((prev) => (prev.trim() ? `${prev.trim()} ${out.text.trim()}` : out.text.trim()).slice(0, MAX_CHARS));
+    setVoiceNote({ tone: out.hint ? 'warn' : 'info', text: `Transcript added to the message box. Review it, then send.${out.hint ? ` ${out.hint}` : ''}` });
+    setDictation((d) => ({ n: (d?.n ?? 0) + 1, text: out.text.trim() }));
+    inputRef.current?.focus();
+  };
+  const { voice, snap, blocks, support } = useVoiceSession({
+    backend: voiceBackend,
+    caps: { stt: { available: sttReady, reason: sttReason }, tts: { available: ttsReady, reason: ttsReason } },
+    consent,
+    consentHint: MIC_CONSENT_HINT,
+    onTranscript,
+  });
+  /** The recording phase as the composer shows it. Read-aloud is not a recording: Talk stays available and interrupts it. */
+  const phase: RecPhase = snap.phase === 'listening' ? 'recording' : snap.phase === 'speaking' ? 'idle' : snap.phase;
+  const micAllowed = snap.consent;
+  const voiceName = settings.voice || 'Windows default voice';
   const speak = useCallback(
-    async (text: string) => {
-      const t = text.trim();
-      if (!t) return;
-      if (!ttsReady) {setVoiceNote({tone:'warn', text:ttsReason});return;}
-      setSpeaking(true);
-      companion.set('speaking');
-      try {
-        const r = await api.speak(t.slice(0, 2000));
-        if (!r.ok) {
-          setVoiceNote({ tone: 'warn', text: r.reason ?? 'Speech playback is not available.' });
-          companion.set('idle');
-        } else {
-          setVoiceNote(null);
-          companion.set('idle');
-        }
-      } catch (e) {
-        setVoiceNote({ tone: 'danger', text: errMsg(e) });
-        companion.set('alert', 3000);
-      } finally {
-        setSpeaking(false);
-      }
+    (text: string, key?: string) => {
+      setVoiceNote(null);
+      void voice.speak(text, { key });
     },
-    [api, companion, ttsReady, ttsReason],
+    [voice],
   );
+  /** Read-aloud that starts by itself (Read replies aloud) never interrupts a recording or another reading. */
+  const autoRead = (m: ChatMessage) => { if (autoSpeak && ttsReady && voice.getSnapshot().phase === 'idle') speak(m.text, m.id); };
+
+  // The companion follows the real voice state; the live region says it in words.
+  const lastPhase = useRef<VoicePhase>('idle');
+  useEffect(() => {
+    const was = lastPhase.current;
+    lastPhase.current = snap.phase;
+    if (snap.phase === 'listening') {
+      companion.set('listening');
+      companion.setSource('microphone');
+      say('Listening. Press Talk again to stop, or Escape to cancel.');
+    } else if (snap.phase === 'transcribing') {
+      companion.set('transcribing');
+      companion.setSource('none');
+      say('Transcribing on this computer.');
+    } else if (snap.phase === 'speaking') {
+      companion.set('speaking');
+    } else if (snap.phase === 'idle' && was !== 'idle') {
+      companion.setSource('none');
+      if (snap.note && snap.note.tone !== 'info') companion.set('alert', 3000);
+      else companion.set('idle');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snap.phase]);
+  // The real microphone level drives the shared companion amplitude (the session only emits while listening).
+  const setCompanionLevel = companion.setLevel;
+  useEffect(() => voice.subscribeLevel((l) => setCompanionLevel(l)), [voice, setCompanionLevel]);
+  // A newer session note replaces an older page note, so the two never contradict each other.
+  useEffect(() => { if (snap.note) setVoiceNote(null); }, [snap.note]);
+  const shownVoiceNote = voiceNote ?? snap.note;
 
   const plannerReady = typeof api.planIntent === 'function';
   const localRoute = capability('local-llm');
@@ -968,7 +979,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
       const reply = await api.chat(text);
       await reload().catch(() => undefined);
       if(reply.source==='system'){companion.set('alert',4000);void refreshSystem();}
-      else {companion.set('idle');if(autoSpeak&&ttsReady)void speak(reply.text);}
+      else {companion.set('idle');autoRead(reply);}
     } catch (e) {
       setSendError(errMsg(e, 'The assistant could not answer.'));
       companion.set('alert', 4000);
@@ -1001,7 +1012,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
       return;
     }
     companion.set('idle');
-    if (final.outcome === 'complete' && autoSpeak && ttsReady) void speak(final.reply.text);
+    if (final.outcome === 'complete') autoRead(final.reply);
   };
 
   const sendStreamed = async (text: string, fromComposer: boolean) => {
@@ -1060,98 +1071,6 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     }
   };
 
-  const startRec = async () => {
-    if (phaseRef.current !== 'idle') return;
-    if (!sttReady) {setVoiceNote({tone:'warn', text:sttReason});return;}
-    if (!support.supported) {setVoiceNote({tone:'warn', text:support.reason ?? 'Microphone capture is not available in this window.'});return;}
-    if (!consent.granted()) {setVoiceNote({tone:'warn', text:'Turn on "Allow the microphone" in the microphone panel first. Nothing was recorded.'});return;}
-    pendingStop.current = false;
-    setVoiceNote(null);
-    setPhaseBoth('starting');
-    const r = new ClipRecorder({ consent });
-    recorder.current = r;
-    // The real analyser level drives both the local meter and the shared companion/avatar amplitude, only while this recorder is the live one.
-    bindLevel(r, () => recorder.current, (l) => {
-      const q = Math.round(l * 20) / 20;
-      setLevel(q);
-      companion.setLevel(q);
-    });
-    r.onLimit = () => void stopRec();
-    r.onDeviceLost = () => {
-      setVoiceNote({ tone: 'warn', text: 'The microphone was disconnected. Whatever was captured is being transcribed.' });
-      void stopRec();
-    };
-    const t0 = performance.now();
-    try {
-      await r.start();
-    } catch (e) {
-      if (recorder.current !== r) return;
-      recorder.current = null;
-      setPhaseBoth('idle');
-      setLevel(0);
-      companion.setSource('none');
-      setVoiceNote({ tone: 'warn', text: micErrorMessage(e) });
-      return;
-    }
-    if (recorder.current !== r || !consent.granted()) { r.cancel(); return; }
-    setPhaseBoth('recording');
-    setElapsedMs(0);
-    companion.set('listening');
-    companion.setSource('microphone');
-    // A release during a long permission prompt is not a deliberate "stop": stay recording until the next tap.
-    if (pendingStop.current && performance.now() - t0 < 1000) void stopRec();
-  };
-
-  const stopRec = async () => {
-    if (phaseRef.current === 'starting') {
-      pendingStop.current = true;
-      return;
-    }
-    const r = recorder.current;
-    if (phaseRef.current !== 'recording' || !r) return;
-    setPhaseBoth('transcribing');
-    companion.set('transcribing');
-    companion.setSource('none');
-    try {
-      const clip = await r.stop();
-      if (recorder.current !== r || !consent.granted()) return;
-      const out = await api.transcribe(clip.wav);
-      if (recorder.current !== r || !consent.granted()) return;
-      if (out.text.trim()) {
-        setInput((prev) => (prev.trim() ? `${prev.trim()} ${out.text.trim()}` : out.text.trim()).slice(0, MAX_CHARS));
-        setVoiceNote({ tone: 'info', text: 'Transcript added to the message box. Review it, then send.' });
-        setDictation((d) => ({ n: (d?.n ?? 0) + 1, text: out.text.trim() }));
-        inputRef.current?.focus();
-        companion.set('idle');
-      } else {
-        setVoiceNote({ tone: 'warn', text: out.reason ?? 'No speech was recognized.' });
-        companion.set('idle');
-      }
-    } catch (e) {
-      if (recorder.current !== r) return;
-      setVoiceNote({ tone: 'warn', text: errMsg(e, 'Transcription failed.') });
-      companion.set('alert', 3000);
-    } finally {
-      if (recorder.current === r) {
-        recorder.current = null;
-        setPhaseBoth('idle');
-        setLevel(0);
-      }
-    }
-  };
-
-  const cancelRec = () => {
-    if (phaseRef.current !== 'idle') {
-      recorder.current?.cancel();
-      recorder.current = null;
-      setPhaseBoth('idle');
-      setLevel(0);
-      companion.set('idle');
-      companion.setSource('none');
-      setVoiceNote({ tone: 'info', text: 'Recording cancelled. Any pending transcript will be discarded.' });
-    }
-  };
-
   /** Explicit "Use cleaned"/"Use original": swaps the transcript already placed in the message box, or adds it if it is gone. */
   const applyDictation = (text: string, which: 'cleaned' | 'original') => {
     const original = dictation?.text ?? '';
@@ -1166,18 +1085,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     inputRef.current?.focus();
   };
 
-  const press = () => {
-    if (phaseRef.current === 'recording') {
-      void stopRec();
-      return;
-    }
-    pressAt.current = performance.now();
-    void startRec();
-  };
-  const release = () => {
-    if (phaseRef.current === 'idle' || phaseRef.current === 'transcribing') return;
-    if (performance.now() - pressAt.current > HOLD_MS) void stopRec();
-  };
+  /** Talk: an explicit press starts listening (and interrupts read-aloud); a second press, or letting go after a hold, stops. */
+  const ptt = usePushToTalk(voice, { holdMs: HOLD_MS, onStart: () => setVoiceNote(null) });
 
   const doClear = async () => {
     setClearing(true);
@@ -1186,24 +1095,11 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     if (ok !== undefined) setConfirmClear(false);
   };
 
-  const setMicAllowed = (v: boolean) => {
-    if (v) consent.grant();
-    else {
-      cancelRec();
-      consent.revoke();
-    }
-    setMicAllowedState(v);
-  };
+  /** The in-app consent switch. Turning it off cancels any recording or transcription at once. */
+  const setMicAllowed = (v: boolean) => voice.setConsent(v);
 
-  // Elapsed time while recording, for the remaining-seconds hint. The recorder enforces the limit itself.
-  useEffect(() => {
-    if (phase !== 'recording') return;
-    const t0 = performance.now();
-    const id = window.setInterval(() => setElapsedMs(performance.now() - t0), 250);
-    return () => window.clearInterval(id);
-  }, [phase]);
-
-  const micBlocked = !support.supported ? support.reason ?? 'Microphone capture is not available in this window.' : !micAllowed ? 'Turn on "Allow the microphone" in the microphone panel first. Nothing is recorded until you do.' : null;
+  const listenBlock = blocks.listen;
+  const micBlocked = listenBlock && (listenBlock.code === 'device' || listenBlock.code === 'consent') ? listenBlock.reason : null;
   const blocker = sendBlocker({ mode, text: input, locked: sendLock.current, pending: pending !== null, live: live !== null, settling, transcribing: phase === 'transcribing', configured, routeReason, plannerReady, stepBusy: stepBusy !== null });
   const recLabel = phase === 'recording' ? 'Recording, release or tap to stop' : phase === 'starting' ? 'Starting microphone…' : phase === 'transcribing' ? 'Transcribing…' : 'Hold to talk';
   const noDot = (t: string) => t.replace(/[.\s]+$/, '');
@@ -1336,11 +1232,15 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                         {m.role === 'assistant' && <Badge tone={m.source === 'local' ? 'muted' : 'accent'}>{m.source === 'cloud' ? (online ? providerName : 'Cloud model') : sourceLabel(m.source)}</Badge>}
                         {incomplete.has(m.id) && <Badge tone="warn">Incomplete</Badge>}
                         <time dateTime={m.createdAt}>{fmtTime(m.createdAt)}</time>
-                        {m.role === 'assistant' && (
-                          <button type="button" className="iconbtn" aria-label="Read this reply aloud" disabled={speaking || !ttsReady} title={ttsReady ? 'Read aloud' : ttsReason} onClick={() => void speak(m.text)}>
+                        {m.role === 'assistant' && (snap.speaking?.key === m.id ? (
+                          <button type="button" className="iconbtn vx-reading" aria-label="Stop reading this reply" disabled={!snap.speaking.stoppable} title={snap.speaking.stoppable ? 'Stop reading' : 'Stop is not available in this window'} onClick={() => void voice.stopSpeaking()}>
+                            <Stop size={15} weight="fill" aria-hidden />
+                          </button>
+                        ) : (
+                          <button type="button" className="iconbtn" aria-label="Read this reply aloud" disabled={!ttsReady || phase !== 'idle'} title={ttsReady ? 'Read aloud' : ttsReason} onClick={() => speak(m.text, m.id)}>
                             <SpeakerHigh size={15} aria-hidden />
                           </button>
-                        )}
+                        ))}
                       </header>
                       <MessageText text={m.text} />
                     </article>
@@ -1419,10 +1319,12 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                 onAiFinished={() => { void reload().catch(() => undefined); }}
               />
             )}
-            {voiceNote && <div aria-live="polite"><Notice tone={voiceNote.tone}>{voiceNote.text}</Notice></div>}
+            {shownVoiceNote && <div aria-live="polite"><Notice tone={shownVoiceNote.tone}>{shownVoiceNote.text}</Notice></div>}
           </div>
 
           <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announce.text}</div>
+
+          <VoiceBar voice={voice} snap={snap} voiceName={voiceName} />
 
           <form
             className={cx('composer', mode === 'command' && 'is-command')}
@@ -1451,6 +1353,10 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                 } else if (e.key === 'Escape' && liveRef.current && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   void stopStream();
+                } else if (e.key === 'Escape' && !e.nativeEvent.isComposing && snap.phase !== 'idle') {
+                  e.preventDefault();
+                  if (snap.phase === 'speaking') void voice.stopSpeaking();
+                  else voice.cancel();
                 }
               }}
             />
@@ -1472,40 +1378,12 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                   aria-pressed={phase === 'recording'}
                   aria-label={recLabel}
                   title={micBlocked ?? (sttReady ? 'Hold to record, or tap once to start and again to stop. Esc cancels.' : sttReason)}
-                  disabled={phase === 'transcribing' || replyBusy || (phase === 'idle' && (!sttReady || micBlocked !== null))}
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                    press();
-                  }}
-                  onPointerUp={release}
-                  onPointerCancel={cancelRec}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') cancelRec();
-                    if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
-                      e.preventDefault();
-                      press();
-                    }
-                  }}
-                  onKeyUp={(e) => {
-                    if (e.key === ' ' || e.key === 'Enter') {
-                      e.preventDefault();
-                      release();
-                    }
-                  }}
-                  onClick={(e) => {
-                    if (e.detail === 0) press();
-                  }}
+                  disabled={phase === 'transcribing' || (phase === 'idle' && (replyBusy || !sttReady || micBlocked !== null))}
+                  {...ptt.handlers}
                 >
                   {phase === 'transcribing' || phase === 'starting' ? <Spinner size={16} /> : phase === 'recording' ? <Stop size={16} weight="fill" aria-hidden /> : <Microphone size={16} aria-hidden />}
                   <span>{phase === 'recording' ? 'Stop' : phase === 'transcribing' ? 'Transcribing' : 'Talk'}</span>
                 </button>
-                {phase === 'recording' && (
-                  <>
-                    <LevelMeter level={level} active />
-                    <span className="voice-time" aria-live="polite">{Math.ceil(remainingMs(elapsedMs) / 1000)} s left</span>
-                    <Button size="sm" variant="quiet" onClick={cancelRec}>Cancel</Button>
-                  </>
-                )}
               </div>
               {phase === 'idle' && (
                 <details className="voice-pop" open={micPanel} onToggle={(e) => setMicPanel(e.currentTarget.open)}>
@@ -1564,9 +1442,13 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                     <label htmlFor="speak-text">Speak this text</label>
                     <textarea id="speak-text" className="input" rows={2} maxLength={2000} value={speakText} onChange={(e) => setSpeakText(e.target.value)} placeholder="Type something to hear it" />
                   </div>
-                  <div className="row">
-                    <Button icon={SpeakerHigh} busy={speaking} disabled={!speakText.trim() || !ttsReady} onClick={() => void speak(speakText)}>Speak</Button>
-                    <span className="sub">Voice: {settings.voice || 'Windows default'}. There is no stop control for playback yet.</span>
+                  <div className="row wrap">
+                    {snap.speaking?.key === 'speak-text' ? (
+                      <Button icon={Stop} disabled={!snap.speaking.stoppable} onClick={() => void voice.stopSpeaking()}>Stop</Button>
+                    ) : (
+                      <Button icon={SpeakerHigh} disabled={!speakText.trim() || !ttsReady || phase !== 'idle'} onClick={() => speak(speakText, 'speak-text')}>Speak</Button>
+                    )}
+                    <span className="sub">Voice: {settings.voice || 'Windows default'}. Read on this computer by Windows speech; nothing is sent online. Stop, Esc or Talk ends it.</span>
                   </div>
                 </section>
               </div>
