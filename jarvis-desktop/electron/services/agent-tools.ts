@@ -201,6 +201,9 @@ function typeIntoApp(deps: AgentToolDeps & {typing: NonNullable<AgentToolDeps['t
       if (!r.typed) {
         const total = [...text].length;
         if (r.stage === 'during') {
+          if (r.chars === undefined) return {ok: false, phase: 'failed', verified: false,
+            content: JSON.stringify({typed: 'unknown amount', reason: r.reason, note: 'Input was interrupted without a receipt. Some text may have reached the app. Do not retry automatically; ask the person to check.'}),
+            summary: `Input stopped. Some text may have reached ${app}; the count is unavailable. Check the app before retrying`};
           const n = r.chars ?? 0;
           return {
             ok: false,

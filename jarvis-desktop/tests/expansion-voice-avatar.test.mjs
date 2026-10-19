@@ -357,7 +357,7 @@ function fakeStore({ stt = true, consentStored = false } = {}) {
   globalThis.__fakeStore = () => ({
     api: { getApiInfo: async () => ({ features: [] }), transcribe: async () => { throw new Error('must not run'); } },
     state: { chat: [] },
-    settings: { mode: 'offline', localModel: 'm', localEndpoint: 'http://127.0.0.1:1', voice: '' },
+    settings: { mode: 'offline', localModel: 'm', localEndpoint: 'http://127.0.0.1:1', voice: '', voiceInput: consentStored },
     cloudConfigured: false, run: async () => undefined, toast: () => undefined, reload: async () => undefined,
     system: { capabilities: [cap('local-llm', true), cap('tts', false, 'Not checked'), cap('stt', stt, stt ? undefined : 'Windows speech is unavailable here'), cap('intent-planner', true)] },
     systemLoading: false, systemError: null, refreshSystem: async () => undefined,
@@ -395,7 +395,7 @@ test('on load the Assistant renders with consent off, the talk button disabled a
   }
 });
 
-test('stored in-app consent enables the talk button, but a window without capture keeps it off with a reason', () => {
+test('native microphone policy enables the talk button, but a window without capture keeps it off with a reason', () => {
   const { localStorage } = fakeStore({ stt: true, consentStored: true });
   const saved = Object.getOwnPropertyDescriptor(globalThis, 'MediaRecorder');
   Object.defineProperty(globalThis, 'MediaRecorder', { value: class {}, configurable: true, writable: true });

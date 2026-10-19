@@ -17,6 +17,7 @@ export type CompanionPush =
   | {type: 'invoke'}
   | {type: 'collapse'}
   | {type: 'region-cancelled'}
+  | {type: 'region-expired'; token: string}
   | RegionEvent
   | PlacementEvent
   | {type: 'drag'; vx: number | null}

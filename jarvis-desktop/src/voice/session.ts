@@ -209,8 +209,9 @@ export class VoiceSession {
     }
     if (isNativeConsent(c)) {
       const ok = await c.request(true);
-      this.set({ consent: c.granted(), note: ok ? null : { tone: 'info', code: 'consent-off', text: 'The microphone stays off: you chose Cancel or the confirmation could not be shown.' } });
-      return ok;
+      const allowed = c.granted();
+      this.set({ consent: allowed, note: allowed ? null : { tone: 'info', code: 'consent-off', text: 'The microphone stays off: permission was cancelled or changed.' } });
+      return allowed && ok;
     }
     c.grant();
     this.set({ consent: c.granted() });

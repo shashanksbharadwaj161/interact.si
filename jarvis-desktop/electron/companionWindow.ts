@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import type {Backend, CompanionReadiness, CompanionTarget} from './backend';
 import type {AgentEvent} from './services/agent';
+import {ScreenContext, SelectionGate} from './services/screen-context';
 import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
 import {createTrustedConfirm, safeErrorMessage, validateArgsAgainst} from './ipcCore';
 
@@ -48,7 +49,7 @@ const CLICK_THROUGH = process.platform === 'win32' || process.platform === 'darw
 /** Non-activating windows (setFocusable) exist only on Windows and macOS. */
 const NO_ACTIVATE = process.platform === 'win32' || process.platform === 'darwin';
 
-type Region = {png: string; width: number; height: number; at: number};
+type Region = {png: string; width: number; height: number};
 type Pending = {full: NativeImage; display: Electron.Display};
 type Prefs = {point: Point | null; displayId: number | null; dock: Dock; size: number; appearance: Appearance; material: 'none' | 'acrylic'};
 
@@ -102,7 +103,8 @@ export function createCompanion(deps: CompanionDeps) {
   /** The window the person was using when they opened the companion; typing may go only there. Cleared on close. */
   let target: CompanionTarget | null = null;
   const TARGET_WAIT_MS = 700;
-  const regions = new Map<string, Region>();
+  const regions = new ScreenContext<Region>(REGION_TTL_MS, undefined, undefined, undefined, token => send({type: 'region-expired', token}));
+  const selectionGate = new SelectionGate();
   const undoable = new Set<string>();
 
   const confirm = createTrustedConfirm<BrowserWindow>({
@@ -259,7 +261,11 @@ export function createCompanion(deps: CompanionDeps) {
   }
   // A policy change from any window (hub settings, the island, an import) reaches the island page at once.
   const offVoicePolicy = deps.backend.companion.voice.onPolicy((allowed) => send({type: 'voice-policy', allowed}));
-  const onLock = () => { gazeLocked = true; updateGaze(); };
+  const onLock = () => {
+    run?.abort(); closeOverlay(); regions.clear(); target = null; stopVoice();
+    send({type: 'target', target: null}); send({type: 'collapse'});
+    gazeLocked = true; updateGaze();
+  };
   const onUnlock = () => { gazeLocked = false; updateGaze(); };
   /** Backstop for the page's own release: closing the bubble or the island ends the island's speech and transcription. */
   const stopVoice = () => { deps.backend.companion.voice.stop(); deps.backend.companion.voice.cancelTranscribe(); };
@@ -306,6 +312,8 @@ export function createCompanion(deps: CompanionDeps) {
     win.on('closed', () => {
       if (island === win) island = null;
       run?.abort();
+      closeOverlay();
+      regions.clear();
       if (drag) dragEnd();
       // A new window starts closed and forgets the remembered app window.
       bubble = null;
@@ -335,22 +343,24 @@ export function createCompanion(deps: CompanionDeps) {
   }
 
   function closeOverlay() {
-    pending = null;
-    if (overlay && !overlay.isDestroyed()) overlay.destroy();
+    selectionGate.cancel();
+    const old = overlay;
     overlay = null;
-  }
-
-  function sweepRegions() {
-    const now = Date.now();
-    for (const [k, r] of regions) if (now - r.at > REGION_TTL_MS) regions.delete(k);
+    pending = null;
+    if (old && !old.isDestroyed()) old.destroy();
   }
 
   async function regionBegin(): Promise<{ok: true} | {ok: false; reason: string}> {
     if (overlay) return {ok: false, reason: 'A selection is already open.'};
+    const ticket = selectionGate.begin();
+    if (ticket === null) return {ok: false, reason: 'A selection is already starting.'};
+    regions.clear();
+    try {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     // The island steps aside so it is not part of the picture.
     island?.hide();
     await new Promise((r) => setTimeout(r, 160));
+    if (!selectionGate.current(ticket)) return {ok: false, reason: 'Selection cancelled.'};
     let full: NativeImage | null = null;
     try {
       const size = {width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor)};
@@ -358,9 +368,10 @@ export function createCompanion(deps: CompanionDeps) {
       const src = sources.find((s) => s.display_id === String(display.id)) ?? (sources.length === 1 ? sources[0] : undefined);
       full = src && !src.thumbnail.isEmpty() ? src.thumbnail : null;
     } catch (e) {
-      island?.showInactive();
+      if (selectionGate.current(ticket)) refocus();
       return {ok: false, reason: `The screen could not be captured (${safeErrorMessage(e)}).`};
     }
+    if (!selectionGate.current(ticket) || !alive()) return {ok: false, reason: 'Selection cancelled.'};
     if (!full) {
       island?.showInactive();
       return {ok: false, reason: 'The screen could not be captured on this display.'};
@@ -387,6 +398,7 @@ export function createCompanion(deps: CompanionDeps) {
     if (deps.devOrigin) void ov.loadURL(`${deps.devOrigin}/companion.html#overlay`);
     else void ov.loadFile(path.join(deps.distDir, 'companion.html'), {hash: 'overlay'});
     return {ok: true};
+    } finally {selectionGate.finish(ticket);}
   }
 
   function overlayImage() {
@@ -408,9 +420,8 @@ export function createCompanion(deps: CompanionDeps) {
     if (out.width !== crop.width) img = img.resize({width: out.width, height: out.height, quality: 'best'});
     const png = img.toPNG().toString('base64');
     const preview = img.resize({width: Math.min(240, out.width)}).toDataURL();
-    sweepRegions();
     const token = randomUUID();
-    regions.set(token, {png, width: out.width, height: out.height, at: Date.now()});
+    regions.put(token, {png, width: out.width, height: out.height});
     const ov = overlay;
     overlay = null;
     pending = null;
@@ -428,10 +439,8 @@ export function createCompanion(deps: CompanionDeps) {
     const runId = randomUUID();
     let image: {base64: string; width: number; height: number} | undefined;
     if (token) {
-      sweepRegions();
-      const r = regions.get(token);
+      const r = regions.take(token);
       // Single use: a region is never silently reused for a later request.
-      regions.delete(token);
       if (!r) {
         send({runId, event: {type: 'error', reason: 'setup', message: 'The selected region expired. Select it again.'} satisfies AgentEvent});
         return {runId};
@@ -488,7 +497,7 @@ export function createCompanion(deps: CompanionDeps) {
     companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock, target: shownTarget(), reduceMotion: (await deps.backend.getState()).settings.reduceMotion}),
     companionClearTarget: () => { target = null; send({type: 'target', target: null}); return true; },
     companionAsk: (text: string, token?: string, withTarget?: boolean) => ask(text, token, withTarget),
-    companionCancel: () => { run?.abort(); return true; },
+    companionCancel: () => { run?.abort(); closeOverlay(); regions.clear(); return true; },
     companionUndo: async (id: string) => {
       if (!undoable.has(id)) return false;
       undoable.delete(id);
@@ -501,6 +510,9 @@ export function createCompanion(deps: CompanionDeps) {
       place();
       // Closing the bubble gives the keyboard back: Windows activates the window the person was using before.
       if (!bubble && alive()) {
+        run?.abort();
+        closeOverlay();
+        regions.clear();
         stopVoice();
         if (target) { target = null; send({type: 'target', target: null}); }
         if (island!.isFocused()) island!.blur();
@@ -547,7 +559,7 @@ export function createCompanion(deps: CompanionDeps) {
     companionSetVoiceInput: (on: boolean) => deps.backend.companion.voice.setInput(on, (summary, detail) => confirm(summary, detail)),
     companionInsertText: (text: string) => insertText(text),
     regionBegin: () => regionBegin(),
-    regionDiscard: (token: string) => regions.delete(token),
+    regionDiscard: (token: string) => regions.discard(token),
     overlayImage: () => overlayImage(),
     overlaySubmit: (raw: unknown) => overlaySubmit(raw),
     overlayCancel: () => { closeOverlay(); refocus(); send({type: 'region-cancelled'}); return true; },

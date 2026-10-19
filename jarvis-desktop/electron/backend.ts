@@ -353,6 +353,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   const settings = () => store.snapshot().settings;
   /** Windows that must hear when the microphone policy changes (the island cancels a recording when it turns off). */
   const voicePolicyListeners = new Set<(allowed: boolean) => void>();
+  let voiceRequest = 0;
   const notifyVoicePolicy = () => {
     const allowed = settings().voiceInput === true;
     for (const l of voicePolicyListeners) { try { l(allowed); } catch { /* a closed window */ } }
@@ -673,6 +674,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     async getState(): Promise<AppState> { return store.snapshot(); },
 
     async saveSettings(patch) {
+      const voiceTicket = patch && typeof patch === 'object' && 'voiceInput' in patch ? ++voiceRequest : null;
       return sensitive(async () => {
       const before = settings();
       const proposed = mergeSettings(before, patch);
@@ -687,6 +689,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       if (changes.length && !(await env.confirm?.('Change desktop permissions or AI connection?', changes.join('\n')))) throw new ValidationError('Native confirmation declined or unavailable');
       let changed: string[] = [];
       await store.mutate((d) => {
+        if (voiceTicket !== null && voiceTicket !== voiceRequest) throw new ValidationError('Microphone permission changed while waiting. Review it again.');
         const merged = mergeSettings(d.settings, patch);
         changed = Object.keys(merged).filter((k) => JSON.stringify((merged as unknown as Record<string, unknown>)[k]) !== JSON.stringify((d.settings as unknown as Record<string, unknown>)[k]));
         d.settings = merged;
@@ -1196,7 +1199,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
    * full text, then focus and a re-check of that window's identity and policy before any keystroke. A preview the policy
    * refuses is discarded, not logged as declined. Input that stops part-way reports how much reached the app.
    */
-  async function typeIntoTarget(target: CompanionTarget, text: string, confirm: (summary: string, detail: string) => Promise<boolean>, h: {onConfirm: (open: boolean) => void; current: () => boolean}): Promise<TypeResult> {
+  async function typeIntoTarget(target: CompanionTarget, text: string, confirm: (summary: string, detail: string) => Promise<boolean>, h: {onConfirm: (open: boolean) => void; current: () => boolean; signal: AbortSignal}): Promise<TypeResult> {
     if (!h.current()) return {typed: false, stage: 'before', reason: 'You removed that window or closed the bubble, so nothing was typed'};
     let preview;
     try { preview = await actions.preview({type: 'type-text', target: `hwnd:${target.hwnd}`, text}, {expect: {pid: target.pid, process: target.process}}); } catch (e) { return {typed: false, stage: 'before', reason: e instanceof Error ? e.message : 'The action could not be prepared'}; }
@@ -1209,9 +1212,10 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       h.onConfirm(true);
       try { return (await confirm(summary, detail)) && h.current(); } finally { h.onConfirm(false); }
     };
-    const r = (await actions.execute(preview.id, true, {confirm: shown}).catch((e: unknown) => ({executed: false, reason: e instanceof Error ? e.message : 'Failed'}))) as {executed: boolean; reason?: string; typed?: number};
+    const r = (await actions.execute(preview.id, true, {confirm: shown, current: h.current, signal: h.signal}).catch((e: unknown) => ({executed: false, reason: e instanceof Error ? e.message : 'Failed'}))) as {executed: boolean; reason?: string; typed?: number; inputUncertain?: boolean};
     if (r.executed) return {typed: true, chars: typeof r.typed === 'number' ? r.typed : [...text].length};
     if (typeof r.typed === 'number' && r.typed > 0) return {typed: false, stage: 'during', chars: r.typed, reason: r.reason ?? 'Typing stopped'};
+    if (r.inputUncertain) return {typed: false, stage: 'during', reason: 'Input stopped; the accepted character count is unavailable. Check the app before retrying'};
     return {typed: false, stage: 'before', reason: r.reason ?? 'Not typed'};
   }
 
@@ -1223,14 +1227,17 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     },
     inputAllowed: () => settings().voiceInput === true,
     async setInput(on, confirm) {
+      if (typeof on !== 'boolean') throw new ValidationError('Microphone permission must be true or false');
+      const ticket = ++voiceRequest;
       if (on === (settings().voiceInput === true)) return {allowed: on};
       if (on && !(await confirm('Allow the microphone?', `${MIC_PERMISSION_CHANGE}.\n\nYou can turn it off again in the companion or in the hub at any time.`))) {
         return {allowed: false, reason: 'Not allowed: you chose Cancel or the confirmation could not be shown. The microphone stays off.'};
       }
-      await store.mutate((d) => { d.settings = {...d.settings, voiceInput: on}; });
+      if (ticket !== voiceRequest) return {allowed: settings().voiceInput === true, reason: 'A newer microphone choice replaced this request.'};
+      await store.mutate((d) => { if (ticket === voiceRequest) d.settings = {...d.settings, voiceInput: on}; });
       await activity('settings', on ? 'Microphone allowed (from the companion)' : 'Microphone turned off (from the companion)');
       notifyVoicePolicy();
-      return {allowed: on};
+      return {allowed: settings().voiceInput === true};
     },
     onPolicy(listener) {
       voicePolicyListeners.add(listener);
@@ -1252,7 +1259,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
         return;
       }
       const current = () => !hooks.signal.aborted && (input.targetCurrent ?? (() => true))();
-      const tool = createTypingTool({target, type: (text, h) => typeIntoTarget(target, text, hooks.confirm, {...h, current})});
+      const tool = createTypingTool({target, type: (text, h) => typeIntoTarget(target, text, hooks.confirm, {...h, current, signal: hooks.signal})});
       await runToolDirect(tool, {text: input.text}, {emit: hooks.emit, signal: hooks.signal, callId: `direct-${store.id()}`});
     },
     async run(input, hooks) {
@@ -1266,7 +1273,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
         saveTask: (t) => api.saveTask(t),
         confirm: hooks.confirm,
         today: localDay,
-        ...(target ? {typing: {target, type: (text: string, h: {onConfirm: (open: boolean) => void}) => typeIntoTarget(target, text, hooks.confirm, {...h, current: input.targetCurrent ?? (() => true)})}} : {}),
+        ...(target ? {typing: {target, type: (text: string, h: {onConfirm: (open: boolean) => void}) => typeIntoTarget(target, text, hooks.confirm, {...h, current: () => !hooks.signal.aborted && (input.targetCurrent ?? (() => true))(), signal: hooks.signal})}} : {}),
       });
       let steps = 0, inTok = 0, outTok = 0;
       await runAgent({

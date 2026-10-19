@@ -1,0 +1,286 @@
+{
+  "platform": "win32",
+  "display": {
+    "x": 0,
+    "y": 0,
+    "width": 1536,
+    "height": 816
+  },
+  "results": [
+    {
+      "name": "state reports appearance, size and dock",
+      "ok": true,
+      "appearance": "pet",
+      "size": 96,
+      "dock": "bottom"
+    },
+    {
+      "name": "rest window is the pet plus margin (trimmed at screen edges), inside the work area",
+      "ok": true,
+      "bounds": {
+        "x": 1416,
+        "y": 687,
+        "width": 120,
+        "height": 129
+      },
+      "pet": {
+        "x": 19,
+        "y": 21,
+        "width": 89,
+        "height": 96
+      },
+      "work": {
+        "x": 0,
+        "y": 0,
+        "width": 1536,
+        "height": 816
+      }
+    },
+    {
+      "name": "rest placement event matches the window",
+      "ok": true,
+      "placement": {
+        "type": "placement",
+        "window": {
+          "x": 1416,
+          "y": 687,
+          "width": 120,
+          "height": 129
+        },
+        "pet": {
+          "x": 19,
+          "y": 21,
+          "width": 89,
+          "height": 96
+        },
+        "bubble": null,
+        "side": null,
+        "size": 96,
+        "dock": "bottom"
+      }
+    },
+    {
+      "name": "bubble opens on the side facing the middle (pet docked bottom-right)",
+      "ok": true,
+      "side": "left"
+    },
+    {
+      "name": "window grows to hold pet and bubble, still inside the work area",
+      "ok": true,
+      "bounds": {
+        "x": 988,
+        "y": 436,
+        "width": 548,
+        "height": 380
+      }
+    },
+    {
+      "name": "bubble does not cover the pet",
+      "ok": true,
+      "pet": {
+        "x": 447,
+        "y": 272,
+        "width": 89,
+        "height": 96
+      },
+      "bubble": {
+        "x": 19,
+        "y": 19,
+        "width": 420,
+        "height": 320
+      }
+    },
+    {
+      "name": "dock bottom-left: pet and window inside the work area",
+      "ok": true,
+      "dock": "bottom",
+      "pet": {
+        "x": 12,
+        "y": 708,
+        "width": 89,
+        "height": 96
+      },
+      "side": "right"
+    },
+    {
+      "name": "dock left: pet and window inside the work area",
+      "ok": true,
+      "dock": "left",
+      "pet": {
+        "x": 12,
+        "y": 360,
+        "width": 89,
+        "height": 96
+      },
+      "side": "right"
+    },
+    {
+      "name": "dock top: pet and window inside the work area",
+      "ok": true,
+      "dock": "top",
+      "pet": {
+        "x": 724,
+        "y": 12,
+        "width": 89,
+        "height": 96
+      },
+      "side": "left"
+    },
+    {
+      "name": "dock right: pet and window inside the work area",
+      "ok": true,
+      "dock": "right",
+      "pet": {
+        "x": 1435,
+        "y": 360,
+        "width": 89,
+        "height": 96
+      },
+      "side": "left"
+    },
+    {
+      "name": "dock bottom-right: pet and window inside the work area",
+      "ok": true,
+      "dock": "bottom",
+      "pet": {
+        "x": 1435,
+        "y": 708,
+        "width": 89,
+        "height": 96
+      },
+      "side": "left"
+    },
+    {
+      "name": "docked top: bubble opens beside or below, never off screen",
+      "ok": true,
+      "dock": "top",
+      "side": "left"
+    },
+    {
+      "name": "resize L -> 128px tall",
+      "ok": true,
+      "size": 128,
+      "pet": {
+        "x": 446,
+        "y": 0,
+        "width": 118,
+        "height": 128
+      }
+    },
+    {
+      "name": "resize S -> 64px tall",
+      "ok": true,
+      "size": 64,
+      "pet": {
+        "x": 446,
+        "y": 64,
+        "width": 59,
+        "height": 64
+      }
+    },
+    {
+      "name": "resize M -> 96px tall",
+      "ok": true,
+      "size": 96,
+      "pet": {
+        "x": 446,
+        "y": 32,
+        "width": 89,
+        "height": 96
+      }
+    },
+    {
+      "name": "grow steps by 8 px",
+      "ok": true,
+      "size": 104
+    },
+    {
+      "name": "refuses a position from the page",
+      "ok": true
+    },
+    {
+      "name": "refuses an unknown dock",
+      "ok": true
+    },
+    {
+      "name": "refuses a raw size",
+      "ok": true
+    },
+    {
+      "name": "refuses a drag step from the page",
+      "ok": true
+    },
+    {
+      "name": "refuses a non-boolean hit",
+      "ok": true
+    },
+    {
+      "name": "gaze subscription toggles without error",
+      "ok": true
+    },
+    {
+      "name": "voice status: local only, engines honestly unavailable off Windows",
+      "ok": true,
+      "status": {
+        "stt": {
+          "available": true
+        },
+        "tts": {
+          "available": true
+        },
+        "voice": null,
+        "speaking": false,
+        "transcribing": false,
+        "cloud": false,
+        "inputAllowed": false
+      }
+    },
+    {
+      "name": "speak answers with a reason, not a fake success, when no voice exists",
+      "ok": true,
+      "said": {
+        "ok": true
+      }
+    },
+    {
+      "name": "stop and cancel answer false when nothing runs",
+      "ok": true
+    },
+    {
+      "name": "refuses transcribe with non-audio",
+      "ok": true
+    },
+    {
+      "name": "refuses speak with empty text",
+      "ok": true
+    },
+    {
+      "name": "refuses transcribe with a non-number sample",
+      "ok": true
+    },
+    {
+      "name": "island page: native policy refuses microphone audio by default",
+      "ok": true,
+      "audio": "denied:NotAllowedError"
+    },
+    {
+      "name": "voice status reports the authoritative microphone policy off",
+      "ok": true
+    },
+    {
+      "name": "turning microphone off requires no grant",
+      "ok": true
+    },
+    {
+      "name": "island page: camera is refused",
+      "ok": true,
+      "video": "denied:NotAllowedError"
+    },
+    {
+      "name": "hub page: native policy also refuses microphone audio",
+      "ok": true,
+      "hubAudio": "denied:NotAllowedError"
+    }
+  ],
+  "failed": []
+}

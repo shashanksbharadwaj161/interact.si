@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-19",
+  "platform": "win32",
+  "claudeCheckpoint": "7c3e03cc2d6702ab67051ea09560da6357715e0a",
+  "branch": "codex/character-companion",
+  "productionBuild": "pass",
+  "prototypeBuild": "pass",
+  "fullSuite": {
+    "skipped": 0,
+    "cancelled": 0,
+    "pass": 1755,
+    "durationMs": 97604.4635,
+    "fail": 0
+  },
+  "finalFocused": {
+    "durationMs": 60720.7607,
+    "pass": 37,
+    "fail": 0
+  },
+  "nativePlacement": {
+    "pass": 33,
+    "fail": 0
+  },
+  "nativePetIsland": {
+    "externalRequests": 0,
+    "scriptedInvocation": true,
+    "pass": 17,
+    "scriptedLockEvent": true,
+    "fail": 0
+  },
+  "islandRenderer": {
+    "pass": 14,
+    "fail": 0,
+    "scriptedBridge": true
+  },
+  "smoke": {
+    "externalRequests": 0,
+    "rendererErrors": 0,
+    "routes": 23
+  },
+  "liveProvider": false,
+  "realMicrophone": false,
+  "realExternalAppTypingVerified": false,
+  "installedCopyUpdated": false,
+  "claudeStopped": true,
+  "nativeHelperSha256": "f8708113b4e3860e1caad42882a1fea0da480e3bc90cb4a13b47a4e71e3685cf"
+}

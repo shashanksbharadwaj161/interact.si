@@ -5,7 +5,7 @@
 // placement events match the bounds; arguments outside the specs are refused.
 //
 // Voice: the island's voice methods answer honestly (no Windows engines here) and refuse bad arguments; the app's real
-// session permission handler grants microphone audio to the island and the hub and refuses the camera (Chromium's
+// session permission handler refuses microphone audio by default in both island and hub, and refuses the camera (Chromium's
 // generated test devices, so hardware is not the deciding factor).
 //
 // Not covered (needs a person or a desktop automation tool): dragging (main reads the real OS cursor), click-through
@@ -30,10 +30,13 @@ const check = (name, ok, detail) => { results.push({name, ok, ...detail}); if (!
 const timeout = setTimeout(() => { fail.push('timeout'); finish(); }, 90_000);
 function finish() {
   clearTimeout(timeout);
-  const out = path.join(root, '..', 'planning', 'ui-revamp', 'native-companion', 'native-placement-check.json');
+  const evidenceArg = process.argv.find(a => a.startsWith('--out='));
+  const out = evidenceArg ? path.join(path.resolve(root, evidenceArg.slice(6)), 'native-placement-check.json') : path.join(root, '..', 'planning', 'ui-revamp', 'native-companion', 'native-placement-check.json');
   fs.mkdirSync(path.dirname(out), {recursive: true});
   fs.writeFileSync(out, `${JSON.stringify({platform: process.platform, display: screen.getPrimaryDisplay().workArea, results, failed: fail}, null, 2)}\n`);
-  try { fs.rmSync(data, {recursive: true, force: true}); } catch { /* temp */ }
+  if (path.dirname(path.resolve(data)) === path.resolve(os.tmpdir()) && path.basename(data).startsWith('desktop-companion-native-')) {
+    try { fs.rmSync(data, {recursive: true, force: true}); } catch { /* Electron may hold the isolated profile until exit. */ }
+  }
   app.exit(fail.length ? 1 : 0);
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -118,17 +121,19 @@ app.whenReady().then(async () => {
     for (const [call, why] of [[`window.companion.transcribe('not audio')`, 'transcribe with non-audio'], [`window.companion.speak('')`, 'speak with empty text'], [`window.companion.transcribe([1, 'x'])`, 'transcribe with a non-number sample']]) {
       check(`refuses ${why}`, await js(`${call}.then(() => false, () => true)`), {});
     }
-    // Microphone permission, decided by the app's real session handler: audio for the island, never the camera.
+    // Native microphone policy is off in this isolated profile; no permission grant is automated here.
     const media = (c) => js(`navigator.mediaDevices.getUserMedia(${c}).then((s) => { const k = s.getTracks().map((t) => t.kind).join(','); s.getTracks().forEach((t) => t.stop()); return 'granted:' + k; }, (e) => 'denied:' + e.name)`);
     const audio = await media('{audio: true}');
     const video = await media('{video: true}');
-    check('island page: microphone audio is permitted', audio === 'granted:audio', {audio});
+    check('island page: native policy refuses microphone audio by default', audio === 'denied:NotAllowedError', {audio});
+    check('voice status reports the authoritative microphone policy off', (await js('window.companion.voiceStatus()')).inputAllowed === false);
+    check('turning microphone off requires no grant', (await js('window.companion.setVoiceInput(false)')).allowed === false);
     check('island page: camera is refused', video === 'denied:NotAllowedError', {video});
     const hub = BrowserWindow.getAllWindows().find((w) => w !== island && !/companion\.html/.test(w.webContents.getURL()));
     if (hub) {
       await until(() => !hub.webContents.isLoading(), 15000, 'hub loaded');
       const hubAudio = await hub.webContents.executeJavaScript(`navigator.mediaDevices.getUserMedia({audio: true}).then((s) => { s.getTracks().forEach((t) => t.stop()); return 'granted'; }, (e) => 'denied:' + e.name)`, true);
-      check('hub page: microphone audio is still permitted', hubAudio === 'granted', {hubAudio});
+      check('hub page: native policy also refuses microphone audio', hubAudio === 'denied:NotAllowedError', {hubAudio});
     }
     await js(`window.companion.layout({bubble: null})`);
     finish();

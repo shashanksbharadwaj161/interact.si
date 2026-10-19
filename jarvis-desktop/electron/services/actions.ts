@@ -369,13 +369,15 @@ export class ActionService {
    * own window; it never skips the confirmation, the revalidation, the focus re-check or the window policy. The hub's
    * IPC passes only the first two arguments.
    */
-  async execute(previewId: unknown, approved: unknown, opts?: {confirm?: (summary: string, detail: string) => Promise<boolean>}): Promise<unknown> {
+  async execute(previewId: unknown, approved: unknown, opts?: {confirm?: (summary: string, detail: string) => Promise<boolean>; signal?: AbortSignal; current?: () => boolean}): Promise<unknown> {
     if (typeof previewId !== 'string' || previewId.length > 100) throw new Error('Preview id is invalid');
     if (typeof approved !== 'boolean') throw new Error('approved must be true or false');
     this.prune();
     const entry = this.registry.get(previewId);
     if (!entry) throw new Error('This preview is unknown, expired or was already used. Request a new preview.');
     this.registry.delete(previewId); // single use, even when denied
+    const current = () => !opts?.signal?.aborted && (opts?.current?.() ?? true);
+    if (!current()) return {executed: false, reason: 'Stopped before execution'};
     const summary = entry.ev.summary;
     if (!approved) {
       await this.d.activity('action', `Declined: ${summary}`);
@@ -415,10 +417,12 @@ export class ActionService {
       }
     }
     const check = await this.revalidate(entry);
+    if (!current()) return {executed: false, reason: 'Stopped before execution'};
     if (!check.plan) {
       await this.d.activity('action', `Refused: ${summary}`, check.reason);
       return {executed: false, reason: check.reason ?? 'Not allowed'};
     }
+    let inputStarted = false;
     try {
       // The native confirmation takes focus. Restore only the exact approved window,
       // then re-check its identity and foreground state before native input.
@@ -434,19 +438,22 @@ export class ActionService {
         if (live) throw new Error(live);
         if (this.d.safeLaunch()) throw new Error('Safe launch is active');
       }
-      const result = await this.perform(check.plan);
+      if (!current()) return {executed: false, reason: 'Stopped before input'};
+      inputStarted = check.plan.kind === 'type-text';
+      const result = await this.perform(check.plan, opts?.signal);
       await this.d.activity('action', `Executed: ${summary}`, 'ok');
       return {executed: true, ...result};
     } catch (e) {
       const reason = (e as Error).message.slice(0, 300);
       // Input that stopped part-way still changed the app: say how much was sent.
       const typed = typeof (e as {typed?: unknown}).typed === 'number' ? (e as {typed: number}).typed : undefined;
+      const inputUncertain = inputStarted && typed === undefined;
       await this.d.activity('action', `Failed: ${summary}`, typed !== undefined ? `${reason} (${typed} characters were typed)` : reason);
-      return {executed: false, reason, ...(typed !== undefined ? {typed} : {})};
+      return {executed: false, reason, ...(typed !== undefined ? {typed} : {}), ...(inputUncertain ? {inputUncertain: true} : {})};
     }
   }
 
-  private async perform(plan: Plan): Promise<Record<string, unknown>> {
+  private async perform(plan: Plan, signal?: AbortSignal): Promise<Record<string, unknown>> {
     const n = this.d.native;
     switch (plan.kind) {
       case 'list-windows': {
@@ -490,7 +497,7 @@ export class ActionService {
         return {rect: {x: r.x, y: r.y, width: r.width, height: r.height}, clamped: r.clamped};
       }
       case 'type-text': {
-        const r = await n.typeText({hwnd: plan.win.hwnd, pid: plan.win.pid}, plan.text);
+        const r = await n.typeText({hwnd: plan.win.hwnd, pid: plan.win.pid}, plan.text, signal);
         return {typed: r.typed};
       }
       case 'click':

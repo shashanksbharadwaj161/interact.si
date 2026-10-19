@@ -188,6 +188,8 @@ export function IslandShell(p: IslandShellProps) {
       setTailOn(false);
       if (!shown) {
         setMounted(false);
+        live.current = {view: p.view, node: null};
+        out.current = null;
         props.current.onClosed?.();
         return;
       }
@@ -203,6 +205,7 @@ export function IslandShell(p: IslandShellProps) {
         sizeRef.current = null;
         setSize(null);
         out.current = null;
+        live.current = {view: props.current.view, node: null};
         props.current.onClosed?.();
       });
     }

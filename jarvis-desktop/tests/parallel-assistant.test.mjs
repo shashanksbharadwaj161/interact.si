@@ -362,5 +362,7 @@ test('wiring: the stream path only starts from an explicit send or Retry click, 
 });
 
 test('wiring: no silent fallback between routes in the Assistant source', () => {
-  assert.doesNotMatch(src, /settings\.mode\s*=(?!=)|saveSettings\(|mode:\s*'(?:offline|online)'/, 'the Assistant never switches mode itself');
+  assert.doesNotMatch(src, /settings\.mode\s*=(?!=)|mode:\s*'(?:offline|online)'/, 'the Assistant never switches mode itself');
+  const writes = [...src.matchAll(/\.saveSettings\(([^)]*)\)/g)].map(m => m[1].replace(/\s/g, ''));
+  assert.deepEqual(writes, ['{voiceInput:on}'], 'the only settings write is the explicit native microphone choice; no AI route fallback');
 });

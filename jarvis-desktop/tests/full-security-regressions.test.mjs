@@ -243,7 +243,7 @@ test('packaged boot: sandboxed window, no menu or devtools, no child process at 
   assert.equal(r.spawned, 0, `startup spawned ${r.spawnedFiles.join(', ')}`);
 });
 
-test('session request filter: renderer cannot reach the network, the Ollama port or files outside dist; only audio for the app page', async () => {
+test('session request filter: renderer cannot reach the network or outside files; microphone is off until native permission', async () => {
   const r = await runMain(String.raw`
     const decide = (url) => new Promise((res) => rec.beforeRequest({url}, (d) => res(d.cancel)));
     const urls = ['https://api.anthropic.com/v1/messages', 'http://127.0.0.1:11434/api/chat', 'http://localhost:5173/', 'ws://127.0.0.1:11434/',
@@ -270,7 +270,7 @@ test('session request filter: renderer cannot reach the network, the Ollama port
   assert.equal(c[r.appUrl], false);
   assert.equal(c[r.appUrl.replace('index.html', 'assets/app.js')], false);
   assert.equal(c['data:text/plain,hi'], false);
-  assert.deepEqual([r.audio, r.video, r.audioVideo, r.audioRemote, r.notifications, r.clipboard, r.geo, r.checkMediaRemote, r.checkGeo], [true, false, false, false, false, false, false, false, false]);
+  assert.deepEqual([r.audio, r.video, r.audioVideo, r.audioRemote, r.notifications, r.clipboard, r.geo, r.checkMediaRemote, r.checkGeo], [false, false, false, false, false, false, false, false, false]);
 });
 
 test('development: a non-loopback VITE_DEV_SERVER_URL is ignored; packaged builds ignore any dev URL', async () => {

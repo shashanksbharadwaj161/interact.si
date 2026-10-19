@@ -14,25 +14,28 @@ export type NativeMicConsent = MicConsent & {
 
 export function nativeMicConsent(o: { initial: boolean; set: (on: boolean) => Promise<boolean> }): NativeMicConsent {
   let allowed = o.initial;
+  let revision = 0;
   return {
     granted: () => allowed,
     // A plain grant() is not enough to allow the microphone: only request(true) (with its confirmation) can.
     grant: () => undefined,
-    revoke: () => { allowed = false; void o.set(false).catch(() => undefined); },
+    revoke: () => { revision++; allowed = false; void o.set(false).catch(() => undefined); },
     async request(on) {
+      const ticket = ++revision;
       if (!on) {
         allowed = false;
         await o.set(false).catch(() => undefined);
         return false;
       }
       try {
-        allowed = await o.set(true);
+        const result = await o.set(true);
+        if (ticket === revision) allowed = result;
       } catch {
-        allowed = false;
+        if (ticket === revision) allowed = false;
       }
       return allowed;
     },
-    update(next) { allowed = next; },
+    update(next) { revision++; allowed = next; },
   };
 }
 

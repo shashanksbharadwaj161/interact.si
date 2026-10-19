@@ -1,12 +1,13 @@
 // Production pet renderer in the real Electron app, with an isolated offline profile. The invocation is scripted;
 // no keyboard, mouse, microphone, external app or provider request is used. Screenshots contain this app window only.
-const {app, BrowserWindow, screen, session} = require('electron');
+const {app, BrowserWindow, screen, session, powerMonitor} = require('electron');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const root = path.join(__dirname, '..');
 const data = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-companion-pet-'));
-const evidence = path.join(root, '..', 'planning', 'ui-revamp', 'pet-art', 'first-light-motion-2026-10-18', 'qa');
+const evidenceArg = process.argv.find(a => a.startsWith('--out='));
+const evidence = evidenceArg ? path.resolve(root, evidenceArg.slice(6)) : path.join(root, '..', 'planning', 'ui-revamp', 'pet-art', 'first-light-motion-2026-10-18', 'qa');
 app.setPath('userData', data);
 delete process.env.JARVIS_TEST_MODE;
 const results = [];
@@ -59,10 +60,25 @@ app.whenReady().then(async () => {
     check('voice input is visible with microphone off and Talk blocked until consent', await js('!!document.querySelector(".pet-voice input[type=checkbox]") && !document.querySelector(".pet-voice input[type=checkbox]").checked && document.querySelector(".vx-talk")?.disabled === true'));
     await until(() => js('document.querySelector(".isl[data-placed=true] .isl-skin")?.getBoundingClientRect().width > 300'), 'island expanded');
     check('the real native companion uses the new production island shell', true);
+    check('offline command still allows reviewing text without Claude', await js('!document.querySelector("#cmp-input")?.disabled'));
+    const noTarget = await js(`new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{off();reject(Error('insert error timeout'));},4000);
+      const off=window.companion.onEvent(e=>{if('runId' in e && e.event.type==='error'){off();clearTimeout(timer);resolve(e.event);}});
+      window.companion.insertText('Local verification only').catch(reject);
+    })`);
+    check('real insert IPC rejects a missing app target before any input', noTarget.reason === 'setup' && /No app window/.test(noTarget.message));
     await delay(450);
     // A synthetic, non-screen token checks renderer cleanup without capturing the user's desktop.
     island.webContents.send('companion:event', {type:'region', token:'pet-review-region', preview:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrc0AAAAASUVORK5CYII=', width:1, height:1, sourceScale:1});
     await until(() => js('document.body.innerText.includes("Screen area attached")'), 'sample context chip');
+    island.webContents.send('companion:event', {type:'region-expired',token:'older-token'});
+    await delay(80);
+    check('an older region expiry cannot remove a newer attachment', await js('document.body.innerText.includes("Screen area attached")'));
+    island.webContents.send('companion:event', {type:'region-expired',token:'pet-review-region'});
+    await until(() => js('!document.body.innerText.includes("Screen area attached")'), 'expired preview cleared');
+    check('expiry clears the renderer thumbnail and explains recovery', await js('document.body.innerText.includes("screen area expired")'));
+    island.webContents.send('companion:event', {type:'region', token:'pet-review-region', preview:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrc0AAAAASUVORK5CYII=', width:1, height:1, sourceScale:1});
+    await until(() => js('document.body.innerText.includes("Screen area attached")'), 'sample context reattached');
     await delay(450);
     const openBounds = island.getBounds();
     fs.writeFileSync(path.join(evidence, 'native-island-open.png'), (await island.webContents.capturePage()).toPNG());
@@ -84,6 +100,11 @@ app.whenReady().then(async () => {
     await until(() => js('document.querySelector(".pet-slot canvas")?.dataset.petFrame === "0:0"'), 'reduced motion key pose');
     const stills = [await frame()]; await delay(250); stills.push(await frame()); await delay(250); stills.push(await frame());
     check('reduced motion keeps a single still pose', new Set(stills).size === 1, {frames:stills});
+    // Emits only the app's event; never locks the user's Windows desktop.
+    powerMonitor.emit('lock-screen');
+    await until(() => island.getBounds().width < 200, 'scripted lock collapses island');
+    powerMonitor.emit('unlock-screen');
+    check('a lock event closes the companion instead of leaving controls active', true, {scriptedEvent:true});
     island.hide();
     await until(() => js('document.hidden'), 'hidden renderer visibility');
     check('hidden window restores throttling and page visibility pause', island.webContents.getBackgroundThrottling());

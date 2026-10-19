@@ -260,7 +260,7 @@ test('a dropped connection reads as unreachable, an overloaded provider says so,
 const NOTEPAD = {hwnd: 101, pid: 4242, process: 'notepad.exe', title: 'Untitled - Notepad', x: 0, y: 0, width: 800, height: 600, minimized: false, maximized: false, foreground: true, elevated: 0};
 
 /** A backend whose desktop is one fake window list; typing is recorded, never sent to a real desktop. */
-async function desktopBackend(respond, {windows = () => [NOTEPAD], focus = () => true} = {}) {
+async function desktopBackend(respond, {windows = () => [NOTEPAD], focus = () => true, type, online = true} = {}) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'desktop-companion-test-typing-'));
   const typed = [];
   const focused = [];
@@ -270,7 +270,7 @@ async function desktopBackend(respond, {windows = () => [NOTEPAD], focus = () =>
     native: {
       listWindows: async () => windows(),
       focusWindow: async (w) => { focused.push(w); return {focused: focus()}; },
-      typeText: async (w, text) => { typed.push({w, text}); return {typed: [...text].length}; },
+      typeText: async (w, text, signal) => { if (type) return type(w, text, signal); typed.push({w, text}); return {typed: [...text].length}; },
       dpapi: async () => ({ok: true}), speechVoices: async () => [],
     },
     shell: {spawnApp: async () => {}, openPath: async () => '', openExternal: async () => {}},
@@ -279,8 +279,7 @@ async function desktopBackend(respond, {windows = () => [NOTEPAD], focus = () =>
     confirm: async () => { if (setup) return true; throw new Error('the hub confirmation must not be used for companion typing'); },
     fetchImpl: async (url, init) => respond(String(url), init),
   });
-  await b.setProviderKey('anthropic', KEY);
-  await b.saveSettings({mode: 'online'});
+  if (online) {await b.setProviderKey('anthropic', KEY); await b.saveSettings({mode: 'online'});}
   setup = false;
   return {b, typed, focused, close: async () => { await b.dispose(); await rm(dir, {recursive: true, force: true}); }};
 }
@@ -291,6 +290,69 @@ const typingTurns = (text) => (url, init) => {
   return json(msg([text_(body)]));
 };
 const text_ = (body) => ({type: 'text', text: `Result seen: ${body.messages.at(-1).content[0].content.slice(0, 60)}`});
+
+test('direct insert works offline without a key or model request, preserves exact reviewed text and reports unverified input', async () => {
+  let calls=0; const f=await desktopBackend(()=>{calls++;throw Error('must stay local');},{online:false});
+  try {
+    const events=[];const target=await f.b.companion.foregroundTarget();const reviewed='  Reviewed draft\nSecond line  ';let detail='';
+    await f.b.companion.insertText({text:reviewed,target},{signal:new AbortController().signal,emit:e=>events.push(e),confirm:async(s,d)=>{detail=d;return true;}});
+    assert.equal(calls,0);assert.equal(f.typed.length,1);assert.equal(f.typed[0].text,reviewed);assert.ok(detail.includes(reviewed.replace(/\n/g,'⏎\n')));
+    assert.equal(events.at(-1).type,'answer');assert.equal(events.at(-1).steps,0);
+    const receipt=events.find(e=>e.type==='tool'&&e.phase==='done');assert.equal(receipt.verified,false);assert.match(receipt.summary,/Not read back/);
+  } finally {await f.close();}
+});
+
+test('direct insert refuses missing targets and invalid text before any confirmation or input', async () => {
+  const f=await desktopBackend(()=>{throw Error('no network');},{online:false});
+  try {
+    let confirmations=0;const events=[];const hooks={signal:new AbortController().signal,emit:e=>events.push(e),confirm:async()=>{confirmations++;return true;}};
+    await f.b.companion.insertText({text:'hello'},hooks);assert.equal(events.at(-1).type,'error');
+    await f.b.companion.insertText({text:'x'.repeat(2001),target:NOTEPAD},hooks);
+    assert.equal(events.at(-1).type,'error');assert.equal(confirmations,0);assert.equal(f.typed.length,0);
+  } finally {await f.close();}
+});
+
+test('Stop or target removal while confirming direct input prevents typing after Continue', async () => {
+  for (const cancel of ['stop','remove']) {
+    const f=await desktopBackend(()=>{throw Error('no network');},{online:false});
+    try {
+      const ctl=new AbortController();let attached=true;const events=[];
+      await f.b.companion.insertText({text:'hello',target:NOTEPAD,targetCurrent:()=>attached},{signal:ctl.signal,emit:e=>events.push(e),confirm:async()=>{if(cancel==='stop')ctl.abort();else attached=false;return true;}});
+      assert.equal(f.typed.length,0);assert.ok(events.some(e=>e.type==='tool'&&e.phase==='awaiting-confirm'));
+      assert.ok(!events.some(e=>e.type==='tool'&&e.phase==='done'));
+    } finally {await f.close();}
+  }
+});
+
+test('Stop after confirmation, while Windows focus is being restored, still prevents input', async () => {
+  const ctl=new AbortController();const f=await desktopBackend(()=>{throw Error('no network');},{online:false,focus:()=>{ctl.abort();return true;}});
+  try {
+    const events=[];await f.b.companion.insertText({text:'hello',target:NOTEPAD},{signal:ctl.signal,emit:e=>events.push(e),confirm:async()=>true});
+    assert.equal(f.typed.length,0);assert.match(events.at(-1).message,/Stopped/);
+  } finally {await f.close();}
+});
+
+test('an interrupted typing helper reports an unknown amount, never zero or automatic retry', async () => {
+  const ctl=new AbortController();const f=await desktopBackend(()=>{throw Error('no network');},{online:false,type:async(w,text,signal)=>{assert.equal(signal,ctl.signal);ctl.abort();throw Error('Native helper was cancelled');}});
+  try {
+    const events=[];await f.b.companion.insertText({text:'hello',target:NOTEPAD},{signal:ctl.signal,emit:e=>events.push(e),confirm:async()=>true});
+    const failed=events.find(e=>e.type==='tool'&&e.phase==='failed');assert.equal(failed.verified,false);assert.match(failed.summary,/count is unavailable/);assert.match(failed.summary,/Check the app before retrying/);
+    assert.doesNotMatch(failed.summary,/after 0|Nothing was typed/);
+  } finally {await f.close();}
+});
+
+test('native microphone enable asks for confirmation; Cancel and a newer Off choice keep it off', async () => {
+  const f=await desktopBackend(()=>{throw Error('no network');},{online:false});
+  try {
+    assert.equal(f.b.companion.voice.inputAllowed(),false);let asked=0;
+    const refused=await f.b.companion.voice.setInput(true,async()=>{asked++;return false;});assert.equal(refused.allowed,false);assert.equal(asked,1);
+    let finish;const pending=f.b.companion.voice.setInput(true,()=>new Promise(r=>finish=r));
+    await f.b.companion.voice.setInput(false,async()=>{throw Error('Off needs no confirmation');});finish(true);assert.equal((await pending).allowed,false);assert.equal(f.b.companion.voice.inputAllowed(),false);
+    const seen=[];const off=f.b.companion.voice.onPolicy(v=>seen.push(v));
+    assert.equal((await f.b.companion.voice.setInput(true,async()=>true)).allowed,true);
+    await f.b.companion.voice.setInput(false,async()=>false);assert.deepEqual(seen,[true,false]);off();
+  } finally {await f.close();}
+});
 
 test('typing: the tool exists only with a remembered window, and validates its text', async () => {
   const state = STATE();

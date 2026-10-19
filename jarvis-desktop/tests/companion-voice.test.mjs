@@ -54,9 +54,11 @@ test('the island has its own voice methods, island only, bounded exactly like th
 });
 
 test('microphone permission: audio only, for the hub page or the island itself; nothing else', () => {
-  const allow = (o) => m.core.mediaPermissionAllowed({ permission: 'media', mediaTypes: ['audio'], hubPage: false, islandPage: false, ...o });
+  const allow = (o) => m.core.mediaPermissionAllowed({ permission: 'media', mediaTypes: ['audio'], hubPage: false, islandPage: false, voiceInput: true, ...o });
   assert.equal(allow({ hubPage: true }), true);
   assert.equal(allow({ islandPage: true }), true);
+  assert.equal(allow({ islandPage: true, voiceInput: false }), false, 'native policy overrides a trusted page');
+  assert.equal(allow({ hubPage: true, voiceInput: undefined }), false, 'missing policy fails closed');
   assert.equal(allow({}), false, 'another page, or the selection overlay (not the island webContents)');
   assert.equal(allow({ islandPage: true, mediaTypes: ['video'] }), false, 'no camera');
   assert.equal(allow({ islandPage: true, mediaTypes: ['audio', 'video'] }), false);
@@ -64,7 +66,7 @@ test('microphone permission: audio only, for the hub page or the island itself; 
   assert.equal(allow({ islandPage: true, permission: 'display-capture' }), false, 'no screen capture through this path');
   assert.equal(allow({ hubPage: true, permission: 'geolocation' }), false);
   const main = readFileSync(path.join(root, 'electron/main.ts'), 'utf8');
-  assert.match(main, /mediaPermissionAllowed\(\{permission, mediaTypes: d\.mediaTypes, hubPage: appUrlOk\(url\), islandPage: companion\?\.isIsland\(wc, url\) === true\}\)/);
+  assert.match(main, /mediaPermissionAllowed\(\{permission, mediaTypes: d\.mediaTypes, hubPage: appUrlOk\(url\), islandPage: companion\?\.isIsland\(wc, url\) === true, voiceInput: voiceAllowed\(\)\}\)/);
   const win = readFileSync(path.join(root, 'electron/companionWindow.ts'), 'utf8');
   assert.match(win, /isIsland: \(wc: Electron\.WebContents \| null \| undefined, url: string\) => !!wc && !!island && !island\.isDestroyed\(\) && wc\.id === island\.webContents\.id && trusted\(url\)/);
 });
@@ -115,7 +117,7 @@ test('the real backend: the island voice reports local engines, and hub and isla
   });
   try {
     const st = await b.companion.voice.status();
-    assert.deepEqual(st, { stt: { available: false, reason: 'No Windows speech recognizer is installed' }, tts: { available: true }, voice: null, speaking: false, transcribing: false, cloud: false });
+    assert.deepEqual(st, { stt: { available: false, reason: 'No Windows speech recognizer is installed' }, tts: { available: true }, voice: null, speaking: false, transcribing: false, cloud: false, inputAllowed: false });
     const island = b.companion.voice.speak('island reply');
     await new Promise((r) => setTimeout(r, 20));
     assert.equal((await b.companion.voice.status()).speaking, true);
@@ -136,7 +138,7 @@ test('island wiring: handlers reach only the backend voice, and closing the bubb
     assert.ok(win.includes(`${method}: `) && win.includes(`deps.backend.companion.voice.${call}`), method);
   }
   assert.match(win, /const stopVoice = \(\) => \{ deps\.backend\.companion\.voice\.stop\(\); deps\.backend\.companion\.voice\.cancelTranscribe\(\); \};/);
-  assert.equal((win.match(/stopVoice\(\);/g) ?? []).length, 3, 'bubble closed, island closed, dispose');
+  assert.equal((win.match(/stopVoice\(\);/g) ?? []).length, 4, 'bubble closed, island closed, OS lock event, dispose');
   const pre = readFileSync(path.join(root, 'electron/companionPreload.ts'), 'utf8');
   for (const [k, ch] of [['voiceStatus', 'companionVoiceStatus'], ['transcribe', 'companionTranscribe'], ['transcribeCancel', 'companionTranscribeCancel'], ['speak', 'companionSpeak'], ['speechStop', 'companionSpeechStop']]) {
     assert.match(pre, new RegExp(`\\b${k}: \\([^)]*\\) => call\\('${ch}'`), k);

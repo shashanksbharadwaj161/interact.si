@@ -10,6 +10,7 @@ import {useVoiceSession} from '../voice/useVoiceSession';
 import {useCompanionVoiceCaps} from '../voice/companion';
 import {companionVoiceBackend} from '../voice/backends';
 import {TalkButton, VoiceBar} from '../voice/VoiceBar';
+import {nativeMicConsent} from '../voice/consent';
 import '../styles/voice.css';
 import {companionApi, type AgentEvent, type CompanionPush, type CompanionStatus, type PlacementEvent, type RegionEvent, type TypingTarget} from './api';
 
@@ -40,10 +41,12 @@ export function CompanionApp() {
   const [text, setText] = useState('');
   const voiceBackend = useMemo(() => companionVoiceBackend(api), [api]);
   const {caps, status: voiceStatus, refresh: refreshVoice} = useCompanionVoiceCaps(api);
+  const consent = useMemo(() => nativeMicConsent({initial: false, set: async on => (await api?.setVoiceInput(on))?.allowed === true}), [api]);
   const {voice, snap, blocks} = useVoiceSession({
-    backend: voiceBackend, caps, consentHint: 'Turn on Microphone below, then press Talk. Nothing is recorded until you do.',
+    backend: voiceBackend, caps, consent, consentHint: 'Allow the microphone below, then press Talk. Nothing is recorded until you do.',
     onTranscript: transcript => setText(previous => previous ? `${previous} ${transcript.text}` : transcript.text),
   });
+  useEffect(() => { if (voiceStatus) voice.syncConsent(voiceStatus.inputAllowed === true); }, [voice, voiceStatus]);
   const [region, setRegion] = useState<RegionEvent | null>(null);
   const regionRef = useRef<RegionEvent | null>(null);
   regionRef.current = region;
@@ -59,6 +62,7 @@ export function CompanionApp() {
   // The run id is tracked in a ref (set as soon as ask() returns) so events are matched without waiting for a render.
   const runRef = useRef<string | null>(null);
   const starting = useRef(false);
+  const requestGeneration = useRef(0);
   const early = useRef<Extract<CompanionPush, {runId: string}>[]>([]);
   const anchor = 'corner';
 
@@ -94,7 +98,14 @@ export function CompanionApp() {
   }, [refresh, refreshVoice]);
   const collapse = useCallback(() => {
     voice.release();
+    void api?.cancel().catch(() => undefined);
+    runRef.current = null;
+    requestGeneration.current++;
+    starting.current = false;
+    early.current = [];
+    setRunId(null);
     const selected = regionRef.current;
+    regionRef.current = null;
     if (selected) void api?.regionDiscard(selected.token).catch(() => undefined);
     setRegion(null);
     setSurface('rest');
@@ -137,6 +148,7 @@ export function CompanionApp() {
         return;
       }
       if (e.type === 'drag') setDrag(e.vx);
+      else if (e.type === 'voice-policy') {voice.syncConsent(e.allowed); refreshVoice();}
       else if (e.type === 'gaze') setGaze(e.index);
       else if (e.type === 'placement') setStatus(s => s ? {...s, size: e.size, dock: e.dock} : s);
       else if (e.type === 'target') setTarget(e.target);
@@ -146,8 +158,9 @@ export function CompanionApp() {
         setRegion(e);
         setSurface('command');
       } else if (e.type === 'region-cancelled') setSurface('command');
+      else if (e.type === 'region-expired' && regionRef.current?.token === e.token) {setRegion(null); setNote('The selected screen area expired. Pick it again.');}
     });
-  }, [api, open, collapse, applyRunEvent]);
+  }, [api, open, collapse, applyRunEvent, voice, refreshVoice]);
 
   // Escape: stop a running request first, otherwise collapse.
   useEffect(() => {
@@ -163,36 +176,41 @@ export function CompanionApp() {
     return () => window.removeEventListener('keydown', on);
   }, [api, collapse, voice, snap.phase]);
 
-  const ask = async () => {
+  const ask = async (direct = false) => {
     if (snap.phase === 'starting' || snap.phase === 'listening' || snap.phase === 'transcribing') {
       setNote('Finish or cancel voice input, then review the text before asking.'); return;
     }
-    const t = text.trim();
-    if (!api || !t || runRef.current || starting.current) return;
+    const t = direct ? text : text.trim();
+    if (!api || !t.trim() || runRef.current || starting.current) return;
+    if (!direct && !status?.readiness.ready) {setNote('Connect Claude to ask, or use Type into the attached app without AI.'); return;}
+    const generation = ++requestGeneration.current;
+    if (direct && !target) {setNote('Open the companion from the app where you want this text.'); return;}
     voice.release();
     setSteps([]);
     setAnswer(null);
     setFailure(null);
     setUndone({});
-    setPending('sending');
+    setPending(direct ? null : 'sending');
     setSurface('working');
-    const token = region?.token;
-    setRegion(null);
+    const token = direct ? undefined : region?.token;
+    if (!direct) setRegion(null);
     starting.current = true;
     early.current = [];
     try {
-      const r = await api.ask(t, token, Boolean(target));
+      const r = direct ? await api.insertText(t) : await api.ask(t, token, Boolean(target));
+      if (generation !== requestGeneration.current) return;
       runRef.current = r.runId;
       setRunId(r.runId);
       const queued = early.current.filter((q) => q.runId === r.runId);
       early.current = [];
       for (const q of queued) if (runRef.current === r.runId) applyRunEvent(q.event);
     } catch (e) {
+      if (generation !== requestGeneration.current) return;
       setPending(null);
       setFailure({type: 'error', reason: 'provider', message: e instanceof Error ? e.message : 'The request could not start.'});
       setSurface('error');
     } finally {
-      starting.current = false;
+      if (generation === requestGeneration.current) starting.current = false;
     }
   };
 
@@ -226,6 +244,8 @@ export function CompanionApp() {
           region={region}
           note={note}
           onAsk={() => void ask()}
+          onInsert={() => void ask(true)}
+          inputBusy={snap.phase === 'starting' || snap.phase === 'listening' || snap.phase === 'transcribing'}
           onRegion={async () => {
             setNote(null);
             const r = await api?.regionBegin().catch(() => ({ok: false as const, reason: 'The selection could not start.'}));
@@ -244,7 +264,7 @@ export function CompanionApp() {
           <TalkButton voice={voice} snap={snap} block={blocks.listen} />
           <label><input type="checkbox" checked={snap.consent} onChange={e => voice.setConsent(e.target.checked)} /> Microphone</label>
         </div>
-        <p className="b-meta">{blocks.listen?.reason || 'Talk, review the transcript above, then press Ask. Speech recognition stays on this computer.'}</p>
+        <p className="b-meta">{blocks.listen?.reason || 'Talk, review your text, then Ask Claude or type it into the attached app. Speech recognition stays on this computer.'}</p>
         {snap.note && <p className="b-meta" role="status">{snap.note.text}</p>}
       </section>}
       {surface === 'working' && <Working pending={pending} steps={steps} hasRun={!!runId} onStop={() => void api?.cancel()} />}
@@ -313,6 +333,7 @@ function Island({surface, edge, doneKey, onOpen, onPlaced, label, core, hitRef, 
   const reduced = useReducedMotion();
   // Hold the last content while closing; changing to an empty rest view would restart its fade/morph.
   const lastOpen = useRef({surface, children});
+  const [, refreshClosed] = useState(0);
   if (!rest) lastOpen.current = {surface, children};
   useEffect(() => {
     if (!api) return;
@@ -354,7 +375,7 @@ function Island({surface, edge, doneKey, onOpen, onPlaced, label, core, hitRef, 
       }}>{core(placement?.size ?? 96)}</button>
     <IslandShell open={!rest} view={lastOpen.current.surface} box={placement?.bubble ?? null} side={placement?.side ?? 'none'} edge={edge} edgeKey={doneKey} label="Companion conversation" reducedMotion={reduced}
       onContentSize={size => {if (!rest) void api?.layout({bubble: size});}}
-      onClosed={() => {void api?.layout({bubble: null});}}
+      onClosed={() => {lastOpen.current = {...lastOpen.current, children: null}; refreshClosed(n => n + 1); void api?.layout({bubble: null});}}
       onRect={rect => {islandRect.current = rect;}}>
       <div inert={rest} aria-hidden={rest || undefined}>{lastOpen.current.children}</div>
     </IslandShell>

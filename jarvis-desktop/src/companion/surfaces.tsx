@@ -102,6 +102,9 @@ export function Command(p: {
   showOptions: boolean;
   onToggleOptions: () => void;
   onAsk: () => void;
+  /** Explicit reviewed input without a model call. Available offline when an app is attached. */
+  onInsert?: () => void;
+  inputBusy?: boolean;
   onRegion: () => void;
   onRemoveRegion: () => void;
   onHub: (view: HubView) => void;
@@ -156,7 +159,7 @@ export function Command(p: {
         className="cmd-row"
         onSubmit={(e) => {
           e.preventDefault();
-          p.onAsk();
+          if (ready && !p.inputBusy && p.text.trim()) p.onAsk();
         }}
       >
         <label htmlFor="cmp-input" className="sr-only">
@@ -171,19 +174,23 @@ export function Command(p: {
           value={p.text}
           onChange={(e) => p.setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (ready && !p.inputBusy && e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               p.onAsk();
             }
           }}
           placeholder={p.region ? 'Ask about the area you picked' : 'Ask, or tell me what to do'}
-          disabled={!ready}
+          disabled={p.inputBusy}
         />
         {p.talk}
         <button type="submit" className="btn btn-primary" disabled={!ready || !p.text.trim()}>
           Ask
         </button>
       </form>
+      {p.target && p.onInsert && <div className="cmd-direct">
+        <button type="button" className="chipbtn" disabled={!p.text.trim() || p.inputBusy} onClick={p.onInsert}>Type into {p.target.process.replace(/\.exe$/i, '')}</button>
+        <span className="b-meta">Review the exact text in Windows first. No AI request.</span>
+      </div>}
       {p.note && (
         <p className="cmd-note" role="status">
           {p.note}
@@ -370,7 +377,7 @@ export function AnswerView(p: {answer: Answer; steps: ToolStep[]; undone: Record
   const plain = p.answer.text.replace(CITE_RE, '').replace(/[ \t]+([.,;:!?])/g, '$1').trim();
   return (
     <div className="ans">
-      <Head title="Answer" meta={`Claude · ${p.answer.steps} step${p.answer.steps === 1 ? '' : 's'}`} />
+      <Head title={p.answer.steps === 0 ? 'Action result' : 'Answer'} meta={p.answer.steps === 0 ? 'On this computer · no AI request' : `Claude · ${p.answer.steps} step${p.answer.steps === 1 ? '' : 's'}`} />
       <p className="ans-text">{plain}</p>
       {p.answer.citations.length > 0 && (
         <div className="cites" aria-label="Saved items used">

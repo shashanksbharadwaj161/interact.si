@@ -16,7 +16,7 @@ export interface NativeAdapter {
   listWindows(): Promise<WindowInfo[]>;
   focusWindow(w: WindowRef): Promise<{focused: boolean}>;
   moveWindow(w: WindowRef, rect: Rect): Promise<Rect & {clamped: boolean}>;
-  typeText(w: WindowRef, text: string): Promise<{typed: number}>;
+  typeText(w: WindowRef, text: string, signal?: AbortSignal): Promise<{typed: number}>;
   click(w: WindowRef, x: number, y: number): Promise<void>;
   probeSpeech(): Promise<{voices: string[]; recognizers: string[]}>;
   speak(text: string, voice: string, signal?: AbortSignal): Promise<{ok: boolean; reason?: string}>;
@@ -57,10 +57,10 @@ export function createNativeAdapter(runner: NativeRunner): NativeAdapter {
       const r = need(await runner.run<Res>('move-window', {...w, ...rect}));
       return {x: Number(r.x), y: Number(r.y), width: Number(r.width), height: Number(r.height), clamped: !!r.clamped};
     },
-    async typeText(w, text) {
-      const r = await runner.run<Res>('type-text', {...w, text}, {timeoutMs: 30_000});
+    async typeText(w, text, signal) {
+      const r = await runner.run<Res>('type-text', {...w, text}, {timeoutMs: 30_000, signal});
       // Typing that stopped part-way (focus left the window) reports how much was already typed.
-      if (!r.ok && typeof r.typed === 'number' && r.typed > 0) throw new InputStoppedError(String(r.error ?? 'Typing stopped'), r.typed);
+      if (!r.ok && typeof r.typed === 'number' && r.typed >= 0) throw new InputStoppedError(String(r.error ?? 'Typing stopped'), r.typed);
       return {typed: Number(need(r).typed ?? 0)};
     },
     async click(w, x, y) {
