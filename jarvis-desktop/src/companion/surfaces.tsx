@@ -183,7 +183,7 @@ export function Command(p: {
           disabled={p.inputBusy}
         />
         {p.talk}
-        <button type="submit" className="btn btn-primary" disabled={!ready || !p.text.trim()}>
+        <button type="submit" className="btn btn-primary" disabled={!ready || !p.text.trim() || p.inputBusy}>
           Ask
         </button>
       </form>

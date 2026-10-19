@@ -156,6 +156,7 @@ export function CompanionApp() {
       else if (e.type === 'collapse') collapse();
       else if (e.type === 'region') {
         setRegion(e);
+        setNote(null);
         setSurface('command');
       } else if (e.type === 'region-cancelled') setSurface('command');
       else if (e.type === 'region-expired' && regionRef.current?.token === e.token) {setRegion(null); setNote('The selected screen area expired. Pick it again.');}

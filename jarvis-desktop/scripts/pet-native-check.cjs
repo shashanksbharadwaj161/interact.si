@@ -8,6 +8,7 @@ const root = path.join(__dirname, '..');
 const data = fs.mkdtempSync(path.join(os.tmpdir(), 'desktop-companion-pet-'));
 const evidenceArg = process.argv.find(a => a.startsWith('--out='));
 const evidence = evidenceArg ? path.resolve(root, evidenceArg.slice(6)) : path.join(root, '..', 'planning', 'ui-revamp', 'pet-art', 'first-light-motion-2026-10-18', 'qa');
+fs.mkdirSync(evidence, {recursive: true});
 app.setPath('userData', data);
 delete process.env.JARVIS_TEST_MODE;
 const results = [];
@@ -79,6 +80,7 @@ app.whenReady().then(async () => {
     check('expiry clears the renderer thumbnail and explains recovery', await js('document.body.innerText.includes("screen area expired")'));
     island.webContents.send('companion:event', {type:'region', token:'pet-review-region', preview:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jrc0AAAAASUVORK5CYII=', width:1, height:1, sourceScale:1});
     await until(() => js('document.body.innerText.includes("Screen area attached")'), 'sample context reattached');
+    check('a newly picked area clears the stale expiry warning', await js('!document.body.innerText.includes("screen area expired")'));
     await delay(450);
     const openBounds = island.getBounds();
     fs.writeFileSync(path.join(evidence, 'native-island-open.png'), (await island.webContents.capturePage()).toPNG());

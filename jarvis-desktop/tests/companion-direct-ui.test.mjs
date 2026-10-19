@@ -15,6 +15,7 @@ test('direct insertion requires a target and nonempty text, and is blocked while
   assert.match(command({text:'  '}),/<button[^>]*disabled[^>]*>Type into/);
   assert.match(command({inputBusy:true}),/<textarea[^>]*disabled/);
   assert.match(command({inputBusy:true}),/<button[^>]*disabled[^>]*>Type into/);
+  assert.match(command({status:{readiness:{ready:true,model:'test'}},inputBusy:true}),/<button[^>]*disabled[^>]*>Ask<\/button>/);
 });
 test('a local action receipt never claims a Claude call',()=>{
   const html=m.renderToStaticMarkup(m.createElement(m.AnswerView,{answer:{type:'answer',text:'Typed 4 characters. Not read back.',citations:[],steps:0},steps:[],undone:{},onUndo:nop,onOpen:nop,onFollow:nop,onDone:nop}));

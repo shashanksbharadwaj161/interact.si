@@ -18,6 +18,7 @@ import {pathToFileURL} from 'node:url';
 import type {Backend, CompanionReadiness, CompanionTarget} from './backend';
 import type {AgentEvent} from './services/agent';
 import {ScreenContext, SelectionGate} from './services/screen-context';
+import {ForegroundCapture} from './services/foreground-capture';
 import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
 import {createTrustedConfirm, safeErrorMessage, validateArgsAgainst} from './ipcCore';
 
@@ -102,7 +103,7 @@ export function createCompanion(deps: CompanionDeps) {
   let interactive = !CLICK_THROUGH;
   /** The window the person was using when they opened the companion; typing may go only there. Cleared on close. */
   let target: CompanionTarget | null = null;
-  const TARGET_WAIT_MS = 700;
+  const foregroundCapture = new ForegroundCapture<CompanionTarget>();
   const regions = new ScreenContext<Region>(REGION_TTL_MS, undefined, undefined, undefined, token => send({type: 'region-expired', token}));
   const selectionGate = new SelectionGate();
   const undoable = new Set<string>();
@@ -180,13 +181,16 @@ export function createCompanion(deps: CompanionDeps) {
    * the keyboard yet), so a later "type this there" goes to exactly the app the person was using.
    */
   async function invoke() {
-    if (!alive()) return;
+    if (!alive() || foregroundCapture.busy) return;
     const opening = !bubble;
     if (!island!.isVisible()) island!.showInactive();
     send({type: 'invoke'});
     if (opening) {
-      const wait = new Promise<null>((r) => setTimeout(() => r(null), TARGET_WAIT_MS));
-      target = await Promise.race([deps.backend.companion.foregroundTarget().catch(() => null), wait]);
+      // Keep the non-activating island from taking focus until Windows has identified the source app.
+      // The former 700 ms deadline expired during PowerShell cold start on ordinary laptops.
+      const captured = await foregroundCapture.capture(() => deps.backend.companion.foregroundTarget());
+      if (!captured || !alive()) return;
+      target = captured.target;
       send({type: 'target', target: shownTarget()});
     }
     if (!alive()) return;
@@ -262,6 +266,7 @@ export function createCompanion(deps: CompanionDeps) {
   // A policy change from any window (hub settings, the island, an import) reaches the island page at once.
   const offVoicePolicy = deps.backend.companion.voice.onPolicy((allowed) => send({type: 'voice-policy', allowed}));
   const onLock = () => {
+    foregroundCapture.cancel();
     run?.abort(); closeOverlay(); regions.clear(); target = null; stopVoice();
     send({type: 'target', target: null}); send({type: 'collapse'});
     gazeLocked = true; updateGaze();
@@ -310,6 +315,7 @@ export function createCompanion(deps: CompanionDeps) {
     win.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
     win.webContents.on('will-navigate', (e, url) => { if (!trusted(url)) e.preventDefault(); });
     win.on('closed', () => {
+      foregroundCapture.cancel();
       if (island === win) island = null;
       run?.abort();
       closeOverlay();
@@ -495,9 +501,9 @@ export function createCompanion(deps: CompanionDeps) {
 
   const handlers: Record<CompanionMethod, (...args: never[]) => Promise<unknown> | unknown> = {
     companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock, target: shownTarget(), reduceMotion: (await deps.backend.getState()).settings.reduceMotion}),
-    companionClearTarget: () => { target = null; send({type: 'target', target: null}); return true; },
+    companionClearTarget: () => { foregroundCapture.cancel(); target = null; send({type: 'target', target: null}); return true; },
     companionAsk: (text: string, token?: string, withTarget?: boolean) => ask(text, token, withTarget),
-    companionCancel: () => { run?.abort(); closeOverlay(); regions.clear(); return true; },
+    companionCancel: () => { foregroundCapture.cancel(); run?.abort(); closeOverlay(); regions.clear(); return true; },
     companionUndo: async (id: string) => {
       if (!undoable.has(id)) return false;
       undoable.delete(id);
@@ -510,6 +516,7 @@ export function createCompanion(deps: CompanionDeps) {
       place();
       // Closing the bubble gives the keyboard back: Windows activates the window the person was using before.
       if (!bubble && alive()) {
+        foregroundCapture.cancel();
         run?.abort();
         closeOverlay();
         regions.clear();
@@ -584,6 +591,7 @@ export function createCompanion(deps: CompanionDeps) {
 
   function toggle() {
     if (!alive()) { createIsland(); return; }
+    if (foregroundCapture.busy) { foregroundCapture.cancel(); send({type: 'collapse'}); return; }
     if (island!.isFocused()) send({type: 'collapse'});
     else void invoke();
   }
@@ -596,6 +604,7 @@ export function createCompanion(deps: CompanionDeps) {
   }
 
   function dispose() {
+    foregroundCapture.cancel();
     run?.abort();
     stopVoice();
     offVoicePolicy();

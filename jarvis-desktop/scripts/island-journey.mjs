@@ -188,6 +188,7 @@ async function main() {
     const jumps = f.filter((x) => x.dt > 60).length;
     // Reopening before the close finished continues from the drawn shape (a morph back), not from the capsule.
     expect(f.some((x) => x.phase === 'open') && f.some((x) => x.phase === 'close') && f.at(-1).phase === 'morph', `open, reversed to close, reversed again (${[...new Set(f.map((x) => x.phase))].join(',')})`);
+    notes.push(`reversal frame timing: ${JSON.stringify(stats(f))}; stalls over 60 ms: ${jumps}`);
     expect(jumps === 0, 'no stalled frame during the reversals');
     expect(await page.evaluate(() => document.activeElement?.id === 'cmp-input'), 'focus is back in the message field once, not lost');
     notes.push(`phases: ${[...new Set(widths)].join(' → ')}; ${JSON.stringify(stats(f))}${trace ? '' : ''}`);
