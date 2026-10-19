@@ -198,6 +198,9 @@ function createWindow() {
   else void win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
 
+/** The microphone policy lives in the main process: off until the person allowed it in a trusted confirmation. */
+const voiceAllowed = () => backend?.store.snapshot().settings.voiceInput === true;
+
 function hardenSession() {
   const ses = session.defaultSession;
   ses.setSpellCheckerEnabled(false);
@@ -217,9 +220,9 @@ function hardenSession() {
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
     const d = details as {mediaTypes?: string[]; requestingUrl?: string};
     const url = d.requestingUrl ?? wc.getURL();
-    cb(mediaPermissionAllowed({permission, mediaTypes: d.mediaTypes, hubPage: appUrlOk(url), islandPage: companion?.isIsland(wc, url) === true}));
+    cb(mediaPermissionAllowed({permission, mediaTypes: d.mediaTypes, hubPage: appUrlOk(url), islandPage: companion?.isIsland(wc, url) === true, voiceInput: voiceAllowed()}));
   });
-  ses.setPermissionCheckHandler((wc, permission, origin) => permission === 'media' && !!wc && (appUrlOk(wc.getURL() || origin) || companion?.isIsland(wc, wc.getURL()) === true));
+  ses.setPermissionCheckHandler((wc, permission, origin) => permission === 'media' && !!wc && voiceAllowed() && (appUrlOk(wc.getURL() || origin) || companion?.isIsland(wc, wc.getURL()) === true));
 }
 
 function createTray() {

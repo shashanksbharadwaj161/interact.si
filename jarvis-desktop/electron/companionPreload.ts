@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('companion', {
   transcribeCancel: () => call('companionTranscribeCancel'),
   speak: (text: string) => call('companionSpeak', text),
   speechStop: () => call('companionSpeechStop'),
+  setVoiceInput: (on: boolean) => call('companionSetVoiceInput', on),
+  insertText: (text: string) => call('companionInsertText', text),
   regionBegin: () => call('regionBegin'),
   regionDiscard: (token: string) => call('regionDiscard', token),
   overlayImage: () => call('overlayImage'),

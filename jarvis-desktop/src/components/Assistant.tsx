@@ -8,7 +8,7 @@ import { AiSetup } from './AiSetup';
 import { ConfirmDialog, Dialog } from '../ui/Dialog';
 import { Badge, Button, Notice, Panel, Segmented, Spinner, Switch, Tabs } from '../ui/primitives';
 import '../styles/assistant.css';
-import { MAX_CLIP_MS, createMicConsent, defaultConsentStorage } from '../ui/audio';
+import { MAX_CLIP_MS } from '../ui/audio';
 import { actionOutcome, listedWindows, type ActionOutcome } from '../ui/action-result';
 import { useCompanion } from '../ui/companion';
 import { usePref } from '../ui/prefs';
@@ -19,6 +19,7 @@ import { useReady } from '../ui/store';
 import { cx, errMsg, fmtTime, truncate } from '../ui/util';
 import { hubVoiceBackend } from '../voice/backends';
 import type { Transcript, VoicePhase } from '../voice/session';
+import { nativeMicConsent } from '../voice/consent';
 import { useVoiceSession } from '../voice/useVoiceSession';
 import { HOLD_MS, VoiceBar, usePushToTalk } from '../voice/VoiceBar';
 import '../styles/voice.css';
@@ -754,8 +755,28 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   const unsubRef = useRef<(() => void) | null>(null);
   const streamMounted = useRef(true);
   const [sendError, setSendError] = useState<string | null>(null);
-  /** In-app microphone consent: separate from the Windows permission, off until the user turns it on here, never granted on load. */
-  const consent = useMemo(() => createMicConsent(defaultConsentStorage()), []);
+  /**
+   * Microphone consent is the main process's policy (settings.voiceInput), not this page's storage: off until the person
+   * allows it, and turning it on shows a trusted Windows confirmation. The session refuses audio while it is off.
+   */
+  const voiceInput = settings.voiceInput === true;
+  const consent = useMemo(
+    () =>
+      nativeMicConsent({
+        initial: voiceInput,
+        set: async (on) => {
+          try {
+            const next = await api.saveSettings({ voiceInput: on });
+            void reload().catch(() => undefined);
+            return next.settings.voiceInput === true;
+          } catch {
+            return false;
+          }
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [api],
+  );
   const [drawer, setDrawer] = useState<DrawerTab | null>(null);
   const [setupOpen, setSetupOpen] = useState(Boolean(initialSetup));
   /** The microphone panel beside Talk (consent and why Talk is off). Closed by default; Talk's tooltip carries the same reason. */
@@ -880,6 +901,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
   /** The recording phase as the composer shows it. Read-aloud is not a recording: Talk stays available and interrupts it. */
   const phase: RecPhase = snap.phase === 'listening' ? 'recording' : snap.phase === 'speaking' ? 'idle' : snap.phase;
   const micAllowed = snap.consent;
+  // The policy may change in another window (the companion, Settings): follow it, and stop a recording it turns off.
+  useEffect(() => voice.syncConsent(voiceInput), [voice, voiceInput]);
   const voiceName = settings.voice || 'Windows default voice';
   const speak = useCallback(
     (text: string, key?: string) => {
@@ -1095,8 +1118,8 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
     if (ok !== undefined) setConfirmClear(false);
   };
 
-  /** The in-app consent switch. Turning it off cancels any recording or transcription at once. */
-  const setMicAllowed = (v: boolean) => voice.setConsent(v);
+  /** The consent switch: on asks for a Windows confirmation; off cancels any recording or transcription at once. */
+  const setMicAllowed = (v: boolean) => void voice.setConsent(v);
 
   const listenBlock = blocks.listen;
   const micBlocked = listenBlock && (listenBlock.code === 'device' || listenBlock.code === 'consent') ? listenBlock.reason : null;
@@ -1395,7 +1418,7 @@ export function Assistant({ initialDraft, initialSetup }: { initialDraft?: strin
                     {!support.supported && <Notice tone="warn" title="Microphone unavailable">{support.reason}</Notice>}
                     <Switch
                       label="Allow the microphone in Desktop Companion"
-                      description={micAllowed ? 'On: the microphone opens only while you hold or tap the talk button and is released as soon as you stop or cancel. Turning this off cancels any recording.' : 'Off: the talk button stays disabled and this window never opens the microphone. This is separate from the Windows microphone permission.'}
+                      description={micAllowed ? 'On: the microphone opens only while you hold or tap the talk button and is released as soon as you stop or cancel. Turning this off cancels any recording, here and in the companion.' : 'Off: the talk button stays disabled and this window never opens the microphone. Turning it on asks you to confirm in a Windows dialog; the app refuses microphone access while it is off. This is separate from the Windows microphone permission.'}
                       checked={micAllowed}
                       disabled={!support.supported}
                       onChange={setMicAllowed}
