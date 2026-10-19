@@ -10,7 +10,7 @@ export type TypingTarget = {process: string; title: string};
 export type CompanionStatus = {readiness: Readiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock; target: TypingTarget | null};
 export type Box = {x: number; y: number; width: number; height: number};
 /** The island's voice engines (local Windows speech; `cloud` is always false). */
-export type CompanionVoiceStatus = {stt: {available: boolean; reason?: string}; tts: {available: boolean; reason?: string}; voice: string | null; speaking: boolean; transcribing: boolean; cloud: false};
+export type CompanionVoiceStatus = {stt: {available: boolean; reason?: string}; tts: {available: boolean; reason?: string}; voice: string | null; speaking: boolean; transcribing: boolean; cloud: false; /** The native microphone policy; the session refuses audio while false. Optional for older main processes. */ inputAllowed?: boolean};
 export type PlacementEvent = {type: 'placement'; window: Box; pet: Box; bubble: Box | null; side: 'left' | 'right' | 'above' | 'below' | null; size: number; dock: Dock};
 export type RegionEvent = {type: 'region'; token: string; preview: string; width: number; height: number; sourceScale: number};
 export type CompanionPush =
@@ -22,6 +22,8 @@ export type CompanionPush =
   | {type: 'drag'; vx: number | null}
   | {type: 'gaze'; index: number | null}
   | {type: 'target'; target: TypingTarget | null}
+  /** The microphone policy changed (hub settings, the island or an import). */
+  | {type: 'voice-policy'; allowed: boolean}
   | {runId: string; event: AgentEvent};
 
 export interface CompanionApi {
@@ -46,6 +48,10 @@ export interface CompanionApi {
   transcribeCancel(): Promise<boolean>;
   speak(text: string): Promise<{ok: boolean; reason?: string}>;
   speechStop(): Promise<boolean>;
+  /** The native microphone policy. Turning it on shows a trusted Windows confirmation; the result says what is in force. */
+  setVoiceInput(on: boolean): Promise<{allowed: boolean; reason?: string}>;
+  /** Types this reviewed text into the remembered window without asking Claude. Events arrive as a run, like ask(). */
+  insertText(text: string): Promise<{runId: string}>;
   regionBegin(): Promise<{ok: true} | {ok: false; reason: string}>;
   regionDiscard(token: string): Promise<boolean>;
   overlayImage(): Promise<{dataUrl: string; width: number; height: number} | null>;

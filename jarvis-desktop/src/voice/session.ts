@@ -1,5 +1,6 @@
 import { ClipRecorder, RecordingCancelled, clipQuality, micErrorMessage, type ClipLevel, type ClipResult, type MicConsent } from '../ui/audio';
 import { errMsg } from '../ui/util';
+import { isNativeConsent } from './consent';
 
 /**
  * One voice session for one surface (the Assistant page, later the companion island). It owns the whole local voice loop:
@@ -191,15 +192,40 @@ export class VoiceSession {
     if (this.snap.note) this.set({ note: null });
   }
 
-  /** The in-app consent switch. Turning it off cancels any recording or transcription at once. */
-  setConsent(on: boolean): void {
-    if (on) this.d.consent.grant();
-    else {
+  /**
+   * The consent switch. Turning it off cancels any recording or transcription at once. With a native consent (the main
+   * process's policy) turning it on waits for the person's answer in the trusted confirmation; resolves to what is in
+   * force afterwards.
+   */
+  async setConsent(on: boolean): Promise<boolean> {
+    const c = this.d.consent;
+    if (!on) {
       const active = this.snap.phase === 'starting' || this.snap.phase === 'listening' || this.snap.phase === 'transcribing';
-      this.d.consent.revoke();
+      if (isNativeConsent(c)) void c.request(false);
+      else c.revoke();
       if (active) this.cancel({ tone: 'info', code: 'consent-off', text: 'Microphone turned off. The recording was discarded and nothing was transcribed.' });
+      this.set({ consent: false });
+      return false;
     }
-    this.set({ consent: this.d.consent.granted() });
+    if (isNativeConsent(c)) {
+      const ok = await c.request(true);
+      this.set({ consent: c.granted(), note: ok ? null : { tone: 'info', code: 'consent-off', text: 'The microphone stays off: you chose Cancel or the confirmation could not be shown.' } });
+      return ok;
+    }
+    c.grant();
+    this.set({ consent: c.granted() });
+    return c.granted();
+  }
+
+  /** The policy changed elsewhere (another window, the main process). Turning off cancels a recording in progress. */
+  syncConsent(allowed?: boolean): void {
+    const c = this.d.consent;
+    if (allowed !== undefined && isNativeConsent(c)) c.update(allowed);
+    const now = c.granted();
+    if (!now && (this.snap.phase === 'starting' || this.snap.phase === 'listening' || this.snap.phase === 'transcribing')) {
+      this.cancel({ tone: 'info', code: 'consent-off', text: 'The microphone was turned off. The recording was discarded and nothing was transcribed.' });
+    }
+    this.set({ consent: now });
   }
 
   // ---- listening ----

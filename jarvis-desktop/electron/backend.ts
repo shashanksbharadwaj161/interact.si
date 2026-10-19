@@ -8,8 +8,8 @@ import {LOCAL_KEEP_ALIVE, buildHistory, ollamaChat, resolveChatRoute, sendChat, 
 import {CLOUD_PROVIDERS, cloudProviderInfo, effectiveCloudModel} from '../src/shared/contracts';
 import {STREAM_LIMITS, StreamAborted, StreamIncomplete, StreamProtocolError, streamOllamaChat, type StreamLimits, type StreamResult} from './services/ollama';
 import {AGENT_MAX_TOKENS, CloudProviderError, createAnthropicMessage, modelListFailure, parseModelList, streamProviderChat} from './services/cloud';
-import {companionSystemPrompt, runAgent, type AgentEvent, type UndoHandle} from './services/agent';
-import {createAgentTools, type TypeResult} from './services/agent-tools';
+import {companionSystemPrompt, runAgent, runToolDirect, type AgentEvent, type UndoHandle} from './services/agent';
+import {createAgentTools, createTypingTool, type TypeResult} from './services/agent-tools';
 import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
 import {parseModelPlan, planIntent as planRules, PLANNED_TYPES, type IntentWindow} from './services/intent';
@@ -32,7 +32,7 @@ import {createDpapiKeyVault, createIntegrationService, type IntegrationService} 
 import {createUsageLedger, type UsageLedger} from './services/usage';
 import {ClipboardHistory, type ClipboardReader} from './services/clipboard';
 import {createJsonSidecar, type SidecarFs} from './services/sidecar';
-import {LIMITS, ValidationError, validateChatText, validateCloudProvider, buildCapsule, buildNote, buildTask, checkId, mergeSettings, parseState} from './services/validation';
+import {LIMITS, ValidationError, validateChatText, validateCloudProvider, buildCapsule, buildNote, buildTask, checkId, mergeSettings, parseState, MIC_PERMISSION_CHANGE} from './services/validation';
 import {createNativeAdapter, type NativeAdapter} from './native/adapter';
 import {NativeRunner} from './native/runner';
 
@@ -125,12 +125,23 @@ export interface CompanionService {
   foregroundTarget(): Promise<CompanionTarget | null>;
   /** The island's own voice: the same local Windows speech as the hub, tagged so each surface stops only its own audio. */
   voice: CompanionVoice;
+  /**
+   * Types a text the person reviewed into the remembered window, without asking Claude: the same preview, trusted
+   * confirmation, window re-check and receipt as the type_into_app tool. Events use the run event shape.
+   */
+  insertText(input: {text: string; target: CompanionTarget | null; targetCurrent?: () => boolean}, hooks: {emit: (e: AgentEvent) => void; confirm: (summary: string, detail: string) => Promise<boolean>; signal: AbortSignal}): Promise<void>;
 }
 
 /** Engine state for the island's voice UI. Local only: there is no cloud speech, so `cloud` is always false. */
-export type CompanionVoiceStatus = {stt: {available: boolean; reason?: string}; tts: {available: boolean; reason?: string}; voice: string | null; speaking: boolean; transcribing: boolean; cloud: false};
+export type CompanionVoiceStatus = {stt: {available: boolean; reason?: string}; tts: {available: boolean; reason?: string}; voice: string | null; speaking: boolean; transcribing: boolean; cloud: false; inputAllowed: boolean};
 export interface CompanionVoice {
   status(): Promise<CompanionVoiceStatus>;
+  /** The native microphone policy (settings.voiceInput). The session refuses audio while it is false. */
+  inputAllowed(): boolean;
+  /** Turning it on needs the trusted confirmation passed in (owned by the caller's window); turning it off does not. */
+  setInput(on: boolean, confirm: (summary: string, detail: string) => Promise<boolean>): Promise<{allowed: boolean; reason?: string}>;
+  /** Called whenever the policy changes, from any window (hub settings, island, import). */
+  onPolicy(listener: (allowed: boolean) => void): () => void;
   transcribe(audio: unknown): Promise<{text: string; reason?: string; cancelled?: boolean}>;
   speak(text: unknown): Promise<{ok: boolean; reason?: string}>;
   stop(): boolean;
@@ -340,6 +351,12 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   let keyConfigured = await secrets.configured();
   const providerKeys = {openai: await secrets.hasKey('openai'), openrouter: await secrets.hasKey('openrouter')};
   const settings = () => store.snapshot().settings;
+  /** Windows that must hear when the microphone policy changes (the island cancels a recording when it turns off). */
+  const voicePolicyListeners = new Set<(allowed: boolean) => void>();
+  const notifyVoicePolicy = () => {
+    const allowed = settings().voiceInput === true;
+    for (const l of voicePolicyListeners) { try { l(allowed); } catch { /* a closed window */ } }
+  };
   const safeLaunch = env.safeLaunch ?? (() => false);
   const activity = (kind: string, summary: string, details?: string) => store.addActivity(kind, summary, details);
 
@@ -663,6 +680,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
         ...proposed.approvedApps.filter((v) => !before.approvedApps.includes(v)).map((v) => `Approve executable: ${v}`),
         ...proposed.allowedRoots.filter((v) => !before.allowedRoots.includes(v)).map((v) => `Allow folder: ${v}`),
         ...(before.mode !== 'online' && proposed.mode === 'online' ? ['Enable online mode (cloud requests may send conversation content)'] : []),
+        ...(!before.voiceInput && proposed.voiceInput ? [MIC_PERMISSION_CHANGE] : []),
         ...(before.localEndpoint !== proposed.localEndpoint ? [`Local model endpoint: ${before.localEndpoint} → ${proposed.localEndpoint}`] : []),
         ...(proposed.mode === 'online' && selectedCloudProvider(before) !== selectedCloudProvider(proposed) ? [`Cloud provider: ${selectedCloudProvider(before)} → ${selectedCloudProvider(proposed)}`] : []),
       ];
@@ -677,6 +695,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       // Leaving online mode ends any cloud reply in flight; the guard would refuse its next request anyway.
       if (before.mode === 'online' && settings().mode !== 'online') chatStreams.abortRoute('cloud', 'offline');
       if (changed.length) await activity('settings', `Settings changed: ${changed.join(', ')}`);
+      if (changed.includes('voiceInput')) notifyVoicePolicy();
       return store.snapshot();
       });
     },
@@ -873,7 +892,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       const validated = parseState(envelope.state);
       const document = {format: 'jarvis-export', schemaVersion: envelope.schemaVersion, state: validated};
       const current = settings();
-      document.state.settings = {...document.state.settings, approvedApps: current.approvedApps, allowedRoots: current.allowedRoots, mode: 'offline', localEndpoint: current.localEndpoint, cloudModel: current.cloudModel};
+      document.state.settings = {...document.state.settings, approvedApps: current.approvedApps, allowedRoots: current.allowedRoots, mode: 'offline', localEndpoint: current.localEndpoint, cloudModel: current.cloudModel, voiceInput: current.voiceInput === true};
       const state = await store.importDocument(JSON.stringify(document));
       await reconcileProductivity();
       system.invalidate();
@@ -1185,9 +1204,10 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       actions.discard(preview.id);
       return {typed: false, stage: 'before', reason: preview.reason ?? 'Not allowed'};
     }
+    // A Stop, a removed window or a closed bubble while the dialog was open means no input, even after Continue.
     const shown = async (summary: string, detail: string) => {
       h.onConfirm(true);
-      try { return await confirm(summary, detail); } finally { h.onConfirm(false); }
+      try { return (await confirm(summary, detail)) && h.current(); } finally { h.onConfirm(false); }
     };
     const r = (await actions.execute(preview.id, true, {confirm: shown}).catch((e: unknown) => ({executed: false, reason: e instanceof Error ? e.message : 'Failed'}))) as {executed: boolean; reason?: string; typed?: number};
     if (r.executed) return {typed: true, chars: typeof r.typed === 'number' ? r.typed : [...text].length};
@@ -1199,7 +1219,22 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     async status() {
       const st = await speech.status();
       const cap = (c: {available: boolean; reason?: string}) => (c.available ? {available: true} : {available: false, reason: c.reason});
-      return {stt: cap(st.stt), tts: cap(st.tts), voice: st.tts.selectedVoice, speaking: st.speaking, transcribing: st.transcribing, cloud: false};
+      return {stt: cap(st.stt), tts: cap(st.tts), voice: st.tts.selectedVoice, speaking: st.speaking, transcribing: st.transcribing, cloud: false, inputAllowed: settings().voiceInput === true};
+    },
+    inputAllowed: () => settings().voiceInput === true,
+    async setInput(on, confirm) {
+      if (on === (settings().voiceInput === true)) return {allowed: on};
+      if (on && !(await confirm('Allow the microphone?', `${MIC_PERMISSION_CHANGE}.\n\nYou can turn it off again in the companion or in the hub at any time.`))) {
+        return {allowed: false, reason: 'Not allowed: you chose Cancel or the confirmation could not be shown. The microphone stays off.'};
+      }
+      await store.mutate((d) => { d.settings = {...d.settings, voiceInput: on}; });
+      await activity('settings', on ? 'Microphone allowed (from the companion)' : 'Microphone turned off (from the companion)');
+      notifyVoicePolicy();
+      return {allowed: on};
+    },
+    onPolicy(listener) {
+      voicePolicyListeners.add(listener);
+      return () => { voicePolicyListeners.delete(listener); };
     },
     transcribe: (audio) => speech.transcribe(audio, {owner: 'companion'}),
     speak: (text) => speech.speak(text, {owner: 'companion'}),
@@ -1210,6 +1245,16 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   const companion: CompanionService = {
     readiness: companionReadiness,
     voice: companionVoice,
+    async insertText(input, hooks) {
+      const target = input.target;
+      if (!target) {
+        hooks.emit({type: 'error', reason: 'setup', message: 'No app window is remembered. Open the companion from the app you want to type into, then try again.'});
+        return;
+      }
+      const current = () => !hooks.signal.aborted && (input.targetCurrent ?? (() => true))();
+      const tool = createTypingTool({target, type: (text, h) => typeIntoTarget(target, text, hooks.confirm, {...h, current})});
+      await runToolDirect(tool, {text: input.text}, {emit: hooks.emit, signal: hooks.signal, callId: `direct-${store.id()}`});
+    },
     async run(input, hooks) {
       const r = await companionReadiness();
       if (!r.ready) { hooks.emit({type: 'error', reason: 'setup', message: r.reason}); return; }

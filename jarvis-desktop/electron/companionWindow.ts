@@ -243,6 +243,8 @@ export function createCompanion(deps: CompanionDeps) {
       if (gaze.bucket !== null) { gaze.bucket = null; send({type: 'gaze', index: null}); }
     }
   }
+  // A policy change from any window (hub settings, the island, an import) reaches the island page at once.
+  const offVoicePolicy = deps.backend.companion.voice.onPolicy((allowed) => send({type: 'voice-policy', allowed}));
   const onLock = () => { gazeLocked = true; updateGaze(); };
   const onUnlock = () => { gazeLocked = false; updateGaze(); };
   /** Backstop for the page's own release: closing the bubble or the island ends the island's speech and transcription. */
@@ -447,6 +449,25 @@ export function createCompanion(deps: CompanionDeps) {
     return {runId};
   }
 
+  /**
+   * Types the reviewed text into the window remembered when the bubble opened, without a model call. It runs as a
+   * request of its own (Stop cancels it and closes an open confirmation as Cancel) and may type only while the person
+   * still has that same window attached and the bubble open.
+   */
+  function insertText(text: string) {
+    run?.abort();
+    const ctl = new AbortController();
+    run = ctl;
+    const runId = randomUUID();
+    const sendTarget = target;
+    const targetCurrent = () => !!sendTarget && !!target && !!bubble && target.hwnd === sendTarget.hwnd && target.pid === sendTarget.pid;
+    const emit = (event: AgentEvent) => send({runId, event});
+    void deps.backend.companion.insertText({text, target: sendTarget, targetCurrent}, {emit, confirm: (summary, detail) => confirm(summary, detail, ctl.signal), signal: ctl.signal}).catch((e) => {
+      emit({type: 'error', reason: 'provider', message: safeErrorMessage(e)});
+    }).finally(() => { if (run === ctl) run = null; });
+    return {runId};
+  }
+
   const handlers: Record<CompanionMethod, (...args: never[]) => Promise<unknown> | unknown> = {
     companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock, target: shownTarget()}),
     companionClearTarget: () => { target = null; send({type: 'target', target: null}); return true; },
@@ -506,6 +527,9 @@ export function createCompanion(deps: CompanionDeps) {
     companionTranscribeCancel: () => deps.backend.companion.voice.cancelTranscribe(),
     companionSpeak: (text: string) => deps.backend.companion.voice.speak(text),
     companionSpeechStop: () => deps.backend.companion.voice.stop(),
+    // Turning the microphone on shows the island's own trusted confirmation (Cancel is the default); off needs none.
+    companionSetVoiceInput: (on: boolean) => deps.backend.companion.voice.setInput(on, (summary, detail) => confirm(summary, detail)),
+    companionInsertText: (text: string) => insertText(text),
     regionBegin: () => regionBegin(),
     regionDiscard: (token: string) => regions.delete(token),
     overlayImage: () => overlayImage(),
@@ -546,6 +570,7 @@ export function createCompanion(deps: CompanionDeps) {
   function dispose() {
     run?.abort();
     stopVoice();
+    offVoicePolicy();
     bubble = null;
     target = null;
     if (drag) { clearInterval(drag.timer); drag = null; }

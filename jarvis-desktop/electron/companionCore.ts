@@ -31,6 +31,10 @@ export const COMPANION_METHODS = [
   'companionTranscribeCancel',
   'companionSpeak',
   'companionSpeechStop',
+  // The native microphone policy (turning it on shows the island's trusted confirmation) and typing a reviewed text
+  // into the remembered window without asking Claude (preview, trusted confirmation, re-check, type).
+  'companionSetVoiceInput',
+  'companionInsertText',
   'regionBegin',
   'regionDiscard',
   'overlayImage',
@@ -46,6 +50,8 @@ const TOKEN: ArgSpec = {kind: 'string', min: 16, max: 64};
 /** The hub's transcribe/speak bounds (LIMITS in services/validation.ts), repeated so this file stays pure; a test keeps them equal. */
 export const COMPANION_WAV_MAX = 44 + 480_000 * 2 + 1024;
 export const COMPANION_SPEAK_MAX = 4000;
+/** Same limit as the type_into_app tool (MAX_TYPED_CHARS); the tool's own validation still applies. */
+export const COMPANION_TYPE_MAX = 2000;
 export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = {
   companionState: [],
   // text, region token, and whether the page showed the remembered app window and the person kept it attached.
@@ -67,6 +73,8 @@ export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = 
   companionTranscribeCancel: [],
   companionSpeak: [{kind: 'string', min: 1, max: COMPANION_SPEAK_MAX}],
   companionSpeechStop: [],
+  companionSetVoiceInput: [{kind: 'boolean'}],
+  companionInsertText: [{kind: 'string', min: 1, max: COMPANION_TYPE_MAX}],
   regionBegin: [],
   regionDiscard: [TOKEN],
   overlayImage: [],
@@ -302,10 +310,11 @@ export function sendSize(crop: {width: number; height: number}, maxEdge = REGION
 }
 
 /**
- * Whether a media permission request may be granted: microphone audio only (never camera or screen), and only for the
- * hub page or the companion island itself. The selection overlay and every other page are refused.
+ * Whether a media permission request may be granted: microphone audio only (never camera or screen), only while the
+ * person has allowed the microphone (settings.voiceInput, set through a trusted confirmation), and only for the hub page
+ * or the companion island itself. The selection overlay and every other page are refused.
  */
-export function mediaPermissionAllowed(o: {permission: string; mediaTypes?: readonly string[]; hubPage: boolean; islandPage: boolean}): boolean {
+export function mediaPermissionAllowed(o: {permission: string; mediaTypes?: readonly string[]; hubPage: boolean; islandPage: boolean; voiceInput: boolean}): boolean {
   const audioOnly = o.permission === 'media' && !!o.mediaTypes?.length && o.mediaTypes.every((t) => t === 'audio');
-  return audioOnly && (o.hubPage || o.islandPage);
+  return audioOnly && o.voiceInput === true && (o.hubPage || o.islandPage);
 }

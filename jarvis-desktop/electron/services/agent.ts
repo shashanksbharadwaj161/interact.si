@@ -178,6 +178,32 @@ export async function runAgent(req: AgentRequest): Promise<void> {
   emit({type: 'error', reason: 'steps', message: `Stopped after ${MAX_STEPS} steps without a final answer. Anything already confirmed stays done.`});
 }
 
+/**
+ * Runs one tool for a request the person made directly in the companion (no model call): the same validation, the same
+ * step events and the same outcome as inside runAgent, then a short receipt as the answer (`steps: 0` marks that no
+ * request went to Claude). Used for "type this reviewed text into the remembered window".
+ */
+export async function runToolDirect(tool: AgentTool, input: Record<string, unknown>, req: {emit: (e: AgentEvent) => void; signal: AbortSignal; callId: string}): Promise<void> {
+  const {emit, signal, callId} = req;
+  const name = tool.def.name;
+  if (signal.aborted) return emit({type: 'error', reason: 'cancelled', message: 'Stopped. Nothing was done.'});
+  const checked = tool.validate(input);
+  if (!checked.ok) {
+    emit({type: 'tool', callId, tool: name, label: tool.label, phase: 'failed', summary: `Not run: ${checked.error}`});
+    return emit({type: 'error', reason: 'setup', message: `Not run: ${checked.error}`});
+  }
+  emit({type: 'tool', callId, tool: name, label: tool.label, phase: 'running', summary: tool.label});
+  let outcome: ToolOutcome;
+  try {
+    outcome = await tool.run(checked.value, {signal, setPhase: (phase, summary, stage) => emit({type: 'tool', callId, tool: name, label: tool.label, phase, summary, ...(stage ? {stage} : {})})});
+  } catch (e) {
+    outcome = {ok: false, phase: 'failed', content: 'The tool failed and nothing was changed.', summary: e instanceof Error ? e.message.slice(0, 200) : 'The tool failed.'};
+  }
+  emit({type: 'tool', callId, tool: name, label: tool.label, phase: outcome.phase ?? (outcome.ok ? 'done' : 'failed'), summary: outcome.summary, verified: outcome.verified, undo: outcome.undo});
+  if (signal.aborted && outcome.phase !== 'done') return emit({type: 'error', reason: 'cancelled', message: `Stopped. ${outcome.summary}.`});
+  emit({type: 'answer', text: outcome.summary.endsWith('.') ? outcome.summary : `${outcome.summary}.`, citations: [], steps: 0});
+}
+
 /** The companion's instructions. Stable text (no timestamps), so repeated requests share a cacheable prefix. */
 export function companionSystemPrompt(personality: 'steady' | 'crisp' | 'playful' = 'steady'): string {
   const voice = {

@@ -227,6 +227,11 @@ function typeIntoApp(deps: AgentToolDeps & {typing: NonNullable<AgentToolDeps['t
   };
 }
 
+/** The typing tool on its own, for a reviewed text the person asks to type directly (no model call). */
+export function createTypingTool(typing: NonNullable<AgentToolDeps['typing']>): AgentTool {
+  return typeIntoApp({typing} as AgentToolDeps & {typing: NonNullable<AgentToolDeps['typing']>}) as AgentTool;
+}
+
 export function createAgentTools(deps: AgentToolDeps): AgentTool[] {
   const tools: AgentTool[] = [searchSaved(deps), readSaved(deps), createTask(deps)] as AgentTool[];
   if (deps.typing) tools.push(typeIntoApp({...deps, typing: deps.typing}) as AgentTool);
