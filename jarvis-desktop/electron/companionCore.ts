@@ -49,6 +49,12 @@ export const OVERLAY_METHODS: readonly CompanionMethod[] = ['overlayImage', 'ove
 export const companionChannel = (m: CompanionMethod) => `${COMPANION_CHANNEL_PREFIX}${m}`;
 
 const TOKEN: ArgSpec = {kind: 'string', min: 16, max: 64};
+/**
+ * How the companion shows itself. 'camera-island' is a fixed capsule at the top centre of the work area (just below a
+ * laptop webcam on most screens); it never moves with the pointer. Pet and orb keep the movable pet layout.
+ */
+export const APPEARANCES = ['pet', 'legacy-orb', 'camera-island'] as const;
+export type Appearance = (typeof APPEARANCES)[number];
 /** The hub's transcribe/speak bounds (LIMITS in services/validation.ts), repeated so this file stays pure; a test keeps them equal. */
 export const COMPANION_WAV_MAX = 44 + 480_000 * 2 + 1024;
 export const COMPANION_SPEAK_MAX = 4000;
@@ -67,7 +73,7 @@ export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = 
   companionResize: [{kind: 'enum', values: ['S', 'M', 'L', 'grow', 'shrink']}],
   companionDock: [{kind: 'enum', values: ['bottom-left', 'bottom-right', 'left', 'right', 'top']}],
   companionGaze: [{kind: 'boolean'}],
-  companionSetAppearance: [{kind: 'enum', values: ['pet', 'legacy-orb']}],
+  companionSetAppearance: [{kind: 'enum', values: APPEARANCES}],
   companionClearTarget: [],
   companionOpenHub: [{kind: 'enum', values: ['home', 'assistant', 'notes', 'tasks', 'capsules', 'search', 'companion', 'settings']}, {kind: 'string', min: 1, max: 64, optional: true}],
   companionSetMaterial: [{kind: 'enum', values: ['none', 'acrylic']}],
@@ -235,6 +241,79 @@ export function placePet(p: Point, size: number, bubble: {width: number; height:
   const win: Rect = {x: x0, y: y0, width: x1 - x0, height: y1 - y0};
   const rel = (r: Rect): Rect => ({x: r.x - x0, y: r.y - y0, width: r.width, height: r.height});
   return {window: win, pet: rel(pet), bubble: b ? rel(b) : null, side};
+}
+
+/* ---------- Camera island ---------- */
+
+/** The collapsed capsule (DIP), centred at the top of the work area, this far below its top edge. */
+export const CAMERA_ISLAND = {width: 236, height: 38, top: 8, gap: 8} as const;
+
+/**
+ * Window and content geometry for the camera island: the collapsed capsule (reported as `pet`, the anchor) at the top
+ * centre of the work area, and the expanded bubble centred directly below it (side 'below'). Everything is clamped into
+ * the work area, so nothing is ever placed off screen, under the taskbar or across another display, including on tiny
+ * work areas and displays with negative origins. Uses only the work area: no camera hardware is read. The window is the
+ * same small transparent window as the pet layout, never a full-screen overlay.
+ */
+export function placeCameraIsland(bubble: {width: number; height: number} | null, work: Rect, margin = LAYOUT_MARGIN): PetPlacement {
+  const aw = Math.max(1, Math.min(CAMERA_ISLAND.width, Math.floor(work.width)));
+  const ah = Math.max(1, Math.min(CAMERA_ISLAND.height, Math.floor(work.height)));
+  const ax = work.x + Math.floor((work.width - aw) / 2);
+  const ay = work.y + Math.max(0, Math.min(CAMERA_ISLAND.top, Math.floor(work.height - ah)));
+  const anchor: Rect = {x: ax, y: ay, width: aw, height: ah};
+  let b: Rect | null = null;
+  if (bubble) {
+    const bw = Math.max(1, Math.min(Math.round(bubble.width), Math.floor(work.width)));
+    const top = ay + ah + CAMERA_ISLAND.gap;
+    const room = work.y + work.height - top;
+    if (room >= 1) {
+      const bh = Math.max(1, Math.min(Math.round(bubble.height), room));
+      b = clampInto({x: work.x + Math.floor((work.width - bw) / 2), y: top, width: bw, height: bh}, work);
+    } else {
+      // No room below on a very short work area: the bubble overlaps the capsule rather than leaving the screen.
+      const bh = Math.max(1, Math.min(Math.round(bubble.height), Math.floor(work.height)));
+      b = clampInto({x: work.x + Math.floor((work.width - bw) / 2), y: ay, width: bw, height: bh}, work);
+    }
+  }
+  const rects = b ? [anchor, b] : [anchor];
+  const x0 = Math.max(work.x, Math.min(...rects.map((r) => r.x)) - margin);
+  const y0 = Math.max(work.y, Math.min(...rects.map((r) => r.y)) - margin);
+  const x1 = Math.min(work.x + work.width, Math.max(...rects.map((r) => r.x + r.width)) + margin);
+  const y1 = Math.min(work.y + work.height, Math.max(...rects.map((r) => r.y + r.height)) + margin);
+  const win: Rect = {x: x0, y: y0, width: x1 - x0, height: y1 - y0};
+  const rel = (r: Rect): Rect => ({x: r.x - x0, y: r.y - y0, width: r.width, height: r.height});
+  return {window: win, pet: rel(anchor), bubble: b ? rel(b) : null, side: b ? 'below' : null};
+}
+
+/* ---------- Saved preferences ---------- */
+
+export type CompanionPrefs = {point: Point | null; displayId: number | null; dock: Dock; size: number; appearance: Appearance; material: 'none' | 'acrylic'};
+
+/**
+ * Reads companion.json. `null` means the file does not exist: a new profile, which starts as the camera island. An
+ * existing profile keeps its saved appearance; a file without one, or one that cannot be read, keeps the pet (the look
+ * it had before the camera island existed). Every field is checked; nothing invalid is trusted.
+ */
+export function parseCompanionPrefs(text: string | null): CompanionPrefs {
+  const base: CompanionPrefs = {point: null, displayId: null, dock: 'bottom', size: PET_SIZE.default, appearance: text === null ? 'camera-island' : 'pet', material: 'none'};
+  if (text === null) return base;
+  let raw: Record<string, unknown>;
+  try {
+    const v = JSON.parse(text) as unknown;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return base;
+    raw = v as Record<string, unknown>;
+  } catch { return base; }
+  const pt = raw.point as Record<string, unknown> | null | undefined;
+  const point = pt && typeof pt === 'object' && typeof pt.x === 'number' && typeof pt.y === 'number' && Number.isFinite(pt.x) && Number.isFinite(pt.y) ? {x: pt.x, y: pt.y} : null;
+  const docks: Dock[] = ['free', 'bottom', 'top', 'left', 'right'];
+  return {
+    point,
+    displayId: typeof raw.displayId === 'number' && Number.isFinite(raw.displayId) ? raw.displayId : null,
+    dock: docks.includes(raw.dock as Dock) ? (raw.dock as Dock) : 'bottom',
+    size: typeof raw.size === 'number' && Number.isFinite(raw.size) ? clampSize(raw.size) : PET_SIZE.default,
+    appearance: (APPEARANCES as readonly unknown[]).includes(raw.appearance) ? (raw.appearance as Appearance) : 'pet',
+    material: raw.material === 'acrylic' ? 'acrylic' : 'none',
+  };
 }
 
 /** The page may ask only for a bubble size (or none). No position, ever. */

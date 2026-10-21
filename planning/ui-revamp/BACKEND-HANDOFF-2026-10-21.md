@@ -409,3 +409,61 @@ Codex adds the shared types locally. The Electron side is wired here:
 5. The owner-run live session under `DESKTOP_COMPANION_LIVE_TEST` with `claude-haiku-4-5`: connection test, a text ask, an image ask, the UIA journey, and the ledger file checked after each step.
 6. The 23-route smoke and the packaged installer.
 
+
+## Checkpoint 8: camera-island appearance (backend only)
+
+### Contract
+
+1. **Appearance.** `Appearance = 'pet' | 'legacy-orb' | 'camera-island'`, exported from `electron/companionCore.ts` (`APPEARANCES`).
+   - The IPC enum for `companionSetAppearance` uses that list; any other value is refused.
+   - Preload: `setAppearance(a: 'pet' | 'legacy-orb' | 'camera-island')`.
+2. **Placement push.** It now also carries `appearance`:
+   `{type: 'placement', window, pet, bubble, side, size, dock, appearance}`.
+   - In camera mode, `pet` is the **collapsed capsule rectangle** (the anchor) relative to the window.
+   - `bubble` is the expanded area centred directly below it.
+   - `side` is `'below'` when a bubble is present and `null` when collapsed.
+   - `companionState().appearance` is unchanged in shape and now includes the new value.
+3. **Geometry** (pure, `placeCameraIsland(bubble, workArea): PetPlacement`):
+   - **Capsule:** 236×38 DIP, centred horizontally, at `workArea.y + 8`. The work area already excludes the taskbar.
+   - **Bubble:** centred on the same line, `CAMERA_ISLAND.gap` (8 DIP) below the capsule.
+   - **Fitting:** everything is clamped into the work area. On tiny work areas it shrinks to fit; with no room below, the bubble overlaps the capsule instead of leaving the screen. Negative origins and fractional DIP work areas stay inside.
+   - **Window:** the same small transparent frameless window plus the layout margin. There is no full-screen overlay and no maximize.
+   - **No camera hardware is read.** "Below the webcam" means top centre of the work area.
+4. **Behaviour in camera mode** (`companionWindow.ts`):
+   - `companionSetAppearance('camera-island')` ends any drag, persists the choice, turns gaze off, and places the window immediately.
+   - The capsule stays at the top centre of the display the companion is on: `displayFor(current pet point)`.
+   - **Refused as no-ops,** with the mode unchanged:
+     - `companionDrag('start')` returns `{started: false}`. A press and release still opens the island, as a click.
+     - `companionResize` returns the current size.
+     - `companionDock` returns the current dock.
+   - The pet's saved point and size are untouched, so switching back to `'pet'` or `'legacy-orb'` restores the pet where it was.
+   - Ask, Cancel, the target, the region, the confirmations and the hub's security are unchanged.
+5. **Preferences migration** (`parseCompanionPrefs`):
+
+   | `companion.json` | Starting appearance |
+   |---|---|
+   | No file (`ENOENT`, a new profile) | `'camera-island'` |
+   | File without `appearance` (saved before this change) | `'pet'` |
+   | File that cannot be read, or invalid JSON | `'pet'` |
+   | Unknown `appearance` value | `'pet'` |
+   | Saved value | Kept |
+
+### Tests
+
+- `tests/companion-camera.test.mjs`: 9 tests. They cover:
+  - top-centre geometry, and the bubble below on the same centre line;
+  - a taskbar at the top;
+  - negative origins, 125%, 150% and fractional work areas;
+  - tiny screens, and 500 randomised layouts that never go off the work area;
+  - the pet layout being unchanged;
+  - the enum, and preference migration;
+  - window-source checks: drag, resize and dock no-ops, gaze off, immediate placement, appearance in the push, and no maximize, full-screen or kiosk call.
+- Full suite on Linux: 1835 tests; 1820 pass and 15 fail (the same baseline).
+
+### Windows checks
+
+1. The capsule sits under the webcam notch area on the owner's laptop at 100%, 125% and 150%.
+2. With the taskbar at the top, the capsule sits below it.
+3. Switching between camera and pet restores the pet's previous spot.
+4. Moving the companion to a second display (in pet mode) and then switching to camera mode puts the capsule on that display.
+5. Click-through around the capsule still works.

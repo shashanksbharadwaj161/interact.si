@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('companion', {
   resize: (op: 'S' | 'M' | 'L' | 'grow' | 'shrink') => call('companionResize', op),
   dock: (target: 'bottom-left' | 'bottom-right' | 'left' | 'right' | 'top') => call('companionDock', target),
   gaze: (on: boolean) => call('companionGaze', on),
-  setAppearance: (a: 'pet' | 'legacy-orb') => call('companionSetAppearance', a),
+  setAppearance: (a: 'pet' | 'legacy-orb' | 'camera-island') => call('companionSetAppearance', a),
   clearTarget: () => call('companionClearTarget'),
   openHub: (view: string, item?: string) => (item === undefined ? call('companionOpenHub', view) : call('companionOpenHub', view, item)),
   setMaterial: (m: 'none' | 'acrylic') => call('companionSetMaterial', m),

@@ -1,4 +1,6 @@
-# Bounded live-provider testing (owner-authorized, $2 maximum)
+# Bounded live-provider testing (owner-authorized, $10 maximum in total)
+
+> **Updated 21 Oct 2026:** the owner raised the total to **$10**, replacing $2. Use **one** `budgetId` for all live testing, with `"maxReservedUsd":10`. The ceiling is enforced per budget id, so a second id would start its own ledger. This app does not track a total across ids.
 
 This setting applies in the main process to **every** request that leaves the computer for a model provider: island steps, hub chat (streamed or not), and the connection test. It does not depend on prompting the model to be brief.
 
@@ -10,7 +12,7 @@ This setting applies in the main process to **every** request that leaves the co
 Set one environment variable for the review process only, then start the app from the same shell:
 
 ```powershell
-$env:DESKTOP_COMPANION_LIVE_TEST = '{"budgetId":"review-2026-10-21","model":"claude-haiku-4-5","maxOutputTokens":256,"maxSteps":3,"maxBodyChars":60000,"maxRequests":40,"maxReservedUsd":2,"inputPerMillionUsd":<IN>,"outputPerMillionUsd":<OUT>}'
+$env:DESKTOP_COMPANION_LIVE_TEST = '{"budgetId":"review-2026-10-21","model":"claude-haiku-4-5","maxOutputTokens":256,"maxSteps":3,"maxBodyChars":60000,"maxRequests":40,"maxReservedUsd":10,"inputPerMillionUsd":<IN>,"outputPerMillionUsd":<OUT>}'
 npm start   # or the review launcher; the variable is read once at start-up
 Remove-Item Env:DESKTOP_COMPANION_LIVE_TEST   # afterwards
 ```

@@ -19,7 +19,7 @@ import type {Backend, CompanionReadiness, CompanionTarget} from './backend';
 import type {AgentEvent, AgentImage, UndoHandle} from './services/agent';
 import {ScreenContext, SelectionGate} from './services/screen-context';
 import {ForegroundCapture} from './services/foreground-capture';
-import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, encodeRegion, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
+import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, encodeRegion, parseCompanionPrefs, placeCameraIsland, type Appearance, type CompanionPrefs, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
 import {createTrustedConfirm, safeErrorMessage, validateArgsAgainst} from './ipcCore';
 
 export type CompanionDeps = {
@@ -33,7 +33,7 @@ export type CompanionDeps = {
 };
 
 export type MaterialState = {requested: 'none' | 'acrylic'; applied: boolean; note: string};
-export type Appearance = 'pet' | 'legacy-orb';
+export type {Appearance} from './companionCore';
 export type CompanionStatus = {readiness: CompanionReadiness; shortcut: string | null; material: MaterialState; platform: string; appearance: Appearance; size: number; dock: Dock; target: {process: string; title: string} | null; reduceMotion: boolean};
 
 const SHORTCUTS = ['Control+Shift+Space', 'Control+Alt+Space'] as const;
@@ -52,7 +52,7 @@ const NO_ACTIVATE = process.platform === 'win32' || process.platform === 'darwin
 
 type Region = {data: string; mediaType: 'image/png' | 'image/jpeg'; width: number; height: number};
 type Pending = {full: NativeImage; display: Electron.Display};
-type Prefs = {point: Point | null; displayId: number | null; dock: Dock; size: number; appearance: Appearance; material: 'none' | 'acrylic'};
+type Prefs = CompanionPrefs;
 
 /** Windows 11 22H2 (build 22621) and later document background materials; earlier builds get the solid look. */
 function materialSupported(): boolean {
@@ -65,24 +65,11 @@ export function createCompanion(deps: CompanionDeps) {
   const fileUrl = pathToFileURL(path.join(deps.distDir, 'companion.html')).href;
   const trusted = (url: string) => isTrustedCompanionUrl(url, fileUrl, deps.devOrigin);
   const prefsFile = path.join(deps.userData, 'companion.json');
+  // A new profile (no companion.json yet) starts as the camera island; an existing profile keeps its saved look.
   const prefs: Prefs = (() => {
-    const base: Prefs = {point: null, displayId: null, dock: 'bottom', size: PET_SIZE.default, appearance: 'pet', material: 'none'};
-    try {
-      const raw = JSON.parse(fs.readFileSync(prefsFile, 'utf8')) as Record<string, unknown>;
-      const pt = raw.point as Record<string, unknown> | null | undefined;
-      const point = pt && typeof pt.x === 'number' && typeof pt.y === 'number' && Number.isFinite(pt.x) && Number.isFinite(pt.y) ? {x: pt.x, y: pt.y} : null;
-      const docks: Dock[] = ['free', 'bottom', 'top', 'left', 'right'];
-      return {
-        point,
-        displayId: typeof raw.displayId === 'number' ? raw.displayId : null,
-        dock: docks.includes(raw.dock as Dock) ? (raw.dock as Dock) : 'bottom',
-        size: typeof raw.size === 'number' && Number.isFinite(raw.size) ? clampSize(raw.size) : PET_SIZE.default,
-        appearance: raw.appearance === 'legacy-orb' ? 'legacy-orb' : 'pet',
-        material: raw.material === 'acrylic' ? 'acrylic' : 'none',
-      };
-    } catch {
-      return base;
-    }
+    let text: string | null;
+    try { text = fs.readFileSync(prefsFile, 'utf8'); } catch (e) { text = (e as {code?: string}).code === 'ENOENT' ? null : ''; }
+    return parseCompanionPrefs(text);
   })();
   const savePrefs = () => fs.promises.writeFile(prefsFile, JSON.stringify(prefs), 'utf8').catch(() => undefined);
 
@@ -146,7 +133,9 @@ export function createCompanion(deps: CompanionDeps) {
     const p = currentPoint();
     const work = displayFor(p).workArea;
     point = clampPetPoint(p, prefs.size, work);
-    const planned = placePet(point, prefs.size, bubble, work);
+    // The camera island sits at the top centre of the display the companion is on; the pet point is kept untouched so
+    // switching back restores the pet where it was.
+    const planned = camera() ? placeCameraIsland(bubble, work) : placePet(point, prefs.size, bubble, work);
     const before = island!.getBounds();
     const wanted = planned.window;
     if (before.x !== wanted.x || before.y !== wanted.y || before.width !== wanted.width || before.height !== wanted.height) island!.setBounds(wanted, false);
@@ -164,7 +153,7 @@ export function createCompanion(deps: CompanionDeps) {
     }
     const rebase = (box: {x: number; y: number; width: number; height: number}) => ({...box, x: box.x + wanted.x - actual.x, y: box.y + wanted.y - actual.y});
     placement = {window: actual, pet: rebase(planned.pet), bubble: planned.bubble ? rebase(planned.bubble) : null, side: planned.side};
-    send({type: 'placement', ...placement, size: prefs.size, dock: prefs.dock});
+    send({type: 'placement', ...placement, size: prefs.size, dock: prefs.dock, appearance: prefs.appearance});
   };
   function setInteractive(on: boolean) {
     if (!CLICK_THROUGH || !alive() || interactive === on) return;
@@ -200,8 +189,10 @@ export function createCompanion(deps: CompanionDeps) {
     island!.focus();
   }
 
+  const camera = () => prefs.appearance === 'camera-island';
   function dragStart() {
-    if (!alive() || drag || overlay) return false;
+    // The camera island is fixed at the top centre: it is never dragged (a press still opens it, as a click).
+    if (!alive() || drag || overlay || camera()) return false;
     // While carried the pet does not look at where the pointer was before the grab.
     if (gaze.bucket !== null) { gaze.bucket = null; send({type: 'gaze', index: null}); }
     const c = screen.getCursorScreenPoint();
@@ -256,7 +247,7 @@ export function createCompanion(deps: CompanionDeps) {
     if (bucket !== gaze.bucket) { gaze.bucket = bucket; send({type: 'gaze', index: bucket}); }
   }
   function updateGaze() {
-    const on = gazeWanted && !gazeLocked && alive() && island!.isVisible();
+    const on = gazeWanted && !gazeLocked && !camera() && alive() && island!.isVisible();
     if (on && !gazeTimer) gazeTimer = setInterval(gazeTick, GAZE_TICK_MS);
     if (!on && gazeTimer) {
       clearInterval(gazeTimer);
@@ -549,12 +540,15 @@ export function createCompanion(deps: CompanionDeps) {
     },
     companionHit: (over: boolean) => { if (!drag) setInteractive(over); return true; },
     companionResize: (op: ResizeOp) => {
+      // No-op for the fixed camera island; the pet size is kept for when the pet comes back.
+      if (camera()) return prefs.size;
       prefs.size = resizePet(prefs.size, op);
       remember(prefs.dock);
       place();
       return prefs.size;
     },
     companionDock: (target: DockTarget) => {
+      if (camera()) return prefs.dock;
       const work = displayFor(currentPoint()).workArea;
       const d = dockPoint(target, prefs.size, work);
       point = d.point;
@@ -563,7 +557,14 @@ export function createCompanion(deps: CompanionDeps) {
       return d.dock;
     },
     companionGaze: (on: boolean) => { gazeWanted = on; updateGaze(); return true; },
-    companionSetAppearance: (a: Appearance) => { prefs.appearance = a; void savePrefs(); return a; },
+    companionSetAppearance: (a: Appearance) => {
+      if (a === 'camera-island' && drag) { clearInterval(drag.timer); drag = null; send({type: 'drag', vx: null}); }
+      prefs.appearance = a;
+      void savePrefs();
+      updateGaze();
+      place();
+      return a;
+    },
     companionOpenHub: (view: string, item?: string) => {
       if (item !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(item)) throw new Error('Invalid item');
       deps.openHub(view, item);
