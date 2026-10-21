@@ -1,6 +1,7 @@
 // Typed facade over the PowerShell scripts. Services depend on this interface so tests can mock it
 // and never touch the real desktop.
 import type {NativeRunner} from './runner';
+import type {UiaAction, UiaReadback} from '../services/uia';
 
 export interface WindowInfo {
   hwnd: number; title: string; pid: number; process: string;
@@ -22,6 +23,10 @@ export interface NativeAdapter {
   speak(text: string, voice: string, signal?: AbortSignal): Promise<{ok: boolean; reason?: string}>;
   transcribe(wavPath: string): Promise<{text: string; reason?: string}>;
   dpapi(op: 'probe' | 'protect' | 'unprotect', data?: string): Promise<{ok: boolean; data?: string}>;
+  /** Bounded UI Automation snapshot of one window (uia-inspect.ps1). Optional: adapters without it offer no app control. */
+  uiaInspect?(w: WindowRef, opts: {maxNodes: number; maxDepth: number}, signal?: AbortSignal): Promise<{nodes: unknown[]; truncated: boolean}>;
+  /** One named action on one element found again by runtime id (uia-act.ps1). */
+  uiaAct?(w: WindowRef, req: {rid: string; expect: {type: string; name: string; aid: string}; action: UiaAction}, signal?: AbortSignal): Promise<{performed: boolean; reason?: string; readback?: UiaReadback}>;
 }
 
 type Res = {ok: boolean; error?: string; reason?: string} & Record<string, unknown>;
@@ -78,6 +83,15 @@ export function createNativeAdapter(runner: NativeRunner): NativeAdapter {
       const r = await runner.run<Res>('transcribe', {wavPath}, {timeoutMs: 60_000});
       if (!r.ok) throw new Error(String(r.reason ?? r.error ?? 'Transcription failed'));
       return {text: String(r.text ?? ''), reason: r.reason ? String(r.reason) : undefined};
+    },
+    async uiaInspect(w, opts, signal) {
+      const r = need(await runner.run<Res>('uia-inspect', {...w, ...opts}, {timeoutMs: 20_000, maxStdoutBytes: 1024 * 1024, signal}));
+      return {nodes: Array.isArray(r.nodes) ? r.nodes : [], truncated: r.truncated === true};
+    },
+    async uiaAct(w, req, signal) {
+      // An Invoke that opens a modal dialog can block the helper; the timeout ends it and the action reads as not confirmed.
+      const r = need(await runner.run<Res>('uia-act', {...w, ...req}, {timeoutMs: 20_000, signal}));
+      return {performed: r.performed === true, ...(typeof r.reason === 'string' ? {reason: r.reason} : {}), ...(r.readback && typeof r.readback === 'object' ? {readback: r.readback as UiaReadback} : {})};
     },
     async dpapi(op, data) {
       const r = await runner.run<Res>('dpapi', {op, data}, {timeoutMs: 20_000});
