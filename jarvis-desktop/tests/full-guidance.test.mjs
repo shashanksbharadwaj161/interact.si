@@ -121,7 +121,8 @@ test('streaming needs the build feature and a ready route; it never assumes a fa
 
   const offlineDown = items(input({ capabilities: [{ id: 'local-llm', name: 'x', available: false, reason: 'Ollama did not respond' }] }));
   assert.equal(byId(offlineDown, 'streaming').status, 'blocked');
-  assert.match(byId(offlineDown, 'streaming').reason, /Ollama did not respond/);
+  assert.match(byId(offlineDown, 'streaming').reason, /AI is not connected\. Connect Claude/);
+  assert.doesNotMatch(byId(offlineDown, 'streaming').reason, /Ollama/, 'the normal route advice is Claude, not a local server');
   assert.equal(byId(offlineDown, 'streaming').canMarkDone, false);
 
   const online = (s, key) => byId(items(input({ settings: { ...SETTINGS, mode: 'online', cloudModel: s }, cloudKeyConfigured: key })), 'streaming');
@@ -137,11 +138,13 @@ test('streaming needs the build feature and a ready route; it never assumes a fa
   assert.equal(byId(items(input({ settings: null })), 'streaming').status, 'unknown');
 });
 
-test('local models: done only from the live check; missing Ollama is fixable, not downloaded', () => {
+test('legacy local model: done only from the live check; a missing one is not a setup step and nothing is downloaded', () => {
   assert.equal(byId(items(), 'local-models').status, 'done');
   assert.equal(byId(items(), 'local-models').reason, 'Ollama is running and llama3.2 is installed.');
   const down = byId(items(input({ capabilities: [{ id: 'local-llm', name: 'x', available: false, reason: 'Model not installed.' }] })), 'local-models');
-  assert.equal(down.status, 'blocked');
+  assert.equal(down.status, 'unavailable', 'a new Claude-first setup is not nagged to install a local model');
+  assert.match(down.reason, /Model not installed/);
+  assert.match(down.reason, /Claude does not need it/);
   assert.match(down.reason, /Nothing is downloaded automatically/);
   const noFeature = byId(items(input({ apiFeatures: [{ id: 'local-models', available: false, reason: 'No runtime' }] })), 'local-models');
   assert.equal(noFeature.status, 'unavailable');
@@ -210,8 +213,8 @@ test('manual marks: done only while usable; skips are excluded from progress', (
 test('summary counts blocked/unknown/unavailable and picks the next useful topic', () => {
   const list = items(input({ capabilities: [{ id: 'local-llm', name: 'x', available: false }], counts: { notes: 1, tasks: 1, capsules: 1 } }), prefs({ marked: { privacy: 'done', motion: 'done' } }));
   const s = G.summarizeGuide(list);
-  assert.deepEqual({ done: s.done, blocked: s.blocked, unavailable: s.unavailable, next: s.next }, { done: 5, blocked: 2, unavailable: 1, next: 'streaming' });
-  assert.equal(G.progressLabel(s), '5 of 7 done · 2 need attention · 1 not available here');
+  assert.deepEqual({ done: s.done, blocked: s.blocked, unavailable: s.unavailable, next: s.next }, { done: 5, blocked: 1, unavailable: 2, next: 'streaming' }, 'a legacy local model that is not answering counts as not available, not as attention needed');
+  assert.equal(G.progressLabel(s), '5 of 6 done · 1 needs attention · 2 not available here');
   const hidden = G.visibleItems(list, true);
   assert.deepEqual(hidden.map((i) => i.id), ['dictation', 'streaming', 'local-models']);
   assert.equal(G.selectTopic(hidden, 'notes'), 'dictation');
@@ -453,11 +456,12 @@ test('mounted component reads validated prefs from storage and renders real stat
       renderToStaticMarkup(createElement(GuidedSetup, { status, reducedMotion: true, onNavigate: () => assert.fail('navigate during render'), onAction: () => assert.fail('action during render'), now: NOW, ...extra }));
 
     const unchecked = render(input({ capabilities: null, apiFeatures: null, checkedAt: null }));
-    assert.match(unchecked, /Guided setup/);
+    assert.match(unchecked, /Help &amp; setup/);
     assert.match(unchecked, /Statuses not checked yet/);
     assert.match(unchecked, /data-reduced-motion="true"/);
     assert.match(unchecked, /never falls back silently/);
-    assert.match(unchecked, /Local model \(offline mode\)/);
+    assert.match(unchecked, /Legacy local model \(offline mode\)/);
+    assert.ok(unchecked.indexOf('Claude and other providers') < unchecked.indexOf('Legacy local model (offline mode)'), 'the cloud route is explained before the legacy one');
     assert.match(unchecked, /0 of 8 done · 3 not checked/);
 
     store.set('jarvis.ui.guidance.v1', JSON.stringify({ v: 1, marked: { privacy: 'done', ghost: 'done' }, lastTopic: 'privacy' }));

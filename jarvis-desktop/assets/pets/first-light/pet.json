@@ -1,0 +1,25 @@
+{
+  "format": "desktop-companion/pet-pack@1",
+  "id": "first-light",
+  "name": "First Light",
+  "description": "Cream and indigo desktop companion with a folded ear and brush tail. Animation preview.",
+  "spriteVersion": 2,
+  "atlas": "spritesheet.png",
+  "atlasSha256": "b481a82dac79a9c95bed1d61e782ccdd521a5939dcd69824b3d222fe6bf2aae9",
+  "rendering": "smooth",
+  "anchor": {
+    "x": 96,
+    "y": 202
+  },
+  "review": {
+    "status": "in-review",
+    "notes": "Real animation preview for user feedback. Bundled atlas/quality checks passed; four subtle intermediate gaze directions have recorded warnings. Not recorded as owner-approved."
+  },
+  "qa": {
+    "tool": "create-pet v0.1.6 bundled scripts",
+    "atlasValidation": "qa/atlas-validation.json",
+    "petQuality": "qa/pet-quality.json"
+  },
+  "source": "Built-in image_gen with the original project concept as reference. Sources and QA: planning/ui-revamp/pet-art/first-light-motion-2026-10-18.",
+  "license": "Original generated project artwork"
+}

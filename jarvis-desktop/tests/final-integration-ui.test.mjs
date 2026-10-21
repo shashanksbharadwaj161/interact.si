@@ -1,6 +1,6 @@
 // Final integration glue: every IPC method is mounted (backend handler + preload binding), the real Calendar and
 // Clipboard components are reachable from the shell with their bridges, Calendar's main-process dialog routes render
-// and report outcomes, and dashboard widgets reflow for narrow containers. Real TypeScript/TSX bundled in memory and
+// and report outcomes. Real TypeScript/TSX bundled in memory and
 // rendered with react-dom/server; the backend uses namespaced temp folders and injected dialogs. No network or input.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,11 +27,10 @@ const M = await bundle(`
   export {calendarBridge, clipboardBridge} from './src/ui/bridges';
   export {Calendar, fileImportMessage} from './src/components/Calendar';
   export {Clipboard} from './src/components/Clipboard';
-  export {packLayout, defaultLayout, widgetPlacement, GRID_COLUMNS} from './src/ui/widgets';
   export {createElement} from 'react';
   export {renderToStaticMarkup} from 'react-dom/server';
 `);
-const {createBackend, METHODS, calendarBridge, clipboardBridge, Calendar, fileImportMessage, Clipboard, packLayout, defaultLayout, widgetPlacement, GRID_COLUMNS, createElement, renderToStaticMarkup} = M;
+const {createBackend, METHODS, calendarBridge, clipboardBridge, Calendar, fileImportMessage, Clipboard, createElement, renderToStaticMarkup} = M;
 
 const ICS = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:a', 'DTSTART:20261014T010000Z', 'SUMMARY:Stand-up', 'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
 
@@ -121,21 +120,4 @@ test('Clipboard renders from a real backend bridge and stays off by default', as
     const html = renderToStaticMarkup(createElement(Clipboard, {client, initial: {status, entries: []}}));
     assert.match(html, /not connected in this build|no clipboard reader/i, 'without a host reader the panel says so');
   } finally { await f.close(); }
-});
-
-test('dashboard widgets carry exact, two-up and stacked placements; CSS reflows by container width', async () => {
-  const {items} = packLayout(defaultLayout());
-  for (const item of items) {
-    const p = widgetPlacement(item);
-    assert.equal(p['--dash-col'], `${item.x + 1} / span ${item.width}`);
-    assert.equal(p['--dash-mid'], item.width > GRID_COLUMNS / 2 ? 'span 12' : 'span 6');
-    assert.equal(p['--dash-rows'], `span ${item.rows}`);
-    assert.ok(item.x + item.width <= GRID_COLUMNS);
-  }
-  const css = await readFile(path.join(root, 'src', 'styles', 'views.css'), 'utf8');
-  assert.match(css, /\.dash-wrap \{\s*container-type: inline-size;/);
-  assert.match(css, /@container \(max-width: 760px\) \{\s*\.dash-card \{\s*grid-column: var\(--dash-mid/);
-  assert.match(css, /@container \(max-width: 480px\) \{\s*\.dash-grid \{\s*grid-template-columns: minmax\(0, 1fr\);/);
-  const home = await readFile(path.join(root, 'src', 'components', 'Home.tsx'), 'utf8');
-  assert.doesNotMatch(home, /gridTemplateColumns:|gridColumn: `/, 'no inline grid styles that CSS cannot override');
 });

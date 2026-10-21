@@ -2,7 +2,7 @@
 // plus the small pure policies main.ts needs (file-request confinement, dev URL, trusted confirmation).
 import * as nodePath from 'node:path';
 import type {ChatMessage, ChatStreamBatch, ChatStreamEvent, ChatStreamOutcome, ChatStreamRoute, ChatStreamStart, JarvisAPI} from '../src/shared/contracts';
-import {ARITY, METHODS, CLOUD_PROVIDER_IDS, type MethodName} from './channels';
+import {ACCOUNT_PROVIDER_IDS, ARITY, METHODS, CLOUD_PROVIDER_IDS, type MethodName} from './channels';
 import {MAX_COMMAND_CHARS} from './services/intent';
 import {LIMITS} from './services/validation';
 
@@ -90,6 +90,8 @@ export interface ConfirmWindowLike { isDestroyed(): boolean; isVisible(): boolea
 
 export interface MessageBoxOptions {
   type: 'warning'; title: string; message: string; detail: string; buttons: string[]; defaultId: number; cancelId: number; noLink: true;
+  /** Closes the dialog as if Cancel was chosen (the request it belongs to was stopped). */
+  signal?: AbortSignal;
 }
 
 export interface TrustedConfirmDeps<W extends ConfirmWindowLike> {
@@ -103,10 +105,10 @@ export interface TrustedConfirmDeps<W extends ConfirmWindowLike> {
  * Builds BackendEnv.confirm. The dialog is owned by the main window, defaults to Cancel and carries the full detail.
  * Fails closed: no visible, focused, ready, trusted window; a dialog already open; or any dialog error -> false.
  */
-export function createTrustedConfirm<W extends ConfirmWindowLike>(deps: TrustedConfirmDeps<W>): (summary: string, detail: string) => Promise<boolean> {
+export function createTrustedConfirm<W extends ConfirmWindowLike>(deps: TrustedConfirmDeps<W>): (summary: string, detail: string, signal?: AbortSignal) => Promise<boolean> {
   let open = false;
-  return async (summary, detail) => {
-    if (open || typeof summary !== 'string' || typeof detail !== 'string') return false;
+  return async (summary, detail, signal) => {
+    if (open || typeof summary !== 'string' || typeof detail !== 'string' || signal?.aborted) return false;
     const win = deps.getWindow();
     try {
       if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized() || !win.isFocused() || !deps.isTrusted(win)) return false;
@@ -115,9 +117,10 @@ export function createTrustedConfirm<W extends ConfirmWindowLike>(deps: TrustedC
     try {
       const r = await deps.showMessageBox(win, {
         type: 'warning', title: 'Desktop Companion', message: summary.slice(0, 300), detail,
-        buttons: ['Cancel', 'Continue'], defaultId: 0, cancelId: 0, noLink: true,
+        buttons: ['Cancel', 'Continue'], defaultId: 0, cancelId: 0, noLink: true, ...(signal ? {signal} : {}),
       });
-      return r.response === 1;
+      // A stop while the dialog was open closes it as Cancel; an answer that raced the stop does not count either.
+      return r.response === 1 && !signal?.aborted;
     } catch { return false; } finally { open = false; }
   };
 }
@@ -143,7 +146,15 @@ export interface RouterOptions {
   devOrigin?: string;
 }
 
-export type HandlerMap = Pick<Required<JarvisAPI>, MethodName>;
+/**
+ * The two provider-test methods are typed here until src/shared/contracts.ts carries them (Codex integrates the shared
+ * ProviderTestResult type); the shapes match planning/ui-revamp/BACKEND-HANDOFF-2026-10-21.md.
+ */
+type ProviderTestMethods = {
+  providerConnectionTest(provider: unknown): Promise<unknown>; providerConnectionTestCancel(): Promise<boolean>;
+  accountsStatus(provider: unknown): Promise<unknown>; accountsConnect(provider: unknown): Promise<unknown>; accountsCancel(): Promise<boolean>; accountsDisconnect(provider: unknown): Promise<unknown>;
+};
+export type HandlerMap = Pick<Required<JarvisAPI>, Exclude<MethodName, keyof ProviderTestMethods>> & ProviderTestMethods;
 
 /**
  * Shape of each IPC argument, checked before any handler runs. This is a coarse boundary filter (type, presence, size);
@@ -160,6 +171,7 @@ export type ArgSpec =
 
 const ID: ArgSpec = {kind: 'string', min: 1, max: 64};
 const OBJ: ArgSpec = {kind: 'object'};
+const ACCOUNT: ArgSpec = {kind: 'enum', values: ACCOUNT_PROVIDER_IDS};
 const OPTIONS: ArgSpec = {kind: 'object', optional: true};
 const MODEL_NAME: ArgSpec = {kind: 'string', min: 1, max: 200};
 const PATH_ARG: ArgSpec = {kind: 'string', min: 1, max: 4096};
@@ -177,6 +189,7 @@ export const ARG_SPECS: Record<MethodName, readonly ArgSpec[]> = {
   cloudProviderStatus: [],
   setProviderKey: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}, {kind: 'string', min: 1, max: 4096}],
   clearProviderKey: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}],
+  cloudModels: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}],
   // The renderer may only propose. `approved` must be a real boolean; the native confirmation still decides.
   previewAction: [OBJ], executeAction: [ID, {kind: 'boolean'}],
   speak: [{kind: 'string', max: LIMITS.speakChars}],
@@ -201,6 +214,9 @@ export const ARG_SPECS: Record<MethodName, readonly ArgSpec[]> = {
   chatStreamStart: [{kind: 'string', max: LIMITS.chat}], chatStreamRead: [STREAM_ID, {kind: 'integer', min: 0, max: 1_000_000}], chatStreamCancel: [STREAM_ID],
   // Preview tokens are random UUIDs; ApprovedDocuments re-checks the exact format and that the token is still pending.
   documentsChoose: [], documentsSave: [STREAM_ID, OPTIONS], documentsDiscard: [STREAM_ID],
+  speechStop: [], transcribeCancel: [],
+  providerConnectionTest: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}], providerConnectionTestCancel: [],
+  accountsStatus: [ACCOUNT], accountsConnect: [ACCOUNT], accountsCancel: [], accountsDisconnect: [ACCOUNT],
 };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -235,7 +251,11 @@ function argProblem(spec: ArgSpec, v: unknown): string | null {
 
 /** Returns a user-safe message for the first invalid argument, or null when every argument matches its spec. */
 export function validateArgs(method: MethodName, args: readonly unknown[]): string | null {
-  const specs = ARG_SPECS[method];
+  return validateArgsAgainst(method, ARG_SPECS[method], args);
+}
+
+/** The same check against any spec list (the companion window has its own method table). */
+export function validateArgsAgainst(method: string, specs: readonly ArgSpec[], args: readonly unknown[]): string | null {
   if (args.length > specs.length) return 'Wrong number of arguments';
   for (let i = 0; i < specs.length; i++) {
     const v = args[i];

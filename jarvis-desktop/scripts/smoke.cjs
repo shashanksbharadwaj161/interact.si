@@ -29,16 +29,20 @@ app.whenReady().then(async()=>{
  // Finish onboarding through the same bridge the UI uses (mode stays offline), then reload into the main shell.
  await win.webContents.executeJavaScript(`(async()=>{const s=await window.jarvis.getState();await window.jarvis.saveSettings({...s.settings,onboarded:true});})()`);
  await new Promise((r)=>{win.webContents.once('did-finish-load',r);win.webContents.reload();});await new Promise(r=>setTimeout(r,1200));
- // Route sweep: every navigation entry the shell renders must mount a non-empty main region without renderer errors.
- const routes=await win.webContents.executeJavaScript(`(async()=>{const wait=(ms)=>new Promise(r=>setTimeout(r,ms));const links=[...document.querySelectorAll('nav a[href^="#"]')].map(a=>a.getAttribute('href')).filter((h,i,all)=>h.length>2&&all.indexOf(h)===i);const out=[];for(const h of links){location.hash=h.slice(1);await wait(450);const m=document.getElementById('main');const text=m?m.innerText.trim():'';out.push({route:h,label:m?m.getAttribute('aria-label'):null,chars:text.length,current:!!document.querySelector('nav a[aria-current="page"][href="'+h+'"]')});}location.hash='';await wait(200);return out;})()`);
- if(routes.length<10)throw new Error('Route sweep found too few navigation links: '+routes.length);
+ // Route sweep: every view id (the rail shows areas, so the list is fixed here rather than read from the rail) must mount a
+ // non-empty main region named after the view, with its own navigation entry marked current, without renderer errors.
+ const VIEW_IDS=['home','assistant','companion','capsules','notes','tasks','computer','status','settings','lab','developer','search','motion','avatar','routines','clipboard','calendar','models','integrations','usage','memory','writing','guide'];
+ const routes=await win.webContents.executeJavaScript(`(async()=>{const wait=(ms)=>new Promise(r=>setTimeout(r,ms));const out=[];for(const id of ${JSON.stringify(VIEW_IDS)}){const h='#/'+id;location.hash=h.slice(1);await wait(450);const m=document.getElementById('main');const text=m?m.innerText.trim():'';out.push({route:h,label:m?m.getAttribute('aria-label'):null,chars:text.length,current:!!document.querySelector('a[aria-current="page"][href="'+h+'"]')});}location.hash='';await wait(200);return out;})()`);
+ if(routes.length!==VIEW_IDS.length)throw new Error('Route sweep covered '+routes.length+' of '+VIEW_IDS.length+' views');
  const broken=routes.filter((r)=>!r.label||r.chars<20||!r.current);if(broken.length)throw new Error('Route(s) did not render: '+JSON.stringify(broken.slice(0,4)));
  // Optional owned-fixture review: --shots=<dir> shows this smoke window without focus (hidden windows pause CSS entrance
  // animations) and saves PNGs of this app window only, never the desktop, for every route.
  const shotsArg=process.argv.find((a)=>a.startsWith('--shots='));let shots=0;
  if(shotsArg){const dir=path.resolve(shotsArg.slice(8));fs.mkdirSync(dir,{recursive:true});win.setSize(1280,820);win.showInactive();await new Promise(r=>setTimeout(r,500));for(const h of routes.map((r)=>r.route)){await win.webContents.executeJavaScript(`location.hash=${JSON.stringify(h.slice(1))}`);await new Promise(r=>setTimeout(r,700));const img=await win.webContents.capturePage();fs.writeFileSync(path.join(dir,(packaged?'packaged-':'')+h.replace(/[^a-z0-9]+/gi,'_').replace(/^_+/,'')+'.png'),img.toPNG());shots++;}win.hide();await win.webContents.executeJavaScript(`location.hash=''`);}
  if(rendererErrors.length)throw new Error('Renderer console errors: '+rendererErrors.slice(0,3).join(' | '));
- const external=seen.filter((u)=>!/^(file|data|blob|devtools):/i.test(u));
+ // A loopback dev origin (VITE_DEV_SERVER_URL, accepted by main.ts only for http loopback) serves the renderer; it is local too.
+ const devOrigin=(()=>{try{const u=new URL(process.env.VITE_DEV_SERVER_URL||'');return u.protocol==='http:'&&/^(127\.0\.0\.1|localhost|\[::1\])$/.test(u.hostname)?u.origin:null;}catch{return null;}})();
+ const external=seen.filter((u)=>!/^(file|data|blob|devtools):/i.test(u)&&!(devOrigin&&u.startsWith(devOrigin+'/')));
  if(external.length)throw new Error('Unexpected non-local request(s): '+external.slice(0,3).join(', '));
  const metrics=app.getAppMetrics();const footprint={processes:metrics.length,workingSetMb:Math.round(metrics.reduce((n,m)=>n+(m.memory?.workingSetSize??0),0)/1024)};
  console.log('ELECTRON_SMOKE_PASS',JSON.stringify({...result,routes:routes.map((r)=>r.route),rendererErrors:rendererErrors.length,hardened:true,navigationBlocked:true,helperManifestFiles:Object.keys(manifest.files).length,externalRequests:external.length,shots,footprint}));finish(0);

@@ -27,6 +27,8 @@ const flat: Omit<FullJarvisAPI, 'productivity'> = {
   executeAction: (id, approved) => call('executeAction', id, approved),
   speak: (text) => call('speak', text),
   transcribe: (audio) => call('transcribe', audio),
+  speechStop: () => call('speechStop'),
+  transcribeCancel: () => call('transcribeCancel'),
   exportData: () => call('exportData'),
   importData: () => call('importData'),
   pickPath: (kind) => call('pickPath', kind),
@@ -34,6 +36,7 @@ const flat: Omit<FullJarvisAPI, 'productivity'> = {
   // Per-provider cloud keys: only a provider id and (for set) the key go in; only booleans and provider metadata come back.
   cloudProviderStatus: () => call('cloudProviderStatus'),
   setProviderKey: (provider, key) => call('setProviderKey', provider, key),
+  cloudModels: (provider) => call('cloudModels', provider),
   clearProviderKey: (provider) => call('clearProviderKey', provider),
   // Optional arguments are forwarded only when given, so the main-process arity/shape check sees exactly what the caller passed.
   planIntent: (command, options) => (options === undefined ? call('planIntent', command) : call('planIntent', command, options)),
@@ -77,7 +80,16 @@ const flat: Omit<FullJarvisAPI, 'productivity'> = {
 // Nested namespace read by src/ui/store.tsx; every member is one of the flat calls above.
 const productivity = productivityBridge(flat);
 if (!productivity) throw new Error('Productivity bridge is incomplete');
-const api: FullJarvisAPI = {...flat, productivity};
+// v2.6 provider readiness. Typed locally until FullJarvisAPI carries these two methods (shared contract, Codex).
+const providerTest = {
+  providerConnectionTest: (provider: string) => call('providerConnectionTest', provider),
+  providerConnectionTestCancel: (): Promise<boolean> => call('providerConnectionTestCancel'),
+  accountsStatus: (provider: string) => call('accountsStatus', provider),
+  accountsConnect: (provider: string) => call('accountsConnect', provider),
+  accountsCancel: (): Promise<boolean> => call('accountsCancel'),
+  accountsDisconnect: (provider: string) => call('accountsDisconnect', provider),
+};
+const api: FullJarvisAPI & typeof providerTest = {...flat, productivity, ...providerTest};
 
 contextBridge.exposeInMainWorld('jarvis', api);
 

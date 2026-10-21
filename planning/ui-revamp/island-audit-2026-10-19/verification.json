@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-19",
+  "platform": "win32",
+  "sourceBuild": "passed",
+  "prototypeBuild": "passed",
+  "fullTests": {
+    "skipped": 0,
+    "passed": 1759,
+    "failed": 0
+  },
+  "focusedIslandTests": {
+    "failed": 0,
+    "passed": 67
+  },
+  "nativePlacement": {
+    "failed": 0,
+    "checks": 33
+  },
+  "nativePet": {
+    "externalRequests": 0,
+    "checks": 18,
+    "failed": 0
+  },
+  "browserJourney": {
+    "firstRunFailed": 1,
+    "firstRunPassed": 13,
+    "passed": 14,
+    "failed": 0,
+    "backend": "scripted preview"
+  },
+  "smoke": {
+    "routes": 23,
+    "localNoteTaskCapsulePersistence": "passed",
+    "externalRequests": 0,
+    "rendererErrors": 0
+  },
+  "manual": {
+    "observedCharacters": 34,
+    "aiRequest": false,
+    "text": "Companion island verified locally.",
+    "action": "invoke, attach exact app, preview, native Continue, type into external app",
+    "escapeCollapse": "passed",
+    "actualTypingVerified": true,
+    "followup": "attempted, not verified",
+    "sourceApp": "disposable Electron input test pad"
+  },
+  "paidRequests": 0,
+  "installedAppUpdated": false,
+  "limitations": [
+    "Live Claude and actual selected screen analysis not exercised",
+    "Microphone recording and Windows acrylic not exercised",
+    "General semantic click/scroll and readback incomplete",
+    "Mouse drag/click-through and installed package not certified",
+    "Pet remains animation preview; frame timing degraded once under load"
+  ]
+}

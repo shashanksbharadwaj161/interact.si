@@ -45,11 +45,15 @@ export const noteDrafts = {
 
 type Selection = string | 'new' | null;
 
-/** `initialItem` is the route's item parameter: the note to open first. An unknown id keeps the first note selected. */
-export function Notes({ initialItem }: { initialItem?: string } = {}) {
+/**
+ * `initialItem` is the route's item parameter: the note to open first. An unknown id keeps the first note selected.
+ * `newTitle` (the route's `new` parameter, from quick search or Today) opens a new unsaved note, titled when given.
+ */
+export function Notes({ initialItem, newTitle }: { initialItem?: string; newTitle?: string } = {}) {
   const { state, api, mutate, toast, productivity } = useReady();
   // Starting point: the routed note, else an unsaved draft left behind earlier in this session, else the first note.
   const initial = useMemo(() => {
+    if (newTitle !== undefined && !noteDrafts.get('new')) return { selected: 'new' as Selection, draft: { ...blank(), title: newTitle.slice(0, 120) }, loadedAt: undefined, restored: false };
     const routed = state.notes.find((n) => n.id === initialItem);
     const key = routed ? routed.id : initialItem ? undefined : noteDrafts.latest();
     const cached = key ? noteDrafts.get(key) : undefined;

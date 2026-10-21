@@ -194,7 +194,7 @@ export function GuidedSetupView(p: GuidedSetupViewProps) {
     <div className="page guide" data-reduced-motion={p.reducedMotion ? 'true' : 'false'}>
       <PageHeader
         eyebrow="Help"
-        title="Guided setup"
+        title="Help & setup"
         subtitle="Short local tours for the main features. Statuses come from this computer; nothing here runs, downloads or turns on by itself."
         actions={
           <div className="page-actions">

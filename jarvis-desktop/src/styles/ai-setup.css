@@ -1,0 +1,276 @@
+/* Connect AI: provider, then a four-step sequence (key, connect, model, test) that shows exactly where you are. */
+.ai-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: var(--t-small);
+}
+
+.provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.provider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s3) var(--s4);
+  text-align: left;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-mid), background var(--dur-fast);
+}
+
+@supports (corner-shape: bevel) {
+  .provider {
+    border-radius: var(--cut) 0 var(--cut) 0;
+    corner-shape: bevel;
+  }
+}
+
+.provider:hover:not(:disabled) {
+  border-color: var(--energy-line);
+}
+
+.provider .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.provider strong {
+  font: 600 var(--t-body) var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.provider.on {
+  border-color: var(--energy);
+  background: var(--energy-soft);
+  box-shadow: 0 0 30px -16px var(--energy);
+}
+
+.provider.is-primary {
+  padding: var(--s4);
+}
+
+.provider:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.provider-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  color: var(--energy-ink);
+  background: var(--energy);
+  box-shadow: 0 0 18px -4px var(--glow);
+}
+
+.provider-others .disclosure-body {
+  gap: var(--s2);
+}
+
+.ai-steps {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* The connector line between step marks. */
+.ai-steps::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--energy-line), var(--line));
+}
+
+.ai-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--s4);
+  padding-bottom: var(--s5);
+}
+
+.ai-step:last-child {
+  padding-bottom: 0;
+}
+
+.ai-step-mark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--line-strong);
+  font: 600 var(--t-meta) var(--font-mono);
+  transform: rotate(45deg);
+  transition: background var(--dur-mid), border-color var(--dur-mid), color var(--dur-mid), box-shadow var(--dur-mid);
+}
+
+.ai-step-mark > * {
+  transform: rotate(-45deg);
+}
+
+.ai-step-mark {
+  font-size: 0;
+}
+
+.ai-step-mark::after {
+  content: attr(data-n);
+}
+
+.ai-step.is-active .ai-step-mark {
+  color: var(--energy);
+  border-color: var(--energy);
+  box-shadow: 0 0 16px -4px var(--glow);
+}
+
+.ai-step.is-done .ai-step-mark {
+  color: var(--energy-ink);
+  background: var(--lime);
+  border-color: var(--lime);
+}
+
+.ai-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  min-width: 0;
+  padding-top: 3px;
+}
+
+.ai-step-body h3 {
+  font: 600 var(--t-body) var(--font-display);
+  letter-spacing: 0.03em;
+}
+
+.ai-step.is-todo .ai-step-body h3 {
+  color: var(--muted);
+}
+
+.ai-step.is-active .ai-step-body {
+  animation: rise var(--dur-panel) var(--spring-soft) both;
+}
+
+.model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 2px;
+}
+
+.model {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  width: 100%;
+  padding: 9px 12px 9px 16px;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+
+.model:hover {
+  background: var(--hover);
+}
+
+.model.on {
+  background: var(--energy-soft);
+  border-color: var(--energy-line);
+}
+
+.model.on::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  background: var(--energy);
+  box-shadow: 0 0 8px var(--glow);
+}
+
+.model strong {
+  font-weight: 600;
+}
+
+.model .mono {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ai-test {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.ai-stream {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  background: var(--sunken);
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--energy);
+}
+
+.ai-stream.is-live {
+  box-shadow: 0 0 30px -18px var(--energy);
+}
+
+.ai-ok {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--lime);
+  font: 600 var(--t-small) var(--font-display);
+  letter-spacing: 0.03em;
+}
+
+.ai-skip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.copy-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}

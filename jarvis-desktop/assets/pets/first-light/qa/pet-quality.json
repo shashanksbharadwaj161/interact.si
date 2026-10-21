@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "atlas": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\final\\spritesheet-extended.png",
+  "encoded_bytes": 2593570,
+  "sha256": "b481a82dac79a9c95bed1d61e782ccdd521a5939dcd69824b3d222fe6bf2aae9",
+  "jump": {
+    "idle_baseline": 202,
+    "jump_baselines": [
+      202,
+      193,
+      164,
+      192,
+      202
+    ],
+    "airborne_lift_pixels": 38,
+    "landing_delta_pixels": 0
+  },
+  "look_registration": {
+    "neutral_center_x": 96.0,
+    "look_centers_x": [
+      100.5,
+      98.0,
+      96.5,
+      98.0,
+      99.5,
+      100.5,
+      101.0,
+      101.5,
+      83.0,
+      87.5,
+      82.5,
+      87.5,
+      93.5,
+      100.5,
+      97.0,
+      98.5
+    ],
+    "look_widths": [
+      115,
+      122,
+      123,
+      120,
+      115,
+      115,
+      118,
+      115,
+      134,
+      121,
+      135,
+      125,
+      119,
+      109,
+      110,
+      109
+    ],
+    "maximum_center_drift_pixels": 13.5,
+    "maximum_width_ratio": 1.238532110091743
+  },
+  "errors": [],
+  "warnings": [
+    "look direction 022.5 accepted with a reviewed warning",
+    "look direction 067.5 accepted with a reviewed warning",
+    "look direction 247.5 accepted with a reviewed warning",
+    "look direction 337.5 accepted with a reviewed warning",
+    "000 has transparent interior hole rows (y=200)",
+    "022.5 has transparent interior hole rows (y=199, y=200)",
+    "045 has transparent interior hole rows (y=199, y=200)",
+    "067.5 has transparent interior hole rows (y=199, y=200)",
+    "090 has transparent interior hole rows (y=199, y=200)",
+    "112.5 has transparent interior hole rows (y=199, y=200)",
+    "135 has transparent interior hole rows (y=199, y=200)",
+    "157.5 has transparent interior hole rows (y=199, y=200)",
+    "270 has transparent interior hole rows (y=127)",
+    "157.5->180 diff is a local outlier (5538 pixels vs neighbor average 2950)",
+    "157.5->180 center shift is high (18.6px)",
+    "270->292.5 diff is a local outlier (3642 pixels vs neighbor average 2318)",
+    "337.5->000 diff is a local outlier (4353 pixels vs neighbor average 2393)",
+    "337.5->000 center shift is high (9.7px)",
+    "337.5->000 sprite area ratio is high (1.16)"
+  ]
+}

@@ -11,7 +11,7 @@
 import type {CloudProvider, Mode} from '../../src/shared/contracts';
 import {isLoopbackHost} from './validation';
 
-export type Purpose = 'ollama' | 'cloud-chat' | 'provider-check';
+export type Purpose = 'ollama' | 'cloud-chat' | 'provider-check' | 'oauth';
 
 export class NetworkDenied extends Error {}
 
@@ -116,6 +116,8 @@ export interface GuardContext {
 
 /** Every header that carries a credential. Each route below names the only one it may send; all others are refused. */
 const CREDENTIAL_HEADERS = ['authorization', 'x-api-key', 'proxy-authorization', 'cookie'];
+/** Token and revocation endpoints of services/oauth.ts OAUTH_PROVIDERS (a test keeps the two lists equal). */
+export const OAUTH_ENDPOINTS: readonly string[] = ['https://oauth2.googleapis.com/token', 'https://oauth2.googleapis.com/revoke', 'https://accounts.spotify.com/api/token'];
 
 function headerNames(h: HeadersInit | undefined): string[] {
   if (!h) return [];
@@ -143,6 +145,16 @@ export function evaluateEgress(
   // A pure caller may omit the method; guardedFetch always passes the real one (default GET, like fetch).
   const method = opts.method?.toUpperCase();
   const sensitive = headerNames(opts.headers).filter((h) => CREDENTIAL_HEADERS.includes(h));
+
+  // Account sign-in: only the exact token and revocation endpoints of the listed providers, POST, online, and no
+  // credential header (the PKCE exchange carries no secret).
+  if (purpose === 'oauth') {
+    if (!OAUTH_ENDPOINTS.includes(`${u.origin}${u.pathname}`) || u.search) return 'Account sign-in requests are limited to the listed provider token endpoints';
+    if (mode !== 'online') return 'Offline mode: account sign-in is blocked';
+    if (method !== 'POST') return 'Account sign-in requests must use POST';
+    if (sensitive.length) return 'No credential header may be sent with an account sign-in request';
+    return null;
+  }
 
   if (purpose === 'provider-check') {
     const entry = PROVIDER_CHECKS.find((c) => (c.origin === ANTHROPIC_ORIGIN ? cloudOrigin : c.origin) === u.origin && c.path === u.pathname && (c.query ?? '') === u.search);

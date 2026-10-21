@@ -1,0 +1,2372 @@
+{
+ "schemaVersion": 1,
+ "date": "2026-10-21",
+ "branch": "claude/compassionate-hawking-m9x36g",
+ "statuses": [
+  "working",
+  "implemented-unverified",
+  "partial",
+  "preview",
+  "missing",
+  "superseded"
+ ],
+ "method": "All 140 original requirement IDs from planning/App-completion-audit-2026-10-16.json. Status is carried forward unless the entry is marked reaudited; re-audited entries cite 21 Oct branch source and tests. Linux cloud container: no Windows, hardware or live-provider run. No completion percentage is claimed.",
+ "superseded": "None marked superseded: the Claude-primary direction removes local-model setup from normal paths but does not delete those requirements; they keep their earlier status.",
+ "counts": {
+  "working": 48,
+  "implemented-unverified": 25,
+  "partial": 35,
+  "preview": 11,
+  "missing": 21,
+  "superseded": 0
+ },
+ "baselineCounts": {
+  "working": 48,
+  "partial": 34,
+  "implemented-unverified": 22,
+  "missing": 24,
+  "preview": 12
+ },
+ "entries": [
+  {
+   "id": 1,
+   "name": "First-run setup wizard",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Onboarding.tsx: four-step Mode, Permissions, Hardware, Review wizard",
+    "tests/onboarding.test.mjs: invalid model blocks Next/Finish"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 2,
+   "name": "Hardware and dependency checks",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/system.ts: systemInfo capability checks",
+    "src/components/Onboarding.tsx: modelReadiness",
+    "tests/onboarding.test.mjs: live Ollama readiness and unknown states"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 3,
+   "name": "Offline/online mode selection",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/netGuard.ts: external request guard",
+    "src/components/Settings.tsx: route/mode controls",
+    "tests/backend-core.test.mjs: offline rejects external endpoints",
+    "tests/substantial-streaming.test.mjs: switching offline aborts cloud stream"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 4,
+   "name": "Permission setup and review",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Settings.tsx: permission-change confirmation preview",
+    "electron/services/policy.ts: backend enforcement",
+    "tests/parallel-settings.test.mjs: preview mirrors main-process confirmation rule"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 5,
+   "name": "Main application dashboard",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Home.tsx: live dashboard/widgets",
+    "src/components/App.tsx: Home route",
+    "tests/autopilot-shell-runtime.test.mjs: every navigable view renders",
+    "tests/milestone-home-widgets.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 6,
+   "name": "Searchable settings",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Settings.tsx: searchable ranked sections",
+    "tests/parallel-settings.test.mjs: search title rank and flat live-region results"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 7,
+   "name": "Personal profiles and preferences",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Settings.tsx: displayName and appearance/notification preferences",
+    "src/ui/prefs.ts: persisted preferences",
+    "src/ui/profiles.ts: six-setting allowlist, named capture/rename/remove/switch patches",
+    "src/components/Settings.tsx: PersonalProfilesPanel persists profiles via usePref and applies through api.saveSettings; failed save preserves previous active profile",
+    "tests/slice-personal-profiles.test.mjs: profile isolation, bounds, apply, normalization, diff and mounted wiring"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 8,
+   "name": "Keyboard and accessibility controls",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/App.tsx: shortcutAction, reduced-motion and text-size controls",
+    "tests/autopilot-shell-runtime.test.mjs: every displayed shortcut opens correct view and fields/buttons named",
+    "tests/milestone-a11y.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 9,
+   "name": "Tray, startup, notification preferences",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/main.ts: tray, global hotkey, startHidden, due notifications",
+    "src/components/Settings.tsx: startup and quiet-toast settings"
+   ],
+   "gaps": [
+    "Complete login-startup/notification preference integration and Windows acceptance not established"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 10,
+   "name": "Help, tutorials, diagnostic status",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/GuidedSetup.tsx: guided topics/tour",
+    "src/components/App.tsx: Help and guided setup route",
+    "tests/full-guidance.test.mjs: callbacks, tour bounds, actual capability statuses",
+    "src/components/Status.tsx"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 11,
+   "name": "Local text reasoning",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/chat.ts: local Ollama chat",
+    "src/components/Assistant.tsx: selected local route",
+    "docs/current-verification.md: real qwen3.5:2b arithmetic response"
+   ],
+   "gaps": [
+    "G2 reference-laptop latency/throughput and 8/16GB sizing acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 12,
+   "name": "Local speech recognition",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/services/speech.ts: Windows recognizer and optional local engines",
+    "tests/backlog-voice.test.mjs: Whisper adapter exact argv, executable hash, timeout and unavailable states",
+    "src/ui/dictation-cleanup.ts: transcript postprocessing, not an ASR engine",
+    "tests/slice-dictation-cleanup.test.mjs: deterministic cleanup and guarded model transport"
+   ],
+   "gaps": [
+    "No newly installed/bundled verified neural ASR engine pack or G3 WER/license acceptance."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 13,
+   "name": "Local speech playback",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/speech.ts: local TTS playback/cancel",
+    "src/components/Assistant.tsx: speak controls",
+    "tests/backend-native.test.mjs: honest missing voice capability",
+    "docs/current-verification.md: actual Windows TTS detected"
+   ],
+   "gaps": [
+    "Audible playback acceptance on target Windows hardware"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 14,
+   "name": "Local model-pack setup and offline import",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "src/components/Models.tsx: validate/import model pack",
+    "electron/services/models.ts: pack verification/import",
+    "tests/model-pack-path-security.test.mjs"
+   ],
+   "gaps": [
+    "Real GGUF pack import/runtime acceptance and hardware sizing"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 15,
+   "name": "Local vision model support",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "electron/services/models.ts: local-vision capability explicitly unavailable without image adapter"
+   ],
+   "gaps": [
+    "No local image-input pipeline or registered vision adapter; G2 open"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 16,
+   "name": "Local embeddings and retrieval",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/ui/local-retrieval.ts: BM25 lexical index/search",
+    "src/components/MemorySearch.tsx: related retrieval",
+    "tests/slice-local-retrieval.test.mjs",
+    "electron/services/models.ts: embeddings unsupported",
+    "canonical outputs/jarvis-desktop/src/ui/notes-qa.ts: suggestNotes remains BM25; tests/slice-notes-qa.test.mjs: local BM25 ranking"
+   ],
+   "gaps": [
+    "Local embedding generation/vector retrieval absent; G2 open"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 17,
+   "name": "Model switching and version pinning",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/services/models.ts: select model",
+    "src/components/Models.tsx: onSelect",
+    "tests/autopilot-models.test.mjs"
+   ],
+   "gaps": [
+    "No version/digest pinning workflow; G2 sizing unrecorded"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 18,
+   "name": "CPU/GPU and memory budgets",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/services/models.ts: RESOURCE_PROFILES, selectProfile/chatOptions",
+    "src/components/Models.tsx: selectable profile",
+    "tests/autopilot-models.test.mjs"
+   ],
+   "gaps": [
+    "Measured/enforced OS CPU/GPU/RAM limits and reference-laptop G2 validation"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 19,
+   "name": "Model download verification and removal",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/models.ts: pull jobs, checksums/size and removal",
+    "src/components/Models.tsx: job status/cancel/removal",
+    "tests/autopilot-models.test.mjs",
+    "tests/model-pack-path-security.test.mjs"
+   ],
+   "gaps": [
+    "Actual model download/removal and G2 reference-hardware acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 20,
+   "name": "Personal model fine-tuning experiments",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Models.tsx: FinetuneDatasetPanel",
+    "src/ui/finetune-dataset.ts: split/export/sensitive scan",
+    "tests/slice-finetune-dataset.test.mjs"
+   ],
+   "gaps": [
+    "Training execution, adapter loading and resulting-model evaluation absent"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 21,
+   "name": "Text chat with streaming",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/liveBudget.ts: hub chat output capped under a live-test budget",
+    "tests/live-budget.test.mjs",
+    "src/components/Assistant.tsx: LiveReply, applyStreamEvent, Stop and live composer",
+    "electron/services/chat.ts: stream hub",
+    "tests/substantial-streaming.test.mjs: local streaming end-to-end, cancel, cloud gating and reported usage",
+    "canonical outputs/jarvis-desktop/tests/slice-ai-writing.test.mjs: stream send/cancel/fallback; tests/slice-notes-qa.test.mjs: stream deltas/cancellation",
+    "src/ui/document-explain.ts: runDocumentExplain uses streaming chat bridge and cancellation",
+    "tests/slice-document-explain-ai.test.mjs: deltas, cancel, timeout/lost response, fallback and no double send"
+   ],
+   "gaps": [],
+   "reaudited": true,
+   "note": "Unchanged capability; live-test cap added."
+  },
+  {
+   "id": 22,
+   "name": "Push-to-talk conversation",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/backend.ts micTranscribe: transcription only while the native microphone policy allows it; revocation cancels",
+    "tests/voice-policy.test.mjs",
+    "src/components/Assistant.tsx: hold-to-record and transcription",
+    "src/ui/audio.ts: ClipRecorder",
+    "tests/backlog-voice.test.mjs: consent, WAV16kHz, stop, silence, device-loss"
+   ],
+   "gaps": [
+    "Physical microphone and Windows recognizer acceptance"
+   ],
+   "reaudited": true,
+   "note": "Policy enforcement moved into main on 21 Oct."
+  },
+  {
+   "id": 23,
+   "name": "Clean dictation with insertion preview",
+   "baseline2026_10_16": "partial",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/backend.ts companion.insertText: preview, trusted confirmation, window re-check, type",
+    "planning/ui-revamp/island-audit-2026-10-19/README.md: real Windows typing of reviewed text into a separate app (34 characters, offline)",
+    "tests/companion-agent.test.mjs",
+    "src/components/Assistant.tsx: transcript enters composer before Send",
+    "electron/services/speech.ts: bounded transcription",
+    "tests/backlog-voice.test.mjs",
+    "src/components/Assistant.tsx: DictationCleanup, original/cleaned preview, Use cleaned/Use original, explicit optional local/cloud cleanup and applyDictation composer insertion",
+    "src/ui/dictation-cleanup.ts: offline punctuation/filler/spacing rules; bounded model cleanup with cancellation",
+    "tests/slice-dictation-cleanup.test.mjs: stream/cancel/failure cases and explicit insertion wiring"
+   ],
+   "gaps": [
+    "Speech capture with a real microphone feeding the reviewed insert",
+    "Recognition accuracy acceptance"
+   ],
+   "reaudited": true,
+   "note": "Was partial on 16 Oct; cross-app insertion now exists and was manually verified on Windows for typed text, not for voice."
+  },
+  {
+   "id": 24,
+   "name": "Selected screen-region questions",
+   "baseline2026_10_16": "missing",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/companionWindow.ts: explicit picker, DPI crop, memory-only thumbnail, single-use expiring token, encodeRegion",
+    "electron/services/cloud.ts streamAnthropicMessage + agent.ts firstUserContent",
+    "companionOutbound exact preview",
+    "tests/companion-screen.test.mjs (15)",
+    "src/components/Computer.tsx: no region capture/question pipeline",
+    "src/ui/context-policy.ts: policy only"
+   ],
+   "gaps": [
+    "Real desktopCapturer crop at 125/150/200% and multi-monitor on Windows",
+    "Live Claude image answer under the bounded live-test budget"
+   ],
+   "reaudited": true,
+   "note": "Was missing on 16 Oct."
+  },
+  {
+   "id": 25,
+   "name": "OCR and otherwise unselectable text extraction",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/ocr.ts: choose local image, language check, recognize/cancel",
+    "src/components/Computer.tsx: OCR review",
+    "tests/backlog-ocr.test.mjs",
+    "tests/expansion-ocr-ui.test.mjs"
+   ],
+   "gaps": [
+    "Real Windows image OCR and G6 acceptance; screen capture absent"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 26,
+   "name": "Translation and app-specific writing tone",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/PromptTools.tsx: toneSend and translation controls",
+    "src/ui/tone-profiles.ts: app-specific style and checks",
+    "tests/slice-tone-profiles.test.mjs",
+    "tests/full-workspace.test.mjs: createDraftSender sends only on explicit Send",
+    "canonical outputs/jarvis-desktop/src/ui/ai-writing.ts: buildWritingRequest/runWritingAction; src/components/PromptTools.tsx: data-ai-writing, explicit confirmation/insert; tests/slice-ai-writing.test.mjs: stream path, cancellation and fallback"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 27,
+   "name": "Approved document explanations",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/PromptTools.tsx: docSend approval/fingerprint/chunk routing",
+    "src/ui/document-explain.ts: approval and explanation prompts",
+    "electron/services/approvedDocuments.ts: approved txt/md import",
+    "tests/slice-document-explain.test.mjs",
+    "tests/approved-documents.test.mjs",
+    "src/ui/document-explain.ts: exact request preview, depth and selection-aware bounded explanation generation",
+    "src/components/PromptTools.tsx: Explain with AI, route/key confirmation, cancel, preview and Insert into editor",
+    "tests/slice-document-explain-ai.test.mjs: guarded transport and renderer wiring"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 28,
+   "name": "Error diagnosis with proposed actions",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/ui/error-diagnosis.ts: errno/HRESULT/traceback rules and proposed actions",
+    "src/components/PromptTools.tsx: diagnosis and copy controls",
+    "tests/slice-error-diagnosis.test.mjs",
+    "electron/services/actions.ts: open-path/reveal-folder preview, native-confirmation execution and root/link/executable policy",
+    "src/components/PromptTools.tsx and src/ui/error-diagnosis.ts: proposed path actions use real preview/execute; settings action navigates",
+    "tests/slice-reveal-path-action.test.mjs: injected shell executes approved safe targets, refuses others"
+   ],
+   "gaps": [
+    "Diagnosis remains a bounded rule-based checker; no general model-backed diagnostic reasoning.",
+    "Real native Windows fixture-matrix execution remains unverified."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 29,
+   "name": "Explicit screen/app context controls",
+   "baseline2026_10_16": "preview",
+   "status": "partial",
+   "evidence": [
+    "Explicit region picker, attached-window chip, companionOutbound preview (electron/companionWindow.ts, backend.ts)",
+    "UIA inspect of the attached app only (electron/services/uia.ts)",
+    "src/ui/context-policy.ts: decideContextShare/buildContextPreview",
+    "src/components/Assistant.tsx: context-policy controls",
+    "tests/slice-context-policy.test.mjs"
+   ],
+   "gaps": [
+    "No continuous or ambient app-context bridge (by design: explicit only)",
+    "Island UI for the outbound preview (Codex)"
+   ],
+   "reaudited": true,
+   "note": "Was preview on 16 Oct."
+  },
+  {
+   "id": 30,
+   "name": "Conversation history and export",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Assistant.tsx: History panel, archive/import/filter/export",
+    "src/ui/conversation-export.ts: JSON/Markdown exports",
+    "tests/slice-conversation-export.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 31,
+   "name": "Explicit project checkpoints",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MemoryWorkbench.tsx: Checkpoints add/edit/delete",
+    "electron/services/store.ts: checkpoint ops",
+    "tests/full-workspace.test.mjs: evidence update and original timestamp preservation"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 32,
+   "name": "Searchable project notes and references",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MemorySearch.tsx: project filter and note references",
+    "src/components/Capsules.tsx: ProjectMemory references",
+    "tests/backend-search.test.mjs: ranked typed snippets",
+    "tests/full-workspace.test.mjs",
+    "canonical outputs/jarvis-desktop/src/ui/notes-qa.ts: selected-note request, citation mapping/runNotesQa; src/components/MemorySearch.tsx: NotesQa consent/confirm panel; tests/slice-notes-qa.test.mjs: unchecked notes excluded, citations and cancellation"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 33,
+   "name": "Opt-in application session timeline",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/MemoryWorkbench.tsx: Timeline view",
+    "src/components/MemorySearch.tsx: opt-in policy",
+    "electron/services/store.ts: timeline operations",
+    "tests/full-workspace.test.mjs: grouped timeline",
+    "src/ui/session-association.ts and src/components/MemoryWorkbench.tsx: corrections over persisted timeline/focus records",
+    "tests/slice-session-association.test.mjs"
+   ],
+   "gaps": [
+    "Still no live OS application-session reporting/capture source."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 34,
+   "name": "Evidence-backed daily recaps",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MemoryWorkbench.tsx: RecapSection day/source filters",
+    "electron/services/search.ts: buildDailyRecap/resolveEvidence",
+    "tests/full-workspace.test.mjs: stale evidence, source filtering and recap rendering"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 35,
+   "name": "Draft worklog and standup updates",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MemoryWorkbench.tsx: StandupDraft generate/edit/copy/window/project",
+    "src/ui/worklog-draft.ts: buildWorklogDraft",
+    "tests/slice-worklog-draft.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 36,
+   "name": "Correctable task/session association",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/store.ts: session associations and suggestions",
+    "electron/services/search.ts: association logic",
+    "src/ui/session-association.ts: deterministic suggestions, immutable apply/clear, correction history and stored association reconstruction",
+    "src/ui/store.tsx: setSessionAssociation validates and persists existing association.set/association.clear operations",
+    "src/components/MemoryWorkbench.tsx: mounted task/project selects, Save/Clear, suggestions and corrected-by-you history on timeline/focus sessions",
+    "tests/slice-session-association.test.mjs: apply/clear, stored reload reconstruction, unknown-ID refusal and renderer/store wiring"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 37,
+   "name": "Memory edit, forget, retention controls",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MemorySearch.tsx: MemoryControls retention preview/two-step forgetting",
+    "src/components/MemoryWorkbench.tsx: checkpoint editing/deletion",
+    "tests/expansion-memory.test.mjs: retention and explicit forget",
+    "tests/full-workspace.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 38,
+   "name": "Coding-session adapters",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/MemoryWorkbench.tsx: CodingSessionImport",
+    "src/ui/coding-session-adapter.ts: parseGitLog/groupSessionsDetailed/checkpoint ops",
+    "tests/slice-coding-session-adapter.test.mjs"
+   ],
+   "gaps": [
+    "Live IDE/coding-tool session adapters absent"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 39,
+   "name": "Continuous screen history",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/ui/context-policy.ts: screen policy only",
+    "no continuous capture implementation in inspected source"
+   ],
+   "gaps": [
+    "Continuous screen recording/history pipeline and G6 consent/retention acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 40,
+   "name": "Meeting/system-audio capture and summaries",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/ui/audio.ts: microphone clip recorder only",
+    "electron/services/speech.ts: dictation"
+   ],
+   "gaps": [
+    "Meeting/system-audio loopback capture and summary session workflow; G3/G6 acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 41,
+   "name": "Project capsules with goals and references",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Capsules.tsx: ProjectMemory goals/references/checkpoints",
+    "electron/services/store.ts: capsule.setMeta",
+    "tests/full-workspace.test.mjs: portable goals/references and store acceptance"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 42,
+   "name": "Launch apps, files, and URLs together",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "src/components/Capsules.tsx: restore preview/confirmation",
+    "electron/services/capsules.ts: restoreCapsule launch sequence",
+    "tests/backend-native.test.mjs",
+    "tests/autopilot-productivity.test.mjs"
+   ],
+   "gaps": [
+    "Real multi-item launch acceptance across Windows apps/files/URLs"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 43,
+   "name": "Save and restore supported window geometry",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "src/components/Capsules.tsx: RestoreTools.listWins/capture and saved windows",
+    "electron/services/capsules.ts: captureGeometry/restoreCapsule",
+    "native Win32 helper",
+    "tests/backend-native.test.mjs"
+   ],
+   "gaps": [
+    "Real geometry save/restore/DPI/multi-monitor matrix acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 44,
+   "name": "Project-specific visual scene",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Capsules.tsx: saved capsule scene",
+    "src/ui/scenes.ts: scene catalogue",
+    "electron/services/capsules.ts: export/import preserves scene"
+   ],
+   "gaps": [
+    "No established project-resume scene application pipeline"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 45,
+   "name": "Resume recap with source references",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Capsules.tsx: ProjectMemory resume recap/source badges/copy draft",
+    "electron/services/search.ts: buildResumeRecap",
+    "tests/autopilot-productivity.test.mjs",
+    "tests/full-workspace.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 46,
+   "name": "Cross-project search",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MemorySearch.tsx: cross-project search and project filter",
+    "electron/services/search.ts: searchState",
+    "tests/backend-search.test.mjs: typed results, capsule items and chat explicit opt-in"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 47,
+   "name": "Browser-profile and tab adapters",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Capsules.tsx: BrowserRefsImport",
+    "src/ui/browser-refs.ts: paste parser/import",
+    "tests/slice-browser-refs.test.mjs"
+   ],
+   "gaps": [
+    "Live browser-profile/tab-reading/restoration adapter absent"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 48,
+   "name": "Portable capsule export with path mapping",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "src/components/Capsules.tsx: RestoreTools export/read/parse/import/path remapping",
+    "electron/services/capsules.ts: exportCapsulePack/parseCapsulePack",
+    "tests/autopilot-productivity.test.mjs"
+   ],
+   "gaps": [
+    "Packaged file-picker/export/import round trip on target Windows"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 49,
+   "name": "Deep app-state restoration adapters",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/Capsules.tsx: adapter status explicitly limits restoration to launch/geometry",
+    "electron/services/capsules.ts: supported restore only"
+   ],
+   "gaps": [
+    "Deep app-specific document/cursor/editor/tab state restoration adapters"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 50,
+   "name": "Spatial project map with historical branches",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Capsules.tsx: ProjectMapPanel keyboard SVG timeline",
+    "src/ui/project-map.ts: buildProjectMap",
+    "tests/slice-project-map.test.mjs"
+   ],
+   "gaps": [
+    "Historical branching graph/branch creation or restoration absent"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 51,
+   "name": "Tasks and checklists",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Tasks.tsx: taskMatches, filterCounts, groupTasks and save/toggle/delete controls",
+    "electron/backend.ts: persisted task CRUD; tests/parallel-tasks.test.mjs and tests/backend-core.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 52,
+   "name": "Reminders and timers",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/reminders.ts: reminder scheduling and notification delivery",
+    "src/components/Tasks.tsx: reminderStatus/snoozeUntil and focus timer controls; src/ui/focus.tsx: absolute deadline, pause/resume",
+    "tests/autopilot-productivity.test.mjs and tests/backlog-routines.test.mjs"
+   ],
+   "gaps": [
+    "Real Windows notification/timer delivery across sleep/restart not established by current source audit"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 53,
+   "name": "Focus sessions with history",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/ui/focus.tsx: FocusProvider persisted deadline with start/pause/resume/reset",
+    "src/components/Tasks.tsx: observeFocus records sessions and focusSummary shows today/week/recent sessions",
+    "electron/services/search.ts: observeFocus, focusSummary; productivity backend persistence"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 54,
+   "name": "Quick notes and snippets",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Notes.tsx: persisted note editor, tags, drafts, export/import and snippet insertion",
+    "src/ui/note-snippets.ts: listSnippets, insertAtCursor and parseNotesExport",
+    "tests/parallel-notes.test.mjs: draft restoration and conflict cases; tests/slice-note-snippets.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 55,
+   "name": "File shelf with references",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/search.ts: searches productivity.shelf references",
+    "src/components/Capsules.tsx: project reference editor with file/folder picker and saved references",
+    "src/ui/file-shelf.ts: normalize/add/edit/remove/search/group/reference data and successful-open recents",
+    "src/components/Home.tsx: mounted FileShelf with picker/typed references, label/note/tags edit, removal and preview-confirm open",
+    "tests/slice-file-shelf.test.mjs: data behavior, URL safety, dedupe, persistence key and renderer wiring"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 56,
+   "name": "Optional clipboard history",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/clipboard.ts: opt-in collection, retention and purge",
+    "src/components/Clipboard.tsx: clipboardActions load/toggle/remove/purge, searchable grouped previews",
+    "tests/slice-clipboard-history.test.mjs: search, grouping, focus and mounted panel; tests/autopilot-clipboard.test.mjs"
+   ],
+   "gaps": [
+    "Real desktop clipboard sampling/privacy lifecycle not independently exercised in this audit"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 57,
+   "name": "Application launcher and recent items",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Computer.tsx: approved Launch app action form",
+    "electron/services/actions.ts: launch-app and launch-path execution; src/components/Capsules.tsx: restore approved apps/files",
+    "src/components/Home.tsx: file/folder/URL shelf with Recently opened after confirmed executed outcomes",
+    "src/ui/file-shelf.ts: recentItems and recordOpened",
+    "tests/slice-file-shelf.test.mjs"
+   ],
+   "gaps": [
+    "No dedicated application launcher/catalog with recent launched applications; shelf kinds are file/folder/url and explicit app kind is rejected."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 58,
+   "name": "Media and per-app volume controls",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "electron/services/integrations.ts and src/components/Integrations.tsx: Spotify website handoff/setup-required, no playback/session-volume adapter",
+    "tests/backlog-connectors.test.mjs: Spotify playback stays setup-required"
+   ],
+   "gaps": [
+    "Media transport integration",
+    "Windows per-app audio session enumeration and volume modification"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 59,
+   "name": "Calendar view and local calendar import",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Calendar.tsx and CalendarImport.tsx: calendar view and explicit local ICS review/import",
+    "electron/services/calendar.ts: parsed event import and persistent calendar",
+    "src/ui/calendar-import.ts and tests/parallel-calendar-import.test.mjs: timezone, recurrence and duplicates",
+    "src/ui/calendar-export.ts: RFC5545 escaping, UTF8-aware folding, all-day and UTC event output",
+    "src/components/Calendar.tsx: exact ICS preview, Blob download and export summary",
+    "tests/slice-calendar-export.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 60,
+   "name": "System, battery, and device widgets",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/services/system.ts: System.resources measured CPU/memory/process telemetry and optional battery injection",
+    "src/components/Status.tsx: system/resource display; src/components/Home.tsx: capabilities widget",
+    "electron/services/system.ts: HostBatteryReader using powerMonitorAdapter, honest AC/battery measurement without invented percentage",
+    "electron/ipc.ts and electron/preload.ts: trusted push-only host battery bridge wired to Electron powerMonitor",
+    "src/components/Status.tsx: BatteryPanel browser→host→unmeasured fallback",
+    "tests/slice-host-battery.test.mjs: adapter behavior, fallback, push caching and source labels"
+   ],
+   "gaps": [
+    "Broader device widgets beyond existing capability summaries remain absent.",
+    "No native battery percentage measurement or real-device fixture acceptance added."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 61,
+   "name": "Movable expanding desktop island",
+   "baseline2026_10_16": "missing",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/companionWindow.ts + companionCore.ts placement, dock, drag, hit-testing",
+    "island-audit-2026-10-19: 33 native placement checks, global invocation on Windows",
+    "electron/main.ts: createWindow creates ordinary 1180x780 BrowserWindow, no overlay/island window",
+    "src/components/App.tsx: regular app shell"
+   ],
+   "gaps": [
+    "Real pointer drag, click-through, multi-monitor and fullscreen-app behaviour acceptance"
+   ],
+   "reaudited": true,
+   "note": "Was missing on 16 Oct. Renderer/island visuals are Codex-owned."
+  },
+  {
+   "id": 62,
+   "name": "Original color, typography, material themes",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/App.tsx: document dataset theme/textSize effects",
+    "src/components/Settings.tsx: theme and appearance preferences",
+    "src/styles/tokens.css, shell.css and components.css: implemented palette/material/typography tokens; tests/autopilot-visual.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 63,
+   "name": "Interruptible status and panel animations",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/App.tsx: live motion policy and panel shell",
+    "src/styles/components.css and src/styles/avatar.css: state and panel transitions",
+    "src/ui/companion.tsx: state changes replace timers and animate current activity",
+    "src/ui/anim-state.ts: explicit frozen idle/entering/active/exiting/interrupted state machine with current-progress retargeting and reduced motion",
+    "src/ui/companion.tsx: requestAnimationFrame lifecycle/cancel hook",
+    "src/components/Companion.tsx: status badge wired through machine",
+    "tests/slice-interruptible-anim.test.mjs: interruption, cancel, monotonic/clamped progress and reduced-motion behavior"
+   ],
+   "gaps": [
+    "Panel transitions themselves are not wired to this machine.",
+    "Desktop-island status/panel animation acceptance remains absent."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 64,
+   "name": "Reduced motion, battery, fullscreen controls",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/App.tsx: useReducedMotion, batteryWantsReducedMotion and fullscreen toggle",
+    "src/components/Settings.tsx: reduce-motion and low-battery motion switches",
+    "tests/autopilot-visual.test.mjs and tests/backlog-resources.test.mjs",
+    "src/ui/resource-policy.ts: batterySaverMotionActive and browser→host fallback",
+    "src/components/Status.tsx: measured battery source and preference-aware status",
+    "src/components/App.tsx: actual root motion policy still reads navigator.getBattery only",
+    "tests/slice-host-battery.test.mjs"
+   ],
+   "gaps": [
+    "External fullscreen-app detection/suppression still absent.",
+    "Host fallback is shown on Status, but root motion policy in App.tsx is not wired to host battery; Electron without navigator.getBattery still misses actual host-driven motion suppression."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 65,
+   "name": "Companion with assistant-state animations",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/ui/companion.tsx: CompanionProvider live state and quantized microphone amplitude",
+    "src/components/Assistant.tsx: sets listening/thinking/speaking/error activity",
+    "src/components/Companion.tsx and Avatar.tsx: live animated avatar rendering; tests/parallel-avatar.test.mjs"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 66,
+   "name": "Audio-reactive waveforms and effects",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/ui/audio.ts: ClipRecorder WebAudio analyser reads microphone amplitude",
+    "src/components/Assistant.tsx: real analyser drives local meter and shared companion level during consented recording",
+    "src/ui/companion.tsx: quantizeLevel, hostVoiceLevel; src/components/AvatarStudio.tsx: live level host"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 67,
+   "name": "Animated project/scene transitions",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/SceneBackdrop.tsx and src/styles/scene3d.css: animated in-app scenes",
+    "src/components/App.tsx and src/styles/components.css: page/panel transitions; saved scene preference",
+    "src/components/SceneBackdrop.tsx: useAnimMachine requested-scene transition with current-progress retargeting",
+    "src/components/Capsules.tsx: mounted scene editor preview benefits from stable backdrop instance",
+    "tests/slice-interruptible-anim.test.mjs: machine behavior and source wiring"
+   ],
+   "gaps": [
+    "App.tsx scene-layer is keyed by scene (line730), remounting SceneBackdrop on global scene change and discarding previous machine state.",
+    "No distinct project-to-project scene transition workflow is wired; capsules store scene, app-wide scene is independent preference."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 68,
+   "name": "Widget layout editor and live preview",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Home.tsx: normalizeLayout, moveWidget, setWidgetHidden and mounted WidgetPicker",
+    "src/components/WidgetPicker.tsx and src/ui/widgets.ts: editable saved widths/order/visibility",
+    "tests/milestone-home-widgets.test.mjs: saved layout placement, mounted picker and allowed widths"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 69,
+   "name": "Live wallpaper/shader scenes",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/MotionStudio.tsx and Scene3D.tsx: animated visual scenes inside application",
+    "src/components/SceneBackdrop.tsx: CSS scene backgrounds"
+   ],
+   "gaps": [
+    "Windows desktop wallpaper attachment/lifecycle",
+    "Desktop shader wallpaper runtime/performance acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 70,
+   "name": "Physics-driven desktop and window effects",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "electron/main.ts: ordinary window without physics/desktop overlay",
+    "src/ui/mod-catalog.ts: unsupported effect declarations; no desktop physics adapter"
+   ],
+   "gaps": [
+    "Desktop/window physics simulation and native effect application"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 71,
+   "name": "Curated optional mod catalog",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/mod-catalog.ts: CATALOG has four generic profiles; every homepage/version/license/build verification is absent",
+    "src/components/Customization.tsx: renders descriptions and manual reversal guidance",
+    "tests/autopilot-mods.test.mjs: project links blocked until verified permissive license"
+   ],
+   "gaps": [
+    "Actual curated identified mods with verified links/licenses/releases"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 72,
+   "name": "Mod version and compatibility checks",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/mod-catalog.ts: checkCompatibility compares supplied metadata, verifiedVersion fields null",
+    "src/components/Customization.tsx: displays compatibility result"
+   ],
+   "gaps": [
+    "Installed/version detection",
+    "Real release/build compatibility metadata and tested entries"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 73,
+   "name": "Taskbar and Start menu presets",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/components/Customization.tsx: TaskbarPresetsPanel explicitly preview-only with manually entered values",
+    "src/ui/taskbar-presets.ts: buildPlan/captureSnapshot/serializePlan; tests/slice-taskbar-presets.test.mjs"
+   ],
+   "gaps": [
+    "Reading actual Windows settings",
+    "Applying and reverting taskbar/Start presets"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 74,
+   "name": "Explorer and notification presets",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/components/Customization.tsx: ExplorerPresetsPanel manually entered values and Applying is not available notice",
+    "src/ui/explorer-presets.ts: buildPlan/serializePlan; tests/slice-explorer-presets.test.mjs"
+   ],
+   "gaps": [
+    "Reading actual Windows settings",
+    "Applying and reverting Explorer/notification presets"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 75,
+   "name": "Save and restore customization settings",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/mod-catalog.ts: normalizePrefs/exportPrefs and preset/effect preference state",
+    "src/components/Customization.tsx: preference export and stored preview selection"
+   ],
+   "gaps": [
+    "Snapshot of actual Windows customization",
+    "Restore/apply adapter"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 76,
+   "name": "Advanced window borders, corners, transparency",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/Customization.tsx: experimental scope unavailable text",
+    "electron/main.ts: no native border/corner/transparency adapter"
+   ],
+   "gaps": [
+    "Native window styling implementation and reversal"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 77,
+   "name": "Dock/genie/wobble animation packs",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/Customization.tsx: experimental scopes not built",
+    "src/ui/mod-catalog.ts: no supported dock or window animation effect"
+   ],
+   "gaps": [
+    "Dock engine",
+    "Genie/wobble native animation packs"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 78,
+   "name": "Resource and icon redirection packs",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/ui/mod-catalog.ts: no resource/icon redirection adapter",
+    "src/components/Customization.tsx: experimental feature unavailable"
+   ],
+   "gaps": [
+    "Resource/icon redirection implementation and reversible pack installer"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 79,
+   "name": "Virtual-desktop behavior modifications",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "electron/native/adapter.ts: window input/focus primitives, no virtual-desktop modification adapter",
+    "src/components/Customization.tsx: experimental scope unavailable"
+   ],
+   "gaps": [
+    "Windows virtual-desktop APIs and behavior modification/reversal"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 80,
+   "name": "AI-composed validated scene specifications",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "ROUND29 DELTA outputs/jarvis-desktop/src/ui/motion-ai.ts: buildMotionRequest, runMotionGeneration, validateGeneratedScene route guarded chat/stream replies through existing scene validator",
+    "ROUND29 DELTA outputs/jarvis-desktop/src/components/MotionStudio.tsx: exact prompt preview, explicit local/cloud send, cancellation, validated result review before apply",
+    "ROUND29 DELTA tests/slice-motion-ai.test.mjs: schema-derived prompt, invalid replies, guarded stream and cancellation; root confirms integrated 1572 tests/build/smoke"
+   ],
+   "gaps": [
+    "Live-model generated scene response and real provider failure/recovery acceptance not established by mocked tests"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 81,
+   "name": "Approved app-launch action tools",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "src/components/Computer.tsx: preview/approval/execute launcher controls",
+    "electron/services/actions.ts: resolveExecutable, preview TTL, single-use execution and native trusted confirmation",
+    "tests/backend-approval.test.mjs and tests/backend-native.test.mjs",
+    "electron/services/actions.ts: guarded path-action additions retain preview TTL/single use/native confirmation",
+    "tests/slice-reveal-path-action.test.mjs: approved execution and refusal with injected shell"
+   ],
+   "gaps": [
+    "Native action behavior on real Windows app fixture matrix not independently verified."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 82,
+   "name": "Durable scheduled routines",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/agent-work.ts run_routine through RoutineEngine; Stop cancels",
+    "tests/companion-work.test.mjs",
+    "electron/services/routines.ts: persisted routine/run/schedule engine",
+    "src/components/Routines.tsx: schedule editor and manual/start/pause controls; App.tsx routinesBridge wiring",
+    "tests/autopilot-routines.test.mjs: exactly-once slots across restarts, missed/grace cases and persistence"
+   ],
+   "gaps": [
+    "Packaged Windows long-running scheduling acceptance",
+    "Schedules run only while the app is open (no OS scheduler)"
+   ],
+   "reaudited": true,
+   "note": "Companion manual run added 21 Oct."
+  },
+  {
+   "id": 83,
+   "name": "Visual editable workflow steps",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/Routines.tsx: blankStep, routineToDraft, draftIssues/draftToPayload and editable reordered action/wait steps",
+    "tests/autopilot-routines.test.mjs: editor round-trip, candidates and mounted routine screen"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 84,
+   "name": "Conditions, bounded retries, duplicate prevention",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/routines.ts: conditional execution, bounded retries and per-routine/global run locks",
+    "src/components/Routines.tsx: condition/retry controls",
+    "tests/autopilot-routines.test.mjs: fresh confirmation on retry, policy declines no retry, duplicate prevention"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 85,
+   "name": "Execution results and partial-failure history",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/routines.ts: persisted RunRecord and per-step results",
+    "src/components/Routines.tsx: filterRuns, durationText, history and partial-failure inspection",
+    "tests/autopilot-routines.test.mjs: partial results, continue-on-failure, restart interruption"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 86,
+   "name": "Cancellation and pause-all controls",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/routines.ts: cancel and pause-all hold between steps",
+    "src/components/Routines.tsx: Cancel/Stop/Pause controls",
+    "tests/autopilot-routines.test.mjs: cancellation keeps partial results, pause skips due slots"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 87,
+   "name": "Undo for explicitly reversible steps",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "src/components/Routines.tsx: undoable flag limited to move-window and history undo button",
+    "electron/services/routines.ts: one-time reverse move with trusted confirmation",
+    "tests/autopilot-routines.test.mjs: undo only explicitly reversible moves through confirmation once"
+   ],
+   "gaps": [
+    "Real window movement/restore acceptance on Windows"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 88,
+   "name": "Selected file/browser action adapters",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/services/uia.ts + native/uia-*.ps1: bounded semantic control of the attached app (invoke, toggle, expand, select, focus, scroll) with revalidation and honest receipts",
+    "tests/companion-uia.test.mjs (14)",
+    "electron/services/actions.ts: authorized launch-path/open-url; src/components/Capsules.tsx file/folder references",
+    "src/components/Computer.tsx: open-url scope explicitly says page is not read or controlled",
+    "tests/backend-approval.test.mjs and tests/slice-browser-refs.test.mjs"
+   ],
+   "gaps": [
+    "UIA helpers never run on Windows yet",
+    "No browser tab/content adapter",
+    "No rich file operations"
+   ],
+   "reaudited": true,
+   "note": "UIA slice added 21 Oct; still partial."
+  },
+  {
+   "id": 89,
+   "name": "Watch-once routine recording",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "electron/services/routines.ts and tests/autopilot-routines.test.mjs: recording explicitly gated/unimplemented",
+    "src/components/Routines.tsx: manual editor only"
+   ],
+   "gaps": [
+    "Consent-based action recorder",
+    "Recorded action interpretation and editable replay"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 90,
+   "name": "Cross-app semantic drag-to-action workflows",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/Routines.tsx: no semantic cross-app drag handlers",
+    "tests/autopilot-routines.test.mjs: semantic drag remains gated"
+   ],
+   "gaps": [
+    "Cross-app drag semantic interpretation",
+    "Approved executable workflow adapter"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 91,
+   "name": "Task board and worker status",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Developer.tsx: TaskBoardPanel with createTask/transitionTask/deriveWorkerStatus",
+    "src/ui/task-board.ts: persisted manual status transitions; tests/slice-task-board.test.mjs"
+   ],
+   "gaps": [
+    "Live execution-linked worker status in installed app"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 92,
+   "name": "Isolated project workspaces",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/Developer.tsx: external Control Room link only; no app workspace/worktree creation API",
+    "electron/backend.ts: no isolated worker workspace service"
+   ],
+   "gaps": [
+    "Product project/worktree isolation and execution workspace lifecycle"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 93,
+   "name": "Model/worker role selection",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/ui/worker-roles.ts: WORKER_ROLES, recommendModel, validateAssignment and override normalization",
+    "src/components/Developer.tsx: role/model assignment for manual board tasks; tests/slice-worker-roles.test.mjs"
+   ],
+   "gaps": [
+    "Role/model selection connected to actual spawned app workers"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 94,
+   "name": "Persistent resumable agent sessions",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/agent-session.ts: buildSession/serializeSession/planResume/diffSessions",
+    "src/components/Developer.tsx: SessionsGroup explicitly saves manual board/log/budget snapshots and never starts worker",
+    "tests/slice-agent-session.test.mjs"
+   ],
+   "gaps": [
+    "Actual agent execution transcript/state continuation",
+    "Resume connection to worker runtime"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 95,
+   "name": "Scoped tools and context policies",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/ui/tool-scope-policy.ts: effectivePolicy/evaluateActionScope used by Computer.tsx",
+    "src/ui/context-policy.ts: deny-wins policy normalization and buildContextPreview used in Assistant.tsx",
+    "electron/services/policy.ts: native action root/app/window restrictions; tests/slice-tool-scope-policy.test.mjs and slice-context-policy.test.mjs"
+   ],
+   "gaps": [
+    "Actual agent-worker tool scope enforcement in product",
+    "Full collected-context capture/share pipeline"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 96,
+   "name": "Agent logs and result inspection",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/agent-log.ts: appendEntry/filterLog/exportLog/redactSecrets",
+    "src/components/Developer.tsx: AgentLogGroup user-recorded log entries and manual task summaries",
+    "tests/slice-agent-log.test.mjs"
+   ],
+   "gaps": [
+    "Real worker event ingestion and execution results linked to agents"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 97,
+   "name": "Budgets and bounded task execution",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/task-budget.ts: evaluateStart/findOverdue and manual spend ledger",
+    "src/components/Developer.tsx: budgets only gate manual board Start/Resume; comment says evaluated on render, nothing runs on timer",
+    "tests/slice-task-budget.test.mjs"
+   ],
+   "gaps": [
+    "Actual worker token/cost accounting",
+    "Enforced runtime cancellation/spend limits for product agent execution"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 98,
+   "name": "Local specialist multi-agent execution",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/Developer.tsx: separate Control Room external link, no launch/embed/data exchange",
+    "electron/backend.ts: no local multi-agent worker executor"
+   ],
+   "gaps": [
+    "Installed product specialist worker runtime and coordination",
+    "Local model-backed concurrent execution"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 99,
+   "name": "Animated worker/crew visualization",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/Developer.tsx: static manual worker/task lists",
+    "src/components/Avatar.tsx and Companion.tsx: single assistant animation, not worker crew"
+   ],
+   "gaps": [
+    "Worker-linked animated crew scene/visualization"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 100,
+   "name": "Suggested reusable skills from past runs",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/ui/skill-suggestions.ts: suggestSkills groups repeated completed manual tasks and taskFromSkill creates reusable templates",
+    "src/components/Developer.tsx: SkillSuggestionsGroup lists/saves/queues suggestions; tests/slice-skill-suggestions.test.mjs"
+   ],
+   "gaps": [
+    "Suggestions derived from real executed agent runs",
+    "Reusable skill execution connected to worker engine"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 101,
+   "name": "Anthropic BYOK provider",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "backend.providerConnectionTest (8-token streamed test, cancel, usage, estimate label) + IPC",
+    "electron/services/liveBudget.ts bounded live-test configuration",
+    "tests/live-budget.test.mjs (13)",
+    "electron/services/cloud.ts: streamCloudChat streams Anthropic Messages through guarded fetch",
+    "electron/backend.ts: cloudKeyStatus/setCloudKey and chat route; src/components/Settings.tsx: secure key entry/cloud-model controls",
+    "tests/autopilot-integrations.test.mjs: approved Anthropic check sends one request without exposing key"
+   ],
+   "gaps": [
+    "Owner-authorized live run ($2 cap) on Windows not yet performed"
+   ],
+   "reaudited": true,
+   "note": "Saved key is still not a tested provider until the connection test passes live."
+  },
+  {
+   "id": 102,
+   "name": "Additional optional AI providers",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "providerConnectionTest covers openai and openrouter through the same guarded stream",
+    "tests/live-budget.test.mjs",
+    "src/components/Integrations.tsx: explicit OpenAI connection-check-only disclosure",
+    "electron/services/integrations.ts: createIntegrationService approved connection checks",
+    "tests/autopilot-integrations.test.mjs: OpenAI bearer header and rejected-key mapping",
+    "Scope: docs/product-roadmap.md and docs/loop/GOAL.md name feature102 only as Additional optional AI providers; src/shared/feature-registry.json requires only online mode. No original named Gemini requirement was found. Prior audit gap examples are not additional acceptance obligations.",
+    "Accepted canonical electron/services/cloud.ts: OpenAiStreamValidator and streamOpenAiCompatibleChat implement bounded SSE generation, usage extraction, cancellation, incomplete/error handling and dispatch for both OpenAI and OpenRouter.",
+    "Accepted canonical electron/services/netGuard.ts: exact OpenAI /v1/chat/completions and OpenRouter /api/v1/chat/completions origins/routes; offline and own-key gating; redirect denial.",
+    "Accepted canonical electron/services/chat.ts: selectedCloudProvider, effectiveCloudModel and compatChat route actual sends through selected provider key and guarded stream without trying another provider.",
+    "Accepted canonical electron/backend.ts and electron/services/secrets.ts: provider-specific protected key slots, provider status/save/remove handlers and state selection.",
+    "Accepted canonical src/components/Settings.tsx: Anthropic/OpenAI/OpenRouter selection, selected host/model display, separate masked save/remove key controls and explicit provider-change confirmation.",
+    "Accepted canonical tests/slice-cloud-providers.test.mjs: fixture-driven stream deltas/usage, protocol errors, cancellation, incomplete replies, status-only HTTP errors, offline/route/own-key guard refusal, per-provider key isolation, real createBackend selection and usage wiring. Test existence and content inspected; this auditor has not certified the current mutable worker test pass.",
+    "Independent combined gate: 1686 tests, build and offline smoke passed after authoritative IPC repair."
+   ],
+   "gaps": [
+    "No live OpenAI/OpenRouter acceptance (owner authorized Anthropic only)"
+   ],
+   "reaudited": true,
+   "note": "Re-checked on 21 Oct against branch source and tests."
+  },
+  {
+   "id": 103,
+   "name": "Web research with cited sources",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/ui/integration-catalog.ts: web-research availability not-built; provider not chosen"
+   ],
+   "gaps": [
+    "Search provider",
+    "Research retrieval and source citation flow"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 104,
+   "name": "Calendar account connectors",
+   "baseline2026_10_16": "missing",
+   "status": "partial",
+   "evidence": [
+    "electron/services/oauth.ts OAuthConnector: scope review, PKCE, exact loopback, state, expiry, refresh, revoke; IPC accounts*",
+    "tests/oauth-connector.test.mjs (13)",
+    "planning/ui-revamp/ACCOUNT-SETUP-CHECKLIST.md",
+    "src/ui/integration-catalog.ts: calendar connector setup-required",
+    "electron/services/integrations.ts: pure OAuth/PKCE helpers explicitly implement no sign-in"
+   ],
+   "gaps": [
+    "Blocked: no owner OAuth registration exists",
+    "No calendar read/sync or change API call implemented (previews only)"
+   ],
+   "reaudited": true,
+   "note": "Was missing on 16 Oct; now a tested seam, blocked externally."
+  },
+  {
+   "id": 105,
+   "name": "Issue-tracker draft export and approved posting",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Integrations.tsx: IssueDraft form formats and copies local issue draft",
+    "src/ui/integration-catalog.ts: formatIssueDraft",
+    "tests/autopilot-integrations.test.mjs: formatIssueDraft formats locally and requires title"
+   ],
+   "gaps": [
+    "Authenticated tracker posting adapter",
+    "Posting approval and posted-result confirmation"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 106,
+   "name": "Weather/news feed widgets",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/integration-catalog.ts: weather connection check only; news availability not-built",
+    "electron/services/integrations.ts: approved exact-origin connection check"
+   ],
+   "gaps": [
+    "Weather display widget",
+    "News retrieval source and widget"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 107,
+   "name": "Optional model/update downloads",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/download-manifest.ts: parseDownloadManifest/verifyDigest/planDownload",
+    "src/components/Models.tsx: ManifestVerifyPanel explicitly states no download started",
+    "tests/slice-download-manifest.test.mjs: host/HTTPS/digest/plan checks"
+   ],
+   "gaps": [
+    "Download execution",
+    "Verified installation and signed update distribution"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 108,
+   "name": "Per-provider data previews and usage history",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/backend.ts: integrationsPreview and integrationsUsage wired",
+    "src/components/Integrations.tsx: preview/check controls and UsageHistory",
+    "tests/autopilot-integrations.test.mjs: preview describes what leaves without sending; approved checks recorded"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 109,
+   "name": "Encrypted cross-device sync",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/ui/encrypted-bundle.ts: PBKDF2/AES-GCM authenticated encrypted transfer bundle",
+    "src/components/Settings.tsx: EncryptedBundlePanel with manual file download/import",
+    "tests/slice-encrypted-bundle.test.mjs: Unicode roundtrip, wrong passphrase and tampering"
+   ],
+   "gaps": [
+    "Automatic device synchronization transport",
+    "Conflict resolution and remote device state"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 110,
+   "name": "Community scene/widget marketplace",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/ui/integration-catalog.ts: marketplace gated/unavailable"
+   ],
+   "gaps": [
+    "Community catalog",
+    "Package trust/review",
+    "Publish/install flows"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 111,
+   "name": "Windows installer and uninstaller",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "package.json: electron-builder NSIS x64 target, assisted install and install-directory controls",
+    "docs/current-verification.md: built unsigned NSIS development installer"
+   ],
+   "gaps": [
+    "Clean-machine install/uninstall lifecycle validation"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 112,
+   "name": "Bundled runtime and offline installation option",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "package.json: Electron packaged with compiled app and native helpers",
+    "docs/current-verification.md: local runtime/weights not bundled"
+   ],
+   "gaps": [
+    "Offline AI runtime/model-weight installation bundle"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 113,
+   "name": "Local encrypted sensitive-data storage",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/services/secrets.ts: Secrets uses safeStorage/DPAPI encrypted atomic key vault",
+    "electron/services/integrations.ts: createDpapiKeyVault provider slots",
+    "electron/services/store.ts: ordinary state JSON persistence",
+    "electron/services/atRest.ts: versioned encrypted envelope and safeStorage adapter; memoryCipher explicitly test-only",
+    "electron/main.ts: stateCipher created from real Electron safeStorage and passed into backend Store",
+    "electron/services/store.ts: state.json and rolling/preimport backup encode/decode, legacy backup migration, read-only on unavailable encrypted key",
+    "tests/slice-at-rest-encryption.test.mjs: 8/8 focused tests; migration/reload, corruption recovery, unavailable-key non-overwrite, encrypted backups and deliberate plaintext exports"
+   ],
+   "gaps": [
+    "ProductivityStore still writes productivity.json as plaintext JSON at store.ts:801, including timeline/focus/reference data.",
+    "Renderer preferences remain localStorage plaintext and now include file shelf paths/notes/tags; not all sensitive content is protected.",
+    "First-write unavailable protector still falls back to plaintext, so encryption is not mandatory/fail-closed before initial migration.",
+    "Real Windows DPAPI/user-profile migration acceptance is not supplied by injected-cipher tests."
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 114,
+   "name": "Export/import and backup recovery",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/backend.ts: exportData/importData native dialog paths",
+    "electron/services/store.ts: exportDocument/importDocument, atomic backup and valid-backup corruption recovery",
+    "tests/backend-core.test.mjs: valid import preserves permissions and failed save rolls back; malformed import makes no change",
+    "src/components/Settings.tsx: Data export/import controls",
+    "src/ui/calendar-export.ts and src/components/Calendar.tsx: additional local ICS export",
+    "tests/slice-calendar-export.test.mjs",
+    "Existing workspace backup/import/recovery evidence retained from baseline"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 115,
+   "name": "Crash recovery and safe launch",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/main.ts: launch guard safeLaunch wiring, unresponsive/exception activity recording",
+    "electron/services/lifecycle.ts: launch marker guard",
+    "tests/autopilot-native.test.mjs: two unclean starts enter safe launch and clean exit clears markers"
+   ],
+   "gaps": [
+    "Real packaged crash/restart acceptance exercise"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 116,
+   "name": "Network-denial/offline verification",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "netGuard oauth purpose limited to listed token/revoke endpoints",
+    "tests/oauth-connector.test.mjs egress test",
+    "electron/services/netGuard.ts: guarded outbound request policy",
+    "electron/main.ts: renderer session security/egress hooks",
+    "docs/local-integration-2026-10-15.md: actual Electron offline smoke, 23 routes, zero external requests",
+    "docs/loop/PROGRESS.json: integrated batches passed npm run smoke"
+   ],
+   "gaps": [],
+   "reaudited": true,
+   "note": "Unchanged; new purpose is allow-listed."
+  },
+  {
+   "id": 117,
+   "name": "Signed updates with rollback",
+   "baseline2026_10_16": "preview",
+   "status": "preview",
+   "evidence": [
+    "src/ui/update-manifest.ts: signature verification, planUpdate and descriptive rollback ledger; never downloads/installs/rolls back",
+    "src/components/Status.tsx: offline update-manifest panel",
+    "tests/slice-update-manifest.test.mjs: genuine signature and tamper verification"
+   ],
+   "gaps": [
+    "Signing and updater are external blockers (certificate, release infrastructure)"
+   ],
+   "reaudited": true,
+   "note": "Unchanged."
+  },
+  {
+   "id": 118,
+   "name": "Validated x64/ARM64 compatibility tiers",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "package.json: actual x64 packaging target",
+    "src/ui/compat-tiers.ts: ARM64 explicitly untested",
+    "src/components/Status.tsx: compatibility view",
+    "tests/slice-compat-tiers.test.mjs: tier classifier validation"
+   ],
+   "gaps": [
+    "ARM64 build/runtime acceptance is an external blocker"
+   ],
+   "reaudited": true,
+   "note": "Unchanged."
+  },
+  {
+   "id": 119,
+   "name": "Commercial licensing without mandatory cloud check-in",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/ui/license-file.ts: offline ECDSA P-256 license verification/evaluation; explicitly gates no functionality",
+    "src/components/Settings.tsx: LicensePanel verifies pasted license",
+    "tests/slice-license-file.test.mjs: genuine signature, tamper, expiry/grace and featureEnabled"
+   ],
+   "gaps": [
+    "Publisher-owned issuance/trusted-key distribution",
+    "Integrated entitlement enforcement and commercial purchase/license lifecycle"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 120,
+   "name": "Enterprise policy and managed deployment",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/shared/feature-registry.json: no enterprise implementation reference; package.json only personal NSIS installer"
+   ],
+   "gaps": [
+    "Managed policy source/enforcement",
+    "Enterprise deployment tooling"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 121,
+   "name": "Unified usage dashboard",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "Usage ledger unchanged; live-test ledger is separate (live-test-budget-<id>.json)",
+    "src/components/App.tsx: UsageView wired to usageBridge",
+    "src/components/UsagePanel.tsx: totals/models/billing/budget/attribution/performance panels",
+    "electron/backend.ts: usageReport returns ledger report and performance",
+    "tests/autopilot-usage.test.mjs: rendered unknown and empty states, budget meter"
+   ],
+   "gaps": [],
+   "reaudited": true,
+   "note": "Re-checked on 21 Oct against branch source and tests."
+  },
+  {
+   "id": 122,
+   "name": "Supported provider quota/balance adapters",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "electron/services/usage.ts: declared adapter snapshots and unsupported/unknown placeholders only",
+    "src/components/UsagePanel.tsx: No billing adapter/unknown statuses"
+   ],
+   "gaps": [
+    "Actual provider quota/balance fetch adapters and refresh path"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 123,
+   "name": "Reset countdown and stale-data indicators",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/UsagePanel.tsx: billingBadge, reset countdown and reset-passed states",
+    "electron/services/usage.ts: report computes ageMs/resetInMs/resetDue",
+    "tests/autopilot-usage.test.mjs: observed/unknown/unsupported/stale distinct"
+   ],
+   "gaps": [
+    "Real provider observation ingestion making countdown live"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 124,
+   "name": "Local token and estimated cost ledger",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/usage.ts: recordEvent/reserve/settle/setPrices/snapshot/loadState",
+    "electron/backend.ts: chat request result usage recorded and persisted",
+    "src/components/UsagePanel.tsx: token and estimated cost display",
+    "tests/autopilot-usage.test.mjs: priced/unpriced events, reservations and state roundtrip"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 125,
+   "name": "Project/worker cost attribution",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "electron/services/usage.ts: report attribution grouping by project/worker",
+    "src/components/UsagePanel.tsx: attribution table",
+    "tests/autopilot-usage.test.mjs: attribution groups spend and propagates unpriced unknown",
+    "electron/backend.ts: chat recordEvent currently omits project and worker"
+   ],
+   "gaps": [
+    "Actual request context project/worker tagging",
+    "Installed-app worker execution cost collection"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 126,
+   "name": "Budget pace and threshold alerts",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/usage.ts: setBudget and report budget conservativeTotal/pace/alerts",
+    "electron/backend.ts: usageSetBudget wiring",
+    "src/components/UsagePanel.tsx: budget pace meter and threshold alert rendering",
+    "tests/autopilot-usage.test.mjs: monthly conservative spend, reached alerts and over-pace"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 127,
+   "name": "Local inference performance history",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "electron/services/usage.ts: parseOllamaMetrics and performance tokensPerSecond history",
+    "electron/backend.ts: chat usage records generation timings; usageReport returns performance",
+    "src/components/UsagePanel.tsx: Local performance list",
+    "tests/autopilot-usage.test.mjs: final Ollama chunk metrics produce tokens-per-second history"
+   ],
+   "gaps": [
+    "Real installed local-model timing acceptance run"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 128,
+   "name": "Usage report export",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "electron/services/usage.ts: bounded exportCsv/exportJson with truncation flags",
+    "electron/backend.ts: usageExport native save dialog",
+    "src/components/App.tsx: UsageView export controls",
+    "tests/autopilot-usage.test.mjs: CSV formula neutralization, row/byte caps and JSON time range"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 129,
+   "name": "2D avatar geometry editor",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/AvatarStudio.tsx: geometry sliders, switches, persisted pack and live stage",
+    "src/ui/avatar-editor.ts: bounded geometry and rendering",
+    "tests/autopilot-visual.test.mjs: finite shapes and canvas-only painter",
+    "tests/parallel-avatar.test.mjs: undo/redo actual pack edits"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 130,
+   "name": "Expression authoring library",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/AvatarStudio.tsx: built-in and user expressions; save/update/delete pose controls",
+    "src/ui/avatar-editor.ts: upsertExpression and expression normalization",
+    "tests/backlog-avatar.test.mjs: valid bounded built-in poses; new poses render finite geometry"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 131,
+   "name": "Avatar animation timeline editor",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/AvatarStudio.tsx: editable keyframes/time/expression/easing, looping, playback and save timeline",
+    "src/ui/avatar-editor.ts: deterministic timeline sampling/review",
+    "tests/backlog-avatar.test.mjs: keyframe easing, bounded poses, loop seam/gap/flicker review"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 132,
+   "name": "Portable avatar pack import/export",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/AvatarStudio.tsx: JSON download/copy/file import with review, replace/merge and undo",
+    "src/ui/avatar-editor.ts: bounded pack parsing and merge",
+    "tests/backlog-avatar.test.mjs: BOM/CRLF import, id clash rewrite, repeat-import dedupe",
+    "tests/parallel-avatar.test.mjs: import/export preview and edit history"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 133,
+   "name": "3D avatar/model customization",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/AvatarStudio.tsx: 2D geometry pack and explicit rejection of 3D model imports",
+    "src/components/Scene3D.tsx: procedural scene rendering separate from avatar model pipeline"
+   ],
+   "gaps": [
+    "3D avatar asset import",
+    "Rig/material/model customization and export"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 134,
+   "name": "Voice-driven avatar mouth/pose states",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/Assistant.tsx: explicit recording amplitude forwarded to inline avatar",
+    "src/ui/avatar-editor.ts: voice smoothing/bands and bounded expression state",
+    "tests/backlog-avatar.test.mjs: smoothing attack/release and bounded bands"
+   ],
+   "gaps": [
+    "TTS audio-driven mouth/pose path",
+    "Real microphone/avatar acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 135,
+   "name": "Realistic portrait animation adapter",
+   "baseline2026_10_16": "missing",
+   "status": "missing",
+   "evidence": [
+    "src/components/AvatarStudio.tsx: geometric 2D editor; image/portrait/3D import refused",
+    "src/shared/feature-registry.json: no portrait adapter evidence"
+   ],
+   "gaps": [
+    "Portrait model/assets",
+    "Animation inference adapter and rendering pipeline"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 136,
+   "name": "Avatar quality/hardware profile manager",
+   "baseline2026_10_16": "partial",
+   "status": "partial",
+   "evidence": [
+    "src/components/AvatarStudio.tsx: selectable quality profiles",
+    "src/ui/avatar-editor.ts: frame-rate and pixel-ratio limits",
+    "tests/autopilot-visual.test.mjs: quality profiles bound FPS/DPR and unknown ids fall back"
+   ],
+   "gaps": [
+    "Hardware-aware recommendation/detection",
+    "Measured hardware/profile acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 137,
+   "name": "Procedural motion scene editor",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MotionStudio.tsx: actual canvas scene settings, layered timeline/keyframes/playback, persistence/import/export",
+    "src/ui/motion-presets.ts: procedural layers and scene sampling",
+    "tests/parallel-motion.test.mjs: accessible timeline controls and frame stepping",
+    "tests/backlog-motion.test.mjs: deterministic tracks and bounded exports"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 138,
+   "name": "Original scene/template library",
+   "baseline2026_10_16": "working",
+   "status": "working",
+   "evidence": [
+    "src/components/MotionStudio.tsx: built-in preset library and user save/replace/delete presets",
+    "src/ui/motion-presets.ts: original built-in presets",
+    "tests/motion-presets.test.mjs: valid distinct presets cover every kind; reserved built-in prefix"
+   ],
+   "gaps": [],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 139,
+   "name": "AI-to-validated-scene generation",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "ROUND29 DELTA canonical src/ui/motion-ai.ts: buildMotionRequest, runMotionGeneration guarded chat streaming/cancellation and validateGeneratedScene using existing schema",
+    "ROUND29 DELTA canonical src/components/MotionStudio.tsx: exact prompt preview, explicit Anthropic cloud confirmation or Generate locally, validated preview/apply controls",
+    "ROUND29 DELTA canonical tests/slice-motion-ai.test.mjs: mocked streaming, errors/cancellation, destination consent, malformed generated JSON, guarded preview/apply wiring",
+    "Parent confirmed round29 accepted with 1572 tests/build/smoke passing"
+   ],
+   "gaps": [
+    "Real installed-app AI provider or local-model scene generation acceptance"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  },
+  {
+   "id": 140,
+   "name": "Local animation/clip export",
+   "baseline2026_10_16": "implemented-unverified",
+   "status": "implemented-unverified",
+   "evidence": [
+    "src/components/MotionStudio.tsx: clipSupport, canvas.captureStream, MediaRecorder WebM chunks and downloadBlob",
+    "src/components/MotionStudio.tsx: separate sampled .clip.json export",
+    "tests/parallel-motion.test.mjs: recording stops with playback, recorder error/unmount cleanup and truthful exports",
+    "tests/slice-clip-export.test.mjs: deterministic bounded sampled JSON frames"
+   ],
+   "gaps": [
+    "Actual encoded WebM file save/playback acceptance in packaged Windows runtime"
+   ],
+   "reaudited": false,
+   "note": "Carried forward from the 16 Oct audit; not re-audited on 21 Oct."
+  }
+ ],
+ "companionJourneys": [
+  {
+   "journey": "Screen-aware Claude question",
+   "status": "implemented-unverified",
+   "evidence": [
+    "tests/companion-screen.test.mjs"
+   ],
+   "windowsChecks": [
+    "DPI/multi-monitor crop",
+    "pet reappears after lock during picker",
+    "live image answer"
+   ]
+  },
+  {
+   "journey": "Semantic control of attached app (UIA)",
+   "status": "implemented-unverified",
+   "evidence": [
+    "tests/companion-uia.test.mjs"
+   ],
+   "windowsChecks": [
+    "Calculator invoke/toggle",
+    "menus expand",
+    "modal Invoke timeout => uncertain",
+    "elevated and password refusal"
+   ]
+  },
+  {
+   "journey": "Saved work: note, complete task, undo",
+   "status": "working",
+   "evidence": [
+    "tests/companion-work.test.mjs (real store)"
+   ],
+   "windowsChecks": [
+    "trusted dialog on the island"
+   ]
+  },
+  {
+   "journey": "Routine dry-run and manual run from the island",
+   "status": "implemented-unverified",
+   "evidence": [
+    "tests/companion-work.test.mjs (real RoutineEngine)"
+   ],
+   "windowsChecks": [
+    "step confirmations ownership",
+    "Stop during a step"
+   ]
+  },
+  {
+   "journey": "Speak, review, insert",
+   "status": "implemented-unverified",
+   "evidence": [
+    "tests/voice-policy.test.mjs",
+    "island-audit-2026-10-19 manual typed insert"
+   ],
+   "windowsChecks": [
+    "real microphone + recognizer"
+   ]
+  },
+  {
+   "journey": "Bounded live provider test",
+   "status": "implemented-unverified",
+   "evidence": [
+    "tests/live-budget.test.mjs"
+   ],
+   "windowsChecks": [
+    "owner-run $2-capped session"
+   ]
+  },
+  {
+   "journey": "Account connections",
+   "status": "partial",
+   "evidence": [
+    "tests/oauth-connector.test.mjs"
+   ],
+   "blockedBy": "No owner OAuth registration"
+  }
+ ]
+}

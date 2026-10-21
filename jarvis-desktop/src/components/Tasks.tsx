@@ -295,7 +295,7 @@ export function Tasks() {
 
   return (
     <div className="page page-wide">
-      <PageHeader eyebrow="Work" title="Tasks & focus" subtitle={total ? `${doneCount} of ${total} done.` : 'A checklist with due dates, plus a focus timer.'} />
+      <PageHeader eyebrow="Work" title="Tasks" subtitle={total ? `${doneCount} of ${total} done.` : 'A checklist with due dates, plus a focus timer.'} />
 
       <div className="tasks-grid">
         <div className="stack">
@@ -362,7 +362,7 @@ export function Tasks() {
                         const focusing = focus.taskId === t.id && (focus.phase === 'running' || focus.phase === 'paused');
                         const isSel = selectedId === t.id;
                         return (
-                          <li key={t.id} className={cx('list-row', t.done && 'is-done')} style={isSel ? { boxShadow: 'inset 3px 0 0 var(--accent)', background: 'var(--accent-soft)' } : undefined}>
+                          <li key={t.id} className={cx('list-row', 'task-row', t.done && 'is-done')} style={isSel ? { boxShadow: 'inset 3px 0 0 var(--accent)', background: 'var(--accent-soft)' } : undefined}>
                             <input ref={element=>{if(element)checkboxes.current.set(t.id,element);else checkboxes.current.delete(t.id);}} type="checkbox" className="check" checked={t.done} disabled={busyId !== null} aria-label={`${t.done ? 'Reopen' : 'Complete'} “${t.title}”`} onChange={() => void toggle(t)} />
                             <button
                               type="button"

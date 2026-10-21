@@ -30,7 +30,7 @@ test('the whole renderer graph bundles for the browser with no Node built-in imp
 test('workspace and guidance screens are lazy routes with navigation entries and real headings', async () => {
   const app = await src('src/components/App.tsx');
   const nav = await src('src/ui/nav.tsx');
-  for (const [view, comp, label] of [['memory', 'MemoryWorkbench', 'Memory'], ['writing', 'WritingWorkbench', 'Writing'], ['guide', 'GuidedSetup', 'Guided setup']]) {
+  for (const [view, comp, label] of [['memory', 'MemoryWorkbench', 'Memory'], ['writing', 'WritingWorkbench', 'Writing'], ['guide', 'GuidedSetup', 'Help & setup']]) {
     assert.match(app, new RegExp(`const ${comp} = lazy\\(\\(\\) => import\\('\\./${comp}'\\)`), `${comp} is code-split`);
     assert.doesNotMatch(app, new RegExp(`^import [^;]*from '\\./${comp}';`, 'm'), `${comp} is not statically imported`);
     assert.match(app, new RegExp(`case '${view}':\\s*\\n\\s*body = <(${comp}|GuideView)`), `${view} renders its screen`);

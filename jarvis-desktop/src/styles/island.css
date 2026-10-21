@@ -1,0 +1,866 @@
+/*
+ * The desktop companion island (production window) and its screen-region picker.
+ *
+ * The island window is transparent and frameless; everything visible is drawn here. Inside a transparent Electron
+ * window, CSS backdrop-filter has nothing behind it to blur (it blurs only this page), so the default surface is a
+ * solid smoked glass that stays readable over any wallpaper. When the Windows acrylic material is requested and
+ * reported applied, data-material="acrylic" lets the surface thin out; whether that looks right is a Windows check,
+ * not something this file can prove.
+ *
+ * Edge light means something real: hover/focus (a still soft rim), a request in flight (one slow trace), waiting for
+ * the Windows confirmation (a held violet rim), a finished answer (one sweep, then off), an error (a held amber rim).
+ * At rest with nothing happening there is no moving light.
+ */
+
+@property --edge-a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --i-ink: #080b12;
+  --i-raised: #141b28;
+  --i-text: #f2f5fa;
+  --i-muted: #b2bdcf;
+  --i-cyan: #72e9f2;
+  --i-violet: #a88bff;
+  --i-amber: #ffb547;
+  --i-lime: #c8ff4d;
+  /* Without native blur, sharp text behind a thinner surface would show through and compete with the answer. */
+  --i-glass: rgba(11, 15, 24, 0.97);
+  --i-line: rgba(255, 255, 255, 0.1);
+  --i-line-strong: rgba(255, 255, 255, 0.2);
+  --i-r-rest: 26px;
+  --i-r: 20px;
+  --i-r-ctl: 10px;
+  --i-margin: 18px;
+  --i-spring: cubic-bezier(0.22, 1.18, 0.36, 1);
+  --i-dur: 380ms;
+  --i-fast: 150ms;
+  color-scheme: dark;
+}
+
+:root[data-material="acrylic"] {
+  --i-glass: rgba(11, 15, 24, 0.72);
+}
+
+html,
+body.cmp-body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: var(--i-text);
+  font: 400 13.5px / 1.4 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+body.cmp-body #root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.cmp-browser {
+  position: fixed;
+  inset: auto 12px 12px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #141b28;
+  color: var(--i-text);
+  font-size: 12.5px;
+}
+
+/* ---------- The island ---------- */
+
+.island {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: var(--i-r);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.012) 40%, rgba(255, 255, 255, 0) 100%),
+    var(--i-glass);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px var(--i-line),
+    0 12px 26px -12px rgba(0, 0, 0, 0.7);
+  transition:
+    width var(--i-dur) var(--i-spring),
+    height var(--i-dur) var(--i-spring),
+    border-radius var(--i-dur) var(--i-spring),
+    box-shadow var(--i-fast);
+}
+
+.island[data-surface="rest"] {
+  border-radius: var(--i-r-rest);
+}
+
+/* The window grows away from its docked edge; the island keeps that edge fixed inside it. */
+.island[data-anchor="corner"] {
+  right: var(--i-margin);
+  bottom: var(--i-margin);
+}
+
+.island[data-anchor="top"] {
+  top: var(--i-margin);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.island[data-anchor="right"] {
+  right: var(--i-margin);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.edge {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: conic-gradient(from var(--edge-a), transparent 0deg, transparent 220deg, var(--edge-c, var(--i-cyan)) 300deg, #fff 330deg, var(--edge-c2, var(--i-violet)) 350deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  transition: opacity 220ms;
+}
+
+.island:hover .edge,
+.island:focus-within .edge {
+  --edge-a: 200deg;
+  opacity: 0.5;
+}
+
+.island[data-edge="working"] .edge {
+  opacity: 0.9;
+  animation: i-orbit 2.2s linear infinite;
+}
+
+.island[data-edge="waiting"] .edge {
+  --edge-a: 0deg;
+  opacity: 0.85;
+  background: linear-gradient(90deg, var(--i-violet), var(--i-cyan), var(--i-violet));
+}
+
+.island[data-edge="done"] .edge {
+  --edge-c: var(--i-lime);
+  --edge-c2: var(--i-cyan);
+  animation: i-done 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.island[data-edge="error"] .edge {
+  --edge-a: 0deg;
+  opacity: 0.85;
+  background: linear-gradient(90deg, var(--i-amber), #ff7a45, var(--i-amber));
+}
+
+.island[data-edge="error"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 181, 71, 0.28),
+    0 12px 26px -12px rgba(0, 0, 0, 0.7);
+}
+
+@keyframes i-orbit {
+  to {
+    --edge-a: 360deg;
+  }
+}
+
+@keyframes i-done {
+  0% {
+    --edge-a: 0deg;
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    --edge-a: 360deg;
+    opacity: 0;
+  }
+}
+
+/* The core never remounts while the island changes shape. */
+.island-core {
+  position: absolute;
+  z-index: 4;
+  top: 9px;
+  left: 9px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: default;
+  transition: top var(--i-dur) var(--i-spring), left var(--i-dur) var(--i-spring);
+}
+
+.island[data-surface="rest"] .island-core {
+  cursor: pointer;
+}
+
+.island:not([data-surface="rest"]) .island-core {
+  top: 12px;
+  left: 12px;
+}
+
+.island-core:focus-visible {
+  outline: 2px solid var(--i-cyan);
+  outline-offset: 2px;
+}
+
+/* The panel sizes itself; the island measures it and the window follows. */
+.island-panel {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  animation: i-panel-in 220ms ease-out both;
+}
+
+.island-panel[data-s="rest"] {
+  width: max-content;
+}
+
+.island-panel[data-s="command"],
+.island-panel[data-s="answer"],
+.island-panel[data-s="error"] {
+  width: 440px;
+}
+
+.island-panel[data-s="working"] {
+  width: 400px;
+}
+
+@keyframes i-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* ---------- Rest pill ---------- */
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0 14px 0 52px;
+}
+
+.pill-text {
+  display: grid;
+  line-height: 1.15;
+}
+
+.pill-text strong {
+  font: 600 12.5px var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pill-text span {
+  color: var(--i-muted);
+  font-size: 11.5px;
+}
+
+kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--i-line-strong);
+  border-radius: 6px;
+  color: var(--i-muted);
+  font: 500 10.5px var(--font-mono);
+  white-space: nowrap;
+}
+
+/* ---------- Panel structure ---------- */
+
+.cmd,
+.work,
+.ans {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 12px;
+}
+
+.p-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-left: 52px;
+}
+
+.p-title {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.p-title strong {
+  font: 600 13px var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.p-meta {
+  color: var(--i-muted);
+  font-size: 11.5px;
+}
+
+.p-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.p-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.p-foot .p-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.grow {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Controls ---------- */
+
+.cmp-body .btn,
+.ov .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid var(--i-line-strong);
+  border-radius: var(--i-r-ctl);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--i-text);
+  font: 600 12px / 1.2 var(--font-display);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--i-fast), background var(--i-fast), box-shadow var(--i-fast), transform 90ms;
+}
+
+.cmp-body .btn-sm {
+  min-height: 28px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+}
+
+.cmp-body .btn-primary,
+.ov .btn-primary {
+  border-color: transparent;
+  background: linear-gradient(100deg, var(--i-cyan), #9fd8ff 55%, var(--i-violet));
+  color: #061017;
+}
+
+.cmp-body .btn:hover:not(:disabled),
+.ov .btn:hover:not(:disabled),
+.ibtn:hover,
+.chipbtn:hover:not(:disabled),
+.stop:hover:not(:disabled),
+.cite:hover {
+  border-color: rgba(114, 233, 242, 0.6);
+  box-shadow: 0 0 0 1px rgba(114, 233, 242, 0.25) inset, 0 0 16px -6px rgba(114, 233, 242, 0.55);
+}
+
+.cmp-body .btn:active:not(:disabled),
+.ov .btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+}
+
+.cmp-body .btn:disabled,
+.ov .btn:disabled,
+.chipbtn:disabled,
+.stop:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cmp-body :focus-visible,
+.ov :focus-visible {
+  outline: 2px solid var(--i-cyan);
+  outline-offset: 2px;
+}
+
+.ibtn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--i-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ibtn:hover {
+  color: var(--i-text);
+}
+
+.chipbtn {
+  padding: 4px 10px;
+  border: 1px solid rgba(114, 233, 242, 0.35);
+  border-radius: 999px;
+  background: rgba(114, 233, 242, 0.06);
+  color: var(--i-cyan);
+  font: 600 11.5px var(--font-display);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.linkbtn {
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--i-cyan);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.stop {
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 1px solid rgba(255, 181, 71, 0.5);
+  border-radius: var(--i-r-ctl);
+  background: rgba(255, 181, 71, 0.08);
+  color: var(--i-amber);
+  font: 600 12px var(--font-display);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+/* ---------- Command ---------- */
+
+.cmd-setup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 181, 71, 0.3);
+  border-radius: var(--i-r-ctl);
+  background: rgba(255, 181, 71, 0.06);
+}
+
+.cmd-setup p {
+  flex: 1;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.cmd-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.cmd-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 120px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--i-line-strong);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--i-text);
+  font: 400 14px / 1.35 var(--font-ui);
+  resize: none;
+  field-sizing: content;
+  user-select: text;
+}
+
+.cmd-input::placeholder {
+  color: #8d98ab;
+}
+
+.cmd-input:focus {
+  border-color: rgba(114, 233, 242, 0.65);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(114, 233, 242, 0.14);
+}
+
+.cmd-input:disabled {
+  opacity: 0.55;
+}
+
+.cmd-row .btn {
+  min-height: 40px;
+}
+
+.cmd-note {
+  margin: 0;
+  color: var(--i-amber);
+  font-size: 12px;
+}
+
+.ctx-empty,
+.ctx-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--i-muted);
+  font-size: 12px;
+}
+
+.ctx-empty span {
+  flex: 1;
+}
+
+.ctx-chip {
+  padding: 6px;
+  border: 1px solid var(--i-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ctx-chip strong {
+  color: var(--i-text);
+  font-size: 12.5px;
+}
+
+.ctx-img {
+  flex: none;
+  width: 72px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--i-line-strong);
+}
+
+/* ---------- Progress, answer, receipts ---------- */
+
+.steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+.steps li {
+  position: relative;
+  padding: 6px 10px 6px 24px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.steps li::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--i-muted);
+}
+
+.steps .is-running::before {
+  background: var(--i-cyan);
+  box-shadow: 0 0 8px var(--i-cyan);
+}
+
+.steps .is-awaiting-confirm {
+  box-shadow: inset 0 0 0 1px rgba(168, 139, 255, 0.5);
+}
+
+.steps .is-awaiting-confirm::before {
+  background: var(--i-violet);
+}
+
+.steps .is-done::before {
+  background: var(--i-lime);
+}
+
+.steps .is-declined::before {
+  background: var(--i-muted);
+}
+
+.steps .is-failed::before {
+  background: var(--i-amber);
+}
+
+.step-word {
+  color: var(--i-text);
+  font-weight: 600;
+}
+
+.tag-ok,
+.tag-warn {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font: 600 10.5px var(--font-mono);
+}
+
+.tag-ok {
+  background: rgba(200, 255, 77, 0.12);
+  color: var(--i-lime);
+}
+
+.tag-warn {
+  background: rgba(255, 181, 71, 0.12);
+  color: var(--i-amber);
+}
+
+.ans-text {
+  max-height: 260px;
+  margin: 0;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.ans.is-error .p-title strong {
+  color: var(--i-amber);
+}
+
+.cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cite {
+  max-width: 100%;
+  padding: 4px 10px;
+  overflow: hidden;
+  border: 1px solid var(--i-line-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--i-text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cite-kind {
+  color: var(--i-cyan);
+  font: 600 10.5px var(--font-mono);
+  text-transform: uppercase;
+}
+
+.receipts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.receipts li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid rgba(200, 255, 77, 0.22);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+/* ---------- Region picker ---------- */
+
+body.ov-body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.ov {
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+  outline: none;
+  touch-action: none;
+}
+
+.ov-shot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ov-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 7, 12, 0.55);
+  pointer-events: none;
+}
+
+.ov-sel {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--i-cyan);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 22px -4px rgba(114, 233, 242, 0.7);
+  pointer-events: none;
+}
+
+.ov-size {
+  position: absolute;
+  top: -24px;
+  left: -1px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(8, 11, 18, 0.9);
+  color: var(--i-cyan);
+  font: 500 11px var(--font-mono);
+  white-space: nowrap;
+}
+
+.ov-bar {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(820px, calc(100% - 48px));
+  box-sizing: border-box;
+  padding: 10px 12px 10px 16px;
+  transform: translateX(-50%);
+  border-radius: 18px;
+  background: rgba(11, 15, 24, 0.95);
+  box-shadow: inset 0 0 0 1px var(--i-line-strong), 0 20px 50px -20px #000;
+  color: var(--i-text);
+  font: 400 13px / 1.35 var(--font-ui);
+  cursor: default;
+}
+
+.ov-hint {
+  flex: 1 1 260px;
+  font-weight: 600;
+}
+
+.ov-note {
+  flex: 1 1 100%;
+  order: 9;
+  color: var(--i-muted);
+  font-size: 11.5px;
+}
+
+/* ---------- Reduced motion, transparency and high contrast ---------- */
+
+:root[data-motion="reduced"] .island,
+:root[data-motion="reduced"] .island-core {
+  transition-duration: 0.01ms;
+}
+
+:root[data-motion="reduced"] .island-panel {
+  animation-duration: 0.01ms;
+}
+
+:root[data-motion="reduced"] .island[data-edge="working"] .edge {
+  --edge-a: 0deg;
+  animation: none;
+  background: linear-gradient(90deg, var(--i-cyan), var(--i-violet), var(--i-cyan));
+  opacity: 0.8;
+}
+
+:root[data-motion="reduced"] .island[data-edge="done"] .edge {
+  --edge-a: 0deg;
+  animation: i-fade 700ms ease-out both;
+  background: linear-gradient(90deg, var(--i-lime), var(--i-cyan), var(--i-lime));
+}
+
+@keyframes i-fade {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --i-glass: rgba(12, 16, 26, 0.98);
+  }
+}
+
+@media (forced-colors: active) {
+  .island,
+  .ov-bar {
+    background: Canvas;
+    border: 2px solid CanvasText;
+  }
+
+  .edge {
+    display: none;
+  }
+
+  .ov-sel {
+    border-color: Highlight;
+  }
+}
+
+
+/* Native pet + shared speech bubble; all coordinates come from the trusted main process. */
+.pet-desktop { position: relative; width: 100%; height: 100%; }
+.pet-handle { position: absolute; padding: 0; border: 0; outline-offset: -3px; border-radius: 30%; background: transparent; cursor: grab; touch-action: none; }
+.pet-handle:active { cursor: grabbing; }
+.pet-handle:focus-visible { outline: 2px solid var(--i-cyan); }
+.pet-desktop .pet-review-tag { top: auto; bottom: -2px; padding: 1px 5px; background: #171d31e6; color: #c4d4f5; font-size: 8px; pointer-events: none; }
+.pet-desktop .bubble-body { max-height: min(600px, var(--bubble-height, 600px)); scrollbar-width: thin; }
+.pet-preferences { display: grid; gap: 9px; }
+.pet-preferences fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.pet-control-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+.pet-voice { margin: 0 18px 16px; display: grid; gap: 8px; }
+.pet-voice-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pet-voice-controls label { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--i-muted); }
+.pet-voice-controls input { accent-color: var(--i-cyan); }
+
+.pet-concept-tag { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); padding: 1px 5px; border-radius: 6px; color: #c8cfe0; background: #171c2de6; font: 400 9px var(--font-ui); pointer-events: none; }

@@ -1,0 +1,310 @@
+/* First run: one scene. Content on the left; the core on a dark instrument stage on the right. */
+.onboard-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: auto;
+}
+
+.onboard {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  min-height: 0;
+}
+
+.ob-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--s5);
+  padding: var(--s6) clamp(24px, 6vw, 88px);
+  min-width: 0;
+}
+
+.ob-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 700 var(--t-small) var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.ob-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  max-width: 600px;
+  animation: rise var(--dur-panel) var(--spring-soft) both;
+}
+
+.ob-step > * {
+  animation: rise var(--dur-panel) var(--spring-soft) both;
+}
+
+.ob-step > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+
+.ob-step > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+
+.ob-step > *:nth-child(n + 4) {
+  animation-delay: 140ms;
+}
+
+.ob-step h1 {
+  outline: none;
+}
+
+.ob-step h1.display {
+  font-size: clamp(44px, 5vw, 64px);
+}
+
+.ob-step h1:not(.display) {
+  font-size: 32px;
+}
+
+.ob-lead {
+  font-size: var(--t-lead);
+  color: var(--ink-2);
+  max-width: 54ch;
+}
+
+.ob-paths {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.ob-path {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s4) var(--s5);
+  text-align: left;
+  color: var(--ink);
+  background: linear-gradient(110deg, var(--elevated), var(--surface) 70%);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-mid), transform var(--dur-press);
+}
+
+@supports (corner-shape: bevel) {
+  .ob-path {
+    border-radius: var(--cut-lg) 0 var(--cut-lg) 0;
+    corner-shape: bevel;
+  }
+}
+
+.ob-path:hover {
+  border-color: var(--energy-line);
+  box-shadow: 0 0 44px -22px var(--energy);
+}
+
+.ob-path:active {
+  transform: scale(0.995);
+}
+
+.ob-path .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ob-path strong {
+  font: 600 var(--t-h2) var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.ob-path .grow > span {
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+
+.ob-path > svg {
+  flex: none;
+  color: var(--energy);
+  transition: transform var(--dur-mid) var(--spring);
+}
+
+.ob-path:hover > svg {
+  transform: translateX(4px);
+}
+
+.ob-path.is-primary {
+  border-color: var(--energy-line);
+  box-shadow: inset 2px 0 0 var(--energy);
+}
+
+.ob-path-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  color: var(--energy);
+  background: var(--energy-soft);
+  border: 1px solid var(--energy-line);
+}
+
+.ob-path.is-primary .ob-path-icon {
+  color: var(--energy-ink);
+  background: var(--energy);
+  box-shadow: 0 0 20px -4px var(--glow);
+}
+
+.ob-prefs {
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+  flex-wrap: wrap;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+.ob-prefs .switch-row {
+  flex: 1 1 260px;
+}
+
+.ob-first {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.ob-input {
+  min-height: 52px;
+  font-size: var(--t-lead);
+}
+
+.ob-record {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s4);
+  padding: var(--s5);
+  background: linear-gradient(110deg, var(--elevated), var(--surface));
+  border: 1px solid var(--energy-line);
+  box-shadow: 0 0 50px -26px var(--energy);
+  animation: dialog-in var(--dur-panel) var(--spring) both;
+}
+
+@supports (corner-shape: bevel) {
+  .ob-record {
+    border-radius: var(--cut-lg) 0 var(--cut-lg) 0;
+    corner-shape: bevel;
+  }
+}
+
+.ob-record strong {
+  display: block;
+  margin-top: 2px;
+  font: 600 22px var(--font-display);
+}
+
+.ob-record .sub {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ob-record-body {
+  margin-top: var(--s2);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+
+.ob-record-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--energy-ink);
+  background: var(--lime);
+  box-shadow: 0 0 16px -2px var(--lime);
+}
+
+.ob-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s4);
+  padding: var(--s7);
+  border-left: 1px solid var(--line);
+  text-align: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, color-mix(in oklab, var(--violet) 14%, transparent), transparent 55%), var(--bg-2);
+}
+
+.ob-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(closest-side, #000 20%, transparent 100%);
+  pointer-events: none;
+}
+
+.ob-stage .sub {
+  position: relative;
+  max-width: 36ch;
+}
+
+@media (max-width: 960px) {
+  .onboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ob-stage {
+    order: -1;
+    padding: var(--s5);
+    border-left: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ob-stage .sub {
+    display: none;
+  }
+
+  .ob-main {
+    padding: var(--s6) var(--s5);
+  }
+}
+
+/* Character-led first run: an airy work surface beside a living glass stage. */
+.onboard { min-height: min-content; background: var(--bg); }
+.ob-main { justify-content: flex-start; padding: clamp(24px, 4vh, 48px) clamp(24px, 4vw, 64px); gap: 30px; }
+.ob-brand { text-transform: none; letter-spacing: -.01em; font-weight: 600; }
+.ob-step h1.display { font-size: clamp(36px, 4.1vw, 58px); line-height: 1.07; letter-spacing: -.055em; text-wrap: initial; background: none; -webkit-text-fill-color: var(--ink); }
+.ob-step h1.display em { font-style: normal; color: #b6c1e9; -webkit-text-fill-color: currentColor; }
+.ob-path { border-radius: 20px; corner-shape: round; padding: 16px 20px; background: linear-gradient(120deg, #ffffff09, #ffffff02); border-color: #ffffff20; }
+.ob-path.is-primary { box-shadow: inset 0 1px 0 #ffffff18; border-color: #b9c7ef66; }
+.ob-path-icon { border-radius: 14px; background: #b1c4ff14; border-color: #b1c4ff22; color: #c1d1ff; }
+.ob-path.is-primary .ob-path-icon { background: #e1e6f7; color: #1b2240; box-shadow: none; }
+.ob-path strong { letter-spacing: -.02em; }
+.ob-stage { position: sticky; top: 0; height: 100vh; max-height: 100%; min-height: 520px; padding: 38px; border-left: 1px solid #ffffff0c; background: radial-gradient(ellipse at 60% 42%, #48558630, transparent 62%), linear-gradient(155deg, #151824, #0e111a 70%); }
+.ob-stage::before { background-size: 56px 56px; opacity: .5; transform: perspective(550px) rotateX(58deg) scale(1.7); transform-origin: 50% 85%; inset: 52% 0 -35%; mask-image: linear-gradient(transparent, black, transparent); }
+.ob-character { position: relative; width: min(310px, 80%); height: 390px; display: grid; place-items: center; }
+.ob-character .companion-pet { height: 350px; width: 300px; position: relative; z-index: 1; filter: drop-shadow(0 20px 30px #0006); }
+.ob-halo { position: absolute; left: 50%; bottom: 16px; width: 270px; height: 70px; transform: translateX(-50%) rotate(-8deg); border: 1px solid #a4bdff44; border-radius: 50%; box-shadow: 0 0 34px -12px #a4bdff88, inset 0 0 28px -12px #a4bdff66; }
+.ob-halo::after { content: ''; position: absolute; inset: 8px -18px; border-radius: 50%; border: 1px solid #c0daec1a; transform: rotate(14deg); }
+.ob-hello { position: absolute; z-index: 2; left: -12px; top: -14px; padding: 13px 18px; border: 1px solid #ffffff26; border-radius: 18px 18px 18px 5px; color: #e8eaf3; background: linear-gradient(130deg, #ffffff15, #ffffff06); backdrop-filter: blur(16px); font-size: 14px; box-shadow: 0 8px 32px #0003; animation: hello-arrive 600ms var(--ease-out) both; }
+.ob-stage > .sub { margin-top: 24px; font-size: 13px; max-width: 32ch; line-height: 1.6; color: #a1a9bf; }
+@keyframes hello-arrive { from { opacity: 0; transform: translateY(10px) rotate(-3deg); } }
+@media (max-width: 960px) { .ob-stage { position: relative; height: 280px; min-height: 280px; } .ob-character { height: 240px; width: 230px; } .ob-character .companion-pet { height: 225px; width: 205px; } .ob-hello { left: 130px; top: 25px; width: 155px; } .ob-halo { width: 180px; height: 45px; bottom: 2px; } }
+@media (max-width: 520px) { .ob-hello { left: 110px; width: 135px; font-size: 12px; } .ob-main { padding: 24px; } }
+@media (prefers-reduced-motion: reduce) { .ob-hello { animation: none; } }
+:root[data-motion="reduced"] .ob-hello { animation: none; }
+@media (prefers-reduced-transparency: reduce) { .ob-hello, .ob-path { background: var(--surface); backdrop-filter: none; } }

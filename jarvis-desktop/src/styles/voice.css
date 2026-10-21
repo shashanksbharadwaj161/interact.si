@@ -1,0 +1,377 @@
+/*
+ * Voice controls (src/voice): the live voice bar, the real-level meter and the "reading" state of a read-aloud button.
+ * Everything is scoped to .vx-* classes so it cannot reach the companion bubble or any other surface; the island can
+ * import this file as is. Colour comes from the app tokens with fallbacks, so it also renders outside the hub.
+ *
+ * The perimeter light is the state signal: a red pulse while listening, an energy sweep while transcribing, a slow violet
+ * breath while reading aloud. It is drawn on a 1 px ring (mask), so it never sits under text.
+ */
+@property --vx-sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.vx {
+  --vx-c: var(--energy, #2de2e6);
+  --vx-ink: var(--ink, #eef4ff);
+  --vx-sub: var(--muted, #93a0b8);
+  --vx-glass: color-mix(in oklab, var(--elevated, #121722) 82%, transparent);
+  --vx-line: var(--line-strong, rgb(255 255 255 / 18%));
+}
+
+.vx-bar {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2, 8px) var(--s3, 12px);
+  margin: 0 0 var(--s2, 8px);
+  padding: 8px 10px 8px 12px;
+  color: var(--vx-ink);
+  background:
+    radial-gradient(120% 160% at 0% 50%, color-mix(in oklab, var(--vx-c) 16%, transparent), transparent 60%),
+    var(--vx-glass);
+  border: 1px solid var(--vx-line);
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--shadow-2, 0 8px 24px rgb(0 0 0 / 30%)), 0 0 36px -22px var(--vx-c);
+  backdrop-filter: blur(14px) saturate(1.2);
+  animation: vx-in var(--dur-panel, 260ms) var(--spring, cubic-bezier(0.2, 0.9, 0.25, 1.15)) both;
+}
+
+@supports (corner-shape: bevel) {
+  .vx-bar {
+    border-radius: var(--cut-sm, 8px) 0 var(--cut-sm, 8px) 0;
+    corner-shape: bevel;
+  }
+}
+
+/* The ring: a conic highlight masked to the border box minus its content, so only the 1 px edge lights. */
+.vx-bar::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  corner-shape: inherit;
+  background: conic-gradient(from var(--vx-sweep), transparent 0 58%, var(--vx-c) 78%, color-mix(in oklab, var(--vx-c) 40%, white) 82%, transparent 92%);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+.vx-bar.is-starting,
+.vx-bar.is-transcribing {
+  --vx-c: var(--energy, #2de2e6);
+}
+
+.vx-bar.is-transcribing::before,
+.vx-bar.is-starting::before {
+  animation: vx-sweep 1.6s linear infinite;
+}
+
+.vx-bar.is-listening {
+  --vx-c: var(--danger, #ff4d6d);
+}
+
+.vx-bar.is-listening::before {
+  background: linear-gradient(var(--vx-c), var(--vx-c));
+  animation: vx-pulse 1.4s ease-in-out infinite;
+}
+
+.vx-bar.is-speaking {
+  --vx-c: var(--violet, #a78bfa);
+}
+
+.vx-bar.is-speaking::before {
+  background: linear-gradient(90deg, transparent, var(--vx-c) 30%, var(--lime, #b6f36a) 70%, transparent);
+  animation: vx-breathe 2.4s ease-in-out infinite;
+}
+
+.vx-sig {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--vx-c);
+  background: color-mix(in oklab, var(--vx-c) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--vx-c) 45%, transparent);
+  border-radius: var(--r-pill, 999px);
+}
+
+.vx-bar.is-listening .vx-sig {
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--vx-c) 55%, transparent);
+  animation: vx-ping 1.4s ease-out infinite;
+}
+
+.vx-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.vx-title {
+  font: 600 var(--t-meta, 12px) / 1.2 var(--font-display, system-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--vx-c);
+}
+
+.vx-detail {
+  font: 400 var(--t-small, 13px) / 1.35 var(--font-ui, system-ui);
+  color: var(--vx-sub);
+  overflow-wrap: anywhere;
+}
+
+/* Real level: each bar is one recent sample (newest on the right), scaled from the session's feed. */
+.vx-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+}
+
+.vx-meter i {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--vx-c, var(--danger, #ff4d6d)) 40%, white), var(--vx-c, var(--danger, #ff4d6d)));
+  transform: scaleY(calc(0.1 + var(--l, 0) * 0.9));
+  opacity: calc(0.35 + var(--l, 0) * 0.65);
+  transition: transform 70ms linear, opacity 70ms linear;
+}
+
+.vx-time {
+  font: 500 12px var(--font-mono, ui-monospace, monospace);
+  color: var(--vx-ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.vx-time-max {
+  color: var(--vx-sub);
+}
+
+.vx-actions {
+  display: inline-flex;
+  gap: var(--s1, 4px);
+  margin-left: auto;
+}
+
+/* Bar buttons: own style so the island can use the bar without the hub's primitives. */
+.vx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  color: var(--vx-ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm, 6px);
+  font: 600 var(--t-meta, 12px) var(--font-ui, system-ui);
+  cursor: pointer;
+  transition: background var(--dur-fast, 120ms), border-color var(--dur-fast, 120ms), transform var(--dur-press, 90ms);
+}
+
+.vx-btn:hover {
+  background: color-mix(in oklab, var(--vx-ink) 8%, transparent);
+  border-color: var(--vx-line);
+}
+
+.vx-btn:active {
+  transform: scale(0.97);
+}
+
+.vx-btn.is-strong {
+  color: var(--vx-ink);
+  background: color-mix(in oklab, var(--vx-c) 22%, transparent);
+  border-color: color-mix(in oklab, var(--vx-c) 55%, transparent);
+}
+
+.vx-btn:focus-visible,
+.vx-talk:focus-visible {
+  outline: 2px solid var(--focus, #7dd3fc);
+  outline-offset: 2px;
+}
+
+/* Talk, for surfaces without their own button (the companion bubble). */
+.vx-talk {
+  --vx-c: var(--energy, #2de2e6);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  color: var(--ink, #eef4ff);
+  background: color-mix(in oklab, var(--vx-c) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--vx-c) 45%, transparent);
+  border-radius: var(--r-pill, 999px);
+  font: 600 var(--t-meta, 12px) var(--font-display, system-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-fast, 120ms), border-color var(--dur-fast, 120ms), box-shadow var(--dur-mid, 200ms), transform var(--dur-press, 90ms);
+}
+
+.vx-talk:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--vx-c) 18%, transparent);
+  box-shadow: 0 0 18px -6px var(--vx-c);
+}
+
+.vx-talk:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.vx-talk.is-listening {
+  --vx-c: var(--danger, #ff4d6d);
+  color: #ffffff;
+  background: var(--vx-c);
+  box-shadow: 0 0 18px -4px var(--vx-c);
+}
+
+.vx-talk:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vx-spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: vx-turn 0.8s linear infinite;
+}
+
+.vx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Compact: one line for the companion bubble. */
+.vx-bar.is-compact {
+  flex-wrap: nowrap;
+  gap: var(--s2, 8px);
+  padding: 6px 6px 6px 8px;
+}
+
+.vx-bar.is-compact .vx-sig {
+  width: 24px;
+  height: 24px;
+}
+
+.vx-bar.is-compact .vx-text {
+  flex: 1 1 auto;
+}
+
+.vx-bar.is-compact .vx-meter {
+  height: 18px;
+}
+
+/* A read-aloud button while its text is being read: lit, and it stops instead of starting. */
+.iconbtn.vx-reading {
+  color: var(--violet, #a78bfa);
+  opacity: 1;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--violet, #a78bfa) 55%, transparent), 0 0 14px -4px var(--violet, #a78bfa);
+}
+
+@keyframes vx-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+@keyframes vx-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes vx-sweep {
+  to {
+    --vx-sweep: 360deg;
+  }
+}
+
+@keyframes vx-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes vx-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes vx-ping {
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Reduced motion: the state stays visible as a steady ring and colour; the level still updates (it is information). */
+@media (prefers-reduced-motion: reduce) {
+  .vx-bar,
+  .vx-bar::before,
+  .vx-sig {
+    animation: none !important;
+  }
+  .vx-spin {
+    animation-duration: 2.4s;
+  }
+  .vx-bar::before {
+    background: linear-gradient(var(--vx-c), var(--vx-c));
+    opacity: 0.8;
+  }
+  .vx-meter i {
+    transition: none;
+  }
+}
+
+:root[data-motion='reduced'] .vx-bar,
+:root[data-motion='reduced'] .vx-bar::before,
+:root[data-motion='reduced'] .vx-sig {
+  animation: none !important;
+}
+
+:root[data-motion='reduced'] .vx-bar::before {
+  background: linear-gradient(var(--vx-c), var(--vx-c));
+  opacity: 0.8;
+}
+
+@media (forced-colors: active) {
+  .vx-bar {
+    border: 1px solid CanvasText;
+    backdrop-filter: none;
+  }
+  .vx-bar::before {
+    display: none;
+  }
+  .vx-title,
+  .vx-sig {
+    color: CanvasText;
+  }
+  .vx-btn,
+  .vx-talk {
+    border: 1px solid ButtonText;
+  }
+  .vx-meter i {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}

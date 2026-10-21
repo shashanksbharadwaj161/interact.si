@@ -1,0 +1,152 @@
+{
+  "date": "2026-10-18",
+  "origin": "http://127.0.0.1:5181",
+  "animationRows": [
+    {
+      "name": "At ease",
+      "frame": "0:1"
+    },
+    {
+      "name": "Run right",
+      "frame": "1:2"
+    },
+    {
+      "name": "Run left",
+      "frame": "2:2"
+    },
+    {
+      "name": "Say hello",
+      "frame": "3:2"
+    },
+    {
+      "name": "Little leap",
+      "frame": "4:2"
+    },
+    {
+      "name": "Something went wrong",
+      "frame": "5:2"
+    },
+    {
+      "name": "Your turn",
+      "frame": "6:2"
+    },
+    {
+      "name": "Thinking",
+      "frame": "7:2"
+    },
+    {
+      "name": "Checking",
+      "frame": "8:2"
+    }
+  ],
+  "gazeDirections": [
+    {
+      "direction": 0,
+      "frame": "9:0"
+    },
+    {
+      "direction": 22.5,
+      "frame": "9:1"
+    },
+    {
+      "direction": 45,
+      "frame": "9:2"
+    },
+    {
+      "direction": 67.5,
+      "frame": "9:3"
+    },
+    {
+      "direction": 90,
+      "frame": "9:4"
+    },
+    {
+      "direction": 112.5,
+      "frame": "9:5"
+    },
+    {
+      "direction": 135,
+      "frame": "9:6"
+    },
+    {
+      "direction": 157.5,
+      "frame": "9:7"
+    },
+    {
+      "direction": 180,
+      "frame": "10:0"
+    },
+    {
+      "direction": 202.5,
+      "frame": "10:1"
+    },
+    {
+      "direction": 225,
+      "frame": "10:2"
+    },
+    {
+      "direction": 247.5,
+      "frame": "10:3"
+    },
+    {
+      "direction": 270,
+      "frame": "10:4"
+    },
+    {
+      "direction": 292.5,
+      "frame": "10:5"
+    },
+    {
+      "direction": 315,
+      "frame": "10:6"
+    },
+    {
+      "direction": 337.5,
+      "frame": "10:7"
+    }
+  ],
+  "atmospheres": [
+    {
+      "name": "Flow field",
+      "scene": "flow",
+      "flowCanvases": 1,
+      "ascii": 0
+    },
+    {
+      "name": "Signal",
+      "scene": "ascii",
+      "flowCanvases": 0,
+      "ascii": 1
+    },
+    {
+      "name": "Quiet",
+      "scene": "quiet",
+      "flowCanvases": 0,
+      "ascii": 0
+    },
+    {
+      "name": "Vapor grid",
+      "scene": "grid",
+      "flowCanvases": 0,
+      "ascii": 0
+    }
+  ],
+  "glassOpacityObserved": "0.58",
+  "edgeOffCount": 0,
+  "edgeOnCount": 1,
+  "reducedMotion": {
+    "keyPose": "1:0",
+    "asciiStable": true,
+    "manualLookAllowed": true
+  },
+  "ascii": {
+    "rows": 24,
+    "distinctSamplesObserved": true
+  },
+  "notes": {
+    "saved": "Motion review check",
+    "context": "browser demo data only",
+    "persistedAcrossReload": true
+  },
+  "console": []
+}

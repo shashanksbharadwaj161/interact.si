@@ -1,0 +1,136 @@
+{
+  "environment": {
+    "platform": "win32",
+    "browser": "156.0.4314.30",
+    "headless": true,
+    "actions": "scripted preview",
+    "note": "Frame timing describes this headless test, not native Windows composition."
+  },
+  "results": [
+    {
+      "name": "rest",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "no island, no request, no microphone"
+      ],
+      "screenshot": "01-rest-light.png"
+    },
+    {
+      "name": "invoke-command",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "open: {\"frames\":13,\"meanMs\":29.19,\"p95Ms\":58.5,\"maxMs\":58.5,\"over20Ms\":6,\"timerSteps\":4}"
+      ],
+      "screenshot": "02-command-light.png"
+    },
+    {
+      "name": "context-region-and-window",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "region + window chips"
+      ],
+      "screenshot": "03-context.png"
+    },
+    {
+      "name": "click-during-morph",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "hit-tested mid-move (50 frames recorded so far)"
+      ],
+      "screenshot": null
+    },
+    {
+      "name": "work-sending-and-tool",
+      "ok": true,
+      "failure": "",
+      "notes": [],
+      "screenshot": "05-work-tool.png"
+    },
+    {
+      "name": "confirmation",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "summary + Stop only; approval is the (scripted) native dialog"
+      ],
+      "screenshot": "06-confirmation.png"
+    },
+    {
+      "name": "verify-and-answer",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "morphs: {\"frames\":131,\"meanMs\":16.61,\"p95Ms\":17.3,\"maxMs\":36.8,\"over20Ms\":1,\"timerSteps\":0}"
+      ],
+      "screenshot": "07-answer-verified.png"
+    },
+    {
+      "name": "collapse-then-shrink",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "close: {\"frames\":15,\"meanMs\":16.45,\"p95Ms\":17,\"maxMs\":17,\"over20Ms\":0,\"timerSteps\":0}; shrink 0 ms after the last frame"
+      ],
+      "screenshot": "09-rest-after-collapse.png"
+    },
+    {
+      "name": "interruption-reversal",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "reversal frame timing: {\"frames\":30,\"meanMs\":16.49,\"p95Ms\":17.4,\"maxMs\":18.5,\"over20Ms\":0,\"timerSteps\":0}; stalls over 60 ms: 0",
+        "phases: open → close → morph; {\"frames\":30,\"meanMs\":16.49,\"p95Ms\":17.4,\"maxMs\":18.5,\"over20Ms\":0,\"timerSteps\":0}"
+      ],
+      "screenshot": "10-reopened-after-reversal.png"
+    },
+    {
+      "name": "typing-unverified-dark",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "typed, not read back"
+      ],
+      "screenshot": "12-answer-unverified-dark.png"
+    },
+    {
+      "name": "stop-during-confirmation",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "Stop closes the confirmation as Cancel (in the app: MessageBox signal)"
+      ],
+      "screenshot": "13-stopped.png"
+    },
+    {
+      "name": "offline-error-busy",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "offline is its own state, distinct from network and provider limits"
+      ],
+      "screenshot": "14-offline-busy.png"
+    },
+    {
+      "name": "reduced-motion",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "opens in place"
+      ],
+      "screenshot": "15-reduced-motion-command.png"
+    },
+    {
+      "name": "page-health",
+      "ok": true,
+      "failure": "",
+      "notes": [
+        "console errors: 0",
+        "external requests: 0"
+      ]
+    }
+  ]
+}

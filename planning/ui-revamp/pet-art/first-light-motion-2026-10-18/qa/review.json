@@ -1,0 +1,973 @@
+{
+  "ok": true,
+  "frames_root": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames",
+  "states": [
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review"
+  ],
+  "errors": [],
+  "warnings": [],
+  "rows": [
+    {
+      "state": "idle",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\idle\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14880,
+          "bbox": [
+            32,
+            5,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 185
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\idle\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14929,
+          "bbox": [
+            32,
+            5,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 154
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\idle\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14846,
+          "bbox": [
+            32,
+            5,
+            159,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 180
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\idle\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14820,
+          "bbox": [
+            32,
+            6,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 171
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\idle\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14529,
+          "bbox": [
+            32,
+            10,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 187
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\idle\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14581,
+          "bbox": [
+            34,
+            5,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 181
+        }
+      ]
+    },
+    {
+      "state": "running-right",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14765,
+          "bbox": [
+            15,
+            8,
+            177,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 298
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14737,
+          "bbox": [
+            19,
+            11,
+            172,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 299
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13908,
+          "bbox": [
+            19,
+            5,
+            172,
+            191
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 288
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14616,
+          "bbox": [
+            21,
+            16,
+            170,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 284
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15056,
+          "bbox": [
+            18,
+            17,
+            174,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 319
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14952,
+          "bbox": [
+            15,
+            15,
+            176,
+            197
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 321
+        },
+        {
+          "index": 6,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13671,
+          "bbox": [
+            22,
+            5,
+            170,
+            187
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 257
+        },
+        {
+          "index": 7,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-right\\07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14398,
+          "bbox": [
+            23,
+            16,
+            169,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 279
+        }
+      ]
+    },
+    {
+      "state": "running-left",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15541,
+          "bbox": [
+            20,
+            5,
+            170,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 320
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13717,
+          "bbox": [
+            16,
+            13,
+            175,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 327
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13918,
+          "bbox": [
+            18,
+            5,
+            173,
+            187
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 275
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15260,
+          "bbox": [
+            14,
+            13,
+            176,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 352
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13896,
+          "bbox": [
+            23,
+            10,
+            168,
+            200
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 285
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15224,
+          "bbox": [
+            11,
+            14,
+            179,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 307
+        },
+        {
+          "index": 6,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14188,
+          "bbox": [
+            14,
+            5,
+            177,
+            187
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 297
+        },
+        {
+          "index": 7,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running-left\\07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15461,
+          "bbox": [
+            9,
+            8,
+            182,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 325
+        }
+      ]
+    },
+    {
+      "state": "waving",
+      "expected_frames": 4,
+      "actual_frames": 4,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waving\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14682,
+          "bbox": [
+            31,
+            5,
+            161,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 126
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waving\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14819,
+          "bbox": [
+            30,
+            5,
+            162,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 108
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waving\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14553,
+          "bbox": [
+            27,
+            5,
+            165,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 136
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waving\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14568,
+          "bbox": [
+            32,
+            5,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 112
+        }
+      ]
+    },
+    {
+      "state": "jumping",
+      "expected_frames": 5,
+      "actual_frames": 5,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\jumping\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10016,
+          "bbox": [
+            39,
+            62,
+            153,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 96
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\jumping\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10587,
+          "bbox": [
+            40,
+            25,
+            152,
+            195
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 97
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\jumping\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11190,
+          "bbox": [
+            39,
+            5,
+            153,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 91
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\jumping\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10230,
+          "bbox": [
+            41,
+            28,
+            151,
+            194
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 104
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\jumping\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10325,
+          "bbox": [
+            41,
+            40,
+            151,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 103
+        }
+      ]
+    },
+    {
+      "state": "failed",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14149,
+          "bbox": [
+            39,
+            5,
+            152,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 269
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12047,
+          "bbox": [
+            34,
+            57,
+            156,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 194
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11922,
+          "bbox": [
+            35,
+            48,
+            156,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 216
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 10684,
+          "bbox": [
+            35,
+            79,
+            156,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 158
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12092,
+          "bbox": [
+            37,
+            36,
+            154,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 184
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12381,
+          "bbox": [
+            37,
+            35,
+            154,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 216
+        },
+        {
+          "index": 6,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13646,
+          "bbox": [
+            33,
+            23,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 256
+        },
+        {
+          "index": 7,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\failed\\07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14287,
+          "bbox": [
+            33,
+            10,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 274
+        }
+      ]
+    },
+    {
+      "state": "waiting",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waiting\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14123,
+          "bbox": [
+            35,
+            5,
+            157,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 116
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waiting\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13858,
+          "bbox": [
+            34,
+            11,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 122
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waiting\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14340,
+          "bbox": [
+            35,
+            5,
+            157,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 120
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waiting\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13921,
+          "bbox": [
+            34,
+            15,
+            158,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 113
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waiting\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13619,
+          "bbox": [
+            36,
+            5,
+            156,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 120
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\waiting\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12780,
+          "bbox": [
+            35,
+            18,
+            157,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 116
+        }
+      ]
+    },
+    {
+      "state": "running",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14012,
+          "bbox": [
+            39,
+            5,
+            152,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 125
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13763,
+          "bbox": [
+            39,
+            5,
+            152,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 134
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14818,
+          "bbox": [
+            32,
+            7,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 123
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14039,
+          "bbox": [
+            38,
+            5,
+            154,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 143
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14622,
+          "bbox": [
+            32,
+            7,
+            160,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 137
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\running\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13918,
+          "bbox": [
+            37,
+            5,
+            155,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 150
+        }
+      ]
+    },
+    {
+      "state": "review",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "components",
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "frames": [
+        {
+          "index": 0,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\review\\00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13919,
+          "bbox": [
+            35,
+            5,
+            157,
+            202
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 156
+        },
+        {
+          "index": 1,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\review\\01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13216,
+          "bbox": [
+            40,
+            5,
+            152,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 135
+        },
+        {
+          "index": 2,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\review\\02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14686,
+          "bbox": [
+            31,
+            30,
+            161,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 120
+        },
+        {
+          "index": 3,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\review\\03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13717,
+          "bbox": [
+            37,
+            8,
+            155,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 129
+        },
+        {
+          "index": 4,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\review\\04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13278,
+          "bbox": [
+            36,
+            5,
+            156,
+            202
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 153
+        },
+        {
+          "index": 5,
+          "file": "C:\\Users\\SHASH\\Documents\\Codex\\2026-10-13\\windhawk-https-share-google-irsvmyv19hhv6tnkv\\outputs\\ui-revamp-review\\planning\\ui-revamp\\pet-art\\first-light-motion-2026-10-18\\frames\\review\\05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13808,
+          "bbox": [
+            38,
+            9,
+            154,
+            203
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 160
+        }
+      ]
+    }
+  ]
+}

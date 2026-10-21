@@ -21,6 +21,9 @@ export const LIMITS = {
 
 export const DEFAULT_ENDPOINT = 'http://127.0.0.1:11434';
 
+/** The line a trusted confirmation shows before the microphone is allowed (settings voiceInput false -> true). */
+export const MIC_PERMISSION_CHANGE = 'Allow the microphone: Desktop Companion may record only while you hold or tap Talk, and turns the audio into text on this computer';
+
 export const DEFAULT_SETTINGS: Settings = {
   onboarded: false,
   mode: 'offline',
@@ -32,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cloudModel: 'claude-haiku-4-5',
   cloudProvider: DEFAULT_CLOUD_PROVIDER,
   voice: '',
+  voiceInput: false,
   allowedRoots: [],
   approvedApps: [],
   retainDays: 90,
@@ -117,7 +121,7 @@ function uniqueCI(list: string[]): string[] {
 
 function settingsField(key: string, v: unknown): unknown {
   switch (key) {
-    case 'onboarded': case 'reduceMotion': case 'startInTray': return bool(v, key);
+    case 'onboarded': case 'reduceMotion': case 'startInTray': case 'voiceInput': return bool(v, key);
     case 'mode':
       if (v !== 'offline' && v !== 'online') throw new ValidationError('mode must be "offline" or "online"');
       return v;
@@ -176,6 +180,7 @@ export function describePermissionChanges(before: Settings, after: Settings): st
     ...after.approvedApps.filter((v) => !has(before.approvedApps, v)).map((v) => `Approve executable: ${visibleText(v)}`),
     ...after.allowedRoots.filter((v) => !has(before.allowedRoots, v)).map((v) => `Allow folder: ${visibleText(v)}`),
     ...(before.mode !== 'online' && after.mode === 'online' ? ['Enable online mode (cloud requests may send conversation content)'] : []),
+    ...(!before.voiceInput && after.voiceInput ? [MIC_PERMISSION_CHANGE] : []),
     ...(before.localEndpoint !== after.localEndpoint ? [`Local model endpoint: ${before.localEndpoint} -> ${after.localEndpoint}`] : []),
     ...(before.cloudModel !== after.cloudModel && after.mode === 'online' ? [`Cloud model: ${before.cloudModel} -> ${after.cloudModel}`] : []),
     ...((before.cloudProvider ?? DEFAULT_CLOUD_PROVIDER) !== (after.cloudProvider ?? DEFAULT_CLOUD_PROVIDER) && after.mode === 'online' ? [`Cloud provider: ${before.cloudProvider ?? DEFAULT_CLOUD_PROVIDER} -> ${after.cloudProvider ?? DEFAULT_CLOUD_PROVIDER}`] : []),

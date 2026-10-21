@@ -1,0 +1,729 @@
+/*
+ * Assistant: the conversation and the composer are the screen. Route details sit in a compact chip, setup in a
+ * dialog, history and options in a side drawer. The voice control is a dock that expands while recording.
+ */
+.assistant {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.assistant.has-drawer {
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 390px);
+}
+
+.assist-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.assist-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s5) var(--s7) var(--s3);
+}
+
+.assist-head h1 {
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assist-tools {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* Route chip and its details */
+.route-pop {
+  position: relative;
+}
+
+.route-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 440px;
+  min-height: 30px;
+  padding: 3px 10px 3px 12px;
+  color: var(--ink-2);
+  background: var(--sunken);
+  border: 1px solid var(--line-strong);
+  font: 500 12.5px var(--font-mono);
+  list-style: none;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+@supports (corner-shape: bevel) {
+  .route-chip {
+    border-radius: var(--cut-sm) 0 var(--cut-sm) 0;
+    corner-shape: bevel;
+  }
+}
+
+.route-chip::-webkit-details-marker {
+  display: none;
+}
+
+.route-chip:hover {
+  border-color: var(--energy-line);
+  box-shadow: 0 0 16px -8px var(--glow);
+}
+
+.route-chip svg {
+  color: var(--energy);
+  transition: transform var(--dur-mid) var(--spring);
+}
+
+.route-pop[open] .route-chip svg {
+  transform: rotate(180deg);
+}
+
+.route-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  width: min(480px, 80vw);
+  padding: var(--s4);
+  background: linear-gradient(180deg, var(--elevated), var(--surface));
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-3);
+  animation: dialog-in var(--dur-panel) var(--spring-soft) both;
+}
+
+@supports (corner-shape: bevel) {
+  .route-panel {
+    border-radius: 0 var(--cut) 0 var(--cut);
+    corner-shape: bevel;
+  }
+}
+
+.route-panel .kv {
+  grid-template-columns: 130px minmax(0, 1fr);
+  padding: 6px 0;
+}
+
+/* Blocked */
+.assist-blocked {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin: 0 var(--s7) var(--s2);
+  padding: var(--s3) var(--s4);
+  background: linear-gradient(90deg, var(--amber-soft), transparent);
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--amber);
+}
+
+.assist-blocked > svg {
+  color: var(--amber);
+  flex: none;
+}
+
+.assist-blocked .grow {
+  display: flex;
+  flex-direction: column;
+}
+
+.assist-blocked strong {
+  font: 600 var(--t-small) var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+/* Conversation */
+.chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 var(--s7) var(--s5);
+}
+
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  padding: var(--s4) 2px var(--s5);
+  outline: none;
+}
+
+.chat-log:focus-visible {
+  box-shadow: 0 0 0 1px var(--focus) inset;
+}
+
+.chat-empty {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s3);
+  max-width: 560px;
+  text-align: center;
+  padding: var(--s4) 0;
+}
+
+.chat-empty h2 {
+  margin-top: var(--s2);
+  font: 600 28px / 1.1 var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+.chat-empty .field-hint {
+  font-size: var(--t-small);
+}
+
+.chat-suggest {
+  justify-content: center;
+  margin-top: var(--s2);
+}
+
+.chat-earlier {
+  justify-content: center;
+}
+
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 84%;
+  min-width: 0;
+  animation: rise var(--dur-panel) var(--spring-soft) both;
+}
+
+.msg header {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--muted);
+  font-size: var(--t-meta);
+}
+
+.msg-who {
+  font: 600 var(--t-micro) var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.msg time {
+  font: 400 12px var(--font-mono);
+}
+
+.msg header .iconbtn {
+  width: 28px;
+  height: 28px;
+  opacity: 0.6;
+}
+
+.msg:hover header .iconbtn,
+.msg header .iconbtn:focus-visible {
+  opacity: 1;
+}
+
+.msg p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+
+.msg-assistant {
+  align-self: flex-start;
+  padding-left: var(--s4);
+  border-left: 1px solid var(--energy-line);
+}
+
+.msg-assistant .msg-who {
+  color: var(--energy);
+}
+
+.msg-user {
+  align-self: flex-end;
+  padding: var(--s3) var(--s4);
+  background: linear-gradient(180deg, var(--elevated), var(--surface-2));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+}
+
+@supports (corner-shape: bevel) {
+  .msg-user {
+    border-radius: var(--cut) 0 var(--cut) var(--cut);
+    corner-shape: bevel;
+  }
+}
+
+.msg-user header {
+  justify-content: flex-end;
+}
+
+.msg-pending {
+  opacity: 0.95;
+}
+
+.msg-stop {
+  margin-top: var(--s1);
+}
+
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: var(--energy);
+  box-shadow: 0 0 8px var(--energy);
+  animation: caret 1s steps(2, start) infinite;
+}
+
+@keyframes caret {
+  to {
+    visibility: hidden;
+  }
+}
+
+.typing {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--muted);
+  font-size: var(--t-small);
+}
+
+.chat-error {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+}
+
+.chat-notes:empty {
+  display: none;
+}
+
+.notice-actions {
+  display: flex;
+  margin-top: var(--s2);
+}
+
+/* Composer: the command surface of this screen. */
+.composer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3) var(--s3) var(--s2);
+  background: linear-gradient(180deg, var(--elevated), var(--surface));
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-2);
+  border-radius: var(--r-lg);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-mid);
+}
+
+@supports (corner-shape: bevel) {
+  .composer {
+    border-radius: var(--cut-lg) 0 var(--cut-lg) 0;
+    corner-shape: bevel;
+  }
+}
+
+.composer::before {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 45%;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--energy), transparent);
+}
+
+.composer:focus-within {
+  border-color: var(--energy-line);
+  box-shadow: var(--shadow-2), 0 0 0 1px var(--energy-line), 0 0 44px -20px var(--energy);
+}
+
+.composer.is-command {
+  border-color: color-mix(in oklab, var(--amber) 60%, transparent);
+}
+
+.composer.is-command::before {
+  background: linear-gradient(90deg, var(--amber), transparent);
+}
+
+.composer-input {
+  width: 100%;
+  min-height: 52px;
+  max-height: 220px;
+  padding: var(--s1) var(--s2);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  resize: none;
+  font: 400 var(--t-body) / 1.55 var(--font-ui);
+  caret-color: var(--energy);
+  field-sizing: content;
+}
+
+.composer-input:focus-visible {
+  outline: none;
+}
+
+.composer-input::placeholder {
+  color: var(--muted);
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+.composer-actions .segmented {
+  padding: 2px;
+}
+
+.composer-actions .seg {
+  min-height: 28px;
+  padding: 3px 10px;
+}
+
+.composer-why {
+  flex: 1 1 160px;
+  min-width: 0;
+  text-align: right;
+}
+
+.composer-actions > .btn-primary {
+  margin-left: auto;
+}
+
+.composer-why + .counter + .btn-primary {
+  margin-left: 0;
+}
+
+.composer-mode-hint {
+  padding: 0 var(--s2);
+}
+
+.counter {
+  color: var(--muted);
+  font: 400 12px var(--font-mono);
+}
+
+/* Voice dock: compact until recording, then it expands (width auto, spring) to show the real level, time and Cancel. */
+.voice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  width: auto;
+  padding: 2px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: width var(--dur-panel) var(--spring), background var(--dur-mid), border-color var(--dur-mid), padding var(--dur-mid);
+}
+
+.voice-recording {
+  padding: 2px 8px 2px 2px;
+  background: var(--danger-soft);
+  border-color: color-mix(in oklab, var(--danger) 45%, transparent);
+}
+
+.voice-recording > * {
+  animation: rise var(--dur-mid) var(--spring-soft) both;
+}
+
+.voice-time {
+  color: var(--danger);
+  font: 500 12px var(--font-mono);
+  white-space: nowrap;
+}
+
+/* The dock and its microphone panel. The panel opens upward from the dock (a spring, from the toggle's corner). */
+.voice-dock {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.voice-pop > summary {
+  list-style: none;
+}
+
+.voice-pop > summary::-webkit-details-marker {
+  display: none;
+}
+
+.voice-pop-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 8px;
+  color: var(--muted);
+  font: 500 var(--t-meta) var(--font-ui);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  transition: color var(--dur-fast);
+}
+
+.voice-pop-toggle.is-off {
+  color: var(--energy);
+  text-decoration-color: var(--energy-line);
+}
+
+.voice-pop-toggle:hover,
+.voice-pop[open] > .voice-pop-toggle {
+  color: var(--ink);
+}
+
+.voice-pop-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  width: min(380px, 80vw);
+  padding: var(--s4);
+  background: var(--elevated);
+  border: 1px solid var(--energy-line);
+  box-shadow: var(--shadow-3), 0 0 40px -22px var(--energy);
+  transform-origin: 20% 100%;
+  animation: voice-pop var(--dur-panel) var(--spring) both;
+}
+
+@supports (corner-shape: bevel) {
+  .voice-pop-panel {
+    border-radius: var(--cut) 0 var(--cut) 0;
+    corner-shape: bevel;
+  }
+}
+
+@keyframes voice-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+
+.ptt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  font: 600 var(--t-meta) var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), transform var(--dur-press);
+}
+
+@supports (corner-shape: bevel) {
+  .ptt {
+    border-radius: var(--cut-sm) 0 var(--cut-sm) 0;
+    corner-shape: bevel;
+  }
+}
+
+.ptt:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--energy-line);
+}
+
+.ptt:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.ptt:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ptt-recording {
+  color: #ffffff;
+  background: var(--danger);
+  border-color: var(--danger);
+  box-shadow: 0 0 18px -4px var(--danger);
+}
+
+.ptt-recording:hover:not(:disabled) {
+  color: #ffffff;
+  background: var(--danger);
+}
+
+.ptt-starting,
+.ptt-transcribing {
+  color: var(--energy);
+  border-color: var(--energy-line);
+}
+
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+}
+
+.meter i {
+  width: 3px;
+  height: 30%;
+  background: var(--line-strong);
+  transition: background 80ms linear;
+}
+
+.meter i.lit {
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+}
+
+/* Drawer */
+.assist-drawer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border-left: 1px solid var(--line-strong);
+  animation: drawer-in var(--dur-panel) var(--spring-soft) both;
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s2);
+  padding: var(--s3) var(--s3) 0 var(--s4);
+}
+
+.drawer-head .tabs {
+  flex: 1;
+  border-bottom: 0;
+}
+
+.drawer-head .iconbtn {
+  margin-bottom: 6px;
+}
+
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+.drawer-body .panel {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.drawer-body .section h2 {
+  font: 600 var(--t-micro) var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--energy);
+}
+
+@media (max-width: 1100px) {
+  .assistant.has-drawer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .assist-drawer {
+    position: fixed;
+    z-index: 40;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(400px, 92vw);
+    box-shadow: var(--shadow-3);
+  }
+
+  .assist-head,
+  .chat {
+    padding-inline: var(--s5);
+  }
+
+  .assist-blocked {
+    margin-inline: var(--s5);
+  }
+}
+
+@media (max-width: 640px) {
+  .msg {
+    max-width: 96%;
+  }
+
+  .assist-head,
+  .chat {
+    padding-inline: var(--s4);
+  }
+}
+
+/* The conversation fills the window: the view gets a definite height so the log scrolls and the composer stays in view. */
+.view:has(> .assistant) {
+  height: 100%;
+}
+
+/* Short windows (1280×720 and below): a smaller empty state so the composer is never pushed out of sight. */
+@media (max-height: 760px) {
+  .assist-head {
+    padding-top: var(--s4);
+    padding-bottom: var(--s2);
+  }
+
+  .chat-empty {
+    gap: var(--s2);
+    padding: var(--s2) 0;
+  }
+
+  .chat-empty .core-frame {
+    display: none;
+  }
+
+  .chat-empty h2 {
+    font-size: 24px;
+  }
+}

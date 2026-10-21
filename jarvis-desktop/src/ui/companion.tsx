@@ -110,6 +110,11 @@ export function CompanionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+/** The live companion when rendered inside CompanionProvider, otherwise null (isolated previews and tests). */
+export function useOptionalCompanion(): Companion | null {
+  return useContext(Ctx);
+}
+
 export function useCompanion(): Companion {
   const c = useContext(Ctx);
   if (!c) throw new Error('useCompanion outside provider');

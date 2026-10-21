@@ -12,6 +12,7 @@ import { SCENES, isKnownScene, sceneName } from '../ui/scenes';
 import { cx, fmtDateTime, parseHttpUrl, relTime, truncate } from '../ui/util';
 import { parseBrowserRefs, splitAgainstCapsule, toCapsuleItems, type BrowserRef, type BrowserRefsResult } from '../ui/browser-refs';
 import { buildProjectMap, mapKeyboardTarget, type MapNode, type ProjectMap } from '../ui/project-map';
+import { FileShelf } from './FileShelf';
 // src/styles/project-map.css holds the .project-map* rules. It is not imported here because existing test bundles of
 // this file have no CSS loader; the SVG below carries presentation attributes so it renders without the stylesheet.
 
@@ -391,6 +392,8 @@ export function Capsules({ initialItem }: { initialItem?: string } = {}) {
           )}
         </div>
       </div>
+
+      <FileShelf />
 
       <ConfirmDialog
         open={pendingSelect !== undefined}

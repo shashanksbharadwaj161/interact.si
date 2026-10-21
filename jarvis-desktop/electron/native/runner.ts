@@ -7,8 +7,11 @@ import {IntegrityError, SHARED_HELPERS, getNativeIntegrity, verifyFiles, type In
 
 export const SCRIPTS = [
   'list-windows', 'focus-window', 'move-window', 'type-text', 'click', 'speak', 'transcribe', 'probe-speech', 'dpapi', 'OcrLocal',
+  'uia-inspect', 'uia-act',
 ] as const;
 export type ScriptName = (typeof SCRIPTS)[number];
+/** Extra modules a helper dot-sources besides common.ps1; verified together with it before every spawn. */
+export const SCRIPT_HELPERS: Partial<Record<ScriptName, readonly string[]>> = {'uia-inspect': ['uia-common.ps1'], 'uia-act': ['uia-common.ps1']};
 
 export interface RunOptions { timeoutMs?: number; maxStdoutBytes?: number; signal?: AbortSignal }
 
@@ -75,7 +78,7 @@ export class NativeRunner {
       return;
     }
     try {
-      await verifyFiles(cfg.manifest, [`${script}.ps1`, ...SHARED_HELPERS], (n) => path.win32.join(this.nativeDir, n), this.readFile);
+      await verifyFiles(cfg.manifest, [`${script}.ps1`, ...SHARED_HELPERS, ...(SCRIPT_HELPERS[script] ?? [])], (n) => path.win32.join(this.nativeDir, n), this.readFile);
     } catch (e) {
       if (e instanceof IntegrityError) throw new NativeError(e.message, 'integrity');
       throw e;
