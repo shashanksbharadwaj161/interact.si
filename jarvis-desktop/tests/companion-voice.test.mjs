@@ -125,6 +125,8 @@ test('the real backend: the island voice reports local engines, and hub and isla
     assert.equal(b.companion.voice.stop(), true);
     assert.deepEqual(await island, { ok: false, reason: 'Speech was stopped' });
     assert.deepEqual(spoken, ['island reply']);
+    assert.match((await b.companion.voice.transcribe([1, 2, 3])).reason, /microphone is off/, 'policy off: nothing is transcribed');
+    await b.companion.voice.setInput(true, async () => true);
     assert.match((await b.companion.voice.transcribe([1, 2, 3])).reason, /No Windows speech recognizer/, 'no recognizer: an honest reason, no text');
   } finally {
     await b.dispose();

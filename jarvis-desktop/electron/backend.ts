@@ -415,11 +415,17 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   let keyConfigured = await secrets.configured();
   const providerKeys = {openai: await secrets.hasKey('openai'), openrouter: await secrets.hasKey('openrouter')};
   const settings = () => store.snapshot().settings;
+  /** Recorded audio is transcribed only while the person allows the microphone (checked again here, in main). */
+  const MIC_OFF = {text: '', reason: 'The microphone is off. Allow it first; nothing was transcribed.'};
+  const micTranscribe = async (audio: unknown, owner: string) => (settings().voiceInput === true ? speech.transcribe(audio, {owner}) : MIC_OFF);
   /** Windows that must hear when the microphone policy changes (the island cancels a recording when it turns off). */
   const voicePolicyListeners = new Set<(allowed: boolean) => void>();
   let voiceRequest = 0;
   const notifyVoicePolicy = () => {
     const allowed = settings().voiceInput === true;
+    // Revocation wins: turning the microphone off ends any transcription in progress, whichever window started it;
+    // its result is discarded (reported as cancelled).
+    if (!allowed) speech.cancelTranscribe();
     for (const l of voicePolicyListeners) { try { l(allowed); } catch { /* a closed window */ } }
   };
   const safeLaunch = env.safeLaunch ?? (() => false);
@@ -940,7 +946,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     executeAction: (id, approved) => actions.execute(id, approved),
 
     speak: (text) => speech.speak(text, {owner: 'hub'}),
-    transcribe: (audio) => speech.transcribe(audio, {owner: 'hub'}),
+    transcribe: (audio) => micTranscribe(audio, 'hub'),
     speechStop: async () => speech.cancel('hub'),
     transcribeCancel: async () => speech.cancelTranscribe('hub'),
 
@@ -1411,7 +1417,7 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       voicePolicyListeners.add(listener);
       return () => { voicePolicyListeners.delete(listener); };
     },
-    transcribe: (audio) => speech.transcribe(audio, {owner: 'companion'}),
+    transcribe: (audio) => micTranscribe(audio, 'companion'),
     speak: (text) => speech.speak(text, {owner: 'companion'}),
     stop: () => speech.cancel('companion'),
     cancelTranscribe: () => speech.cancelTranscribe('companion'),
