@@ -303,6 +303,9 @@ function actInApp(app: NonNullable<AgentToolDeps['app']>): AgentTool<{snapshot: 
         signal: ctx.signal,
         onConfirm: (open) => ctx.setPhase(open ? 'awaiting-confirm' : 'running', open ? `Waiting for your answer in the Windows confirmation (${name})` : `Using ${name}`),
       });
+      if (r.performed === 'uncertain') {
+        return {ok: false, phase: 'failed', verified: false, content: JSON.stringify({performed: 'unknown', reason: r.reason, note: r.note}), summary: r.summary};
+      }
       if (!r.performed) {
         if (r.declined) return {ok: true, phase: 'declined', content: 'Not confirmed: the person chose Cancel or the confirmation could not be shown. Nothing was done.', summary: 'Not confirmed. Nothing was done'};
         return {ok: false, phase: 'failed', content: JSON.stringify({performed: false, reason: r.reason}), summary: `Not done: ${r.reason.slice(0, 160)}`};

@@ -114,10 +114,11 @@ export function sanitizeSnapshot(raw: unknown[], target: UiaTarget, ctx: {id: st
     if (nodes.length >= UIA_LIMITS.maxElements) { truncated = true; break; }
     nodes.push(n);
   }
-  // A label is ambiguous when another element with the same role and name exists and neither has an automation id.
-  const key = (n: RawUiaNode) => `${n.type}\u0000${n.name}`;
+  // Ambiguous: another element has the same role, name and automation id, so the person could not tell them apart in
+  // the confirmation (an automation id does not help when it is repeated too).
+  const key = (n: RawUiaNode) => `${n.type}\u0000${n.name}\u0000${n.aid}`;
   const counts = new Map<string, number>();
-  for (const n of nodes) if (!n.aid) counts.set(key(n), (counts.get(key(n)) ?? 0) + 1);
+  for (const n of nodes) counts.set(key(n), (counts.get(key(n)) ?? 0) + 1);
   const ridToRef = new Map<string, string>();
   const byRef = new Map<string, Kept>();
   const elements: UiaElement[] = [];
@@ -131,7 +132,7 @@ export function sanitizeSnapshot(raw: unknown[], target: UiaTarget, ctx: {id: st
     if (n.password) refused = 'password field';
     else if (!n.enabled) refused = 'disabled';
     else if (!n.name && !n.aid) refused = 'unlabelled';
-    else if (!n.aid && (counts.get(key(n)) ?? 0) > 1) refused = 'ambiguous: another element has the same label';
+    else if ((counts.get(key(n)) ?? 0) > 1) refused = 'ambiguous: another element has the same role, label and id';
     const actions = refused ? [] : actionsFor(n);
     const state: UiaElement['state'] = {};
     if (n.toggle) state.toggle = n.toggle;
@@ -157,11 +158,14 @@ const VERB: Record<UiaAction, string> = {
   scroll_into_view: 'Scroll into view', scroll_up: 'Scroll up in', scroll_down: 'Scroll down in',
 };
 
+const TOGGLE_STATES = new Set(['On', 'Off', 'Indeterminate']);
+
 /** Whether an independent read-back shows the action's expected effect. Invoke and scroll have no such state. */
 export function verifyReadback(action: UiaAction, before: RawUiaNode, rb: UiaReadback | undefined): boolean {
   if (!rb || !rb.exists) return false;
   switch (action) {
-    case 'toggle': return !!rb.toggle && rb.toggle !== before.toggle;
+    // Both states must be known toggle states: an unknown before-state proves nothing about a change.
+    case 'toggle': return TOGGLE_STATES.has(before.toggle ?? '') && TOGGLE_STATES.has(rb.toggle ?? '') && rb.toggle !== before.toggle;
     case 'expand': return rb.expand === 'Expanded';
     case 'collapse': return rb.expand === 'Collapsed';
     case 'select': return rb.selected === true;
@@ -171,8 +175,14 @@ export function verifyReadback(action: UiaAction, before: RawUiaNode, rb: UiaRea
   }
 }
 
+/**
+ * `performed: 'uncertain'`: the helper was started with the action and then failed, timed out or was stopped, so the
+ * action may or may not have reached the app (an Invoke that opened a modal dialog blocks until it closes). Never
+ * retried automatically; the person is asked to look at the app first.
+ */
 export type UiaReceipt =
   | {performed: true; verified: boolean; summary: string; readback?: UiaReadback; note: string}
+  | {performed: 'uncertain'; summary: string; reason: string; note: string}
   | {performed: false; declined?: boolean; summary: string; reason: string};
 
 export type UiaDeps = {
@@ -266,8 +276,11 @@ export class UiaControl {
     try {
       r = await this.deps.native.act({hwnd: target.hwnd, pid: target.pid}, {rid: raw.rid, expect: {type: raw.type, name: raw.name, aid: raw.aid}, action}, h.signal);
     } catch (e) {
-      return {performed: false, summary: 'Not done', reason: h.signal.aborted ? 'Stopped' : `The action could not be run (${e instanceof Error ? e.message.slice(0, 120) : 'helper failed'})`};
+      // The helper already had the action: it may have happened. Say so instead of "not done".
+      const why = h.signal.aborted ? 'Stopped while the action was running' : `The helper did not report back (${e instanceof Error ? clean(e.message, 120) : 'failed'})`;
+      return {performed: 'uncertain', summary: `Unknown whether it happened. Check ${target.process.replace(/\.exe$/i, '')} before trying again`, reason: why, note: 'The action may or may not have reached the app. Do not retry automatically; ask the person to look at the app, or inspect it again.'};
     }
+    // An explicit refusal from the helper is reported before any pattern call, so nothing happened.
     if (!r.performed) return {performed: false, summary: 'Not done', reason: clean(r.reason ?? 'The app refused the action', 160)};
     const verified = verifyReadback(action, raw, r.readback);
     const label = p.kept.el.name || p.kept.el.automationId || p.kept.el.role;

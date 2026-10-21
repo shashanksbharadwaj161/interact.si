@@ -170,7 +170,7 @@ test('performed is not verified: invoke is reported unverified; toggle counts on
   assert.equal(m.verifyReadback('expand', {}, {exists: true, expand: 'Expanded'}), true);
 });
 
-test('a helper refusal or failure is reported as not done; Stop while it runs is reported as stopped', async () => {
+test('a helper refusal is not done; a helper that fails, times out or is stopped after dispatch is an uncertain effect', async () => {
   const d = fakeDesktop({act: () => ({performed: false, reason: 'The element changed since the app was inspected'})});
   let {snapshot} = await d.ctl.inspect(TARGET, sig());
   const r = await d.ctl.perform(TARGET, snapshot.id, 'e2', 'invoke', {signal: sig(), current: () => true, confirm: yes});
@@ -179,7 +179,45 @@ test('a helper refusal or failure is reported as not done; Stop while it runs is
   const d2 = fakeDesktop({act: async (req, signal) => { ctl.abort(); assert.equal(signal, ctl.signal); throw new Error('Native helper was cancelled'); }});
   ({snapshot} = await d2.ctl.inspect(TARGET, sig()));
   const s = await d2.ctl.perform(TARGET, snapshot.id, 'e2', 'invoke', {signal: ctl.signal, current: () => true, confirm: yes});
-  assert.deepEqual([s.performed, s.reason], [false, 'Stopped']);
+  assert.equal(s.performed, 'uncertain', 'Invoke may already have happened');
+  assert.match(s.reason, /Stopped while the action was running/);
+  assert.match(s.summary, /Unknown whether it happened\. Check calc before trying again/);
+  assert.match(s.note, /Do not retry automatically/);
+  const d3 = fakeDesktop({act: async () => { throw new Error('Native helper timed out after 20000 ms'); }});
+  ({snapshot} = await d3.ctl.inspect(TARGET, sig()));
+  const t = await d3.ctl.perform(TARGET, snapshot.id, 'e2', 'invoke', {signal: sig(), current: () => true, confirm: yes});
+  assert.equal(t.performed, 'uncertain');
+  assert.match(t.reason, /did not report back.*timed out/);
+  assert.equal(d3.calls.act.length, 1, 'no automatic retry');
+  const again = await d3.ctl.perform(TARGET, snapshot.id, 'e2', 'invoke', {signal: sig(), current: () => true, confirm: yes});
+  assert.equal(again.performed, false, 'the snapshot is stale after an uncertain action: inspect before retrying');
+  assert.equal(d3.calls.act.length, 1);
+});
+
+test('act_in_app reports an uncertain effect as failed, unverified and not retryable', async () => {
+  const tools = m.createAgentTools({snapshot: () => ({}), saveTask: async () => ({}), confirm: yes, today: () => '', app: {target: TARGET, inspect: async () => ({ok: false, reason: 'x'}), act: async () => ({performed: 'uncertain', summary: 'Unknown whether it happened. Check calc before trying again', reason: 'Stopped while the action was running', note: 'Do not retry automatically; ask the person to look at the app.'})}});
+  const r = await tools.find((t) => t.def.name === 'act_in_app').run({snapshot: 's1', ref: 'e2', action: 'invoke'}, {signal: sig(), setPhase: () => {}});
+  assert.deepEqual([r.ok, r.phase, r.verified], [false, 'failed', false]);
+  assert.equal(JSON.parse(r.content).performed, 'unknown');
+  assert.match(JSON.parse(r.content).note, /Do not retry automatically/);
+});
+
+test('toggle is verified only from a known before-state to a different known after-state', () => {
+  assert.equal(m.verifyReadback('toggle', {}, {exists: true, toggle: 'Off'}), false, 'unknown before + Off after proves nothing');
+  assert.equal(m.verifyReadback('toggle', {toggle: 'Off'}, {exists: true}), false);
+  assert.equal(m.verifyReadback('toggle', {toggle: 'Off'}, {exists: true, toggle: 'Sideways'}), false);
+  assert.equal(m.verifyReadback('toggle', {toggle: 'Off'}, {exists: true, toggle: 'On'}), true);
+  assert.equal(m.verifyReadback('toggle', {toggle: 'On'}, {exists: true, toggle: 'Indeterminate'}), true);
+});
+
+test('elements with the same role, label and automation id are ambiguous and refused, whatever the id', () => {
+  const s = m.sanitizeSnapshot([node('3.1', {name: 'Delete', aid: 'rowDelete'}), node('3.2', {name: 'Delete', aid: 'rowDelete'}), node('3.3', {name: 'Delete', aid: 'other'}), node('3.4', {type: 'MenuItem', name: 'Delete', aid: 'rowDelete'})], TARGET, {id: 's', now: 0});
+  const [a, b, c, d] = s.snapshot.elements;
+  assert.match(a.refused, /ambiguous/);
+  assert.match(b.refused, /ambiguous/);
+  assert.deepEqual([a.actions, b.actions], [[], []]);
+  assert.equal(c.refused, undefined, 'a different automation id tells them apart');
+  assert.equal(d.refused, undefined, 'a different role tells them apart');
 });
 
 /* ---------- Tools ---------- */
