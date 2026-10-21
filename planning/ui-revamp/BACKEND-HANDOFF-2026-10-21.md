@@ -273,10 +273,35 @@ UI copy (Codex): "Saved key · not tested" until a test passes. Then show "Teste
 
 - `tests/live-budget.test.mjs`: 10 tests. They cover config strictness, the cap rewrite, thinking removal, reservation before sending, persistence across restarts, the request and size limits, a ledger save failure, the image allowance, blocking on misconfiguration, island steps and no retry, the hub chat cap, the connection test path, and offline, keyless, 401, cancel and estimate labelling.
 
+## Checkpoint 5: voice policy in main (f530a7d)
+
+- Hub `transcribe` and island `companionTranscribe` return `{text: '', reason: 'The microphone is off. Allow it first; nothing was transcribed.'}` while `settings.voiceInput` is false. No audio file is written.
+- Turning the microphone off from the island (`setInput(false)`) or from hub Settings (`saveSettings({voiceInput: false})`) cancels a transcription in progress, whichever window started it. The result arrives as `{text: '', cancelled: true}`, even if the helper finishes afterwards.
+- **Renderer:** no contract change. Treat `cancelled` as "stopped", not as an error.
+- **Tests:** `tests/voice-policy.test.mjs` (4) covers the gate, revocation from both windows, a late Allow after Off, and removal of the temporary audio file after finishing or cancelling.
+- **Not verified:** real Windows speech recognition and a real microphone.
+
+## Checkpoint 6: account connection seam (OAuth + PKCE)
+
+- **Code:**
+  - `electron/services/oauth.ts`: providers Gmail (send), Google Calendar (events) and Spotify (playback); `OAuthConnector`; Gmail and Calendar previews.
+  - `electron/services/loopback.ts`: listener bound to 127.0.0.1 only, on the exact port and path, one shot.
+  - `netGuard` purpose `oauth`: only the listed token and revoke URLs, POST only, online only, no credential header.
+  - `backend.accounts` and `backend.accountRegistrationProblems`.
+- **Status:** every provider is **blocked**. No registration exists, and no client id is invented.
+- **Owner checklist:** `planning/ui-revamp/ACCOUNT-SETUP-CHECKLIST.md`. It includes an open decision about Google's desktop client secret.
+- **IPC proposal for Codex:** see the checklist, "Still to build". The renderer needs `accountsStatus`, `accountsConnect`, `accountsCancel` and `accountsDisconnect`, whose result types match `OAuthStatus` and the `connect` and `disconnect` results in `oauth.ts`.
+- **Tests:** `tests/oauth-connector.test.mjs` (10) runs against a real loopback listener and a fake provider. It covers:
+  - blocked status without a registration, and a secret in the registration being refused;
+  - scope review, PKCE S256, the exact redirect and state;
+  - forged state, a denied consent, a request to the wrong path, and Cancel releasing the port;
+  - revoke behaviour per provider;
+  - the egress rules;
+  - previews refusing header injection.
+- **Full suite on Linux:** 1820 tests; 1805 pass and 15 fail (the same baseline).
+
 ## Next increments (this branch)
 
-- P5: voice hardening.
-- P6: OAuth seams and registration checklists.
 - P7: release health.
 - The requirement map: `planning/ui-revamp/REQUIREMENT-GAP-MAP-2026-10-21.json`.
 

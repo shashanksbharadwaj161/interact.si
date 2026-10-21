@@ -149,7 +149,8 @@ type FetchLike<P extends string> = (url: string, init: (RequestInit & {timeoutMs
 export function withLiveBudget<P extends string>(fetchFn: FetchLike<P>, budget: LiveBudget | null, blocked: string | null): FetchLike<P> {
   if (!budget && !blocked) return fetchFn;
   return async (url, init = {}, purpose) => {
-    if (purpose === 'ollama') return fetchFn(url, init, purpose);
+    // Loopback model traffic and account sign-in are not model calls.
+    if (purpose === 'ollama' || purpose === 'oauth') return fetchFn(url, init, purpose);
     if (blocked) throw new LiveBudgetError(`Live-test mode is misconfigured (${blocked}); no provider request is sent`);
     const body = await budget!.admit(url, init.method ?? 'GET', init.body);
     return fetchFn(url, body === undefined ? init : {...init, body}, purpose);

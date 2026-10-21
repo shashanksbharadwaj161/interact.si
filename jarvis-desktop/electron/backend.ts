@@ -12,6 +12,8 @@ import {MAX_STEPS, companionSystemPrompt, firstUserContent, runAgent, runToolDir
 import {createAgentTools, createTypingTool, type TypeResult} from './services/agent-tools';
 import {UiaControl} from './services/uia';
 import {LiveBudget, withLiveBudget, type LiveTestConfig} from './services/liveBudget';
+import {OAuthConnector, parseRegistrations} from './services/oauth';
+import {listenLoopback} from './services/loopback';
 import {createWorkTools, undoWork, type RoutineDryRun, type RoutineRunResult, type RoutineSummary} from './services/agent-work';
 import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
@@ -122,6 +124,12 @@ export type Backend = Omit<FullJarvisAPI, 'productivity' | 'onChatStream'> & {
    * planning/ui-revamp/BACKEND-HANDOFF-2026-10-21.md (not wired to the hub page yet: the shared contract is Codex's).
    */
   providerConnectionTest(provider: unknown): Promise<ProviderTestResult>;
+  /**
+   * Per-user account connections (services/oauth.ts). Blocked per provider until the owner adds a public client to
+   * <userData>/account-registrations.json (see planning/ui-revamp/ACCOUNT-SETUP-CHECKLIST.md). Not wired to IPC yet.
+   */
+  accounts: OAuthConnector;
+  accountRegistrationProblems: string[];
   providerConnectionTestCancel(): boolean;
   runRetention(): Promise<void>;
   dispose(): Promise<void>;
@@ -508,6 +516,25 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     onJob: (job) => { if (job.state !== 'running') void activity('models', `Model ${job.kind} ${job.state}: ${job.model}`.slice(0, 200)); },
   });
 
+  // Account connections: owner-registered public clients only; refresh tokens in the DPAPI vault, never in settings.
+  const registrations = parseRegistrations(await sidecar('account-registrations').load().catch(() => null));
+  const accounts = new OAuthConnector({
+    registrations: registrations.ok,
+    vault: createDpapiKeyVault({native, dir: env.userData}),
+    // No trusted confirmation available (tests, safe launch): connecting fails closed.
+    confirm: env.confirm ?? (async () => false),
+    openExternal: (url) => env.shell.openExternal(url),
+    listen: (port, path) => listenLoopback(port, path),
+    post: async (url, form, signal) => {
+      const res = await guardedFetch(url, {method: 'POST', headers: {'content-type': 'application/x-www-form-urlencoded', accept: 'application/json'}, body: form.toString(), signal, timeoutMs: 20_000}, 'oauth');
+      const text = (await res.text()).slice(0, 64_000);
+      let json: unknown = null;
+      try { json = JSON.parse(text); } catch { json = null; }
+      return {status: res.status, json};
+    },
+    online: () => settings().mode === 'online',
+    activity: async (summary) => { await activity('integrations', summary); },
+  });
   // Integrations: the Anthropic slot aliases the existing cloud-key vault, so chat and integrations share one key.
   const integrations = createIntegrationService({
     fetch: guardedFetch,
@@ -1557,6 +1584,8 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
   return {
     ...api,
     providerConnectionTest,
+    accounts,
+    accountRegistrationProblems: registrations.problems,
     providerConnectionTestCancel: () => { if (!providerTest) return false; providerTest.abort(); return true; },
     onActivity: (h: (a: Activity) => void) => store.onActivity(h),
     load, store, productivity, actions, system, speech, routines, models, integrations, usage, clipboard, runner, companion,
