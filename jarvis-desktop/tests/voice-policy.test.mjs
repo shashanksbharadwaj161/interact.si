@@ -48,7 +48,8 @@ async function backend() {
     confirm: async () => true,
     fetchImpl: async () => { throw new Error('no network'); },
   });
-  return {b, tmp, log, close: async () => { await b.dispose(); await rm(dir, {recursive: true, force: true}); }};
+  // On Linux the helper's Windows-style temp path resolves in the working directory: remove any such file too.
+  return {b, tmp, log, close: async () => { await b.dispose(); await new Promise((r) => setTimeout(r, 30)); for (const f of log.transcribe) await rm(f, {force: true}); await rm(dir, {recursive: true, force: true}); }};
 }
 const until = async (f) => { for (let i = 0; i < 200 && !f(); i++) await new Promise((r) => setTimeout(r, 5)); };
 

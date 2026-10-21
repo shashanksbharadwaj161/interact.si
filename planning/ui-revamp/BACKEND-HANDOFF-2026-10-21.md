@@ -348,9 +348,64 @@ Codex adds the shared types locally. The Electron side is wired here:
 - `tests/oauth-connector.test.mjs`: 13 tests (refresh, rejection, offline, IPC parity).
 - Full suite on Linux: the same 15 baseline failures.
 
-## Next increments (this branch)
+## Requirement gap map (P7)
 
-- P7: release health.
-- The requirement map: `planning/ui-revamp/REQUIREMENT-GAP-MAP-2026-10-21.json`.
+- **File:** `planning/ui-revamp/REQUIREMENT-GAP-MAP-2026-10-21.json`.
+- **Scope:** all 140 original IDs.
+- **Statuses:** working, implemented-unverified, partial, preview, missing, superseded.
+- **Method:**
+  - Entries not touched today are **carried forward** from the 16 Oct audit and flagged `reaudited: false`.
+  - 15 entries were re-checked against this branch's source and tests.
+  - Nothing is marked superseded: the Claude-primary direction de-emphasises local-model setup but does not remove those requirements.
+- **No completion percentage is claimed.**
 
-Each increment will add its exact contract here before it is pushed.
+### Counts
+
+| Status | 16 Oct | 21 Oct |
+|---|---|---|
+| Working | 48 | 48 |
+| Implemented, unverified | 22 | 25 |
+| Partial | 34 | 35 |
+| Preview | 12 | 11 |
+| Missing | 24 | 21 |
+
+### Moved today
+
+| ID | Requirement | 16 Oct | 21 Oct | Reason |
+|---|---|---|---|---|
+| 23 | Dictation insertion preview | Partial | Implemented, unverified | Reviewed cross-app insert, manually typed on Windows; real microphone not tested |
+| 24 | Screen-region questions | Missing | Implemented, unverified | Region journey built |
+| 29 | Explicit screen and app context controls | Preview | Partial | Explicit picker, attached window and outbound preview |
+| 61 | Movable expanding island | Missing | Implemented, unverified | Native placement checks on Windows; drag and click-through not accepted |
+| 104 | Calendar account connectors | Missing | Partial | Tested OAuth seam; blocked by registration |
+
+### Also re-checked, with new evidence and gaps, status unchanged
+
+21, 22, 82, 88, 101, 102, 116, 117, 118, 121.
+
+## Release health (P7)
+
+- **Typecheck and build:** `tsc --noEmit` passes. `npm run build` passes (renderer, main and the helper integrity manifest, including the 3 UIA helpers).
+- **Full suite** (Linux, after the last change): 1826 tests, with the same 15 Windows-path, junction, DPAPI and session-filter baseline failures, checked by name.
+- **Electron smoke** (23 routes):
+  - It **cannot run in this container**: as root, Chromium needs `--no-sandbox`, and then `file://…/dist/index.html` is refused with `ERR_BLOCKED_BY_CLIENT` by the session filter's path rule.
+  - Baseline b3c9e0b fails identically, checked in a separate worktree, so this is not a regression.
+  - Codex's Windows smoke remains the evidence.
+- **Data and route IDs:** unchanged.
+  - New sidecars: `live-test-budget-<id>.json` (opt-in only) and `account-registrations.json` (owner-written).
+  - New vault slots: `oauth-<provider>`.
+- **External blockers:** code signing, updater and rollback, ARM64 builds, OAuth registrations, and Google app verification for `gmail.send` (Sensitive).
+
+## Remaining Windows checks (for Codex or the owner)
+
+1. Region picker: crop at 125%, 150% and 200% and on a second monitor; the pet reappears after a lock or Stop during the step-aside; JPEG fallback on a photo-heavy area.
+2. UIA helpers, which have never run:
+   - Calculator press and toggle, and Notepad menus;
+   - a UWP or Chromium tree;
+   - a modal `Invoke` that blocks until the timeout, reported as an uncertain receipt;
+   - refusal of an elevated window and a password field.
+3. Island confirmations for `save_note`, `complete_task` and `run_routine`, and which window owns the routine step confirmations.
+4. A real microphone: Allow, record, then Off during transcription; the result should read as cancelled.
+5. The owner-run live session under `DESKTOP_COMPANION_LIVE_TEST` with `claude-haiku-4-5`: connection test, a text ask, an image ask, the UIA journey, and the ledger file checked after each step.
+6. The 23-route smoke and the packaged installer.
+
