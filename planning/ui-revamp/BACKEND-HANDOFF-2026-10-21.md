@@ -300,6 +300,54 @@ UI copy (Codex): "Saved key · not tested" until a test passes. Then show "Teste
   - previews refusing header injection.
 - **Full suite on Linux:** 1820 tests; 1805 pass and 15 fail (the same baseline).
 
+## Checkpoint 7: budget guard corrections, provider-test and account IPC, token refresh
+
+### Live-test guard corrections (owner review)
+
+- **Input bound.** The bound is now UTF-8 bytes of the request text + 2048 per request + 4800 per image. A token covers at least one byte, and the documented maximum per image is 4784 tokens. A test covers multi-byte text and emoji.
+- **Ledger file.** The file is `<userData>/live-test-budget-<budgetId>.json`, written atomically. **The ledger fails closed**:
+  - any read error other than `ENOENT`, corrupt JSON, a foreign budget id, extra keys, or bad counters (non-integer or negative requests, non-finite or negative dollars) block every provider request;
+  - only a missing file starts at zero.
+  - Tests cover restart, corruption and load failure.
+- **Model and prices.**
+  - The config now requires `model`, and it must be listed in `MODEL_PRICE_FLOOR`. Requests for any other model are refused.
+  - Configured prices must be at or above the floor for that model.
+  - The floors come from the bundled Anthropic model documentation. The owner should still check the pricing page before the run.
+- The $2 aggregate ceiling is unchanged.
+
+### IPC on this branch
+
+Codex adds the shared types locally. The Electron side is wired here:
+
+| Method | Arguments | Result |
+|---|---|---|
+| `providerConnectionTest` | `provider: 'anthropic' \| 'openai' \| 'openrouter'` | `ProviderTestResult` |
+| `providerConnectionTestCancel` | none | `Promise<boolean>` |
+| `accountsStatus` | `provider: 'google-gmail' \| 'google-calendar' \| 'spotify'` | `AccountStatus` (= `OAuthStatus`) |
+| `accountsConnect` | the same provider enum | the `OAuthConnector.connect` result |
+| `accountsCancel` | none | `Promise<boolean>` |
+| `accountsDisconnect` | the same provider enum | `{removedLocally: boolean; revokedAtProvider: boolean \| 'not-offered'; reason?: string}` |
+
+- The router validates the enum arguments (`ARG_SPECS`), and the backend validates them again.
+- `HandlerMap` and the preload type these methods structurally until `FullJarvisAPI` carries them. Codex's identical declarations then merge.
+- Both cancels are `async` in the backend, so they match the Promise contract.
+
+### OAuth token refresh
+
+- `OAuthConnector.accessToken(provider)` is implemented: cached reuse, a shared refresh, a rotated refresh token stored, and on 400 or 401 the sign-in is removed with `reconnect: true`. See ACCOUNT-SETUP-CHECKLIST.md.
+- **Google facts checked against the official docs** (21 Oct 2026, quoted in the checklist):
+  - `client_secret` is optional in both the code exchange and the refresh request;
+  - desktop apps are public clients and should always use PKCE;
+  - `gmail.send` is **Sensitive**;
+  - revocation is a POST to `/revoke`.
+- **Resource operations:** Gmail send and Calendar changes remain **unavailable**. Only previews exist; no API call is implemented.
+
+### Tests
+
+- `tests/live-budget.test.mjs`: 13 tests.
+- `tests/oauth-connector.test.mjs`: 13 tests (refresh, rejection, offline, IPC parity).
+- Full suite on Linux: the same 15 baseline failures.
+
 ## Next increments (this branch)
 
 - P7: release health.

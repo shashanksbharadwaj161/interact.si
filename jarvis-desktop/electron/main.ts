@@ -318,7 +318,7 @@ async function boot() {
   });
   if (LIVE_TEST) {
     await backend.store.addActivity('settings', 'config' in LIVE_TEST
-      ? `Live-test budget active (${LIVE_TEST.config.budgetId}): at most ${LIVE_TEST.config.maxOutputTokens} output tokens and ${LIVE_TEST.config.maxSteps} steps per request, ${LIVE_TEST.config.maxRequests} requests, $${LIVE_TEST.config.maxReservedUsd.toFixed(2)} estimated ceiling`
+      ? `Live-test budget active (${LIVE_TEST.config.budgetId}, ${LIVE_TEST.config.model} only): at most ${LIVE_TEST.config.maxOutputTokens} output tokens and ${LIVE_TEST.config.maxSteps} steps per request, ${LIVE_TEST.config.maxRequests} requests, $${LIVE_TEST.config.maxReservedUsd.toFixed(2)} estimated ceiling`
       : `Live-test configuration rejected (${LIVE_TEST.error}); provider requests are blocked`);
   }
   if (launch.safe) await backend.store.addActivity('recovery', 'Safe launch: the previous two sessions did not exit cleanly. Desktop actions are disabled until a normal restart.');

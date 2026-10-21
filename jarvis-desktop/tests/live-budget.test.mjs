@@ -8,7 +8,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
-import {mkdtemp, rm, readFile} from 'node:fs/promises';
+import {mkdtemp, rm, readFile, writeFile} from 'node:fs/promises';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = await build({
@@ -16,78 +16,123 @@ const out = await build({
     resolveDir: root, sourcefile: 'live-budget-entry.ts', loader: 'ts',
     contents: `
       export { createBackend, PROVIDER_TEST_MAX_TOKENS } from './electron/backend.ts';
-      export { parseLiveTestConfig, LiveBudget, withLiveBudget, estimateInputTokens, IMAGE_TOKEN_ALLOWANCE } from './electron/services/liveBudget.ts';
+      export { parseLiveTestConfig, LiveBudget, withLiveBudget, estimateInputTokens, IMAGE_TOKEN_ALLOWANCE, REQUEST_OVERHEAD_TOKENS, createLedgerFile } from './electron/services/liveBudget.ts';
     `,
   },
   bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
 });
 const m = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 
-const CONFIG = {budgetId: 'review-1', maxOutputTokens: 256, maxSteps: 3, maxBodyChars: 400_000, maxRequests: 20, maxReservedUsd: 2, inputPerMillionUsd: 3, outputPerMillionUsd: 15};
-const memStore = (init = null) => { const s = {value: init, saves: 0, fail: false}; return {s, load: async () => s.value, save: async (l) => { if (s.fail) throw new Error('disk full'); s.saves++; s.value = l; }}; };
+const CONFIG = {budgetId: 'review-1', model: 'claude-haiku-4-5', maxOutputTokens: 256, maxSteps: 3, maxBodyChars: 400_000, maxRequests: 20, maxReservedUsd: 2, inputPerMillionUsd: 3, outputPerMillionUsd: 15};
+const memStore = (init = null) => { const s = {value: init, saves: 0, fail: false}; return {s, load: async () => (s.value === null ? {missing: true} : {missing: false, value: s.value}), save: async (l) => { if (s.fail) throw new Error('disk full'); s.saves++; s.value = l; }}; };
 const post = (body) => JSON.stringify(body);
 
 test('config: strict JSON object with every limit and both prices; anything else is an error', () => {
   assert.deepEqual(m.parseLiveTestConfig(JSON.stringify(CONFIG)), CONFIG);
-  for (const bad of ['not json', '[]', JSON.stringify({...CONFIG, extra: 1}), JSON.stringify({...CONFIG, maxOutputTokens: 4096}), JSON.stringify({...CONFIG, maxSteps: 6}), JSON.stringify({...CONFIG, maxReservedUsd: 0}), JSON.stringify({...CONFIG, outputPerMillionUsd: undefined}), JSON.stringify({...CONFIG, budgetId: 'a b'}), JSON.stringify({...CONFIG, maxRequests: 1.5})]) {
+  for (const bad of ['not json', '[]', JSON.stringify({...CONFIG, extra: 1}), JSON.stringify({...CONFIG, maxOutputTokens: 4096}), JSON.stringify({...CONFIG, maxSteps: 6}), JSON.stringify({...CONFIG, maxReservedUsd: 0}), JSON.stringify({...CONFIG, outputPerMillionUsd: undefined}), JSON.stringify({...CONFIG, budgetId: 'a b'}), JSON.stringify({...CONFIG, maxRequests: 1.5}),
+    JSON.stringify({...CONFIG, model: 'claude-unknown-9'}), JSON.stringify({...CONFIG, model: undefined}), JSON.stringify({...CONFIG, inputPerMillionUsd: 0.5}), JSON.stringify({...CONFIG, outputPerMillionUsd: 4.99})]) {
     assert.throws(() => m.parseLiveTestConfig(bad), (e) => e.name === 'LiveBudgetError', bad);
   }
 });
 
 test('the output cap is written into every provider body; thinking is removed; a lower cap asked by the caller is kept', async () => {
   const b = await m.LiveBudget.open(CONFIG, memStore());
-  const sent = JSON.parse(await b.admit('https://api.anthropic.com/v1/messages', 'POST', post({model: 'x', max_tokens: 16000, thinking: {type: 'adaptive'}, messages: []})));
+  const sent = JSON.parse(await b.admit('https://api.anthropic.com/v1/messages', 'POST', post({model: 'claude-haiku-4-5', max_tokens: 16000, thinking: {type: 'adaptive'}, messages: []})));
   assert.equal(sent.max_tokens, 256);
   assert.equal(sent.thinking, undefined);
-  assert.equal(JSON.parse(await b.admit('u', 'POST', post({max_tokens: 8, messages: []}))).max_tokens, 8);
-  assert.equal(JSON.parse(await b.admit('u', 'POST', post({max_completion_tokens: 9000, messages: []}))).max_completion_tokens, 256);
-  assert.equal(JSON.parse(await b.admit('u', 'POST', post({messages: []}))).max_tokens, 256, 'a missing cap is added');
+  assert.equal(JSON.parse(await b.admit('u', 'POST', post({model: 'claude-haiku-4-5', max_tokens: 8, messages: []}))).max_tokens, 8);
+  assert.equal(JSON.parse(await b.admit('u', 'POST', post({model: 'claude-haiku-4-5', max_completion_tokens: 9000, messages: []}))).max_completion_tokens, 256);
+  assert.equal(JSON.parse(await b.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: []}))).max_tokens, 256, 'a missing cap is added');
   assert.equal(await b.admit('https://api.anthropic.com/v1/models', 'GET', undefined), undefined, 'model listing is not charged');
   assert.equal(b.spent.requests, 4);
 });
 
 test('the dollar ceiling is reserved worst-case before sending and saved first; over the ceiling nothing is sent', async () => {
   const store = memStore();
-  const tight = {...CONFIG, maxReservedUsd: 0.01};
+  const tight = {...CONFIG, maxReservedUsd: 0.025};
   const b = await m.LiveBudget.open(tight, store);
-  // 300 chars ≈ 100 input tokens + 256 output tokens: (100*3 + 256*15) / 1e6 ≈ $0.0041 per request.
-  const body = post({max_tokens: 256, messages: [{role: 'user', content: 'x'.repeat(240)}]});
+  // ≈ 320 bytes + 2048 overhead ≈ 2370 input tokens at $3 + 256 output tokens at $15 ≈ $0.011 per request.
+  const body = post({model: 'claude-haiku-4-5', max_tokens: 256, messages: [{role: 'user', content: 'x'.repeat(240)}]});
   await b.admit('u', 'POST', body);
   await b.admit('u', 'POST', body);
   assert.equal(store.s.saves, 2);
-  await assert.rejects(b.admit('u', 'POST', body), /could cost up to \$0\.00\d+ \(estimate\).*Nothing was sent/);
+  await assert.rejects(b.admit('u', 'POST', body), /could cost up to \$0\.01\d+ \(estimate\).*Nothing was sent/);
   assert.equal(b.spent.requests, 2, 'a refused request reserves nothing');
-  assert.ok(b.spent.reservedUsd <= 0.01);
+  assert.ok(b.spent.reservedUsd <= 0.025);
   const again = await m.LiveBudget.open(tight, store);
   assert.equal(again.spent.requests, 2, 'restarting does not reset the ceiling');
   await assert.rejects(again.admit('u', 'POST', body), /ceiling/);
-  const fresh = await m.LiveBudget.open({...tight, budgetId: 'review-2'}, store);
-  assert.equal(fresh.spent.requests, 0, 'a new budget id starts a new ledger');
+  await assert.rejects(m.LiveBudget.open({...tight, budgetId: 'review-2'}, store), /damaged/, 'a ledger written for another budget id is not reused or reset');
 });
 
 test('request count, body size, unreadable bodies and a ledger that cannot be saved all refuse before sending', async () => {
   const b = await m.LiveBudget.open({...CONFIG, maxRequests: 1}, memStore());
-  await b.admit('u', 'POST', post({messages: []}));
-  await assert.rejects(b.admit('u', 'POST', post({messages: []})), /request limit \(1\)/);
+  await b.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: []}));
+  await assert.rejects(b.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: []})), /request limit \(1\)/);
   const small = await m.LiveBudget.open({...CONFIG, maxBodyChars: 200}, memStore());
-  await assert.rejects(small.admit('u', 'POST', post({messages: [{content: 'x'.repeat(300)}]})), /300|characters of text; the limit is 200/);
+  await assert.rejects(small.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: [{content: 'x'.repeat(300)}]})), /characters of text; the limit is 200/);
+  await assert.rejects(small.admit('u', 'POST', post({model: 'claude-opus-5-5', messages: []})), /only claude-haiku-4-5 may be called/);
   const pic = {type: 'image', source: {type: 'base64', media_type: 'image/png', data: 'A'.repeat(500_000)}};
   const roomy = await m.LiveBudget.open({...CONFIG, maxBodyChars: 2000}, memStore());
-  await roomy.admit('u', 'POST', post({messages: [{role: 'user', content: [pic, {type: 'text', text: 'what is this'}]}]}));
-  await assert.rejects(roomy.admit('u', 'POST', post({messages: [{role: 'user', content: [pic, pic]}]})), /at most 1 image/);
+  await roomy.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: [{role: 'user', content: [pic, {type: 'text', text: 'what is this'}]}]}));
+  await assert.rejects(roomy.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: [{role: 'user', content: [pic, pic]}]})), /at most 1 image/);
   await assert.rejects(small.admit('u', 'POST', 'not json'), /could not be read/);
   await assert.rejects(small.admit('u', 'POST', new Uint8Array(3)), /only JSON/);
   const st = memStore(); st.s.fail = true;
   const failing = await m.LiveBudget.open(CONFIG, st);
-  await assert.rejects(failing.admit('u', 'POST', post({messages: []})), /ledger could not be saved/);
+  await assert.rejects(failing.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: []})), /ledger could not be saved/);
   assert.equal(failing.spent.requests, 0);
+});
+
+test('the input bound is UTF-8 bytes plus overhead: multi-byte and emoji text can never be under-counted', () => {
+  const ascii = m.estimateInputTokens(JSON.stringify({messages: [{content: 'a'.repeat(300)}]}));
+  const kanji = m.estimateInputTokens(JSON.stringify({messages: [{content: '漢'.repeat(300)}]}));
+  const emoji = m.estimateInputTokens(JSON.stringify({messages: [{content: '🧪'.repeat(300)}]}));
+  assert.ok(kanji.tokens - ascii.tokens >= 600, 'three bytes per kanji');
+  assert.ok(emoji.tokens - ascii.tokens >= 900, 'four bytes per emoji (two UTF-16 units)');
+  for (const e of [ascii, kanji, emoji]) assert.ok(e.tokens >= e.textBytes + m.REQUEST_OVERHEAD_TOKENS);
+  // A tokenizer never emits more tokens than input bytes, so per-character counting (length/3) would be the wrong bound.
+  assert.ok(kanji.tokens > Math.ceil(kanji.textChars / 3) * 3);
+});
+
+test('a ledger that cannot be read, is damaged, foreign or has bad counters fails closed; only a missing file starts at zero', async () => {
+  const good = {budgetId: 'review-1', requests: 3, reservedUsd: 0.5};
+  assert.equal((await m.LiveBudget.open(CONFIG, memStore(good))).spent.requests, 3);
+  for (const bad of [{...good, budgetId: 'other'}, {...good, requests: -1}, {...good, requests: 1.5}, {...good, requests: '3'}, {...good, reservedUsd: Number.NaN}, {...good, reservedUsd: -0.1}, {...good, extra: 1}, [], 'text', 7]) {
+    await assert.rejects(m.LiveBudget.open(CONFIG, memStore(bad)), /damaged/, JSON.stringify(bad));
+  }
+  await assert.rejects(m.LiveBudget.open(CONFIG, {load: async () => { throw new Error('EACCES'); }, save: async () => {}}), /EACCES/);
+  // The real file store: missing → zero; unreadable or corrupt JSON → refused; a written ledger survives a restart.
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'desktop-companion-test-ledger-'));
+  try {
+    const file = m.createLedgerFile(dir, 'review-1');
+    const b = await m.LiveBudget.open(CONFIG, file);
+    await b.admit('u', 'POST', post({model: 'claude-haiku-4-5', messages: []}));
+    const again = await m.LiveBudget.open(CONFIG, m.createLedgerFile(dir, 'review-1'));
+    assert.equal(again.spent.requests, 1);
+    assert.equal(again.spent.reservedUsd, b.spent.reservedUsd);
+    await writeFile(path.join(dir, 'live-test-budget-review-1.json'), '{"budgetId":"review-1","requests":');
+    await assert.rejects(m.LiveBudget.open(CONFIG, m.createLedgerFile(dir, 'review-1')), /damaged/);
+    const failing = m.createLedgerFile(dir, 'review-1', {readFile: async () => { throw Object.assign(new Error('denied'), {code: 'EACCES'}); }, writeFile: async () => {}, rename: async () => {}});
+    await assert.rejects(m.LiveBudget.open(CONFIG, failing), /could not be read/);
+  } finally { await rm(dir, {recursive: true, force: true}); }
+});
+
+test('backend: a damaged ledger blocks every provider request instead of restarting the $2 ceiling', async () => {
+  const f = await backend({config: CONFIG}, () => sseText('OK'), {load: async () => ({missing: false, value: {budgetId: 'review-1', requests: 'x', reservedUsd: 0}}), save: async () => {}});
+  try {
+    const r = await f.b.providerConnectionTest('anthropic');
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /misconfigured.*damaged/);
+    assert.equal(f.bodies.length, 0);
+  } finally { await f.close(); }
 });
 
 test('images are charged a fixed allowance, not by their base64 length', () => {
   const img = (t) => ({type: 'image', source: {type: 'base64', media_type: t, data: 'A'.repeat(90_000)}});
   const e = m.estimateInputTokens(JSON.stringify({messages: [{role: 'user', content: [img('image/png'), img('image/jpeg'), {type: 'text', text: 'hi'}]}]}));
   assert.equal(e.images, 2);
-  assert.ok(e.tokens >= 2 * m.IMAGE_TOKEN_ALLOWANCE && e.tokens < 2 * m.IMAGE_TOKEN_ALLOWANCE + 100);
+  assert.ok(e.tokens >= 2 * m.IMAGE_TOKEN_ALLOWANCE + m.REQUEST_OVERHEAD_TOKENS && e.tokens < 2 * m.IMAGE_TOKEN_ALLOWANCE + m.REQUEST_OVERHEAD_TOKENS + 300, 'base64 bytes are not counted as text');
 });
 
 test('a misconfigured budget blocks every provider request; loopback model traffic is untouched', async () => {
@@ -108,12 +153,12 @@ const ev = (type, data = {}) => `event: ${type}\ndata: ${JSON.stringify({type, .
 const sseText = (t) => new Response(ev('message_start', {message: {id: 'm', type: 'message', role: 'assistant', content: [], usage: {input_tokens: 9, output_tokens: 0}}}) + ev('content_block_start', {index: 0, content_block: {type: 'text', text: ''}}) + ev('content_block_delta', {index: 0, delta: {type: 'text_delta', text: t}}) + ev('content_block_stop', {index: 0}) + ev('message_delta', {delta: {stop_reason: 'end_turn'}, usage: {output_tokens: 2}}) + ev('message_stop'), {status: 200});
 const sseTool = (n) => new Response(ev('message_start', {message: {id: 'm', type: 'message', role: 'assistant', content: [], usage: {input_tokens: 9, output_tokens: 0}}}) + ev('content_block_start', {index: 0, content_block: {type: 'tool_use', id: `toolu_${n}`, name: 'search_saved', input: {}}}) + ev('content_block_delta', {index: 0, delta: {type: 'input_json_delta', partial_json: '{"query":"x"}'}}) + ev('content_block_stop', {index: 0}) + ev('message_delta', {delta: {stop_reason: 'tool_use'}, usage: {output_tokens: 5}}) + ev('message_stop'), {status: 200});
 
-async function backend(liveTest, respond) {
+async function backend(liveTest, respond, liveLedger) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'desktop-companion-test-live-'));
   const bodies = [];
   const b = await m.createBackend({
     userData: dir, nativeDir: dir, tmpDir: dir, selfPids: () => [], safeStorage: fakeSafeStorage, companionRetryMs: 0,
-    ...(liveTest ? {liveTest} : {}),
+    ...(liveTest ? {liveTest} : {}), ...(liveLedger ? {liveLedger} : {}),
     native: {listWindows: async () => [], dpapi: async () => ({ok: true}), speechVoices: async () => []},
     shell: {spawnApp: async () => {}, openPath: async () => '', openExternal: async () => {}},
     dialogs: {openImport: async () => null, pick: async () => null, saveExport: async () => null},
@@ -134,7 +179,7 @@ test('island: at most maxSteps model calls, each capped at maxOutputTokens, and 
     assert.ok(f.bodies.every((x) => x.max_tokens === 256));
     assert.equal(events.at(-1).reason, 'steps');
     assert.match(events.at(-1).message, /after 3 steps/);
-    const ledger = JSON.parse(await readFile(path.join(f.dir, 'live-test-budget.json'), 'utf8'));
+    const ledger = JSON.parse(await readFile(path.join(f.dir, 'live-test-budget-review-1.json'), 'utf8'));
     assert.equal(ledger.requests, 3);
     assert.ok(ledger.reservedUsd > 0 && ledger.reservedUsd < 2);
   } finally { await f.close(); }
@@ -212,10 +257,10 @@ test('connection test: a rejected key is status-only, and Cancel stops a pending
   try {
     const p = g.b.providerConnectionTest('anthropic');
     await new Promise((r) => setTimeout(r, 20));
-    assert.equal(g.b.providerConnectionTestCancel(), true);
+    assert.equal(await g.b.providerConnectionTestCancel(), true);
     const r = await p;
     assert.equal(r.cancelled, true);
-    assert.equal(g.b.providerConnectionTestCancel(), false);
+    assert.equal(await g.b.providerConnectionTestCancel(), false);
     void release;
   } finally { await g.close(); }
 });

@@ -11,8 +11,8 @@ import {AGENT_MAX_TOKENS, CloudProviderError, modelListFailure, parseImageSuppor
 import {MAX_STEPS, companionSystemPrompt, firstUserContent, runAgent, runToolDirect, type AgentEvent, type AgentImage, type UndoHandle} from './services/agent';
 import {createAgentTools, createTypingTool, type TypeResult} from './services/agent-tools';
 import {UiaControl} from './services/uia';
-import {LiveBudget, withLiveBudget, type LiveTestConfig} from './services/liveBudget';
-import {OAuthConnector, parseRegistrations} from './services/oauth';
+import {LiveBudget, createLedgerFile, withLiveBudget, type LiveLedgerStore, type LiveTestConfig} from './services/liveBudget';
+import {OAUTH_PROVIDERS, OAuthConnector, parseRegistrations, type OAuthProviderId, type OAuthStatus} from './services/oauth';
 import {listenLoopback} from './services/loopback';
 import {createWorkTools, undoWork, type RoutineDryRun, type RoutineRunResult, type RoutineSummary} from './services/agent-work';
 import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
@@ -96,6 +96,8 @@ export interface BackendEnv {
    * every provider request (a misconfigured test never falls back to unbounded calls). Absent: normal behaviour.
    */
   liveTest?: {config: LiveTestConfig} | {error: string};
+  /** Test seam for the live-test ledger file. */
+  liveLedger?: LiveLedgerStore;
   /** Delay before the companion's one automatic retry of a temporary failure (tests set 0). */
   companionRetryMs?: number;
   chatStreamLimits?: Partial<ChatStreamLimits>;
@@ -130,7 +132,12 @@ export type Backend = Omit<FullJarvisAPI, 'productivity' | 'onChatStream'> & {
    */
   accounts: OAuthConnector;
   accountRegistrationProblems: string[];
-  providerConnectionTestCancel(): boolean;
+  /** IPC wrappers over `accounts` (argument checked against the provider list here as well as in the router). */
+  accountsStatus(provider: unknown): Promise<OAuthStatus>;
+  accountsConnect(provider: unknown): ReturnType<OAuthConnector['connect']>;
+  accountsCancel(): Promise<boolean>;
+  accountsDisconnect(provider: unknown): ReturnType<OAuthConnector['disconnect']>;
+  providerConnectionTestCancel(): Promise<boolean>;
   runRetention(): Promise<void>;
   dispose(): Promise<void>;
 };
@@ -450,8 +457,14 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     await productivity.reconcile({capsuleIds: s.capsules.map((c) => c.id), taskIds: s.tasks.map((t) => t.id)}).catch(() => undefined);
   };
 
-  const liveBudget = env.liveTest && 'config' in env.liveTest ? await LiveBudget.open(env.liveTest.config, createJsonSidecar(env.userData, 'live-test-budget', env.sidecarFs)) : null;
-  const liveBlocked = env.liveTest && 'error' in env.liveTest ? env.liveTest.error : null;
+  // A ledger that cannot be read, or is damaged, blocks every provider request instead of restarting the ceiling.
+  let liveBudget: LiveBudget | null = null;
+  let liveBlocked: string | null = env.liveTest && 'error' in env.liveTest ? env.liveTest.error : null;
+  if (env.liveTest && 'config' in env.liveTest) {
+    try { liveBudget = await LiveBudget.open(env.liveTest.config, env.liveLedger ?? createLedgerFile(env.userData, env.liveTest.config.budgetId)); } catch (e) {
+      liveBlocked = e instanceof Error ? e.message.slice(0, 200) : 'the budget ledger could not be opened';
+    }
+  }
   const rawGuardedFetch = createGuardedFetch({
     mode: () => settings().mode,
     hasCloudKey: () => keyConfigured,
@@ -1539,6 +1552,10 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     },
   };
 
+  const accountId = (v: unknown): OAuthProviderId => {
+    if (typeof v !== 'string' || !OAUTH_PROVIDERS.some((p) => p.id === v)) throw new ValidationError('Unknown account provider');
+    return v as OAuthProviderId;
+  };
   let providerTest: AbortController | null = null;
   async function providerConnectionTest(raw: unknown): Promise<ProviderTestResult> {
     const provider = validateCloudProvider(raw);
@@ -1586,7 +1603,11 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     providerConnectionTest,
     accounts,
     accountRegistrationProblems: registrations.problems,
-    providerConnectionTestCancel: () => { if (!providerTest) return false; providerTest.abort(); return true; },
+    accountsStatus: async (p) => accounts.status(accountId(p)),
+    accountsConnect: async (p) => accounts.connect(accountId(p)),
+    accountsCancel: async () => accounts.cancel(),
+    accountsDisconnect: async (p) => accounts.disconnect(accountId(p)),
+    providerConnectionTestCancel: async () => { if (!providerTest) return false; providerTest.abort(); return true; },
     onActivity: (h: (a: Activity) => void) => store.onActivity(h),
     load, store, productivity, actions, system, speech, routines, models, integrations, usage, clipboard, runner, companion,
     reminderTasks: () => effectiveReminderTasks(store.snapshot().tasks, productivity.snapshot().reminders),

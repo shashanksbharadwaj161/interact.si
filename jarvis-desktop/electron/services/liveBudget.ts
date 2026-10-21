@@ -14,8 +14,12 @@
 // The companion also uses maxSteps and makes no automatic retry while the budget is active (backend.ts).
 // Costs are estimates from the prices in the configuration, not provider invoices.
 
+import {promises as fsp} from 'node:fs';
+
 export type LiveTestConfig = {
   budgetId: string;
+  /** The one model the test may call; it must be in MODEL_PRICE_FLOOR. Requests for any other model are refused. */
+  model: string;
   maxOutputTokens: number;
   maxSteps: number;
   maxBodyChars: number;
@@ -26,11 +30,34 @@ export type LiveTestConfig = {
 };
 
 export const LIVE_TEST_ENV = 'DESKTOP_COMPANION_LIVE_TEST';
-/** Allowance per image block: above the provider's per-image token count at the 1568 px edge this app sends. */
-export const IMAGE_TOKEN_ALLOWANCE = 3300;
+/**
+ * Upper bound per image block. Anthropic documents at most 4784 image tokens per image on its high-resolution models
+ * (2576 px edge); this app sends at most 1568 px, which is less. Rounded up.
+ */
+export const IMAGE_TOKEN_ALLOWANCE = 4800;
+/** Fixed allowance per request for tokens the provider adds that are not in the body (tool-use framing, roles). */
+export const REQUEST_OVERHEAD_TOKENS = 2048;
+/**
+ * Minimum USD prices per million tokens (input / output) for the models a live test may use, from Anthropic's model
+ * documentation as bundled with the claude-api reference (October 2026). For Claude Haiku 5.5 the higher long-prompt
+ * card is used. A configuration with lower prices, or with a model not listed here, is refused: an unknown model is
+ * never silently under-priced. Check the provider's pricing page before a run; raise these numbers if it changed.
+ */
+export const MODEL_PRICE_FLOOR: Readonly<Record<string, {input: number; output: number}>> = {
+  'claude-haiku-4-5': {input: 1, output: 5},
+  'claude-haiku-5-5': {input: 0.5, output: 2.5},
+  'claude-sonnet-4-6': {input: 3, output: 15},
+  'claude-sonnet-5': {input: 2, output: 10},
+  'claude-sonnet-5-5': {input: 2, output: 10},
+  'claude-opus-4-8': {input: 5, output: 25},
+  'claude-opus-5': {input: 5, output: 25},
+  'claude-opus-5-5': {input: 4, output: 20},
+  'claude-fable-5': {input: 10, output: 50},
+  'claude-fable-5-1': {input: 10, output: 50},
+};
 /** Images per request in live-test mode (the companion sends at most one screen area). */
 export const MAX_IMAGES_PER_REQUEST = 1;
-const KEYS = ['budgetId', 'maxOutputTokens', 'maxSteps', 'maxBodyChars', 'maxRequests', 'maxReservedUsd', 'inputPerMillionUsd', 'outputPerMillionUsd'] as const;
+const KEYS = ['budgetId', 'model', 'maxOutputTokens', 'maxSteps', 'maxBodyChars', 'maxRequests', 'maxReservedUsd', 'inputPerMillionUsd', 'outputPerMillionUsd'] as const;
 
 export class LiveBudgetError extends Error { override name = 'LiveBudgetError'; }
 
@@ -52,9 +79,12 @@ export function parseLiveTestConfig(raw: string): LiveTestConfig {
     if (typeof n !== 'number' || !Number.isFinite(n) || n < lo || n > hi) throw new LiveBudgetError(`${k} must be a number from ${lo} to ${hi}`);
     return n;
   };
-  if (typeof o.budgetId !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(o.budgetId)) throw new LiveBudgetError('budgetId must be 1 to 40 letters, digits, _ or -');
-  return {
+  if (typeof o.budgetId !== 'string' || !/^[a-z0-9-]{1,40}$/.test(o.budgetId)) throw new LiveBudgetError('budgetId must be 1 to 40 lowercase letters, digits or -');
+  if (typeof o.model !== 'string' || !Object.prototype.hasOwnProperty.call(MODEL_PRICE_FLOOR, o.model)) throw new LiveBudgetError(`model must be one of ${Object.keys(MODEL_PRICE_FLOOR).join(', ')}`);
+  const floor = MODEL_PRICE_FLOOR[o.model];
+  const cfg: LiveTestConfig = {
     budgetId: o.budgetId,
+    model: o.model,
     maxOutputTokens: int('maxOutputTokens', 1, 1024),
     maxSteps: int('maxSteps', 1, 5),
     maxBodyChars: int('maxBodyChars', 200, 4_000_000),
@@ -64,18 +94,63 @@ export function parseLiveTestConfig(raw: string): LiveTestConfig {
     inputPerMillionUsd: num('inputPerMillionUsd', 0.01, 1000),
     outputPerMillionUsd: num('outputPerMillionUsd', 0.01, 1000),
   };
+  if (cfg.inputPerMillionUsd < floor.input || cfg.outputPerMillionUsd < floor.output) {
+    throw new LiveBudgetError(`Prices for ${cfg.model} must be at least $${floor.input} input and $${floor.output} output per million tokens`);
+  }
+  return cfg;
 }
 
 export type LiveLedger = {budgetId: string; requests: number; reservedUsd: number};
-export interface LiveLedgerStore { load(): Promise<unknown>; save(l: LiveLedger): Promise<void> }
+/** `load` resolves `{missing: true}` only when the ledger file certainly does not exist yet; every other failure throws. */
+export interface LiveLedgerStore { load(): Promise<{missing: true} | {missing: false; value: unknown}>; save(l: LiveLedger): Promise<void> }
 
-/** Worst-case input tokens for a JSON request body: characters / 3 (images excluded), plus an allowance per image block. */
-export function estimateInputTokens(body: string): {tokens: number; images: number; textChars: number} {
+/** The ledger file for one budget id, written atomically (temporary file, then rename). */
+export function createLedgerFile(dir: string, budgetId: string, fs: {readFile: (f: string, e: 'utf8') => Promise<string>; writeFile: (f: string, d: string, o: {encoding: 'utf8'; mode: number}) => Promise<void>; rename: (a: string, b: string) => Promise<void>} = nodeFsPromises()): LiveLedgerStore {
+  const file = `${dir.replace(/[\\/]+$/, '')}/live-test-budget-${budgetId}.json`;
+  return {
+    async load() {
+      let text: string;
+      try { text = await fs.readFile(file, 'utf8'); } catch (e) {
+        if ((e as {code?: string}).code === 'ENOENT') return {missing: true};
+        throw new LiveBudgetError('Live-test mode: the budget ledger could not be read, so no provider request is sent');
+      }
+      try { return {missing: false, value: JSON.parse(text) as unknown}; } catch { throw new LiveBudgetError('Live-test mode: the budget ledger is damaged, so no provider request is sent'); }
+    },
+    async save(l) {
+      const tmp = `${file}.${process.pid}.tmp`;
+      await fs.writeFile(tmp, JSON.stringify(l), {encoding: 'utf8', mode: 0o600});
+      await fs.rename(tmp, file);
+    },
+  };
+}
+function nodeFsPromises() {
+  return {readFile: (f: string, e: 'utf8') => fsp.readFile(f, e), writeFile: (f: string, d: string, o: {encoding: 'utf8'; mode: number}) => fsp.writeFile(f, d, o), rename: (a: string, b: string) => fsp.rename(a, b)};
+}
+
+/** A stored ledger must be exactly {budgetId, requests, reservedUsd} for this budget, with sane counters. */
+export function parseLedger(v: unknown, budgetId: string): LiveLedger {
+  const bad = () => new LiveBudgetError('Live-test mode: the budget ledger is damaged, so no provider request is sent');
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw bad();
+  const o = v as Record<string, unknown>;
+  if (Object.keys(o).sort().join(',') !== 'budgetId,requests,reservedUsd') throw bad();
+  if (o.budgetId !== budgetId) throw bad();
+  if (typeof o.requests !== 'number' || !Number.isSafeInteger(o.requests) || o.requests < 0) throw bad();
+  if (typeof o.reservedUsd !== 'number' || !Number.isFinite(o.reservedUsd) || o.reservedUsd < 0) throw bad();
+  return {budgetId, requests: o.requests, reservedUsd: o.reservedUsd};
+}
+
+/**
+ * Upper bound on input tokens for a JSON request body: the UTF-8 byte count of everything except image data (a token
+ * covers at least one byte, so no tokenizer yields more tokens than bytes), plus a fixed per-request overhead, plus
+ * IMAGE_TOKEN_ALLOWANCE per image block.
+ */
+export function estimateInputTokens(body: string): {tokens: number; images: number; textChars: number; textBytes: number} {
   // Image data is base64 inside "data":"…"; count those blocks and leave their bytes out of the text estimate.
   let images = 0;
   const text = body.replace(/"type"\s*:\s*"base64"\s*,\s*"media_type"\s*:\s*"image\/(?:png|jpeg)"\s*,\s*"data"\s*:\s*"[A-Za-z0-9+/=]*"/g, () => { images++; return ''; })
     .replace(/"image_url"\s*:\s*\{\s*"url"\s*:\s*"data:[^"]*"/g, () => { images++; return ''; });
-  return {tokens: Math.ceil(text.length / 3) + images * IMAGE_TOKEN_ALLOWANCE, images, textChars: text.length};
+  const textBytes = Buffer.byteLength(text, 'utf8');
+  return {tokens: textBytes + REQUEST_OVERHEAD_TOKENS + images * IMAGE_TOKEN_ALLOWANCE, images, textChars: text.length, textBytes};
 }
 
 export class LiveBudget {
@@ -83,15 +158,13 @@ export class LiveBudget {
   private chain: Promise<unknown> = Promise.resolve();
   private constructor(readonly config: LiveTestConfig, private readonly store: LiveLedgerStore, ledger: LiveLedger) { this.ledger = ledger; }
 
+  /**
+   * Opens the ledger. Only a confirmed first use (no file) starts at zero; a read failure or a damaged, foreign or
+   * malformed ledger throws, and the caller then blocks every provider request (never restarts the ceiling).
+   */
   static async open(config: LiveTestConfig, store: LiveLedgerStore): Promise<LiveBudget> {
-    let ledger: LiveLedger = {budgetId: config.budgetId, requests: 0, reservedUsd: 0};
-    const raw = await store.load().catch(() => null);
-    if (raw && typeof raw === 'object') {
-      const r = raw as Record<string, unknown>;
-      if (r.budgetId === config.budgetId && typeof r.requests === 'number' && typeof r.reservedUsd === 'number' && r.requests >= 0 && r.reservedUsd >= 0) {
-        ledger = {budgetId: config.budgetId, requests: r.requests, reservedUsd: r.reservedUsd};
-      }
-    }
+    const r = await store.load();
+    const ledger = r.missing ? {budgetId: config.budgetId, requests: 0, reservedUsd: 0} : parseLedger(r.value, config.budgetId);
     return new LiveBudget(config, store, ledger);
   }
 
@@ -117,6 +190,8 @@ export class LiveBudget {
     let parsed: Record<string, unknown>;
     try { parsed = JSON.parse(body) as Record<string, unknown>; } catch { throw new LiveBudgetError('Live-test mode: the request body could not be read. Nothing was sent'); }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new LiveBudgetError('Live-test mode: unexpected request body. Nothing was sent');
+    // Only the configured, priced model: an unpriced model would make the ceiling meaningless.
+    if (parsed.model !== c.model) throw new LiveBudgetError(`Live-test mode: only ${c.model} may be called (this request asked for ${String(parsed.model).slice(0, 60)}). Nothing was sent`);
     // The output cap is enforced here, whatever the caller asked for.
     const asked = [parsed.max_tokens, parsed.max_completion_tokens].filter((x): x is number => typeof x === 'number');
     const cap = Math.min(c.maxOutputTokens, ...(asked.length ? asked : [c.maxOutputTokens]));

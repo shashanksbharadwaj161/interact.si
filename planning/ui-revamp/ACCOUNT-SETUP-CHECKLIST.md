@@ -47,19 +47,21 @@ Problems in the file are listed in `backend.accountRegistrationProblems`. Those 
    - enable the **Gmail API** and the **Google Calendar API**;
    - configure the **OAuth consent screen**: app name, support email and the scopes below.
 2. Add test users while the app is in "Testing".
-   - Sensitive or restricted scopes (`gmail.send` is restricted) need Google verification before public release. Plan for the review time.
+   - **`gmail.send` is a Sensitive scope** (not Restricted). It is listed under "Sensitive scopes" ("Send email on your behalf"), and sensitive scopes "require additional OAuth App Verification" before public release. Source: developers.google.com/workspace/gmail/api/auth/scopes, checked 21 Oct 2026.
+   - The Calendar scope page (developers.google.com/workspace/calendar/api/auth) does not state a classification for `calendar.events`. It says only that public apps using such scopes "must complete a verification process". Check the verification centre in the console.
 3. Create an **OAuth client ID** of type **Desktop app**. Put its client id in the file.
 4. Scopes used:
    - `https://www.googleapis.com/auth/gmail.send`
    - `https://www.googleapis.com/auth/calendar.events`
-5. **Decision needed: Google client secret.**
-   - Google issues a client secret even for Desktop-app clients, and its token endpoint may expect it.
-   - This app's rule is **no embedded client secret**, so the exchange is sent without one.
-   - Before a live test, the owner should check Google's current documentation for installed apps using PKCE, then choose one of:
-     - (a) confirm that Google accepts the exchange without a secret;
-     - (b) decide explicitly whether a non-confidential desktop secret is acceptable. That needs a code change and a security note;
-     - (c) use a different client type.
-   - Until then, Google stays "registration required" in practice.
+5. **Client secret: not used.** This matches Google's documentation (developers.google.com/identity/protocols/oauth2/native-app, checked 21 Oct 2026):
+   - `client_secret` is marked **Optional** in both the code exchange and the refresh request, and the sample refresh request omits it.
+   - The page says desktop apps "are public clients and cannot keep secrets confidential. Always use PKCE".
+   - The app therefore sends no secret, which matches the documentation; a live sign-in with the owner's test account has still not been run.
+6. **Loopback port.**
+   - The page says to start a listener "on a random available port", and also that the redirect URI "must exactly match one of the authorized redirect URIs" configured for the client.
+   - The app uses the fixed port from the registration file, which satisfies both readings.
+   - Whether a Desktop client accepts other ports without registering them is not stated, so keep the configured port.
+7. **Revocation:** `https://oauth2.googleapis.com/revoke`, using the token as a parameter. HTTP 200 means success. This is what the app does.
 
 ### Spotify
 
@@ -68,14 +70,30 @@ Problems in the file are listed in `backend.accountRegistrationProblems`. Those 
 3. Scopes: `user-read-playback-state` and `user-modify-playback-state`.
 4. Development mode allows only listed users; extended quota needs Spotify's review.
 
+## Token refresh (implemented)
+
+`OAuthConnector.accessToken(provider)` works as follows:
+- It reuses the cached access token while more than a minute is left.
+- Otherwise it sends a `refresh_token` grant with `client_id` and no secret, through the guarded `oauth` purpose.
+- Concurrent callers share one refresh.
+- A rotated refresh token replaces the stored one.
+- HTTP 400 or 401 (for example `invalid_grant`) removes the stored sign-in and returns `reconnect: true`.
+- Network failures keep it, with the error text redacted.
+- Offline mode sends nothing.
+
+## Hub IPC (implemented on the Electron side; shared types by Codex)
+
+```ts
+type AccountProvider = 'google-gmail' | 'google-calendar' | 'spotify';
+accountsStatus(provider: AccountProvider): Promise<AccountStatus>;            // AccountStatus = OAuthStatus in oauth.ts
+accountsConnect(provider: AccountProvider): Promise<AccountConnectResult>;    // = OAuthConnector.connect result
+accountsCancel(): Promise<boolean>;
+accountsDisconnect(provider: AccountProvider): Promise<{removedLocally: boolean; revokedAtProvider: boolean | 'not-offered'; reason?: string}>;
+```
+
 ## Still to build after registration
 
-- **Hub IPC and UI.** This touches the shared contracts (Codex) and needs these methods:
-  - `accountsStatus(provider)`;
-  - `accountsConnect(provider)`, which shows the native confirmation;
-  - `accountsCancel()`;
-  - `accountsDisconnect(provider)`.
-- **Token refresh.** A refresh-token grant on expiry. Same purpose, no secret.
+- **Account setup UI** (Codex), over the IPC above.
 - **Gmail send and Calendar changes.** Each must:
   - show the preview in the trusted confirmation;
   - make one API call through a new allow-listed purpose for `gmail.googleapis.com` and `www.googleapis.com/calendar/v3`;

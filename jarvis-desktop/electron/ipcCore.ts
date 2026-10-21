@@ -2,7 +2,7 @@
 // plus the small pure policies main.ts needs (file-request confinement, dev URL, trusted confirmation).
 import * as nodePath from 'node:path';
 import type {ChatMessage, ChatStreamBatch, ChatStreamEvent, ChatStreamOutcome, ChatStreamRoute, ChatStreamStart, JarvisAPI} from '../src/shared/contracts';
-import {ARITY, METHODS, CLOUD_PROVIDER_IDS, type MethodName} from './channels';
+import {ACCOUNT_PROVIDER_IDS, ARITY, METHODS, CLOUD_PROVIDER_IDS, type MethodName} from './channels';
 import {MAX_COMMAND_CHARS} from './services/intent';
 import {LIMITS} from './services/validation';
 
@@ -146,7 +146,15 @@ export interface RouterOptions {
   devOrigin?: string;
 }
 
-export type HandlerMap = Pick<Required<JarvisAPI>, MethodName>;
+/**
+ * The two provider-test methods are typed here until src/shared/contracts.ts carries them (Codex integrates the shared
+ * ProviderTestResult type); the shapes match planning/ui-revamp/BACKEND-HANDOFF-2026-10-21.md.
+ */
+type ProviderTestMethods = {
+  providerConnectionTest(provider: unknown): Promise<unknown>; providerConnectionTestCancel(): Promise<boolean>;
+  accountsStatus(provider: unknown): Promise<unknown>; accountsConnect(provider: unknown): Promise<unknown>; accountsCancel(): Promise<boolean>; accountsDisconnect(provider: unknown): Promise<unknown>;
+};
+export type HandlerMap = Pick<Required<JarvisAPI>, Exclude<MethodName, keyof ProviderTestMethods>> & ProviderTestMethods;
 
 /**
  * Shape of each IPC argument, checked before any handler runs. This is a coarse boundary filter (type, presence, size);
@@ -163,6 +171,7 @@ export type ArgSpec =
 
 const ID: ArgSpec = {kind: 'string', min: 1, max: 64};
 const OBJ: ArgSpec = {kind: 'object'};
+const ACCOUNT: ArgSpec = {kind: 'enum', values: ACCOUNT_PROVIDER_IDS};
 const OPTIONS: ArgSpec = {kind: 'object', optional: true};
 const MODEL_NAME: ArgSpec = {kind: 'string', min: 1, max: 200};
 const PATH_ARG: ArgSpec = {kind: 'string', min: 1, max: 4096};
@@ -206,6 +215,8 @@ export const ARG_SPECS: Record<MethodName, readonly ArgSpec[]> = {
   // Preview tokens are random UUIDs; ApprovedDocuments re-checks the exact format and that the token is still pending.
   documentsChoose: [], documentsSave: [STREAM_ID, OPTIONS], documentsDiscard: [STREAM_ID],
   speechStop: [], transcribeCancel: [],
+  providerConnectionTest: [{kind: 'enum', values: CLOUD_PROVIDER_IDS}], providerConnectionTestCancel: [],
+  accountsStatus: [ACCOUNT], accountsConnect: [ACCOUNT], accountsCancel: [], accountsDisconnect: [ACCOUNT],
 };
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

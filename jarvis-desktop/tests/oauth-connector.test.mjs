@@ -210,3 +210,68 @@ test('backend: providers are blocked until the owner adds a registration file; p
     await b.dispose();
   } finally { await rm(dir, {recursive: true, force: true}); }
 });
+
+test('refresh: a current token is reused; an expiring one is refreshed without a secret; a rotated refresh token is stored; callers share one refresh', async () => {
+  let now = 1_000_000;
+  const port = await freePort();
+  const v = vault();
+  const posts = [];
+  let reply = {status: 200, json: {access_token: 'AT-1', refresh_token: 'RT-1', expires_in: 3600, scope: 's'}};
+  const c = new m.OAuthConnector({
+    registrations: {spotify: {clientId: 'owner-public-client-123', redirectPort: port, redirectPath: '/oauth/callback'}},
+    vault: v, confirm: async () => true, openExternal: async (u) => browser()(new URL(u)), listen: (p, pth) => m.listenLoopback(p, pth),
+    post: async (url, form) => { posts.push(Object.fromEntries(form)); await new Promise((r) => setTimeout(r, 5)); return reply; },
+    online: () => true, now: () => now,
+  });
+  assert.equal((await c.connect('spotify')).ok, true);
+  assert.deepEqual(await c.accessToken('spotify'), {ok: true, token: 'AT-1'});
+  assert.equal(posts.length, 1, 'no refresh while the token is current');
+  now += 3600_000 - 30_000;
+  reply = {status: 200, json: {access_token: 'AT-2', refresh_token: 'RT-2', expires_in: 3600}};
+  const [a, b] = await Promise.all([c.accessToken('spotify'), c.accessToken('spotify')]);
+  assert.deepEqual([a, b], [{ok: true, token: 'AT-2'}, {ok: true, token: 'AT-2'}]);
+  assert.equal(posts.length, 2, 'concurrent callers share one refresh');
+  assert.deepEqual(posts[1], {grant_type: 'refresh_token', refresh_token: 'RT-1', client_id: 'owner-public-client-123'});
+  assert.equal(v.m2.get('oauth-spotify'), 'RT-2', 'rotated refresh token replaces the old one');
+});
+
+test('refresh: a rejected sign-in is removed and asks to reconnect; a network failure keeps it; offline sends nothing', async () => {
+  const v = vault();
+  await v.store('oauth-spotify', 'RT-old');
+  let reply = {status: 503, json: null};
+  let online = true;
+  const posts = [];
+  const c = new m.OAuthConnector({
+    registrations: {spotify: {clientId: 'owner-public-client-123', redirectPort: 43821, redirectPath: '/cb'}},
+    vault: v, confirm: async () => true, openExternal: async () => {}, listen: async () => { throw new Error('no'); },
+    post: async (url, form) => { posts.push(url); if (reply === 'throw') throw new Error('fetch failed code=SECRET'); return reply; }, online: () => online,
+  });
+  const down = await c.accessToken('spotify');
+  assert.deepEqual([down.ok, down.reconnect], [false, false]);
+  assert.equal(v.m2.get('oauth-spotify'), 'RT-old');
+  reply = 'throw';
+  const net = await c.accessToken('spotify');
+  assert.ok(!net.reason.includes('SECRET'), 'error text is redacted');
+  online = false;
+  const n = posts.length;
+  assert.match((await c.accessToken('spotify')).reason, /Online mode is off/);
+  assert.equal(posts.length, n);
+  online = true;
+  reply = {status: 400, json: {error: 'invalid_grant'}};
+  const gone = await c.accessToken('spotify');
+  assert.deepEqual([gone.ok, gone.reconnect], [false, true]);
+  assert.equal(v.m2.has('oauth-spotify'), false);
+  assert.equal((await c.status('spotify')).state, 'not-connected');
+});
+
+test('IPC: the account methods are declared with provider-enum arguments matching the connector', async () => {
+  const built = await build({stdin: {resolveDir: root, sourcefile: 'ipc-entry.ts', loader: 'ts', contents: `export { METHODS, ARITY, ACCOUNT_PROVIDER_IDS } from './electron/channels.ts'; export { ARG_SPECS } from './electron/ipcCore.ts';`}, bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent'});
+  const c = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`);
+  assert.deepEqual([...c.ACCOUNT_PROVIDER_IDS].sort(), m.OAUTH_PROVIDERS.map((p) => p.id).sort());
+  for (const [name, n] of [['accountsStatus', 1], ['accountsConnect', 1], ['accountsCancel', 0], ['accountsDisconnect', 1], ['providerConnectionTest', 1], ['providerConnectionTestCancel', 0]]) {
+    assert.ok(c.METHODS.includes(name), name);
+    assert.equal(c.ARITY[name], n, name);
+    assert.equal(c.ARG_SPECS[name].length, n, name);
+  }
+  assert.deepEqual(c.ARG_SPECS.accountsConnect[0].values, c.ACCOUNT_PROVIDER_IDS);
+});

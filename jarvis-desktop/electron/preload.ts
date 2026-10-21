@@ -80,7 +80,16 @@ const flat: Omit<FullJarvisAPI, 'productivity'> = {
 // Nested namespace read by src/ui/store.tsx; every member is one of the flat calls above.
 const productivity = productivityBridge(flat);
 if (!productivity) throw new Error('Productivity bridge is incomplete');
-const api: FullJarvisAPI = {...flat, productivity};
+// v2.6 provider readiness. Typed locally until FullJarvisAPI carries these two methods (shared contract, Codex).
+const providerTest = {
+  providerConnectionTest: (provider: string) => call('providerConnectionTest', provider),
+  providerConnectionTestCancel: (): Promise<boolean> => call('providerConnectionTestCancel'),
+  accountsStatus: (provider: string) => call('accountsStatus', provider),
+  accountsConnect: (provider: string) => call('accountsConnect', provider),
+  accountsCancel: (): Promise<boolean> => call('accountsCancel'),
+  accountsDisconnect: (provider: string) => call('accountsDisconnect', provider),
+};
+const api: FullJarvisAPI & typeof providerTest = {...flat, productivity, ...providerTest};
 
 contextBridge.exposeInMainWorld('jarvis', api);
 

@@ -118,6 +118,7 @@ const slot = (id: OAuthProviderId) => `oauth-${id}`;
 export class OAuthConnector {
   private attempt: {provider: OAuthProviderId; abort: AbortController; listener: LoopbackListener | null} | null = null;
   private access = new Map<OAuthProviderId, {token: string; expiresAt: number; scopes: string[]; connectedAt: string}>();
+  private refreshing = new Map<OAuthProviderId, Promise<{ok: true; token: string} | {ok: false; reason: string; reconnect: boolean}>>();
   private readonly now: () => number;
   constructor(private readonly d: OAuthDeps) { this.now = d.now ?? (() => Date.now()); }
 
@@ -219,6 +220,54 @@ export class OAuthConnector {
       attempt.listener?.close();
       if (this.attempt === attempt) this.attempt = null;
     }
+  }
+
+  /**
+   * A current access token for one provider call: the cached one while it has more than a minute left, otherwise a
+   * refresh-token grant (no secret) through the guarded POST. A rotated refresh token replaces the stored one. When the
+   * provider rejects the refresh (revoked, expired), the stored sign-in is removed and the person must connect again.
+   * Concurrent callers share one refresh.
+   */
+  async accessToken(id: OAuthProviderId, signal: AbortSignal = new AbortController().signal): Promise<{ok: true; token: string} | {ok: false; reason: string; reconnect: boolean}> {
+    const p = this.def(id);
+    const blocked = this.blockedReason(id);
+    if (blocked) return {ok: false, reason: blocked, reconnect: false};
+    const cached = this.access.get(id);
+    if (cached && cached.expiresAt - this.now() > 60_000) return {ok: true, token: cached.token};
+    const pending = this.refreshing.get(id);
+    if (pending) return pending;
+    const run = this.refresh(p, signal).finally(() => this.refreshing.delete(id));
+    this.refreshing.set(id, run);
+    return run;
+  }
+
+  private async refresh(p: OAuthProviderDef, signal: AbortSignal): Promise<{ok: true; token: string} | {ok: false; reason: string; reconnect: boolean}> {
+    const id = p.id;
+    const reg = this.d.registrations[id]!;
+    if (!this.d.online()) return {ok: false, reason: 'Online mode is off.', reconnect: false};
+    const refreshToken = await this.d.vault.use(slot(id), async (k) => k);
+    if (!refreshToken) { this.access.delete(id); return {ok: false, reason: `Not connected to ${p.name}.`, reconnect: true}; }
+    let res: {status: number; json: unknown};
+    try {
+      res = await this.d.post(p.tokenUrl, new URLSearchParams({grant_type: 'refresh_token', refresh_token: refreshToken, client_id: reg.clientId}), signal);
+    } catch (e) {
+      return {ok: false, reason: signal.aborted ? 'Stopped.' : `${p.name} could not be reached (${redactOAuthText(e instanceof Error ? e.message : 'network error').slice(0, 100)}).`, reconnect: false};
+    }
+    const t = res.json as Record<string, unknown> | null;
+    if (res.status === 400 || res.status === 401) {
+      // invalid_grant and friends: the saved sign-in no longer works. Remove it rather than retrying it forever.
+      this.access.delete(id);
+      await this.d.vault.remove(slot(id));
+      await this.d.activity?.(`${p.name} sign-in expired or was revoked; connect again`);
+      return {ok: false, reason: `${p.name} no longer accepts the saved sign-in. Connect again.`, reconnect: true};
+    }
+    if (res.status !== 200 || !t || typeof t.access_token !== 'string') return {ok: false, reason: `${p.name} did not refresh the sign-in (HTTP ${res.status}).`, reconnect: false};
+    if (typeof t.refresh_token === 'string' && t.refresh_token && t.refresh_token !== refreshToken) await this.d.vault.store(slot(id), t.refresh_token);
+    const expiresIn = typeof t.expires_in === 'number' && t.expires_in > 0 ? Math.min(t.expires_in, 86_400) : 3600;
+    const prev = this.access.get(id);
+    const scopes = typeof t.scope === 'string' ? t.scope.split(/\s+/).filter(Boolean).slice(0, 20) : prev?.scopes ?? [];
+    this.access.set(id, {token: t.access_token, expiresAt: this.now() + expiresIn * 1000, scopes, connectedAt: prev?.connectedAt ?? new Date(this.now()).toISOString()});
+    return {ok: true, token: t.access_token};
   }
 
   async disconnect(id: OAuthProviderId, signal: AbortSignal = new AbortController().signal): Promise<{removedLocally: boolean; revokedAtProvider: boolean | 'not-offered'; reason?: string}> {
