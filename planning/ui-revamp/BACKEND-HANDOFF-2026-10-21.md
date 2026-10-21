@@ -216,9 +216,65 @@ These helpers have **never run**; they are written for Windows PowerShell 5.1 UI
 - `tests/companion-work.test.mjs`: 8 tests, covering the real store and real `RoutineEngine` through the scripted streamed loop.
 - Full suite on Linux: 1796 tests; 1781 pass and 15 fail (the same baseline).
 
+## Checkpoint 4: provider readiness and the bounded live-test budget
+
+### Live-test budget (owner request: $2 maximum)
+
+- **Code:** `electron/services/liveBudget.ts`, wired in `electron/backend.ts` and `electron/main.ts`.
+- **Operator guide:** `planning/ui-revamp/LIVE-TEST-BUDGET.md`. It gives the exact environment variable (`DESKTOP_COMPANION_LIVE_TEST`, a JSON object with no secrets), the fields and the reservation formula.
+- **Coverage:** enforced on every provider request (island, hub chat, connection test), with:
+  - an output cap written into the body;
+  - at most `maxSteps` island steps;
+  - no automatic retry;
+  - bounded text and at most one image;
+  - a request count limit;
+  - a worst-case dollar reservation saved before sending.
+- **Misconfigured value:** every provider request is blocked.
+- **No variable:** behaviour is unchanged.
+
+### Connection test (backend done; IPC proposal for Codex)
+
+- **Backend.** `backend.providerConnectionTest(provider)` and `backend.providerConnectionTestCancel()` are implemented and tested.
+  - The test is one streamed request, "Reply with the single word OK.", with 8 output tokens.
+  - It is cancellable and never runs on load.
+  - It is not written to the chat history.
+  - Errors are status-only.
+- **Not exposed to the hub yet.** That needs the shared contract in `src/shared/contracts.ts`, which belongs to Codex.
+- **Proposed minimal change**, to be applied by Codex or approved for me to apply:
+
+```ts
+// src/shared/contracts.ts
+export type ProviderTestResult = {
+  provider: string; ok: boolean; model?: string; latencyMs?: number; reply?: string;
+  usage?: {inputTokens: number; outputTokens: number} | null;
+  estimatedCostUsd?: number | null;   // null when no price is set in Usage
+  costNote: string;                    // "Estimated from the price table in Usage. Not a provider invoice."
+  reason?: string; cancelled?: boolean; testedAt: string;
+};
+// FullJarvisAPI gains:
+providerConnectionTest(provider: CloudProvider): Promise<ProviderTestResult>;
+providerConnectionTestCancel(): Promise<boolean>;
+```
+
+Electron side (mine, once the type exists):
+- `METHODS` gets `'providerConnectionTest', 'providerConnectionTestCancel'`.
+- `ARITY` gets 1 and 0.
+- `ARG_SPECS.providerConnectionTest = [{kind: 'enum', values: CLOUD_PROVIDER_IDS}]`.
+- The preload gets the two calls.
+
+UI copy (Codex): "Saved key · not tested" until a test passes. Then show "Tested <time> · <model> · <in>/<out> tokens · est. $x".
+
+### Model metadata
+
+- Anthropic image capability now comes from `/v1/models` (checkpoint 1).
+- Model ids still come only from the provider list, or from a typed id under Advanced.
+
+### Tests
+
+- `tests/live-budget.test.mjs`: 10 tests. They cover config strictness, the cap rewrite, thinking removal, reservation before sending, persistence across restarts, the request and size limits, a ledger save failure, the image allowance, blocking on misconfiguration, island steps and no retry, the hub chat cap, the connection test path, and offline, keyless, 401, cancel and estimate labelling.
+
 ## Next increments (this branch)
 
-- P4: provider connection test.
 - P5: voice hardening.
 - P6: OAuth seams and registration checklists.
 - P7: release health.

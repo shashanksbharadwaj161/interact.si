@@ -77,6 +77,8 @@ export type AgentRequest = {
    * connection, rate limit, overload). No tool has run for that step yet, so sending it again cannot repeat an action.
    */
   retry?: {delayMs: number; wait?: (ms: number, signal: AbortSignal) => Promise<void>};
+  /** Fewer model calls than MAX_STEPS (bounded live testing); never more. */
+  maxSteps?: number;
   emit: (e: AgentEvent) => void;
   signal: AbortSignal;
   maxTokens: number;
@@ -148,7 +150,8 @@ export async function runAgent(req: AgentRequest): Promise<void> {
   const found: Citation[] = [];
   const cancelled = () => emit({type: 'error', reason: 'cancelled', message: 'Stopped. Anything already confirmed stays done; nothing else will run.'});
 
-  for (let step = 1; step <= MAX_STEPS; step++) {
+  const maxSteps = Math.max(1, Math.min(MAX_STEPS, req.maxSteps ?? MAX_STEPS));
+  for (let step = 1; step <= maxSteps; step++) {
     if (signal.aborted) return cancelled();
     emit({type: 'status', phase: step === 1 ? 'sending' : 'thinking'});
     let res: AnthropicMessageResult | null = null;
@@ -226,7 +229,7 @@ export async function runAgent(req: AgentRequest): Promise<void> {
     // All results of one turn go back in a single user message.
     messages.push({role: 'user', content: results});
   }
-  emit({type: 'error', reason: 'steps', message: `Stopped after ${MAX_STEPS} steps without a final answer. Anything already confirmed stays done.`});
+  emit({type: 'error', reason: 'steps', message: `Stopped after ${maxSteps} steps without a final answer. Anything already confirmed stays done.`});
 }
 
 /**

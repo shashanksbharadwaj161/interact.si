@@ -189,7 +189,7 @@ export async function streamOpenAiCompatibleChat(guardedFetch: GuardedFetch, req
     res = await guardedFetch(chatUrlForProvider(req.provider, req.origin ?? originForProvider(req.provider)), {
       method: 'POST',
       headers: {'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${req.key}`},
-      body: JSON.stringify({model: req.model, messages: req.messages, stream: true, max_tokens: CLOUD_MAX_TOKENS, stream_options: {include_usage: true}}),
+      body: JSON.stringify({model: req.model, messages: req.messages, stream: true, max_tokens: Math.min(CLOUD_MAX_TOKENS, req.maxTokens ?? CLOUD_MAX_TOKENS), stream_options: {include_usage: true}}),
       signal: req.signal,
       timeoutMs: limits.totalMs,
     }, 'cloud-chat');
@@ -237,6 +237,8 @@ export interface CloudStreamRequest {
   onDelta: (text: string) => void;
   onOpen?: () => void;
   limits?: Partial<StreamLimits>;
+  /** Lower output cap than CLOUD_MAX_TOKENS (the connection test asks for a few tokens); never higher. */
+  maxTokens?: number;
 }
 
 /**
@@ -261,7 +263,7 @@ export async function streamCloudChat(guardedFetch: GuardedFetch, req: CloudStre
     res = await guardedFetch(`${req.origin ?? ANTHROPIC_ORIGIN}/v1/messages`, {
       method: 'POST',
       headers: {'content-type': 'application/json', accept: 'text/event-stream', 'x-api-key': req.key, 'anthropic-version': ANTHROPIC_STREAM_VERSION},
-      body: JSON.stringify({model: req.model, max_tokens: CLOUD_MAX_TOKENS, messages: req.messages, stream: true}),
+      body: JSON.stringify({model: req.model, max_tokens: Math.min(CLOUD_MAX_TOKENS, req.maxTokens ?? CLOUD_MAX_TOKENS), messages: req.messages, stream: true}),
       signal: req.signal,
       timeoutMs: limits.totalMs,
     }, 'cloud-chat');

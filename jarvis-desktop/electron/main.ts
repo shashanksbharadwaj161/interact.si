@@ -19,10 +19,19 @@ import {registerIpc} from './ipc';
 import {METHODS, ACTIVITY_CHANNEL} from './channels';
 import {createCompanion} from './companionWindow';
 import {mediaPermissionAllowed} from './companionCore';
+import {LIVE_TEST_ENV, parseLiveTestConfig, type LiveTestConfig} from './services/liveBudget';
 
 // Test mode (no dialogs, no tray, auto-approved confirmations) is honoured only for an isolated temp userData with a fixture
 // prefix. Anywhere else a stray JARVIS_TEST_MODE=1 must never reach real user data, so the app refuses to start.
 const TEST_REQUESTED = process.env.JARVIS_TEST_MODE === '1';
+// Bounded live-provider testing (opt-in, no secrets): a JSON object in DESKTOP_COMPANION_LIVE_TEST caps output tokens,
+// model steps, request size, request count and an estimated dollar ceiling for every provider request. Set but invalid:
+// every provider request is refused rather than sent unbounded. See planning/ui-revamp/LIVE-TEST-BUDGET.md.
+const LIVE_TEST: {config: LiveTestConfig} | {error: string} | undefined = (() => {
+  const raw = process.env[LIVE_TEST_ENV];
+  if (raw === undefined || raw === '') return undefined;
+  try { return {config: parseLiveTestConfig(raw)}; } catch (e) { return {error: e instanceof Error ? e.message.slice(0, 200) : 'invalid configuration'}; }
+})();
 // Helper-script hash manifest embedded by scripts/build-main.mjs (absent when the source is run unbundled).
 declare const __NATIVE_MANIFEST__: NativeManifest | undefined;
 // productName is now "Desktop Companion", which would move Electron's default userData folder. Keep using the existing
@@ -304,8 +313,14 @@ async function boot() {
     // state.json and its backups are encrypted at rest with the same per-user protector (boot runs after app ready).
     stateCipher: createSafeStorageCipher(safeStorage),
     // Preferred key protector (no PowerShell child); Secrets falls back to the DPAPI helper when it is unavailable.
+    ...(LIVE_TEST ? {liveTest: LIVE_TEST} : {}),
     safeStorage,
   });
+  if (LIVE_TEST) {
+    await backend.store.addActivity('settings', 'config' in LIVE_TEST
+      ? `Live-test budget active (${LIVE_TEST.config.budgetId}): at most ${LIVE_TEST.config.maxOutputTokens} output tokens and ${LIVE_TEST.config.maxSteps} steps per request, ${LIVE_TEST.config.maxRequests} requests, $${LIVE_TEST.config.maxReservedUsd.toFixed(2)} estimated ceiling`
+      : `Live-test configuration rejected (${LIVE_TEST.error}); provider requests are blocked`);
+  }
   if (launch.safe) await backend.store.addActivity('recovery', 'Safe launch: the previous two sessions did not exit cleanly. Desktop actions are disabled until a normal restart.');
   if (backend.load.warning) await backend.store.addActivity('recovery', backend.load.warning);
 

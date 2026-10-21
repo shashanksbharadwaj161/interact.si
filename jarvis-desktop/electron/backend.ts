@@ -11,6 +11,7 @@ import {AGENT_MAX_TOKENS, CloudProviderError, modelListFailure, parseImageSuppor
 import {MAX_STEPS, companionSystemPrompt, firstUserContent, runAgent, runToolDirect, type AgentEvent, type AgentImage, type UndoHandle} from './services/agent';
 import {createAgentTools, createTypingTool, type TypeResult} from './services/agent-tools';
 import {UiaControl} from './services/uia';
+import {LiveBudget, withLiveBudget, type LiveTestConfig} from './services/liveBudget';
 import {createWorkTools, undoWork, type RoutineDryRun, type RoutineRunResult, type RoutineSummary} from './services/agent-work';
 import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
@@ -88,6 +89,11 @@ export interface BackendEnv {
   windowWaitMs?: number;
   /** Test hooks for the streaming chat bounds (production uses STREAM_LIMITS / CHAT_STREAM_LIMITS). */
   streamLimits?: Partial<StreamLimits>;
+  /**
+   * Bounded live-provider testing (services/liveBudget.ts), from DESKTOP_COMPANION_LIVE_TEST in main.ts. `error` blocks
+   * every provider request (a misconfigured test never falls back to unbounded calls). Absent: normal behaviour.
+   */
+  liveTest?: {config: LiveTestConfig} | {error: string};
   /** Delay before the companion's one automatic retry of a temporary failure (tests set 0). */
   companionRetryMs?: number;
   chatStreamLimits?: Partial<ChatStreamLimits>;
@@ -110,9 +116,36 @@ export type Backend = Omit<FullJarvisAPI, 'productivity' | 'onChatStream'> & {
   runner: NativeRunner | null;
   /** The desktop companion's request loop (main process only; reached through the companion window's own IPC). */
   companion: CompanionService;
+  /**
+   * One tiny, explicit connection test of the saved key for a provider: a single streamed request with an 8-token output
+   * cap, cancellable, never on app load. A saved key is not a tested provider until this succeeds. IPC proposal in
+   * planning/ui-revamp/BACKEND-HANDOFF-2026-10-21.md (not wired to the hub page yet: the shared contract is Codex's).
+   */
+  providerConnectionTest(provider: unknown): Promise<ProviderTestResult>;
+  providerConnectionTestCancel(): boolean;
   runRetention(): Promise<void>;
   dispose(): Promise<void>;
 };
+
+export type ProviderTestResult = {
+  provider: string;
+  ok: boolean;
+  /** Set only when a request was actually sent. */
+  model?: string;
+  latencyMs?: number;
+  /** The first characters of the reply, as plain text. */
+  reply?: string;
+  /** Token counts the provider reported for this request; null when it reported none. */
+  usage?: {inputTokens: number; outputTokens: number} | null;
+  /** From the price table in Usage; null when no price is set for this model. Always an estimate. */
+  estimatedCostUsd?: number | null;
+  costNote: string;
+  reason?: string;
+  cancelled?: boolean;
+  testedAt: string;
+};
+export const PROVIDER_TEST_MAX_TOKENS = 8;
+export const PROVIDER_TEST_PROMPT = 'Reply with the single word OK.';
 
 export type CompanionReadiness = {ready: true; model: string} | {ready: false; reason: string};
 export interface CompanionService {
@@ -403,7 +436,9 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     await productivity.reconcile({capsuleIds: s.capsules.map((c) => c.id), taskIds: s.tasks.map((t) => t.id)}).catch(() => undefined);
   };
 
-  const guardedFetch = createGuardedFetch({
+  const liveBudget = env.liveTest && 'config' in env.liveTest ? await LiveBudget.open(env.liveTest.config, createJsonSidecar(env.userData, 'live-test-budget', env.sidecarFs)) : null;
+  const liveBlocked = env.liveTest && 'error' in env.liveTest ? env.liveTest.error : null;
+  const rawGuardedFetch = createGuardedFetch({
     mode: () => settings().mode,
     hasCloudKey: () => keyConfigured,
     hasProviderKey: (provider) => providerKeys[provider],
@@ -416,6 +451,8 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       if (decision === 'denied' || purpose !== 'ollama') void activity('network', `${decision === 'denied' ? 'Blocked' : 'Allowed'} ${origin}`, `${purpose}${reason ? `: ${reason}` : ''}`);
     },
   });
+  // Every provider request passes the live-test budget first when one is configured (island, hub chat, connection test).
+  const guardedFetch = withLiveBudget(rawGuardedFetch, liveBudget, liveBlocked);
   const nowMs = () => (env.now ?? (() => new Date()))().getTime();
   const sidecar = (name: string) => createJsonSidecar(env.userData, name, env.sidecarFs);
   const speech = new Speech({native, settings, tmpDir: env.tmpDir, newId: () => store.id()});
@@ -1428,12 +1465,14 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
         model: r.model,
         system: companionSystemPrompt(),
         tools: plan.tools,
-        maxTokens: AGENT_MAX_TOKENS,
+        maxTokens: liveBudget ? Math.min(AGENT_MAX_TOKENS, liveBudget.config.maxOutputTokens) : AGENT_MAX_TOKENS,
+        ...(liveBudget ? {maxSteps: liveBudget.config.maxSteps} : {}),
         signal: hooks.signal,
         emit: (e) => { if (e.type === 'status' && e.retry) { retries++; steps--; } hooks.emit(e); },
         call: (body, signal, onText) => { steps++; return streamAnthropicMessage(guardedFetch, {origin: env.cloudOriginOverride, key, body, signal, onText, limits: env.streamLimits}); },
         ...(hooks.onText ? {onText: hooks.onText} : {}),
-        retry: {delayMs: env.companionRetryMs ?? 1500},
+        // No automatic retry while a live-test budget is active: every request is one the person caused.
+        ...(liveBudget || liveBlocked ? {} : {retry: {delayMs: env.companionRetryMs ?? 1500}}),
         onUsage: (i, o) => {
           inTok += i; outTok += o;
           try { usage.recordEvent({runtime: 'cloud', provider: 'anthropic', model: r.model, inputTokens: i, outputTokens: o, generationMs: null, promptMs: null}); void saveUsage(); } catch { /* usage is best effort */ }
@@ -1467,8 +1506,52 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     },
   };
 
+  let providerTest: AbortController | null = null;
+  async function providerConnectionTest(raw: unknown): Promise<ProviderTestResult> {
+    const provider = validateCloudProvider(raw);
+    const name = cloudProviderInfo(provider).name;
+    const testedAt = (env.now ?? (() => new Date()))().toISOString();
+    const costNote = 'Estimated from the price table in Usage. Not a provider invoice.';
+    const no = (reason: string): ProviderTestResult => ({provider, ok: false, reason, costNote, testedAt});
+    if (settings().mode !== 'online') return no(`Online mode is off, so ${name} was not contacted.`);
+    const key = await secrets.revealKey(provider);
+    if (!key) return no(`No ${name} API key is saved on this computer.`);
+    providerTest?.abort();
+    const ctl = new AbortController();
+    providerTest = ctl;
+    const model = effectiveCloudModel(provider, settings().cloudModel);
+    const started = nowMs();
+    let reply = '';
+    try {
+      const r = await streamProviderChat(provider, guardedFetch, {
+        origin: provider === 'anthropic' ? env.cloudOriginOverride : undefined, key, model,
+        messages: [{role: 'user', content: PROVIDER_TEST_PROMPT}], signal: ctl.signal, maxTokens: PROVIDER_TEST_MAX_TOKENS,
+        onDelta: (t) => { if (reply.length < 60) reply += t; }, limits: {replyChars: 200, idleMs: 30_000, totalMs: 60_000},
+      });
+      let estimatedCostUsd: number | null = null;
+      if (r.usage) {
+        try { estimatedCostUsd = usage.recordEvent({runtime: 'cloud', provider, model, ...r.usage}).cost; void saveUsage(); } catch { /* usage is best effort */ }
+      }
+      await activity('settings', `${name} connection test passed`, `Model ${model}; tokens in ${r.usage?.inputTokens ?? '?'}, out ${r.usage?.outputTokens ?? '?'}`);
+      return {provider, ok: true, model, latencyMs: nowMs() - started, reply: r.text.slice(0, 60).replace(/[\u0000-\u001f]/g, ' '), usage: r.usage ? {inputTokens: r.usage.inputTokens, outputTokens: r.usage.outputTokens} : null, estimatedCostUsd, costNote, testedAt};
+    } catch (e) {
+      if (ctl.signal.aborted || e instanceof StreamAborted) {
+        await activity('settings', `${name} connection test stopped`);
+        return {...no('Stopped. The request may have reached the provider; any reply was discarded.'), model, cancelled: true};
+      }
+      // Status-only messages from this app's own modules; provider text is never echoed.
+      const reason = e instanceof NetworkDenied ? `Blocked by this app's network rules: ${e.message}` : e instanceof Error ? e.message.slice(0, 200) : 'The test failed';
+      await activity('settings', `${name} connection test failed`, reason);
+      return {...no(reason), model, latencyMs: nowMs() - started};
+    } finally {
+      if (providerTest === ctl) providerTest = null;
+    }
+  }
+
   return {
     ...api,
+    providerConnectionTest,
+    providerConnectionTestCancel: () => { if (!providerTest) return false; providerTest.abort(); return true; },
     onActivity: (h: (a: Activity) => void) => store.onActivity(h),
     load, store, productivity, actions, system, speech, routines, models, integrations, usage, clipboard, runner, companion,
     reminderTasks: () => effectiveReminderTasks(store.snapshot().tasks, productivity.snapshot().reminders),
