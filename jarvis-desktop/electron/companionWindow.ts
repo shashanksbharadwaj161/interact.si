@@ -16,7 +16,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import type {Backend, CompanionReadiness, CompanionTarget} from './backend';
-import type {AgentEvent, AgentImage} from './services/agent';
+import type {AgentEvent, AgentImage, UndoHandle} from './services/agent';
 import {ScreenContext, SelectionGate} from './services/screen-context';
 import {ForegroundCapture} from './services/foreground-capture';
 import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, encodeRegion, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
@@ -106,7 +106,8 @@ export function createCompanion(deps: CompanionDeps) {
   const foregroundCapture = new ForegroundCapture<CompanionTarget>();
   const regions = new ScreenContext<Region>(REGION_TTL_MS, undefined, undefined, undefined, token => send({type: 'region-expired', token}));
   const selectionGate = new SelectionGate();
-  const undoable = new Set<string>();
+  /** Undo handles offered by receipts in this window, by the opaque id the page sends back. Used at most once. */
+  const undoable = new Map<string, UndoHandle>();
 
   const confirm = createTrustedConfirm<BrowserWindow>({
     getWindow: () => island,
@@ -462,7 +463,7 @@ export function createCompanion(deps: CompanionDeps) {
       image = {base64: r.data, width: r.width, height: r.height, mediaType: r.mediaType};
     }
     const emit = (event: AgentEvent) => {
-      if (event.type === 'tool' && event.undo) undoable.add(event.undo.id);
+      if (event.type === 'tool' && event.undo) undoable.set(event.undo.id, event.undo);
       send({runId, event});
     };
     // The remembered window goes with this request only when the page showed it and the person kept it attached; a page
@@ -516,9 +517,10 @@ export function createCompanion(deps: CompanionDeps) {
     companionAsk: (text: string, token?: string, withTarget?: boolean, streamText?: boolean) => ask(text, token, withTarget, streamText),
     companionCancel: () => { foregroundCapture.cancel(); run?.abort(); closeOverlay(); regions.clear(); return true; },
     companionUndo: async (id: string) => {
-      if (!undoable.has(id)) return false;
+      const handle = undoable.get(id);
+      if (!handle) return false;
       undoable.delete(id);
-      return deps.backend.companion.undo({kind: 'task', id, label: ''});
+      return deps.backend.companion.undo(handle);
     },
     companionLayout: (raw: unknown) => {
       const l = parseBubbleLayout(raw);

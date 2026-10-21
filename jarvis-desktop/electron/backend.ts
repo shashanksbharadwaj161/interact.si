@@ -11,6 +11,7 @@ import {AGENT_MAX_TOKENS, CloudProviderError, modelListFailure, parseImageSuppor
 import {MAX_STEPS, companionSystemPrompt, firstUserContent, runAgent, runToolDirect, type AgentEvent, type AgentImage, type UndoHandle} from './services/agent';
 import {createAgentTools, createTypingTool, type TypeResult} from './services/agent-tools';
 import {UiaControl} from './services/uia';
+import {createWorkTools, undoWork, type RoutineDryRun, type RoutineRunResult, type RoutineSummary} from './services/agent-work';
 import {ANTHROPIC_ORIGIN, OPENAI_ORIGIN} from './services/netGuard';
 import {ChatStreamHub, type ChatStreamLimits, type ChatStreamSink, type StreamStopReason} from './ipcCore';
 import {parseModelPlan, planIntent as planRules, PLANNED_TYPES, type IntentWindow} from './services/intent';
@@ -1226,6 +1227,51 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
     newId: () => store.id().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32) || 'snap',
     ...(env.now ? {now: () => env.now!().getTime()} : {}),
   }) : null;
+  /**
+   * The companion's view of routines: a short list, a dry run that previews every action step through the action
+   * policy and discards each preview (nothing runs), and a manual run that Stop cancels.
+   */
+  const companionRoutines = {
+    list: (): RoutineSummary[] => {
+      const v = routines.view();
+      return v.routines.slice(0, 50).map((r) => {
+        const last = v.runs.find((x) => x.routineId === r.id);
+        const sch = r.schedule;
+        const when = sch.kind === 'manual' ? 'manual only' : sch.kind === 'once' ? `once at ${sch.at}` : sch.kind === 'daily' ? `daily at ${sch.time}` : `every ${sch.minutes} min`;
+        const schedule = !r.enabled ? 'disabled' : sch.kind === 'manual' ? when : `${when} (only while the app is open)`;
+        return {id: r.id, name: r.name.slice(0, 80), enabled: r.enabled, steps: r.steps.length, schedule, lastResult: last?.status ?? null, lastRunAt: last?.endedAt ?? last?.startedAt ?? null, overdue: !!r.scheduleStatus.overdueSlot};
+      });
+    },
+    describe: (id: string): string | null => {
+      const r = routines.view().routines.find((x) => x.id === id);
+      return r ? routines.describe(r) : null;
+    },
+    async dryRun(id: string): Promise<RoutineDryRun> {
+      const r = routines.view().routines.find((x) => x.id === id);
+      if (!r) return {ok: false, reason: 'No routine has that id'};
+      const steps: {label: string; allowed: boolean; detail: string}[] = [];
+      for (const s of r.steps) {
+        if (s.kind === 'wait') { steps.push({label: `Wait ${s.seconds} s`, allowed: true, detail: 'A pause'}); continue; }
+        try {
+          const p = await actions.preview(s.request);
+          actions.discard(p.id);
+          steps.push({label: s.label, allowed: p.allowed, detail: p.allowed ? `${p.summary}${p.requiresApproval ? ' (asks before running)' : ''}` : p.reason ?? 'Not allowed'});
+        } catch (e) {
+          steps.push({label: s.label, allowed: false, detail: e instanceof Error ? e.message.slice(0, 160) : 'Could not be checked'});
+        }
+      }
+      return {ok: true, name: r.name, steps, note: 'Dry run: every step was checked against the current desktop and the action rules; nothing ran. Conditions are evaluated only during a real run.'};
+    },
+    async run(id: string, signal: AbortSignal): Promise<RoutineRunResult> {
+      const started = routines.start(id);
+      const stop = () => { void routines.cancel(started.runId).catch(() => undefined); };
+      if (signal.aborted) stop(); else signal.addEventListener('abort', stop, {once: true});
+      try {
+        const rec = await started.done;
+        return {status: rec.status, ...(rec.reason ? {reason: rec.reason} : {}), steps: rec.steps.map((s) => ({label: s.label, status: s.status, ...(s.summary ? {summary: s.summary} : {}), ...(s.reason ? {reason: s.reason} : {})}))};
+      } finally { signal.removeEventListener('abort', stop); }
+    },
+  };
   /** Image input per Anthropic model id, from the last model list the person asked for (memory only; never guessed). */
   const imageSupport = new Map<string, boolean>();
   // The companion uses Claude through the saved Anthropic key only: its tools rely on Anthropic tool use and image input.
@@ -1260,6 +1306,13 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
         }),
       }} : {}),
     });
+    tools.push(...createWorkTools({
+      snapshot: () => store.snapshot(),
+      confirm,
+      saveNote: (n) => api.saveNote(n),
+      setTaskDone: (id, done) => api.saveTask({id, done}),
+      routines: companionRoutines,
+    }));
     // Stop forgets the app snapshot: nothing from it can be used afterwards.
     if (hooks) signal.addEventListener('abort', () => uia?.clear(), {once: true});
     const context = [
@@ -1399,6 +1452,11 @@ export async function createBackend(env: BackendEnv): Promise<Backend> {
       return {hwnd: fg.hwnd, pid: fg.pid, process: fg.process, title: fg.title};
     },
     async undo(handle) {
+      if (handle.kind === 'note' || handle.kind === 'task-done') {
+        const ok = await undoWork(handle, {snapshot: () => store.snapshot(), deleteNote: (id) => api.deleteNote(id), setTaskDone: (id, done) => api.saveTask({id, done})});
+        if (ok) await activity('companion', handle.kind === 'note' ? 'Companion change undone: a note it saved was deleted' : 'Companion change undone: a task it completed was reopened');
+        return ok;
+      }
       if (handle.kind !== 'task' || typeof handle.id !== 'string') return false;
       const exists = store.snapshot().tasks.some((t) => t.id === handle.id);
       if (!exists) return false;

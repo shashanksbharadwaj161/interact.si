@@ -172,9 +172,52 @@ These helpers have **never run**; they are written for Windows PowerShell 5.1 UI
 - An elevated window and a password field (both should be refused).
 - Runtime-id stability across the inspect → act gap.
 
+### P2 review fixes (b1c7eab)
+
+- **Uncertain effect.** If the UIA helper fails, times out or is stopped *after* it received the action, the receipt is now `{performed: 'uncertain', summary: 'Unknown whether it happened. Check <app> before trying again', reason, note}`, not "not done".
+  - The `act_in_app` event is `phase: 'failed'` and `verified: false`, and the tool result says `performed: 'unknown'` with "do not retry automatically".
+  - The snapshot goes stale, so Claude must inspect again before any further action.
+- **Toggle verification.** A toggle is verified only when both the before-state and the after-state are known (`On`, `Off` or `Indeterminate`) and they differ.
+- **Duplicates.** Elements that share role, label **and** automation id are refused as ambiguous, including when the id is present.
+- **Scroll.** The `ScrollVertical` calls are unchanged; they are in the .NET `ScrollPattern` API.
+
+## Checkpoint 3: saved work and routines in the companion (backend)
+
+### Contract changes
+
+1. **`UndoHandle`** (`electron/services/agent.ts`).
+   - Before: `{kind: 'task'; id; label}`.
+   - Now: `{kind: 'task' | 'note' | 'task-done'; id; label; target?; stamp?}`.
+   - A created task keeps `id` equal to the task id, as before.
+   - New kinds use opaque ids: `note:<noteId>` and `done:<taskId>`.
+   - The page still calls `companionUndo(id)`. Main now remembers the whole handle per id (`Map`), uses it at most once, and calls `backend.companion.undo(handle)`.
+   - **Renderer: no change needed.** If code switches on `undo.kind`, add the two new kinds.
+2. **Five new agent tools.** They use the existing `tool` event shape.
+
+   | Tool | Label | What it does | Confirmation | Read-back and undo |
+   |---|---|---|---|---|
+   | `save_note` | "Saving a note" | Saves a note | Full title, tags and text | Verified; undo deletes the note only if it is unchanged |
+   | `complete_task` | "Completing a task" | Marks a task done | Yes; the task is re-read after the dialog | Verified; undo reopens it only if it is still done |
+   | `list_routines` | "Looking at your routines" | Lists routines | None | Read-only |
+   | `preview_routine` | "Checking a routine (dry run)" | Previews every action step through `ActionService.preview` and discards each one | None | Nothing runs |
+   | `run_routine` | "Running a routine" | Runs a routine | One island confirmation listing every step; each desktop step still raises its own confirmation | Stop cancels through `RoutineEngine.cancel`; result `verified: false` with per-step statuses |
+
+   - Duplicates: within one request, an identical change (same note text, same task, same routine) is never repeated. The second call returns the first receipt with "(already handled; not repeated)" and no undo.
+
+### Not done or limits
+
+- The companion does not create or edit routines; that stays in the hub editor.
+- Schedules are reported as "only while the app is open". There is no OS scheduler.
+- Search of approved documents from the companion is not added. `search_saved` covers notes, tasks and capsules only.
+- Engine limit: an already-open step confirmation from a running routine is not dismissed by Stop. The run stops before the next step.
+
+### Tests
+
+- `tests/companion-work.test.mjs`: 8 tests, covering the real store and real `RoutineEngine` through the scripted streamed loop.
+- Full suite on Linux: 1796 tests; 1781 pass and 15 fail (the same baseline).
+
 ## Next increments (this branch)
 
-- P3: saved work and routines.
 - P4: provider connection test.
 - P5: voice hardening.
 - P6: OAuth seams and registration checklists.

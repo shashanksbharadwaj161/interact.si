@@ -13,7 +13,11 @@ export const MAX_REQUEST_CHARS = 2000;
 const MAX_TOOL_RESULT_CHARS = 12_000;
 
 export type Citation = {kind: 'note' | 'task' | 'capsule'; id: string; title: string};
-export type UndoHandle = {kind: 'task'; id: string; label: string};
+/**
+ * What a receipt offers to reverse. `id` is the opaque handle the page sends back (a created task keeps its task id, as
+ * before; other kinds are prefixed). `target` is the item, `stamp` the saved version it applies to (additive fields).
+ */
+export type UndoHandle = {kind: 'task' | 'note' | 'task-done'; id: string; label: string; target?: string; stamp?: string};
 
 export type ToolPhase = 'running' | 'awaiting-confirm' | 'done' | 'declined' | 'failed';
 export type AgentEvent =
