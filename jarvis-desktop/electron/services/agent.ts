@@ -17,7 +17,8 @@ export type UndoHandle = {kind: 'task'; id: string; label: string};
 
 export type ToolPhase = 'running' | 'awaiting-confirm' | 'done' | 'declined' | 'failed';
 export type AgentEvent =
-  | {type: 'status'; phase: 'sending' | 'thinking'}
+  /** `retry` (additive): this step is being sent again after a temporary failure (1 = first retry). */
+  | {type: 'status'; phase: 'sending' | 'thinking'; retry?: number}
   /** `stage: 'verifying'` on a running step: the tool is reading back what it changed (additive, so older pages still work). */
   | {type: 'tool'; callId: string; tool: string; label: string; phase: ToolPhase; summary: string; verified?: boolean; undo?: UndoHandle; stage?: 'verifying'}
   | {type: 'answer'; text: string; citations: Citation[]; steps: number}
@@ -59,16 +60,50 @@ export type AgentRequest = {
   text: string;
   /** Plain facts the app adds for this request, e.g. today's date. Sent before the person's text. */
   context?: string;
-  image?: {base64: string; width: number; height: number};
+  image?: AgentImage;
   model: string;
   system: string;
   tools: AgentTool[];
-  call: (body: AnthropicMessageBody, signal: AbortSignal) => Promise<AnthropicMessageResult>;
+  /** onText, when given to the call, receives reply text as it streams in (a non-streaming call simply never calls it). */
+  call: (body: AnthropicMessageBody, signal: AbortSignal, onText?: (text: string) => void) => Promise<AnthropicMessageResult>;
+  /** Streamed reply text for this step, as it arrives. Text of a step that then asks for tools is narration, not the answer. */
+  onText?: (step: number, text: string) => void;
+  /**
+   * One bounded automatic retry of a step that failed before anything streamed, for temporary failures only (no
+   * connection, rate limit, overload). No tool has run for that step yet, so sending it again cannot repeat an action.
+   */
+  retry?: {delayMs: number; wait?: (ms: number, signal: AbortSignal) => Promise<void>};
   emit: (e: AgentEvent) => void;
   signal: AbortSignal;
   maxTokens: number;
   onUsage?: (inputTokens: number, outputTokens: number) => void;
 };
+
+export type AgentImage = {base64: string; width: number; height: number; mediaType?: 'image/png' | 'image/jpeg'};
+
+/**
+ * The first user message exactly as it is sent: the image (if any), then the app's plain context, then the person's
+ * text. The outbound preview uses this same function, so what the person reviews is what leaves the computer.
+ */
+export function firstUserContent(input: {text: string; context?: string; image?: AgentImage}): (AnthropicImageBlock | AnthropicTextBlock)[] {
+  const first: (AnthropicImageBlock | AnthropicTextBlock)[] = [];
+  if (input.image) first.push({type: 'image', source: {type: 'base64', media_type: input.image.mediaType ?? 'image/png', data: input.image.base64}});
+  if (input.context) first.push({type: 'text', text: input.context});
+  first.push({type: 'text', text: input.text.trim()});
+  return first;
+}
+
+/** A temporary failure worth one more try: no connection, a rate limit or an overloaded provider. Never a key or a refusal. */
+export function retryable(raw: string, name = ''): boolean {
+  return /fetch failed|ECONN|ENOTFOUND|EAI_AGAIN|socket|timed? ?out/i.test(raw) || name === 'TimeoutError' || /HTTP (429|503|529)|overloaded|rate limit/i.test(raw);
+}
+
+const sleep = (ms: number, signal: AbortSignal) => new Promise<void>((resolve) => {
+  if (signal.aborted) return resolve();
+  const t = setTimeout(done, ms);
+  function done() { clearTimeout(t); signal.removeEventListener('abort', done); resolve(); }
+  signal.addEventListener('abort', done, {once: true});
+});
 
 /** Citation markers the system prompt asks for: [note:ID], [task:ID], [capsule:ID]. */
 const CITE_RE = /\[(note|task|capsule):([A-Za-z0-9_-]{1,64})\]/g;
@@ -104,10 +139,7 @@ export async function runAgent(req: AgentRequest): Promise<void> {
   if (!text) return emit({type: 'error', reason: 'setup', message: 'Type a request first.'});
   if (text.length > MAX_REQUEST_CHARS) return emit({type: 'error', reason: 'setup', message: `Requests are limited to ${MAX_REQUEST_CHARS} characters.`});
   const byName = new Map(req.tools.map((t) => [t.def.name, t]));
-  const first: (AnthropicImageBlock | AnthropicTextBlock)[] = [];
-  if (req.image) first.push({type: 'image', source: {type: 'base64', media_type: 'image/png', data: req.image.base64}} satisfies AnthropicImageBlock);
-  if (req.context) first.push({type: 'text', text: req.context});
-  first.push({type: 'text', text});
+  const first = firstUserContent({text, context: req.context, image: req.image});
   const messages: AnthropicMessageParam[] = [{role: 'user', content: first}];
   const found: Citation[] = [];
   const cancelled = () => emit({type: 'error', reason: 'cancelled', message: 'Stopped. Anything already confirmed stays done; nothing else will run.'});
@@ -115,10 +147,25 @@ export async function runAgent(req: AgentRequest): Promise<void> {
   for (let step = 1; step <= MAX_STEPS; step++) {
     if (signal.aborted) return cancelled();
     emit({type: 'status', phase: step === 1 ? 'sending' : 'thinking'});
-    let res: AnthropicMessageResult;
-    try {
-      res = await req.call({model: req.model, max_tokens: req.maxTokens, system: req.system, tools: req.tools.map((t) => t.def), messages}, signal);
-    } catch (e) {
+    let res: AnthropicMessageResult | null = null;
+    let failure: unknown = null;
+    for (let attempt = 0; ; attempt++) {
+      let streamed = false;
+      const onText = req.onText ? (t: string) => { streamed = true; req.onText!(step, t); } : undefined;
+      try {
+        res = await req.call({model: req.model, max_tokens: req.maxTokens, system: req.system, tools: req.tools.map((t) => t.def), messages}, signal, onText);
+        break;
+      } catch (e) {
+        failure = e;
+        if (signal.aborted || streamed || attempt >= 1 || !req.retry) break;
+        if (!retryable(e instanceof Error ? e.message : '', e instanceof Error ? e.name : '')) break;
+        await (req.retry.wait ?? sleep)(req.retry.delayMs, signal);
+        if (signal.aborted) break;
+        emit({type: 'status', phase: step === 1 ? 'sending' : 'thinking', retry: attempt + 1});
+      }
+    }
+    if (!res) {
+      const e = failure;
       if (signal.aborted) return cancelled();
       const raw = e instanceof Error ? e.message : 'The request failed';
       // Transport failures (no connection, DNS, reset, timeout) say so; the provider's own answers keep their message.

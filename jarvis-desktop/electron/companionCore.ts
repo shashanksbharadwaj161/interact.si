@@ -35,6 +35,8 @@ export const COMPANION_METHODS = [
   // into the remembered window without asking Claude (preview, trusted confirmation, re-check, type).
   'companionSetVoiceInput',
   'companionInsertText',
+  // Exactly what an ask would send (text blocks, image size and type, model, tools), without sending or using up the area.
+  'companionOutbound',
   'regionBegin',
   'regionDiscard',
   'overlayImage',
@@ -54,8 +56,9 @@ export const COMPANION_SPEAK_MAX = 4000;
 export const COMPANION_TYPE_MAX = 2000;
 export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = {
   companionState: [],
-  // text, region token, and whether the page showed the remembered app window and the person kept it attached.
-  companionAsk: [{kind: 'string', min: 1, max: 2000}, {...TOKEN, optional: true}, {kind: 'boolean', optional: true}],
+  // text, region token, whether the page showed the remembered app window and the person kept it attached, and whether
+  // the page wants streamed reply text as 'run-text' pushes (opt-in; pages that do not ask never receive them).
+  companionAsk: [{kind: 'string', min: 1, max: 2000}, {...TOKEN, optional: true}, {kind: 'boolean', optional: true}, {kind: 'boolean', optional: true}],
   companionCancel: [],
   companionUndo: [{kind: 'string', min: 1, max: 64}],
   companionLayout: [{kind: 'object'}],
@@ -75,6 +78,7 @@ export const COMPANION_ARG_SPECS: Record<CompanionMethod, readonly ArgSpec[]> = 
   companionSpeechStop: [],
   companionSetVoiceInput: [{kind: 'boolean'}],
   companionInsertText: [{kind: 'string', min: 1, max: COMPANION_TYPE_MAX}],
+  companionOutbound: [{kind: 'string', min: 1, max: 2000}, {...TOKEN, optional: true}, {kind: 'boolean', optional: true}],
   regionBegin: [],
   regionDiscard: [TOKEN],
   overlayImage: [],
@@ -307,6 +311,25 @@ export function sendSize(crop: {width: number; height: number}, maxEdge = REGION
   if (long <= maxEdge) return {width: crop.width, height: crop.height};
   const k = maxEdge / long;
   return {width: Math.max(1, Math.round(crop.width * k)), height: Math.max(1, Math.round(crop.height * k))};
+}
+
+/**
+ * Anthropic accepts at most 5 MB of base64 per image; this is the raw-byte bound that stays under it with margin.
+ * Screens with fine detail compress well as PNG; photos and gradients may not, and then JPEG is used instead.
+ */
+export const REGION_MAX_IMAGE_BYTES = 3_700_000;
+/**
+ * Chooses the encoding for a selected area: PNG when it fits, otherwise JPEG at falling quality, otherwise none (the
+ * person is asked for a smaller area). The encoders are called lazily, so a fitting PNG never makes a JPEG.
+ */
+export function encodeRegion(png: () => Uint8Array, jpeg: (quality: number) => Uint8Array, max = REGION_MAX_IMAGE_BYTES): {mediaType: 'image/png' | 'image/jpeg'; data: Uint8Array} | null {
+  const p = png();
+  if (p.byteLength <= max) return {mediaType: 'image/png', data: p};
+  for (const q of [88, 75, 60]) {
+    const j = jpeg(q);
+    if (j.byteLength <= max) return {mediaType: 'image/jpeg', data: j};
+  }
+  return null;
 }
 
 /**

@@ -16,10 +16,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import type {Backend, CompanionReadiness, CompanionTarget} from './backend';
-import type {AgentEvent} from './services/agent';
+import type {AgentEvent, AgentImage} from './services/agent';
 import {ScreenContext, SelectionGate} from './services/screen-context';
 import {ForegroundCapture} from './services/foreground-capture';
-import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
+import {COMPANION_ARG_SPECS, COMPANION_EVENT_CHANNEL, COMPANION_METHODS, OVERLAY_METHODS, PET_SIZE, clampPetPoint, clampSize, companionChannel, cropForSelection, dockPoint, encodeRegion, gazeBucket, isTrustedCompanionUrl, parseBubbleLayout, parseSelection, petBox, placePet, resizePet, sendSize, snapDock, type CompanionMethod, type Dock, type DockTarget, type PetPlacement, type Point, type ResizeOp} from './companionCore';
 import {createTrustedConfirm, safeErrorMessage, validateArgsAgainst} from './ipcCore';
 
 export type CompanionDeps = {
@@ -50,7 +50,7 @@ const CLICK_THROUGH = process.platform === 'win32' || process.platform === 'darw
 /** Non-activating windows (setFocusable) exist only on Windows and macOS. */
 const NO_ACTIVATE = process.platform === 'win32' || process.platform === 'darwin';
 
-type Region = {png: string; width: number; height: number};
+type Region = {data: string; mediaType: 'image/png' | 'image/jpeg'; width: number; height: number};
 type Pending = {full: NativeImage; display: Electron.Display};
 type Prefs = {point: Point | null; displayId: number | null; dock: Dock; size: number; appearance: Appearance; material: 'none' | 'acrylic'};
 
@@ -348,6 +348,9 @@ export function createCompanion(deps: CompanionDeps) {
     if (bubble) { setRestFocus(false); island!.show(); island!.focus(); } else island!.showInactive();
   }
 
+  /** Brings the island back without taking focus after a selection that never opened. */
+  function stepBack() { if (alive() && !overlay && !island!.isVisible()) island!.showInactive(); }
+
   function closeOverlay() {
     selectionGate.cancel();
     const old = overlay;
@@ -366,7 +369,9 @@ export function createCompanion(deps: CompanionDeps) {
     // The island steps aside so it is not part of the picture.
     island?.hide();
     await new Promise((r) => setTimeout(r, 160));
-    if (!selectionGate.current(ticket)) return {ok: false, reason: 'Selection cancelled.'};
+    // Cancelled (Stop, bubble closed, screen locked) while the island was stepped aside: the pet comes back at rest, and
+    // no picker opens late.
+    if (!selectionGate.current(ticket)) { stepBack(); return {ok: false, reason: 'Selection cancelled.'}; }
     let full: NativeImage | null = null;
     try {
       const size = {width: Math.round(display.size.width * display.scaleFactor), height: Math.round(display.size.height * display.scaleFactor)};
@@ -377,7 +382,7 @@ export function createCompanion(deps: CompanionDeps) {
       if (selectionGate.current(ticket)) refocus();
       return {ok: false, reason: `The screen could not be captured (${safeErrorMessage(e)}).`};
     }
-    if (!selectionGate.current(ticket) || !alive()) return {ok: false, reason: 'Selection cancelled.'};
+    if (!selectionGate.current(ticket) || !alive()) { full = null; stepBack(); return {ok: false, reason: 'Selection cancelled.'}; }
     if (!full) {
       island?.showInactive();
       return {ok: false, reason: 'The screen could not be captured on this display.'};
@@ -424,26 +429,29 @@ export function createCompanion(deps: CompanionDeps) {
     let img = full.crop(crop);
     const out = sendSize(crop);
     if (out.width !== crop.width) img = img.resize({width: out.width, height: out.height, quality: 'best'});
-    const png = img.toPNG().toString('base64');
+    const encoded = encodeRegion(() => img.toPNG(), (q) => img.toJPEG(q));
+    if (!encoded) return {ok: false as const, reason: 'That area is too detailed to send as one image. Select a smaller area.'};
+    // The preview is made from the same crop, in memory only; nothing about the area is written to disk.
     const preview = img.resize({width: Math.min(240, out.width)}).toDataURL();
     const token = randomUUID();
-    regions.put(token, {png, width: out.width, height: out.height});
+    regions.put(token, {data: Buffer.from(encoded.data).toString('base64'), mediaType: encoded.mediaType, width: out.width, height: out.height});
     const ov = overlay;
     overlay = null;
     pending = null;
     ov?.destroy();
     if (alive()) { setRestFocus(false); island!.show(); island!.focus(); }
-    send({type: 'region', token, preview, width: out.width, height: out.height, sourceScale: display.scaleFactor});
+    // bytes and mediaType are additive: exactly what an ask with this area would attach.
+    send({type: 'region', token, preview, width: out.width, height: out.height, sourceScale: display.scaleFactor, bytes: encoded.data.byteLength, mediaType: encoded.mediaType});
     deps.record(`Screen region selected for the companion (${out.width}×${out.height} px; kept in memory for up to 5 minutes, sent only if you ask)`);
     return {ok: true as const};
   }
 
-  async function ask(text: string, token?: string, withTarget?: boolean) {
+  async function ask(text: string, token?: string, withTarget?: boolean, streamText?: boolean) {
     run?.abort();
     const ctl = new AbortController();
     run = ctl;
     const runId = randomUUID();
-    let image: {base64: string; width: number; height: number} | undefined;
+    let image: AgentImage | undefined;
     if (token) {
       const r = regions.take(token);
       // Single use: a region is never silently reused for a later request.
@@ -451,7 +459,7 @@ export function createCompanion(deps: CompanionDeps) {
         send({runId, event: {type: 'error', reason: 'setup', message: 'The selected region expired. Select it again.'} satisfies AgentEvent});
         return {runId};
       }
-      image = {base64: r.png, width: r.width, height: r.height};
+      image = {base64: r.data, width: r.width, height: r.height, mediaType: r.mediaType};
     }
     const emit = (event: AgentEvent) => {
       if (event.type === 'tool' && event.undo) undoable.add(event.undo.id);
@@ -474,7 +482,10 @@ export function createCompanion(deps: CompanionDeps) {
       // Stop in the island closes this dialog as Cancel: the request it belongs to is over.
       return confirm(summary, detail, ctl.signal);
     };
-    void deps.backend.companion.run({text, image, ...(sendTarget ? {target: sendTarget, targetCurrent} : {})}, {emit, confirm: runConfirm, signal: ctl.signal}).catch((e) => {
+    // Streamed reply text goes out as its own push (no runId key, so pages that do not know it ignore it).
+    // Only for a page that asked for it (streamText), so pages written before streaming never see these pushes.
+    const onText = streamText === true ? (step: number, chunk: string) => { if (run === ctl) send({type: 'run-text', run: runId, step, text: chunk}); } : undefined;
+    void deps.backend.companion.run({text, image, ...(sendTarget ? {target: sendTarget, targetCurrent} : {})}, {emit, confirm: runConfirm, signal: ctl.signal, ...(onText ? {onText} : {})}).catch((e) => {
       emit({type: 'error', reason: 'provider', message: safeErrorMessage(e)});
     }).finally(() => { if (run === ctl) run = null; });
     return {runId};
@@ -502,7 +513,7 @@ export function createCompanion(deps: CompanionDeps) {
   const handlers: Record<CompanionMethod, (...args: never[]) => Promise<unknown> | unknown> = {
     companionState: async (): Promise<CompanionStatus> => ({readiness: await deps.backend.companion.readiness(), shortcut, material, platform: process.platform, appearance: prefs.appearance, size: prefs.size, dock: prefs.dock, target: shownTarget(), reduceMotion: (await deps.backend.getState()).settings.reduceMotion}),
     companionClearTarget: () => { foregroundCapture.cancel(); target = null; send({type: 'target', target: null}); return true; },
-    companionAsk: (text: string, token?: string, withTarget?: boolean) => ask(text, token, withTarget),
+    companionAsk: (text: string, token?: string, withTarget?: boolean, streamText?: boolean) => ask(text, token, withTarget, streamText),
     companionCancel: () => { foregroundCapture.cancel(); run?.abort(); closeOverlay(); regions.clear(); return true; },
     companionUndo: async (id: string) => {
       if (!undoable.has(id)) return false;
@@ -565,6 +576,15 @@ export function createCompanion(deps: CompanionDeps) {
     // Turning the microphone on shows the island's own trusted confirmation (Cancel is the default); off needs none.
     companionSetVoiceInput: (on: boolean) => deps.backend.companion.voice.setInput(on, (summary, detail) => confirm(summary, detail)),
     companionInsertText: (text: string) => insertText(text),
+    companionOutbound: (text: string, token?: string, withTarget?: boolean) => {
+      let image: AgentImage | undefined;
+      if (token) {
+        const r = regions.peek(token);
+        if (!r) return {ready: false, reason: 'The selected region expired. Select it again.'};
+        image = {base64: r.data, width: r.width, height: r.height, mediaType: r.mediaType};
+      }
+      return deps.backend.companion.outbound({text, image, ...(withTarget === true && target ? {target} : {})});
+    },
     regionBegin: () => regionBegin(),
     regionDiscard: (token: string) => regions.discard(token),
     overlayImage: () => overlayImage(),

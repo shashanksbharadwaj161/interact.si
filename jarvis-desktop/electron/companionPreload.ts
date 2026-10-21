@@ -7,7 +7,7 @@ const call = <T>(method: CompanionMethod, ...args: unknown[]): Promise<T> => ipc
 
 contextBridge.exposeInMainWorld('companion', {
   state: () => call('companionState'),
-  ask: (text: string, token?: string, withTarget?: boolean) => (withTarget === undefined ? (token === undefined ? call('companionAsk', text) : call('companionAsk', text, token)) : call('companionAsk', text, token, withTarget)),
+  ask: (text: string, token?: string, withTarget?: boolean, streamText?: boolean) => (streamText !== undefined ? call('companionAsk', text, token, withTarget, streamText) : withTarget === undefined ? (token === undefined ? call('companionAsk', text) : call('companionAsk', text, token)) : call('companionAsk', text, token, withTarget)),
   cancel: () => call('companionCancel'),
   undo: (id: string) => call('companionUndo', id),
   layout: (l: {bubble: {width: number; height: number} | null}) => call('companionLayout', l),
@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('companion', {
   speechStop: () => call('companionSpeechStop'),
   setVoiceInput: (on: boolean) => call('companionSetVoiceInput', on),
   insertText: (text: string) => call('companionInsertText', text),
+  outbound: (text: string, token?: string, withTarget?: boolean) => call('companionOutbound', text, token, withTarget),
   regionBegin: () => call('regionBegin'),
   regionDiscard: (token: string) => call('regionDiscard', token),
   overlayImage: () => call('overlayImage'),

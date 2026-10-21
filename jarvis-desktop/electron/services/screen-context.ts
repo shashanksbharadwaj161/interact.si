@@ -15,6 +15,11 @@ export class ScreenContext<T> {
     this.clear();
     return found.expires > this.clock() ? found.data : null;
   }
+  /** Reads the selection without using it up (for the outbound preview). Expired or unknown: null. */
+  peek(token: string): T | null {
+    if (!this.value || this.value.token !== token || this.value.expires <= this.clock()) return null;
+    return this.value.data;
+  }
   discard(token: string): boolean {
     if (this.value?.token !== token) return false;
     this.clear(); return true;

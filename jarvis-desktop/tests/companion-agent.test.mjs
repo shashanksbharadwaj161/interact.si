@@ -174,11 +174,32 @@ async function backend(respond) {
     shell: {spawnApp: async () => {}, openPath: async () => '', openExternal: async () => {}},
     dialogs: {openImport: async () => null, pick: async () => null, saveExport: async () => null},
     confirm: async () => true,
-    fetchImpl: async (url, init) => { calls.push({url: String(url), init}); return respond(String(url), init, calls.length); },
+    fetchImpl: async (url, init) => { calls.push({url: String(url), init}); return asStream(init, await respond(String(url), init, calls.length)); },
   });
   return {b, calls, close: async () => { await b.dispose(); await rm(dir, {recursive: true, force: true}); }};
 }
 const json = (v) => new Response(JSON.stringify(v), {status: 200, headers: {'content-type': 'application/json'}});
+/** The SSE a streamed Messages request gets for the same message (fake transport): every block, then the stop reason. */
+export function sseFor(m) {
+  const ev = (type, data) => `event: ${type}\ndata: ${JSON.stringify({type, ...data})}\n\n`;
+  let out = ev('message_start', {message: {id: 'msg_1', type: 'message', role: 'assistant', content: [], usage: {input_tokens: m.usage?.input_tokens ?? 1, output_tokens: 0}}});
+  m.content.forEach((b, index) => {
+    if (b.type === 'text') { out += ev('content_block_start', {index, content_block: {type: 'text', text: ''}}); out += ev('content_block_delta', {index, delta: {type: 'text_delta', text: b.text}}); }
+    else if (b.type === 'tool_use') { out += ev('content_block_start', {index, content_block: {type: 'tool_use', id: b.id, name: b.name, input: {}}}); out += ev('content_block_delta', {index, delta: {type: 'input_json_delta', partial_json: JSON.stringify(b.input)}}); }
+    else out += ev('content_block_start', {index, content_block: b});
+    out += ev('content_block_stop', {index});
+  });
+  out += ev('message_delta', {delta: {stop_reason: m.stop_reason}, usage: {output_tokens: m.usage?.output_tokens ?? 1}});
+  return out + ev('message_stop', {});
+}
+async function asStream(init, res) {
+  let streamed = false;
+  try { streamed = JSON.parse(init?.body ?? '{}').stream === true; } catch {}
+  if (!streamed || res.status !== 200 || !/json/.test(res.headers.get('content-type') ?? '')) return res;
+  const m = JSON.parse(await res.text());
+  if (m?.type !== 'message') return new Response(JSON.stringify(m), {status: 200, headers: {'content-type': 'application/json'}});
+  return new Response(sseFor(m), {status: 200, headers: {'content-type': 'text/event-stream'}});
+}
 
 test('offline or without a key, the companion explains the setup and nothing leaves the computer', async () => {
   const f = await backend(() => json(msg([text('x')])));
@@ -277,7 +298,7 @@ async function desktopBackend(respond, {windows = () => [NOTEPAD], focus = () =>
     dialogs: {openImport: async () => null, pick: async () => null, saveExport: async () => null},
     // The hub's confirmation answers the one setup step (going online); after that, companion typing must never use it.
     confirm: async () => { if (setup) return true; throw new Error('the hub confirmation must not be used for companion typing'); },
-    fetchImpl: async (url, init) => respond(String(url), init),
+    fetchImpl: async (url, init) => asStream(init, await respond(String(url), init)),
   });
   if (online) {await b.setProviderKey('anthropic', KEY); await b.saveSettings({mode: 'online'});}
   setup = false;
@@ -484,7 +505,7 @@ test('typing review fixes: reused handle, partial input, honest phases, no false
     shell: {spawnApp: async () => {}, openPath: async () => '', openExternal: async () => {}},
     dialogs: {openImport: async () => null, pick: async () => null, saveExport: async () => null},
     confirm: async () => setup,
-    fetchImpl: async (url, init) => typingTurns('a long note that will be interrupted')(String(url), init),
+    fetchImpl: async (url, init) => asStream(init, await typingTurns('a long note that will be interrupted')(String(url), init)),
   });
   try {
     await b.setProviderKey('anthropic', KEY);

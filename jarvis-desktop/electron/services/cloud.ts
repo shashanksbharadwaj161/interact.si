@@ -328,6 +328,21 @@ export function parseModelList(provider: CloudProvider, body: unknown): CloudMod
   return out.every((m) => m.createdAt) ? out.sort((a, b) => (b.createdAt as string).localeCompare(a.createdAt as string)) : out;
 }
 
+/**
+ * Which listed Anthropic models say they accept images, from the Models API's own capabilities tree
+ * (capabilities.image_input.supported). A model without that field is left out: unknown, not assumed either way.
+ */
+export function parseImageSupport(body: unknown): Map<string, boolean> {
+  const out = new Map<string, boolean>();
+  const data = isObj(body) && Array.isArray(body.data) ? body.data : [];
+  for (const r of data.slice(0, MAX_LISTED_MODELS * 4)) {
+    if (!isObj(r) || typeof r.id !== 'string' || !MODEL_ID_RE.test(r.id.trim())) continue;
+    const img = isObj(r.capabilities) && isObj(r.capabilities.image_input) ? r.capabilities.image_input.supported : undefined;
+    if (typeof img === 'boolean') out.set(r.id.trim(), img);
+  }
+  return out;
+}
+
 /** Plain-language reason for a failed model list request, by HTTP status. */
 export function modelListFailure(status: number): string {
   if (status === 401 || status === 403) return `The provider rejected the saved key (HTTP ${status}). Check the key or save a new one.`;
@@ -339,7 +354,7 @@ export function modelListFailure(status: number): string {
 // ---------- One non-streaming Messages request, for the companion's tool loop ----------
 
 /** Content blocks the companion sends. The model's own blocks (text, tool_use, thinking, …) are sent back unchanged. */
-export type AnthropicImageBlock = {type: 'image'; source: {type: 'base64'; media_type: 'image/png'; data: string}};
+export type AnthropicImageBlock = {type: 'image'; source: {type: 'base64'; media_type: 'image/png' | 'image/jpeg'; data: string}};
 export type AnthropicTextBlock = {type: 'text'; text: string};
 export type AnthropicToolResultBlock = {type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean};
 export type AnthropicToolUseBlock = {type: 'tool_use'; id: string; name: string; input: Record<string, unknown>};
@@ -403,4 +418,112 @@ export async function createAnthropicMessage(guardedFetch: GuardedFetch, req: {o
   let parsed: unknown;
   try { parsed = JSON.parse(raw); } catch { throw new StreamProtocolError('The provider sent a malformed reply'); }
   return parseAnthropicMessage(parsed);
+}
+
+/**
+ * The same Messages request as createAnthropicMessage, streamed. Content blocks are rebuilt from the event stream exactly
+ * as the provider sent them (text, tool_use with its JSON input, thinking with its signature, and any other block type
+ * kept whole), then checked by parseAnthropicMessage, so the caller gets the same result shape and can replay it.
+ * onText receives text as it arrives; nothing else from the stream reaches the caller before the reply is complete.
+ * Bounds: STREAM_LIMITS (line, body bytes, idle gap) and the total timeout; errors are status-only as above.
+ */
+export async function streamAnthropicMessage(guardedFetch: GuardedFetch, req: {origin?: string; key: string; body: AnthropicMessageBody; signal: AbortSignal; onText?: (text: string) => void; limits?: Partial<StreamLimits>}): Promise<AnthropicMessageResult> {
+  const limits: StreamLimits = {...STREAM_LIMITS, ...req.limits};
+  if (req.signal.aborted) throw new StreamAborted('', req.signal.reason);
+  let res: Response;
+  try {
+    res = await guardedFetch(`${req.origin ?? ANTHROPIC_ORIGIN}/v1/messages`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json', accept: 'text/event-stream', 'x-api-key': req.key, 'anthropic-version': ANTHROPIC_STREAM_VERSION},
+      body: JSON.stringify({...req.body, stream: true}),
+      signal: req.signal,
+      timeoutMs: limits.totalMs,
+    }, 'cloud-chat');
+  } catch (e) {
+    if (req.signal.aborted) throw new StreamAborted('', req.signal.reason);
+    throw e;
+  }
+  if (!res.ok) throw await cloudHttpError(res, req.signal);
+  const sse = new SseParser(limits.lineChars);
+  const seq = new AnthropicStreamValidator();
+  const acc = new MessageAccumulator();
+  const shown = {text: ''};
+  const handle = (ev: SseEvent | null): boolean => {
+    if (!ev) return false;
+    const text = seq.accept(ev);
+    acc.accept(ev.data);
+    if (text && req.onText) {
+      const kept = appendCapped(shown, text, limits.replyChars);
+      if (kept) req.onText(kept);
+    }
+    return seq.stopped;
+  };
+  let ended = false;
+  try {
+    await pumpLines(res.body, new LineSplitter(limits), req.signal, limits.idleMs, (line) => (ended = handle(sse.line(line))), () => shown.text);
+  } catch (e) {
+    if (req.signal.aborted) throw new StreamAborted(shown.text, req.signal.reason);
+    throw e;
+  }
+  if (!ended) handle(sse.flush());
+  if (!seq.stopped) throw new StreamIncomplete(shown.text);
+  const out = parseAnthropicMessage(acc.message());
+  return {...out, inputTokens: seq.inputTokens, outputTokens: seq.outputTokens};
+}
+
+/** Rebuilds the Messages content blocks from validated stream events (the validator has already checked the order). */
+export class MessageAccumulator {
+  private blocks: Record<string, unknown>[] = [];
+  private json: string[] = [];
+  private stop: string | null = null;
+  accept(data: string): void {
+    const v = JSON.parse(data) as Record<string, unknown>;
+    const bad = () => new StreamProtocolError('The provider sent a malformed stream event');
+    switch (v.type) {
+      case 'content_block_start': {
+        const b = v.content_block as Record<string, unknown>;
+        const copy: Record<string, unknown> = {...b};
+        // tool_use and server tool blocks start with an empty input that input_json_delta fills in.
+        if (b.type === 'tool_use' || b.type === 'server_tool_use') copy.input = {};
+        this.blocks.push(copy);
+        this.json.push('');
+        return;
+      }
+      case 'content_block_delta': {
+        const i = this.blocks.length - 1;
+        const b = this.blocks[i];
+        const d = v.delta as Record<string, unknown>;
+        if (!b || !isObj(d)) throw bad();
+        if (d.type === 'text_delta' && typeof d.text === 'string' && b.type === 'text') b.text = String(b.text ?? '') + d.text;
+        else if (d.type === 'input_json_delta' && typeof d.partial_json === 'string') this.json[i] += d.partial_json;
+        else if (d.type === 'thinking_delta' && typeof d.thinking === 'string' && b.type === 'thinking') b.thinking = String(b.thinking ?? '') + d.thinking;
+        else if (d.type === 'signature_delta' && typeof d.signature === 'string') b.signature = d.signature;
+        else if (d.type === 'citations_delta' && isObj(d.citation)) b.citations = [...(Array.isArray(b.citations) ? b.citations : []), d.citation];
+        else throw bad();
+        return;
+      }
+      case 'content_block_stop': {
+        const i = this.blocks.length - 1;
+        const b = this.blocks[i];
+        if (!b) throw bad();
+        if ((b.type === 'tool_use' || b.type === 'server_tool_use') && this.json[i]) {
+          // A tool input that is not one complete JSON object is never run: it is a protocol error, not a guess.
+          let input: unknown;
+          try { input = JSON.parse(this.json[i]); } catch { throw bad(); }
+          if (!isObj(input)) throw bad();
+          b.input = input;
+        }
+        return;
+      }
+      case 'message_delta': {
+        const d = v.delta;
+        if (isObj(d) && typeof d.stop_reason === 'string') this.stop = d.stop_reason;
+        return;
+      }
+      default: return;
+    }
+  }
+  message(): unknown {
+    return {type: 'message', content: this.blocks, stop_reason: this.stop};
+  }
 }
